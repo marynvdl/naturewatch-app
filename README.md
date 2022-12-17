@@ -2,7 +2,6 @@
 
 ## Required environment variables
 ```bash
-# YNAB
 APP_xxx = 1234
 ```
 
