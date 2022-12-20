@@ -10,4 +10,4 @@ COPY ./app /code/app
 
 ENV UVICORN_PORT=8080
 ENV UVICORN_HOST="0.0.0.0"
-CMD ["uvicorn", "app.main:app"]
+ENTRYPOINT ["uvicorn", "app.main:app"]
