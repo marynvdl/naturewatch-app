@@ -13,6 +13,7 @@ In the root folder with the Dockerfile, execute:
 
 ```bash
 flyctl apps create globewatch-app
+flyctl ips allocate-v4
 ```
 
 ### Set required secrets
