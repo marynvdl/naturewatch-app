@@ -5,6 +5,18 @@
 APP_xxx = 1234
 ```
 
+## Tests
+
+To run Unit Tests with a coverage report:
+```bash
+pytest -m unittest --cov=app --cov-report=term-missing app/tests -vv
+```
+
+To run Integration tests:
+```bash
+pytest -m integration -vv app/tests
+```
+
 ## Deployment
 
 ### Create the app on [Fly.io](https://fly.io)
