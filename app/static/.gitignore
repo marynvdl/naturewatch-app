@@ -1,3 +1,0 @@
-# Don't ignore this parent directory, even if it's empty
-*
-!.gitignore
