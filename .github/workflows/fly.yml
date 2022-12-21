@@ -25,7 +25,7 @@ jobs:
 
   deploy:
       name: Deploy app
-      needs: test
+      needs: test_suite
       runs-on: ubuntu-latest
       if: github.ref == 'refs/heads/main'
       steps:
