@@ -4,6 +4,7 @@ env:
   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 jobs:
   test_suite:
+    name: Test suite
     runs-on: ubuntu-latest
     steps:
       - name: Check out source code
