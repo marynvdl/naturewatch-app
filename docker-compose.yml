@@ -1,0 +1,16 @@
+# Base services for testing/developing with
+version: "3.7"
+
+services:
+  globewatch-test:
+    build:
+      context: .
+      target: globewatch-test
+    command: ["sleep", "infinity"]
+    volumes:
+      - .:/app
+    networks:
+      - overlay
+
+networks:
+  overlay:

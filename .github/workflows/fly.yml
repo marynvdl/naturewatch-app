@@ -1,15 +1,38 @@
-name: Deploy to Fly.io
-on:
-  push:
-    branches:
-      - main
+name: Test Suite and Deployment
+on: push
 env:
   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 jobs:
+  test_suite:
+    name: Test suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v3
+      - name: Spin up environment
+        run: docker-compose up -d --build
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          docker-compose exec -T globewatch-test flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          docker-compose exec -T globewatch-test flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Run unittest suite in docker
+        run: docker-compose exec -T globewatch-test pytest -m unittest --cov=app --cov-report=term-missing app/tests -vv
+      - name: Run integration test suite in docker
+        run: docker-compose exec -T globewatch-test pytest -m integration app/tests -vv
+      - name: Try a full docker compile to flag any JS issues too
+        run: docker build -t globewatch .
+
   deploy:
       name: Deploy app
+      needs: test_suite
       runs-on: ubuntu-latest
+      if: github.ref == 'refs/heads/main'
       steps:
-        - uses: actions/checkout@v3
-        - uses: superfly/flyctl-actions/setup-flyctl@master
-        - run: flyctl deploy --remote-only
+        - name: Check out source code
+          uses: actions/checkout@v3
+        - name: Setup flyctl
+          uses: superfly/flyctl-actions/setup-flyctl@master
+        - name: Deploy using flyctl
+          run: flyctl deploy --remote-only
