@@ -21,7 +21,7 @@ export default {
       map: {
         accessToken:
           "pk.eyJ1Ijoic29jaWFsZXhwbG9yZXIiLCJhIjoiREFQbXBISSJ9.dwFTwfSaWsHvktHrRtpydQ",
-        style: "mapbox://styles/mapbox/streets-v11?optimize=true",
+        style: "mapbox://styles/mapbox/satellite-streets-v12?optimize=true",
         center: [20.23928, 7.35074],
         zoom: 5,
         maxZoom: 22,
