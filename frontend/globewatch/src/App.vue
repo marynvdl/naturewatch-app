@@ -1,44 +1,28 @@
 <template>
   <main class="w-screen h-screen">
-    <v-map class="w-full h-full" :options="state.map" />
+    <div id="mapContainer" class="w-full h-full"></div>
   </main>
 </template>
 
 <script>
-import 'mapbox-gl/dist/mapbox-gl.css'
-import 'v-mapbox/dist/v-mapbox.css';
-
-import VMap from "v-mapbox";
-import { reactive } from "vue";
+import mapboxgl from "mapbox-gl";
 
 export default {
-  name: "App",
-  components: {
-    VMap,
-  },
-  setup() {
-    const state = reactive({
-      map: {
-        accessToken:
-          "pk.eyJ1Ijoic29jaWFsZXhwbG9yZXIiLCJhIjoiREFQbXBISSJ9.dwFTwfSaWsHvktHrRtpydQ",
-        style: "mapbox://styles/mapbox/satellite-streets-v12?optimize=true",
-        center: [20.23928, 7.35074],
-        zoom: 5,
-        maxZoom: 22,
-        crossSourceCollisions: false,
-        failIfMajorPerformanceCaveat: false,
-        attributionControl: false,
-        preserveDrawingBuffer: true,
-        hash: false,
-        minPitch: 0,
-        maxPitch: 60,
-      },
-    });
-
+  name: "BaseMap",
+  data() {
     return {
-      state,
+      accessToken: "pk.eyJ1Ijoic29jaWFsZXhwbG9yZXIiLCJhIjoiREFQbXBISSJ9.dwFTwfSaWsHvktHrRtpydQ"
     };
   },
+  mounted() {
+    mapboxgl.accessToken = this.accessToken;
+    new mapboxgl.Map({
+      container: "mapContainer",
+      style: "mapbox://styles/mapbox/satellite-streets-v12?optimize=true",
+      center: [20.23928, 7.35074],
+      zoom: 5,
+    });
+  }
 };
 </script>
 

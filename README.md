@@ -122,6 +122,6 @@ npm init vue@latest
 cd globewatch
 npm install
 npm run lint
-npm install --save v-mapbox mapbox-gl
+npm install --save mapbox-gl
 npm run dev
 ```
