@@ -2,10 +2,10 @@
 version: "3.7"
 
 services:
-  globewatch-test:
+  naturewatch-test:
     build:
       context: .
-      target: globewatch-test
+      target: naturewatch-test
     command: ["sleep", "infinity"]
     volumes:
       - .:/app

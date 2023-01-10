@@ -14,15 +14,15 @@ jobs:
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
-          docker-compose exec -T globewatch-test flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          docker-compose exec -T naturewatch-test flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-          docker-compose exec -T globewatch-test flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          docker-compose exec -T naturewatch-test flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: Run unittest suite in docker
-        run: docker-compose exec -T globewatch-test pytest -m unittest --cov=app --cov-report=term-missing app/tests -vv
+        run: docker-compose exec -T naturewatch-test pytest -m unittest --cov=app --cov-report=term-missing app/tests -vv
       - name: Run integration test suite in docker
-        run: docker-compose exec -T globewatch-test pytest -m integration app/tests -vv
+        run: docker-compose exec -T naturewatch-test pytest -m integration app/tests -vv
       - name: Try a full docker compile to flag any JS issues too
-        run: docker build -t globewatch .
+        run: docker build -t naturewatch .
 
   deploy:
       name: Deploy app

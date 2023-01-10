@@ -1,7 +1,7 @@
-# Project GlobeWatch App
+# Project NatureWatch App
 
 
-- [Project GlobeWatch App](#project-globewatch-app)
+- [Project NatureWatch App](#project-naturewatch-app)
   - [Required environment variables](#required-environment-variables)
   - [Deployment](#deployment)
     - [Create the app on Fly.io](#create-the-app-on-flyio)
@@ -26,7 +26,7 @@ APP_xxx = 1234
 In the root folder with the Dockerfile, execute:
 
 ```bash
-flyctl apps create globewatch-app
+flyctl apps create naturewatch-app
 flyctl ips allocate-v4
 ```
 
@@ -35,7 +35,7 @@ flyctl ips allocate-v4
 Set the required environment variables as Fly.io secrets
 
 ```bash
-flyctl secrets set -a globewatch-app APP_xxx="1234"
+flyctl secrets set -a naturewatch-app APP_xxx="1234"
 ```
 
 ### Verify Fly.io configuration file
@@ -110,7 +110,7 @@ node -v && npm -v
 
 Install the dependencies, then run the dev server:
 ```bash
-cd frontend/globewatch
+cd frontend/naturewatch
 npm install
 npm run dev
 ```
@@ -119,7 +119,7 @@ npm run dev
 *For future reference, the Vue project was initialised with these commands:*
 ```bash
 npm init vue@latest
-cd globewatch
+cd naturewatch
 npm install
 npm run lint
 npm install --save mapbox-gl
