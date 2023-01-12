@@ -4,8 +4,8 @@ import uvicorn
 
 app = FastAPI()
 api = FastAPI(openapi_prefix="/api",
-              title="Project GlobeWatch",
-              description="Project GlobeWatch",
+              title="Project NatureWatch",
+              description="Project NatureWatch",
               version="0.1.0")
 
 
