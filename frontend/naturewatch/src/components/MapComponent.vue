@@ -18,6 +18,8 @@ defineProps<{
 }>();
 
 /** Data */
+const mapstylename = ref<string | undefined>('Mapbox Satellite Streets');
+
 const map = ref<mapboxgl.Map | null>(null);
 
 const mapOptions: MapboxMap = {
@@ -34,16 +36,11 @@ onMounted(() => {
 });
 
 /** Methods */
-function changeBaseMap() {
+function changeBaseMap(styleUrl: string) {
   if (map.value !== null) {
-    const currentStyle = map.value.getStyle().name;
-    if (currentStyle === 'Mapbox Satellite Streets') {
-      map.value.setStyle('mapbox://styles/mapbox/dark-v11');
-    } else {
-      map.value.setStyle(
-        'mapbox://styles/mapbox/satellite-streets-v12?optimize=true'
-      );
-    }
+    mapstylename.value = map.value.getStyle().name;
+    console.log(mapstylename.value);
+    map.value.setStyle(styleUrl);
   }
 }
 </script>
@@ -61,7 +58,10 @@ function changeBaseMap() {
       <!-- <p>{{ msg }}</p> -->
 
       <div id="mapDiv" />
-      <BasemapButtonComponent @change-base-map="changeBaseMap" />
+      <BasemapButtonComponent
+        :mapstylename="mapstylename"
+        @change-base-map="changeBaseMap"
+      />
     </v-responsive>
   </v-container>
 </template>
