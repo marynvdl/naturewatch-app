@@ -1,36 +1,21 @@
 <script setup lang="ts">
-/** Props */
-export interface Props {
-  mapstylename: string;
-}
+import useBasemapStore from '@/store/BasemapStore';
+import { computed } from 'vue';
 
-const props = withDefaults(defineProps<Props>(), {
-  mapstylename: 'satellite',
-});
+// Using the basemap store
+const basemapStore = useBasemapStore();
+console.log(basemapStore);
 
-/** Emits */
-const emit = defineEmits<{
-  (e: 'changeBaseMap', value: string): void;
-}>();
-
-/** Methods */
-function changeBaseMap() {
-  console.log('comp:' + props.mapstylename);
-
-  if (props.mapstylename === 'Mapbox Satellite Streets') {
-    emit('changeBaseMap', 'mapbox://styles/mapbox/streets-v12');
-  } else {
-    emit(
-      'changeBaseMap',
-      'mapbox://styles/mapbox/satellite-streets-v12?optimize=true'
-    );
-  }
-}
+// Accessing the currentBasemap and toggleBasemap from the store
+const currentBasemap = computed(() => basemapStore.currentBasemap());
+const toggleBasemap = basemapStore.toggleBasemap;
 </script>
 
 <template>
   <div>
-    <v-btn variant="tonal" @click="changeBaseMap">Street</v-btn>
+    <v-btn variant="tonal" @click="toggleBasemap">
+      {{ currentBasemap.title }}
+    </v-btn>
   </div>
 </template>
 

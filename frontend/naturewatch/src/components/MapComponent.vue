@@ -18,8 +18,6 @@ defineProps<{
 }>();
 
 /** Data */
-const mapstylename = ref<string | undefined>('Mapbox Satellite Streets');
-
 const map = ref<mapboxgl.Map | null>(null);
 
 const mapOptions: MapboxMap = {
@@ -36,13 +34,6 @@ onMounted(() => {
 });
 
 /** Methods */
-function changeBaseMap(styleUrl: string) {
-  if (map.value !== null) {
-    mapstylename.value = map.value.getStyle().name;
-    console.log(mapstylename.value);
-    map.value.setStyle(styleUrl);
-  }
-}
 </script>
 
 <template>
@@ -58,10 +49,7 @@ function changeBaseMap(styleUrl: string) {
       <!-- <p>{{ msg }}</p> -->
 
       <div id="mapDiv" />
-      <BasemapButtonComponent
-        :mapstylename="mapstylename"
-        @change-base-map="changeBaseMap"
-      />
+      <BasemapButtonComponent />
     </v-responsive>
   </v-container>
 </template>
