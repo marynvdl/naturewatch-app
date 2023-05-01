@@ -34,6 +34,11 @@ onMounted(() => {
 });
 
 /** Methods */
+function handleBasemapChanged(newStyleUrl: string) {
+  if (map.value) {
+    map.value.setStyle(newStyleUrl);
+  }
+}
 </script>
 
 <template>
@@ -49,7 +54,7 @@ onMounted(() => {
       <!-- <p>{{ msg }}</p> -->
 
       <div id="mapDiv" />
-      <BasemapButtonComponent />
+      <BasemapButtonComponent @basemap-changed="handleBasemapChanged" />
     </v-responsive>
   </v-container>
 </template>
