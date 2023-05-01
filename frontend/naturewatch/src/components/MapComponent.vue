@@ -52,9 +52,14 @@ function handleBasemapChanged(newStyleUrl: string) {
         class="logo mx-auto"
       /> -->
       <!-- <p>{{ msg }}</p> -->
-
-      <div id="mapDiv" />
-      <BasemapButtonComponent @basemap-changed="handleBasemapChanged" />
+      <div class="map-container">
+        <div id="mapDiv" />
+        <BasemapButtonComponent
+          id="basmapButton"
+          class="basemap-button"
+          @basemap-changed="handleBasemapChanged"
+        />
+      </div>
     </v-responsive>
   </v-container>
 </template>
@@ -64,8 +69,19 @@ function handleBasemapChanged(newStyleUrl: string) {
   will-change: filter;
   filter: drop-shadow(0 0 1em #2196f3aa);
 }
+.map-container {
+  position: relative;
+  height: 100vh;
+}
 
 #mapDiv {
   height: 100vh;
+}
+
+.basemap-button {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 10;
 }
 </style>
