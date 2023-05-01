@@ -12,4 +12,6 @@ export default interface DrawerMenuItem {
   active?: boolean;
   /** Sub Items */
   items?: DrawerMenuItem[];
+  /** Is Nav item */
+  isNav?: boolean;
 }
