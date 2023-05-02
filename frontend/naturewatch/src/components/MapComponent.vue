@@ -24,7 +24,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <v-container class="fill-height">
+  <v-container fluid class="map-parent">
     <v-responsive class="d-flex align-center text-center fill-height">
       <!-- Logo -->
       <!-- <v-img
@@ -51,5 +51,7 @@ onMounted(() => {
   height: 100vh;
 }
 
-
+.map-parent {
+  padding: 0
+}
 </style>

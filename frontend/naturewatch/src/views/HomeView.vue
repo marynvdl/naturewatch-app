@@ -18,7 +18,7 @@ const jsonLd = JSON.stringify(
 </script>
 
 <template>
-  <v-container fluid>
+  <v-container class="map-parent" fluid>
     <map-box msg="Hello World" />
   </v-container>
   <teleport to="head">
@@ -32,3 +32,9 @@ const jsonLd = JSON.stringify(
     </component>
   </teleport>
 </template>
+
+<style scoped>
+.map-parent {
+  padding: 0
+}
+</style>

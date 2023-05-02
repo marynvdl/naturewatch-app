@@ -22,9 +22,6 @@ import logo from '@/assets/logo.svg';
 // Mapbox CSS
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-// Meta
-import Meta from '@/Meta';
-
 /** Vuetify Theme */
 const theme = useTheme();
 
@@ -96,7 +93,7 @@ onMounted(() => {
       <drawer-component />
     </v-navigation-drawer>
 
-    <v-app-bar>
+    <!-- <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer" />
       <v-app-bar-title tag="h1">{{ title }}</v-app-bar-title>
       <v-spacer />
@@ -108,9 +105,9 @@ onMounted(() => {
         :model-value="progress !== null ? progress : 0"
         color="blue-accent-3"
       />
-    </v-app-bar>
+    </v-app-bar> -->
 
-    <v-main>
+    <v-main class="main-container">
       <router-view v-slot="{ Component, route }">
         <component :is="Component" :key="route.path" />
       </router-view>
@@ -129,21 +126,6 @@ onMounted(() => {
       </template>
     </v-snackbar>
 
-    
-    <v-col class="text-center mt-4" cols="12">
-      <span class="text-medium-emphasis">
-        Version: {{ Meta.version }} &nbsp; &nbsp;
-        Build:
-        <time
-          :datetime="Meta.date"
-          v-text="new Date(Meta.date).toLocaleString()"
-        />
-      </span>
-    </v-col>
-
-    <v-footer app elevation="3">
-
-    </v-footer>
   </v-app>
   <teleport to="head">
     <meta name="theme-color" :content="themeColor" />
@@ -197,5 +179,9 @@ html {
 .mapboxgl-ctrl-top-left,
 .mapboxgl-ctrl-top-right {
     position: inherit;
+}
+
+.main-container {
+  padding: 0
 }
 </style>
