@@ -14,7 +14,6 @@ import { useTheme } from 'vuetify/lib/framework.mjs';
 import { useGlobal, useConfig } from '@/store';
 
 // Components
-import AppBarMenuComponent from '@/components/AppBarMenuComponent.vue';
 import DrawerComponent from '@/components/DrawerComponent.vue';
 
 import logo from '@/assets/logo.svg';
@@ -43,9 +42,9 @@ const loading: WritableComputedRef<boolean> = computed({
 });
 
 /** Appbar progressbar value */
-const progress: ComputedRef<number | null> = computed(
-  () => globalStore.progress
-);
+// const progress: ComputedRef<number | null> = computed(
+//   () => globalStore.progress
+// );
 
 /** Snackbar visibility */
 const snackbar: Ref<boolean> = ref(false);
@@ -89,7 +88,7 @@ onMounted(() => {
 
 <template>
   <v-app :theme="isDark">
-    <v-navigation-drawer v-model="drawer">
+    <v-navigation-drawer v-model="drawer" >
       <drawer-component />
     </v-navigation-drawer>
 
@@ -107,7 +106,8 @@ onMounted(() => {
       />
     </v-app-bar> -->
 
-    <v-main class="main-container">
+    <v-main class="pa-0" >
+      <v-btn :class="['drawer-button', { 'drawer-button-collapsed': !drawer }]" @click="drawer = !drawer" icon="mdi-menu" />
       <router-view v-slot="{ Component, route }">
         <component :is="Component" :key="route.path" />
       </router-view>
@@ -181,7 +181,16 @@ html {
     position: inherit;
 }
 
-.main-container {
-  padding: 0
+.drawer-button {
+  position: absolute;
+  top: 30px;
+  left: 220px;
+  z-index: 1005;
+  transition: left 0.2s ease-in-out;
 }
+
+.drawer-button-collapsed {
+  left: 10px; // or any other value you want when the app-bar is collapsed
+}
+
 </style>

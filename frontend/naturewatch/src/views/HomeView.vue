@@ -18,7 +18,7 @@ const jsonLd = JSON.stringify(
 </script>
 
 <template>
-  <v-container class="map-parent" fluid>
+  <v-container class="pa-0" fluid>
     <map-box msg="Hello World" />
   </v-container>
   <teleport to="head">
@@ -26,7 +26,10 @@ const jsonLd = JSON.stringify(
       name="keyword"
       content="nature,watch,globe,space,sattelite,geo,conservation,human,footprint,geospatial"
     />
-    <meta name="description" content="A geospatial web application using Vue3, Vuetify and Mapbox" />
+    <meta
+      name="description"
+      content="A geospatial web application using Vue3, Vuetify and Mapbox"
+    />
     <component :is="'script'" type="application/ld+json">
       {{ jsonLd }}
     </component>
@@ -34,7 +37,5 @@ const jsonLd = JSON.stringify(
 </template>
 
 <style scoped>
-.map-parent {
-  padding: 0
-}
+
 </style>
