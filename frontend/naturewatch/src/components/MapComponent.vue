@@ -92,8 +92,8 @@ function handleBasemapChanged(newStyleUrl: string) {
 
 .basemap-button {
   position: absolute;
-  bottom: 100px;
-  right: 60px;
+  bottom: 90px;
+  right: 45px;
   z-index: 10;
 }
 

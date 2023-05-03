@@ -31,11 +31,7 @@ const buttonImageSrc = computed(() =>
 
 <template>
   <div>
-    <v-btn
-      variant="plain"
-      style="width: 0; height: 0"
-      @click="handleButtonClick"
-    >
+    <v-btn style="width: 0; height: 0" @click="handleButtonClick">
       <v-img
         class="basemap-btn"
         aspect-ratio="16/9"
@@ -48,7 +44,7 @@ const buttonImageSrc = computed(() =>
 
 <style scoped>
 .basemap-btn {
-  width: 60px;
+  width: 70px;
   transition: transform 0.2s ease-in-out;
 }
 .basemap-btn:hover {
