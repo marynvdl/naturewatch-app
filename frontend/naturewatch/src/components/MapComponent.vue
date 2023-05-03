@@ -59,7 +59,12 @@ function handleBasemapChanged(newStyleUrl: string) {
       <div class="map-container">
         <div id="mapDiv" />
         <!-- Toggle Dark mode -->
-        <v-btn id="darkmodeButton" class="darkmode-button" icon="mdi-theme-light-dark" @click="configStore.toggleTheme" />
+        <v-btn
+          id="darkmodeButton"
+          class="darkmode-button"
+          icon="mdi-theme-light-dark"
+          @click="configStore.toggleTheme"
+        />
         <!-- Toggle Basemap type -->
         <BasemapButtonComponent
           id="basmapButton"
@@ -87,8 +92,8 @@ function handleBasemapChanged(newStyleUrl: string) {
 
 .basemap-button {
   position: absolute;
-  bottom: 30px;
-  right: 40px;
+  bottom: 100px;
+  right: 60px;
   z-index: 10;
 }
 
@@ -100,6 +105,6 @@ function handleBasemapChanged(newStyleUrl: string) {
 }
 
 .map-parent {
-  padding: 0
+  padding: 0;
 }
 </style>
