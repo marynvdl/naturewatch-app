@@ -88,7 +88,7 @@ onMounted(() => {
 
 <template>
   <v-app :theme="isDark">
-    <v-navigation-drawer v-model="drawer" >
+    <v-navigation-drawer v-model="drawer">
       <drawer-component />
     </v-navigation-drawer>
 
@@ -106,8 +106,12 @@ onMounted(() => {
       />
     </v-app-bar> -->
 
-    <v-main class="pa-0" >
-      <v-btn :class="['drawer-button', { 'drawer-button-collapsed': !drawer }]" @click="drawer = !drawer" icon="mdi-menu" />
+    <v-main class="pa-0">
+      <v-btn
+        :class="['drawer-button', { 'drawer-button-collapsed': !drawer }]"
+        icon="mdi-menu"
+        @click="drawer = !drawer"
+      />
       <router-view v-slot="{ Component, route }">
         <component :is="Component" :key="route.path" />
       </router-view>
@@ -125,7 +129,6 @@ onMounted(() => {
         </v-btn>
       </template>
     </v-snackbar>
-
   </v-app>
   <teleport to="head">
     <meta name="theme-color" :content="themeColor" />
@@ -172,13 +175,12 @@ html {
   bottom: 0;
 }
 
-
 /* Override Mapbox CSS that causes issues with layout */
 .mapboxgl-ctrl-bottom-left,
 .mapboxgl-ctrl-bottom-right,
 .mapboxgl-ctrl-top-left,
 .mapboxgl-ctrl-top-right {
-    position: inherit;
+  position: inherit;
 }
 
 .drawer-button {
@@ -192,5 +194,4 @@ html {
 .drawer-button-collapsed {
   left: 10px; // or any other value you want when the app-bar is collapsed
 }
-
 </style>

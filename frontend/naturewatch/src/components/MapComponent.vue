@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
 import { useConfig } from '@/store';
+import type Basemap from '@/interfaces/BasemapInterface';
 
 /** Config Store */
 const configStore = useConfig();
@@ -28,7 +29,7 @@ const mapOptions: MapboxMap = {
   accessToken:
     'pk.eyJ1Ijoic29jaWFsZXhwbG9yZXIiLCJhIjoiREFQbXBISSJ9.dwFTwfSaWsHvktHrRtpydQ',
   container: 'mapDiv',
-  style: 'mapbox://styles/mapbox/satellite-streets-v12?optimize=true',
+  style: 'mapbox://styles/mapbox/streets-v12',
   center: [20.23928, 7.35074],
   zoom: 5,
 };
@@ -38,9 +39,28 @@ onMounted(() => {
 });
 
 /** Methods */
-function handleBasemapChanged(newStyleUrl: string) {
+function handleBasemapChanged(newBasemap: Basemap) {
   if (map.value) {
-    map.value.setStyle(newStyleUrl);
+    if (newBasemap.source === 'mapbox') {
+      // Change style of mapbox basemap
+      map.value.setStyle(newBasemap.url);
+    } else if (newBasemap.source === 'custom') {
+      // Add custom basemap as tile layer
+      // First add a source
+      map.value.addSource('raster-source', {
+        type: 'raster',
+        url: newBasemap.url,
+      });
+      // Then, add the layer
+      map.value.addLayer({
+        id: 'raster-layer',
+        type: 'raster',
+        source: 'raster-source',
+        paint: {
+          'raster-opacity': 1,
+        },
+      });
+    }
   }
 }
 </script>
@@ -59,7 +79,12 @@ function handleBasemapChanged(newStyleUrl: string) {
       <div class="map-container">
         <div id="mapDiv" />
         <!-- Toggle Dark mode -->
-        <v-btn id="darkmodeButton" class="darkmode-button" icon="mdi-theme-light-dark" @click="configStore.toggleTheme" />
+        <v-btn
+          id="darkmodeButton"
+          class="darkmode-button"
+          icon="mdi-theme-light-dark"
+          @click="configStore.toggleTheme"
+        />
         <!-- Toggle Basemap type -->
         <BasemapButtonComponent
           id="basmapButton"
@@ -87,8 +112,8 @@ function handleBasemapChanged(newStyleUrl: string) {
 
 .basemap-button {
   position: absolute;
-  bottom: 30px;
-  right: 40px;
+  bottom: 90px;
+  right: 45px;
   z-index: 10;
 }
 
@@ -100,6 +125,6 @@ function handleBasemapChanged(newStyleUrl: string) {
 }
 
 .map-parent {
-  padding: 0
+  padding: 0;
 }
 </style>
