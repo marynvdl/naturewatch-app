@@ -2,6 +2,10 @@
 import { onMounted, ref } from 'vue';
 import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
+import { useConfig } from '@/store';
+
+/** Config Store */
+const configStore = useConfig();
 
 /** Interfaces */
 interface MapboxMap {
@@ -42,7 +46,7 @@ function handleBasemapChanged(newStyleUrl: string) {
 </script>
 
 <template>
-  <v-container class="fill-height">
+  <v-container fluid class="map-parent">
     <v-responsive class="d-flex align-center text-center fill-height">
       <!-- Logo -->
       <!-- <v-img
@@ -54,6 +58,9 @@ function handleBasemapChanged(newStyleUrl: string) {
       <!-- <p>{{ msg }}</p> -->
       <div class="map-container">
         <div id="mapDiv" />
+        <!-- Toggle Dark mode -->
+        <v-btn id="darkmodeButton" class="darkmode-button" icon="mdi-theme-light-dark" @click="configStore.toggleTheme" />
+        <!-- Toggle Basemap type -->
         <BasemapButtonComponent
           id="basmapButton"
           class="basemap-button"
@@ -80,8 +87,19 @@ function handleBasemapChanged(newStyleUrl: string) {
 
 .basemap-button {
   position: absolute;
-  bottom: 20px;
-  left: 20px;
+  bottom: 30px;
+  right: 40px;
   z-index: 10;
+}
+
+.darkmode-button {
+  position: absolute;
+  top: 30px;
+  right: 40px;
+  z-index: 10;
+}
+
+.map-parent {
+  padding: 0
 }
 </style>

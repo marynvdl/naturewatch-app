@@ -14,16 +14,12 @@ import { useTheme } from 'vuetify/lib/framework.mjs';
 import { useGlobal, useConfig } from '@/store';
 
 // Components
-import AppBarMenuComponent from '@/components/AppBarMenuComponent.vue';
 import DrawerComponent from '@/components/DrawerComponent.vue';
 
 import logo from '@/assets/logo.svg';
 
 // Mapbox CSS
 import 'mapbox-gl/dist/mapbox-gl.css';
-
-// Meta
-import Meta from '@/Meta';
 
 /** Vuetify Theme */
 const theme = useTheme();
@@ -46,9 +42,9 @@ const loading: WritableComputedRef<boolean> = computed({
 });
 
 /** Appbar progressbar value */
-const progress: ComputedRef<number | null> = computed(
-  () => globalStore.progress
-);
+// const progress: ComputedRef<number | null> = computed(
+//   () => globalStore.progress
+// );
 
 /** Snackbar visibility */
 const snackbar: Ref<boolean> = ref(false);
@@ -92,11 +88,11 @@ onMounted(() => {
 
 <template>
   <v-app :theme="isDark">
-    <v-navigation-drawer v-model="drawer">
+    <v-navigation-drawer v-model="drawer" >
       <drawer-component />
     </v-navigation-drawer>
 
-    <v-app-bar>
+    <!-- <v-app-bar>
       <v-app-bar-nav-icon @click="drawer = !drawer" />
       <v-app-bar-title tag="h1">{{ title }}</v-app-bar-title>
       <v-spacer />
@@ -108,9 +104,10 @@ onMounted(() => {
         :model-value="progress !== null ? progress : 0"
         color="blue-accent-3"
       />
-    </v-app-bar>
+    </v-app-bar> -->
 
-    <v-main>
+    <v-main class="pa-0" >
+      <v-btn :class="['drawer-button', { 'drawer-button-collapsed': !drawer }]" @click="drawer = !drawer" icon="mdi-menu" />
       <router-view v-slot="{ Component, route }">
         <component :is="Component" :key="route.path" />
       </router-view>
@@ -129,21 +126,6 @@ onMounted(() => {
       </template>
     </v-snackbar>
 
-    
-    <v-col class="text-center mt-4" cols="12">
-      <span class="text-medium-emphasis">
-        Version: {{ Meta.version }} &nbsp; &nbsp;
-        Build:
-        <time
-          :datetime="Meta.date"
-          v-text="new Date(Meta.date).toLocaleString()"
-        />
-      </span>
-    </v-col>
-
-    <v-footer app elevation="3">
-
-    </v-footer>
   </v-app>
   <teleport to="head">
     <meta name="theme-color" :content="themeColor" />
@@ -198,4 +180,17 @@ html {
 .mapboxgl-ctrl-top-right {
     position: inherit;
 }
+
+.drawer-button {
+  position: absolute;
+  top: 30px;
+  left: 220px;
+  z-index: 1005;
+  transition: left 0.2s ease-in-out;
+}
+
+.drawer-button-collapsed {
+  left: 10px; // or any other value you want when the app-bar is collapsed
+}
+
 </style>
