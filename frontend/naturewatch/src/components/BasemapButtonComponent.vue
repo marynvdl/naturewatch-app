@@ -3,7 +3,6 @@ import useBasemapStore from '@/store/BasemapStore';
 import { computed } from 'vue';
 import satelliteImg from '@/assets/satellite.png';
 import streetsImg from '@/assets/streets.png';
-import type Basemap from '@/interfaces/BasemapInterface';
 
 // Using the basemap store
 const basemapStore = useBasemapStore();
@@ -15,13 +14,13 @@ const toggleBasemap = basemapStore.toggleBasemap;
 
 /** Emits */
 const emit = defineEmits<{
-  (e: 'basemap-changed', value: Basemap): void;
+  (e: 'basemap-changed', value: string): void;
 }>();
 
 /** Methods */
 function handleButtonClick() {
   toggleBasemap();
-  emit('basemap-changed', currentBasemap.value);
+  emit('basemap-changed', currentBasemap.value.url);
 }
 
 /** Computed properties */
