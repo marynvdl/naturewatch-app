@@ -26,9 +26,9 @@ const map = ref<mapboxgl.Map | null>(null);
 
 const mapOptions: MapboxMap = {
   accessToken:
-    'pk.eyJ1Ijoic29jaWFsZXhwbG9yZXIiLCJhIjoiREFQbXBISSJ9.dwFTwfSaWsHvktHrRtpydQ',
+    'pk.eyJ1IjoibmF0dXJlLXdhdGNoIiwiYSI6ImNsZWU4MHN6MjBlZmwzcG12cTdnNGJwcGEifQ.gK_j2FlTCHa0bV0cUT_3IA',
   container: 'mapDiv',
-  style: 'mapbox://styles/mapbox/satellite-streets-v12?optimize=true',
+  style: 'mapbox://styles/nature-watch/clhasye2x014301pg03i97sca',
   center: [20.23928, 7.35074],
   zoom: 5,
 };
