@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
 import { useConfig } from '@/store';
+import useBasemapStore from '@/store/BasemapStore';
 
-/** Config Store */
+/** Using stores */
 const configStore = useConfig();
+const basemapStore = useBasemapStore();
 
 /** Interfaces */
 interface MapboxMap {
@@ -22,13 +24,16 @@ defineProps<{
 }>();
 
 /** Data */
+// Current basemap from store
+const currentBasemap = computed(() => basemapStore.currentBasemap());
+
 const map = ref<mapboxgl.Map | null>(null);
 
 const mapOptions: MapboxMap = {
   accessToken:
     'pk.eyJ1IjoibmF0dXJlLXdhdGNoIiwiYSI6ImNsZWU4MHN6MjBlZmwzcG12cTdnNGJwcGEifQ.gK_j2FlTCHa0bV0cUT_3IA',
   container: 'mapDiv',
-  style: 'mapbox://styles/nature-watch/clhasye2x014301pg03i97sca',
+  style: currentBasemap.value.url,
   center: [20.23928, 7.35074],
   zoom: 5,
 };
