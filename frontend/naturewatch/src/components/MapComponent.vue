@@ -44,9 +44,7 @@ onMounted(() => {
 
 /** Methods */
 function handleBasemapChanged(newStyleUrl: string) {
-function handleBasemapChanged(newStyleUrl: string) {
   if (map.value) {
-    map.value.setStyle(newStyleUrl);
     map.value.setStyle(newStyleUrl);
   }
 }
