@@ -29,7 +29,7 @@ defineProps<{
 /** Data */
 // Current basemap from store
 const currentBasemap = computed(() => basemapStore.currentBasemap());
-
+const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
 
 const mapOptions: MapboxMap = {
@@ -57,21 +57,7 @@ watch(
         // Updating the map
         if (map.value) {
           if (newLayer.visible) {
-            // Add the source if it does not yet exist
-            if (!map.value.getSource(newLayer.title)) {
-              map.value.addSource(newLayer.title, {
-                type: 'raster',
-                tiles: [newLayer.url],
-                tileSize: 256,
-              });
-            }
-
-            // Add the layer
-            map.value.addLayer({
-              id: newLayer.title,
-              type: 'raster',
-              source: newLayer.title, // Use the source ID (newLayer.title) here
-            });
+            addMapLayer(newLayer);
           } else {
             // Remove the layer from the map
             map.value.removeLayer(newLayer.title);
@@ -84,14 +70,45 @@ watch(
   },
   { deep: true }
 );
+
 onMounted(() => {
   map.value = new mapboxgl.Map(mapOptions);
+
+  // Add event listener for style.load
+  if (map.value) {
+    map.value.on('style.load', () => {
+      visibleMapLayers.value.forEach((layer, index) => {
+        addMapLayer(layer);
+      });
+    });
+  }
 });
 
 /** Methods */
 function handleBasemapChanged(newStyleUrl: string) {
   if (map.value) {
     map.value.setStyle(newStyleUrl);
+  }
+}
+
+/** Add Map Layer */
+function addMapLayer(layer: MapLayer) {
+  if (map.value) {
+    // Add the source if it does not yet exist
+    if (!map.value.getSource(layer.title)) {
+      map.value.addSource(layer.title, {
+        type: 'raster',
+        tiles: [layer.url],
+        tileSize: 256,
+      });
+    }
+
+    // Add the layer
+    map.value.addLayer({
+      id: layer.title,
+      type: 'raster',
+      source: layer.title, // Use the source ID (newLayer.title) here
+    });
   }
 }
 </script>
