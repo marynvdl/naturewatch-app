@@ -46,9 +46,6 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     const layerToUpdate = MapLayers.value.find(layer => layer.title === title);
     if (layerToUpdate) {
       layerToUpdate.visible = !layerToUpdate.visible;
-      console.log(
-        '#MapLayerStore updated visible to: ' + layerToUpdate.visible
-      );
     }
   }
 

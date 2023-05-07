@@ -29,7 +29,8 @@ const homeItem: DrawerMenuItem = {
       <v-row v-if="item.button_type === 'big'" align="center" justify="center">
         <v-col class="my-0" cols="auto">
           <div class="d-flex flex-column align-center">
-            <v-btn :icon="item.icon" block rounded="lg" size="100" @click="toggleLayerVisibility(item.title)" />
+            <v-btn variant="tonal" :icon="item.icon" block rounded="lg" size="100"
+              :color="item.visible ? 'light-green-darken-4' : 'default'" @click="toggleLayerVisibility(item.title)" />
             <span class="mb-0" style="font-size: 12px">{{ item.title }}</span>
           </div>
         </v-col>
@@ -38,9 +39,10 @@ const homeItem: DrawerMenuItem = {
       <v-row v-else-if="item.button_type === 'small'" align="center" justify="center">
         <v-col cols="auto">
           <div class="d-flex flex-column align-center">
-            <v-btn :icon="item.icon" size="large" rounded="lg" @click="toggleLayerVisibility(item.title)">
+            <v-btn variant="tonal" :icon="item.icon" size="large" rounded="lg"
+              :color="item.visible ? 'light-green-darken-4' : 'default'" @click="toggleLayerVisibility(item.title)">
               <template #default>
-                <v-icon color="success" />
+                <v-icon color="grey-darken-3" />
               </template>
             </v-btn>
             <span class="mb-2" style="font-size: 12px">
