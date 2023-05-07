@@ -57,15 +57,20 @@ watch(
         // Updating the map
         if (map.value) {
           if (newLayer.visible) {
-            // Add the layer to the map
-            map.value.addLayer({
-              id: newLayer.title,
-              type: 'raster',
-              source: {
+            // Add the source if it does not yet exist
+            if (!map.value.getSource(newLayer.title)) {
+              map.value.addSource(newLayer.title, {
                 type: 'raster',
                 tiles: [newLayer.url],
                 tileSize: 256,
-              },
+              });
+            }
+
+            // Add the layer
+            map.value.addLayer({
+              id: newLayer.title,
+              type: 'raster',
+              source: newLayer.title, // Use the source ID (newLayer.title) here
             });
           } else {
             // Remove the layer from the map
