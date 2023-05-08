@@ -88,7 +88,7 @@ onMounted(() => {
 
 <template>
   <v-app :theme="isDark">
-    <v-navigation-drawer v-model="drawer">
+    <v-navigation-drawer v-model="drawer" width="180">
       <drawer-component />
     </v-navigation-drawer>
 

@@ -30,31 +30,38 @@ const homeItem: DrawerMenuItem = {
     />
   </v-list>
   <v-container>
-    <template v-for="item in mapLayers" :key="item.title">
-      <!-- Big buttons -->
-      <v-row v-if="item.button_type === 'big'" align="center" justify="center">
-        <v-col class="my-0" cols="auto">
-          <div class="d-flex flex-column align-center">
+    <!-- Big buttons -->
+    <v-row align="center" justify="center">
+      <template v-for="item in mapLayers" :key="'big-' + item.title">
+        <v-col v-if="item.button_type === 'big'" class="my-0" cols="auto">
+          <div class="d-flex flex-column align-center position-relative">
             <v-btn
               :variant="item.visible ? undefined : 'tonal'"
-              :icon="item.icon"
               block
               rounded="lg"
-              size="100"
-              :color="item.visible ? item.button_color : 'default'"
+              class="position-relative d-flex align-center justify-center"
+              style="min-height: 100px; min-width: 100px"
               @click="toggleLayerVisibility(item.title)"
-            />
-            <span class="mb-0" style="font-size: 12px">{{ item.title }}</span>
+            >
+              <v-img
+                class="position-absolute rounded-lg"
+                width="100%"
+                cover
+                :src="item.image"
+              />
+              <span class="text-center" style="z-index: 1">
+                {{ item.title }}
+              </span>
+            </v-btn>
           </div>
         </v-col>
-      </v-row>
-      <!-- Small buttons -->
-      <v-row
-        v-else-if="item.button_type === 'small'"
-        align="center"
-        justify="center"
-      >
-        <v-col cols="auto">
+      </template>
+    </v-row>
+
+    <!-- Small buttons -->
+    <v-row align="center" justify="center">
+      <template v-for="item in mapLayers" :key="'small-' + item.title">
+        <v-col v-if="item.button_type === 'small'" class="pa-2" cols="">
           <div class="d-flex flex-column align-center">
             <v-btn
               :variant="item.visible ? undefined : 'tonal'"
@@ -74,7 +81,13 @@ const homeItem: DrawerMenuItem = {
             </span>
           </div>
         </v-col>
-      </v-row>
-    </template>
+      </template>
+    </v-row>
   </v-container>
 </template>
+
+<style scoped>
+.position-relative {
+  position: relative;
+}
+</style>

@@ -12,8 +12,10 @@ export default interface MapLayer {
   type: MapLayerType;
   /** Layer visible on map */
   visible: boolean;
-  /** Button Icon */
+  /** Button icon if small button */
   icon?: string;
+  /** Button image if big button */
+  image?: string;
   /** Button color when selected */
   button_color?: string;
   /** Button is active */
