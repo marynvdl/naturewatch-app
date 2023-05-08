@@ -14,6 +14,8 @@ export default interface MapLayer {
   visible: boolean;
   /** Button Icon */
   icon?: string;
+  /** Button color when selected */
+  button_color?: string;
   /** Button is active */
   active?: boolean;
 }

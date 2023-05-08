@@ -12,6 +12,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       type: 'raster',
       visible: false,
       icon: 'mdi-map-legend',
+      button_color: 'brown-lighten-1',
       active: true,
     },
     {
@@ -21,6 +22,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       type: 'raster',
       visible: false,
       icon: 'mdi-fire',
+      button_color: 'amber-lighten-4',
       active: true,
     },
     {
@@ -30,6 +32,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       type: 'raster',
       visible: false,
       icon: 'mdi-tree',
+      button_color: 'red-lighten-3',
       active: true,
     },
   ]);
