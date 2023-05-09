@@ -55,7 +55,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       visible: false,
       icon: 'mdi-square-rounded',
       button_color: 'red-lighten-3',
-      active: true,
+      active: false,
     },
     {
       title: 'Mines',
@@ -65,7 +65,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       visible: false,
       icon: 'mdi-shovel',
       button_color: 'amber-lighten-4',
-      active: true,
+      active: false,
     },
     {
       title: 'Crops',
@@ -75,7 +75,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       visible: false,
       icon: 'mdi-barley',
       button_color: 'red-lighten-3',
-      active: true,
+      active: false,
     },
     {
       title: 'Rivers',
@@ -85,7 +85,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       visible: false,
       image: satelliteImg,
       button_color: 'brown-lighten-1',
-      active: true,
+      active: false,
     },
   ]);
 

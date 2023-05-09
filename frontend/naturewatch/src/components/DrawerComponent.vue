@@ -30,17 +30,20 @@ const homeItem: DrawerMenuItem = {
     />
   </v-list>
   <v-container>
-    <!-- Big buttons -->
     <v-row align="center" justify="center">
-      <template v-for="item in mapLayers" :key="'big-' + item.title">
-        <v-col v-if="item.button_type === 'big'" class="my-0" cols="auto">
-          <div class="d-flex flex-column align-center position-relative">
+      <template v-for="item in mapLayers" :key="item.title">
+        <!-- Big buttons -->
+        <v-col v-if="item.button_type === 'big'" class="my-3" cols="auto">
+          <div
+            class="d-flex flex-column align-center position-relative aspect-ratio--1-1"
+          >
             <v-btn
+              :disabled="!item.active"
               :variant="item.visible ? undefined : 'tonal'"
               block
               rounded="lg"
               class="position-relative d-flex align-center justify-center"
-              style="min-height: 100px; min-width: 100px"
+              size="80"
               @click="toggleLayerVisibility(item.title)"
             >
               <v-img
@@ -55,18 +58,17 @@ const homeItem: DrawerMenuItem = {
             </v-btn>
           </div>
         </v-col>
-      </template>
-    </v-row>
-
-    <!-- Small buttons -->
-    <v-row align="center" justify="center">
-      <template v-for="item in mapLayers" :key="'small-' + item.title">
-        <v-col v-if="item.button_type === 'small'" class="pa-2" cols="">
-          <div class="d-flex flex-column align-center">
+        <!-- Small buttons -->
+        <v-col
+          v-else-if="item.button_type === 'small'"
+          class="pa-2"
+          cols="auto"
+        >
+          <div class="d-flex flex-column align-center aspect-ratio--1-1">
             <v-btn
+              :disabled="!item.active"
               :variant="item.visible ? undefined : 'tonal'"
               :icon="item.icon"
-              size="large"
               rounded="lg"
               :color="item.visible ? item.button_color : 'default'"
               elevation="0"
@@ -76,7 +78,11 @@ const homeItem: DrawerMenuItem = {
                 <v-icon color="grey-darken-3" />
               </template>
             </v-btn>
-            <span class="mb-2" style="font-size: 12px">
+            <span
+              class="mb-0"
+              :class="!item.active ? 'text-disabled' : ''"
+              style="font-size: 12px"
+            >
               {{ item.title }}
             </span>
           </div>
@@ -89,5 +95,8 @@ const homeItem: DrawerMenuItem = {
 <style scoped>
 .position-relative {
   position: relative;
+}
+.position-absolute {
+  position: absolute;
 }
 </style>
