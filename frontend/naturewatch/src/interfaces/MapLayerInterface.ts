@@ -14,8 +14,10 @@ export default interface MapLayer {
   visible: boolean;
   /** Button icon if small button */
   icon?: string;
-  /** Button image if big button */
-  image?: string;
+  /** Button image if big button and layer visible*/
+  image_visible?: string;
+  /** Button image if big button and layer not visible*/
+  image_notvisible?: string;
   /** Button color when selected */
   button_color?: string;
   /** Button is active */

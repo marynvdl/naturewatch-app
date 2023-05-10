@@ -2,6 +2,7 @@
 import type DrawerMenuItem from '@/interfaces/DrawerMenuItemInterface';
 import useMapLayerStore from '@/store/MapLayerStore';
 import { computed } from 'vue';
+import logo from '@/assets/logo_nw.png';
 
 // Using the Map Layer store
 const mapLayerStore = useMapLayerStore();
@@ -20,15 +21,17 @@ const homeItem: DrawerMenuItem = {
 </script>
 
 <template>
-  <v-list>
-    <v-list-item
+  <v-container class="position-relative d-flex justify-center align-center">
+    <v-btn
+      class="elevation-0 bg-transparent"
       nav
       :disabled="!homeItem.to"
-      :prepend-icon="homeItem.icon"
       :to="homeItem.to"
-      link
-    />
-  </v-list>
+      size="80"
+    >
+      <v-img class="position-absolute" width="100%" cover :src="logo" />
+    </v-btn>
+  </v-container>
   <v-container>
     <v-row align="center" justify="center">
       <template v-for="item in mapLayers" :key="item.title">
@@ -44,13 +47,14 @@ const homeItem: DrawerMenuItem = {
               rounded="lg"
               class="position-relative d-flex align-center justify-center"
               size="80"
+              elevation="0"
               @click="toggleLayerVisibility(item.title)"
             >
               <v-img
                 class="position-absolute rounded-lg"
                 width="100%"
                 cover
-                :src="item.image"
+                :src="item.visible ? item.image_visible : item.image_notvisible"
               />
               <span class="text-center" style="z-index: 1">
                 {{ item.title }}

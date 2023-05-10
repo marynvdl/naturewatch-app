@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import type MapLayer from '@/interfaces/MapLayerInterface';
-import streetsImg from '@/assets/streets.png';
-import satelliteImg from '@/assets/satellite.png';
+import allVisibleImg from '@/assets/all_visible.png';
+import allNotVisibleImg from '@/assets/all_notvisible.png';
+import riversVisibleImg from '@/assets/rivers_visible.png';
+import riversNotVisibleImg from '@/assets/rivers_notvisible.png';
 
 const useMapLayerStore = defineStore('mapLayer', () => {
   // State
@@ -13,7 +15,8 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       url: 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
       type: 'raster',
       visible: false,
-      image: streetsImg,
+      image_visible: allVisibleImg,
+      image_notvisible: allNotVisibleImg,
       button_color: 'brown-lighten-1',
       active: true,
     },
@@ -83,9 +86,10 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       url: 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
       type: 'raster',
       visible: false,
-      image: satelliteImg,
+      image_visible: riversVisibleImg,
+      image_notvisible: riversNotVisibleImg,
       button_color: 'brown-lighten-1',
-      active: false,
+      active: true,
     },
   ]);
 
