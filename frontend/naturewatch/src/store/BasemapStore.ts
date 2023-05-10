@@ -7,7 +7,7 @@ const useBasemapStore = defineStore('basemap', () => {
   // State
   const title: Ref<string> = ref('Satellite');
   const url: Ref<string> = ref(
-    'mapbox://styles/mapbox/satellite-streets-v12?optimize=true'
+    'mapbox://styles/nature-watch/clhasye2x014301pg03i97sca'
   );
 
   // Getters
@@ -28,7 +28,7 @@ const useBasemapStore = defineStore('basemap', () => {
       url.value = 'mapbox://styles/mapbox/streets-v12';
     } else {
       title.value = 'Satellite';
-      url.value = 'mapbox://styles/mapbox/satellite-streets-v12?optimize=true';
+      url.value = 'mapbox://styles/nature-watch/clhasye2x014301pg03i97sca';
     }
   }
 

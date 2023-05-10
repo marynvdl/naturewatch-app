@@ -6,7 +6,6 @@ import streetsImg from '@/assets/streets.png';
 
 // Using the basemap store
 const basemapStore = useBasemapStore();
-console.log(basemapStore);
 
 // Accessing the currentBasemap and toggleBasemap from the store
 const currentBasemap = computed(() => basemapStore.currentBasemap());
@@ -32,12 +31,7 @@ const buttonImageSrc = computed(() =>
 <template>
   <div>
     <v-btn style="width: 0; height: 0" @click="handleButtonClick">
-      <v-img
-        class="basemap-btn"
-        aspect-ratio="16/9"
-        cover
-        :src="buttonImageSrc"
-      />
+      <v-img class="basemap-btn" aspect-ratio="16/9" cover :src="buttonImageSrc" />
     </v-btn>
   </div>
 </template>
@@ -47,6 +41,7 @@ const buttonImageSrc = computed(() =>
   width: 70px;
   transition: transform 0.2s ease-in-out;
 }
+
 .basemap-btn:hover {
   transform: scale(1.2);
 }

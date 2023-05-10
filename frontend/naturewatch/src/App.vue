@@ -32,8 +32,11 @@ const configStore = useConfig();
 /** Title */
 const title = import.meta.env.VITE_APP_TITLE || 'NatureWatch';
 
-/** drawer visibility */
+/** Drawer visibility */
 const drawer: Ref<boolean> = ref(true);
+
+/** Drawer width */
+const drawerWidth = ref('170');
 
 /** loading overlay visibility */
 const loading: WritableComputedRef<boolean> = computed({
@@ -88,7 +91,7 @@ onMounted(() => {
 
 <template>
   <v-app :theme="isDark">
-    <v-navigation-drawer v-model="drawer">
+    <v-navigation-drawer v-model="drawer" :width="drawerWidth">
       <drawer-component />
     </v-navigation-drawer>
 
@@ -108,8 +111,10 @@ onMounted(() => {
 
     <v-main class="pa-0">
       <v-btn
-        :class="['drawer-button', { 'drawer-button-collapsed': !drawer }]"
-        icon="mdi-menu"
+        class="drawer-button"
+        :style="drawer ? `left: ${parseInt(drawerWidth) - 15}px` : 'left: 15px'"
+        :icon="drawer ? 'mdi-menu-open' : 'mdi-menu'"
+        elevation="2"
         @click="drawer = !drawer"
       />
       <router-view v-slot="{ Component, route }">
@@ -186,12 +191,7 @@ html {
 .drawer-button {
   position: absolute;
   top: 30px;
-  left: 220px;
   z-index: 1005;
   transition: left 0.2s ease-in-out;
-}
-
-.drawer-button-collapsed {
-  left: 10px; // or any other value you want when the app-bar is collapsed
 }
 </style>
