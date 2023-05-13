@@ -2,6 +2,8 @@ import type { MapLayerType, MapLayerButtonType } from '../types/MapLayerType';
 
 /** Map Layer Interface */
 export default interface MapLayer {
+  /** Layer ID */
+  id: string;
   /** Layer Name */
   title: string | '-';
   /** Button type */
@@ -22,4 +24,6 @@ export default interface MapLayer {
   button_color?: string;
   /** Button is active */
   active?: boolean;
+  /** Optional query string */
+  query_string?: string;
 }

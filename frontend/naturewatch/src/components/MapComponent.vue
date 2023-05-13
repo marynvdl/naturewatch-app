@@ -2,15 +2,18 @@
 import { onMounted, ref, computed, watch } from 'vue';
 import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
+import TimelineComponent from '@/components/TimelineComponent.vue';
 import { useConfig } from '@/store';
 import useBasemapStore from '@/store/BasemapStore';
 import useMapLayerStore from '@/store/MapLayerStore';
+import useTimelineStore from '@/store/TimelineStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
 
 /** Using stores */
 const configStore = useConfig();
 const basemapStore = useBasemapStore();
 const mapLayerStore = useMapLayerStore();
+const timelineStore = useTimelineStore();
 
 /** Interfaces */
 interface MapboxMap {
@@ -31,6 +34,10 @@ defineProps<{
 const currentBasemap = computed(() => basemapStore.currentBasemap());
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
+
+// Timeline visibility from store
+const timelineVisibility = computed(() => timelineStore.visible);
+const activeYear = computed(() => timelineStore.activeYear);
 
 const mapOptions: MapboxMap = {
   accessToken:
@@ -55,20 +62,25 @@ watch(
 
       if (newLayer.visible !== oldLayer.visible) {
         // Updating the map
-        if (map.value) {
-          if (newLayer.visible) {
-            addMapLayer(newLayer);
-          } else {
-            // Remove the layer from the map
-            map.value.removeLayer(newLayer.title);
-          }
-        }
-        // Update the previous state only when there's a change in the visible property
+        updateMapLayer(newLayer, map.value);
+
+        // Update the previous state only when there's a change in the visible or id property
         prevMapLayers.value[index] = JSON.parse(JSON.stringify(newLayer));
       }
     });
   },
   { deep: true }
+);
+
+// Watch for changes in the activeYear from the timeline
+watch(
+  () => timelineStore.activeYear,
+  (newActiveYear, oldActiveYear) => {
+    prevMapLayers.value.forEach((layer, index) => {
+      // Updating the map
+      updateMapLayer(layer, map.value, oldActiveYear);
+    });
+  }
 );
 
 onMounted(() => {
@@ -78,37 +90,103 @@ onMounted(() => {
   if (map.value) {
     map.value.on('style.load', () => {
       visibleMapLayers.value.forEach((layer, index) => {
-        addMapLayer(layer);
+        addSourceAndLayer(layer, activeYear.value, map.value);
       });
     });
   }
 });
 
 /** Methods */
+/** Handle basemap change */
 function handleBasemapChanged(newStyleUrl: string) {
   if (map.value) {
     map.value.setStyle(newStyleUrl);
   }
 }
 
-/** Add Map Layer */
-function addMapLayer(layer: MapLayer) {
-  if (map.value) {
-    // Add the source if it does not yet exist
-    if (!map.value.getSource(layer.title)) {
-      map.value.addSource(layer.title, {
+/**
+ * Updates the map layer's visibility and manages layer removal based on previous year.
+ *
+ * @param layer - The MapLayer to be updated.
+ * @param map - The Mapbox map instance
+ * @param previousYear - Optional. The previous year of the layer to be removed.
+ */
+function updateMapLayer(
+  layer: MapLayer,
+  map: mapboxgl.Map | null,
+  previousYear?: number
+) {
+  if (map) {
+    if (layer.visible) {
+      addSourceAndLayer(layer, activeYear.value, map);
+      if (previousYear) {
+        map.removeLayer(layer.title + previousYear);
+      }
+    } else if (map.getSource(layer.title + activeYear.value)) {
+      // Remove the layer from the map
+      map.removeLayer(layer.title + activeYear.value);
+    }
+  }
+}
+
+/**
+ * Builds the layer's url to be used in the tile request.
+ *
+ * @param layer - The MapLayer to be updated.
+ * @param activeYear - The year selected on the timeline.
+ */
+function getLayerUrl(layer: MapLayer, activeYear: number) {
+  let layerUrl: string;
+  if (layer.query_string) {
+    const queryString = layer.query_string.replace(
+      /{year}/g,
+      activeYear.toString()
+    );
+    layerUrl = layer.url + '?' + queryString;
+  } else {
+    layerUrl = layer.url;
+  }
+  return layerUrl;
+}
+
+/** Add layer source to the map */
+function addSourceToMap(
+  layer: MapLayer,
+  layerUrl: string,
+  map: mapboxgl.Map | null
+) {
+  if (map) {
+    if (!map?.getSource(layer.title + activeYear.value)) {
+      map.addSource(layer.title + activeYear.value, {
         type: 'raster',
-        tiles: [layer.url],
+        tiles: [layerUrl],
         tileSize: 256,
       });
     }
+  }
+}
 
-    // Add the layer
-    map.value.addLayer({
-      id: layer.title,
+/** Add layer to the map */
+function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
+  if (map) {
+    map.addLayer({
+      id: layer.title + activeYear.value,
       type: 'raster',
-      source: layer.title, // Use the source ID (newLayer.title) here
+      source: layer.title + activeYear.value,
     });
+  }
+}
+
+/** Get layer_url, add source and layer to map */
+function addSourceAndLayer(
+  layer: MapLayer,
+  activeYear: number,
+  map: mapboxgl.Map | null
+) {
+  if (map) {
+    const layerUrl = getLayerUrl(layer, activeYear);
+    addSourceToMap(layer, layerUrl, map);
+    addLayerToMap(layer, map);
   }
 }
 </script>
@@ -127,10 +205,21 @@ function addMapLayer(layer: MapLayer) {
       <div class="map-container">
         <div id="mapDiv" />
         <!-- Toggle Dark mode -->
-        <v-btn id="darkmodeButton" class="darkmode-button" icon="mdi-theme-light-dark" @click="configStore.toggleTheme" />
+        <v-btn
+          id="darkmodeButton"
+          class="darkmode-button"
+          icon="mdi-theme-light-dark"
+          @click="configStore.toggleTheme"
+        />
         <!-- Toggle Basemap type -->
-        <BasemapButtonComponent id="basmapButton" class="basemap-button" @basemap-changed="handleBasemapChanged" />
+        <BasemapButtonComponent
+          id="basmapButton"
+          class="basemap-button"
+          @basemap-changed="handleBasemapChanged"
+        />
       </div>
+      <!-- Timeline Component -->
+      <TimelineComponent v-show="timelineVisibility" class="timeline" />
     </v-responsive>
   </v-container>
 </template>
@@ -161,6 +250,14 @@ function addMapLayer(layer: MapLayer) {
   position: absolute;
   top: 30px;
   right: 40px;
+  z-index: 10;
+}
+
+.timeline {
+  position: absolute;
+  top: 50px;
+  left: 220px;
+  width: 300px;
   z-index: 10;
 }
 

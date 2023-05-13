@@ -39,6 +39,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       icon: 'mdi-tree',
       button_color: 'red-lighten-3',
       active: true,
+      query_string: `start_year={year}&end_year={year}`,
     },
     {
       title: 'Fire',

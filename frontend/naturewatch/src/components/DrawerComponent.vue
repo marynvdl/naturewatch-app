@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import type DrawerMenuItem from '@/interfaces/DrawerMenuItemInterface';
 import useMapLayerStore from '@/store/MapLayerStore';
+import useTimelineStore from '@/store/TimelineStore';
 import { computed } from 'vue';
 import logo from '@/assets/logo_nw.png';
 
-// Using the Map Layer store
+// Using stores
 const mapLayerStore = useMapLayerStore();
+const timelineStore = useTimelineStore();
 
-// Accessing the Map Layers and Toggle layer visibility function
+// Accessing values from the stores
+// Map layers and their visibility
 const mapLayers = computed(() => mapLayerStore.MapLayers);
 const toggleLayerVisibility = mapLayerStore.toggleLayerVisibility;
+const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
+// Timeline visibility
+const toggleTimelineVisibility = timelineStore.toggleTimelineVisibility;
 
 /** Drawer menu items */
 const homeItem: DrawerMenuItem = {
@@ -18,6 +24,17 @@ const homeItem: DrawerMenuItem = {
   isNav: true,
   to: { name: 'Home' },
 };
+
+/** Methods */
+/** Handle button click to toggle layer */
+function handleButtonClick(title: string) {
+  toggleLayerVisibility(title);
+  if (visibleMapLayers.value.length === 0) {
+    toggleTimelineVisibility(false);
+  } else if (visibleMapLayers.value.length > 0) {
+    toggleTimelineVisibility(true);
+  }
+}
 </script>
 
 <template>
@@ -48,7 +65,7 @@ const homeItem: DrawerMenuItem = {
               class="position-relative d-flex align-center justify-center"
               size="80"
               elevation="0"
-              @click="toggleLayerVisibility(item.title)"
+              @click="handleButtonClick(item.title)"
             >
               <v-img
                 class="position-absolute rounded-lg"
@@ -76,7 +93,7 @@ const homeItem: DrawerMenuItem = {
               rounded="lg"
               :color="item.visible ? item.button_color : 'default'"
               elevation="0"
-              @click="toggleLayerVisibility(item.title)"
+              @click="handleButtonClick(item.title)"
             >
               <template #default>
                 <v-icon color="grey-darken-3" />
