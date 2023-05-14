@@ -22,4 +22,6 @@ export default interface MapLayer {
   button_color?: string;
   /** Button is active */
   active?: boolean;
+  /** Optional query string */
+  query_string?: string;
 }
