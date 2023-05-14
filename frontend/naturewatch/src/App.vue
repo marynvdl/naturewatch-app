@@ -10,33 +10,29 @@ import {
   type WritableComputedRef,
 } from 'vue';
 import { useTheme } from 'vuetify/lib/framework.mjs';
+import DrawerComponent from '@/components/DrawerComponent.vue';
+import logo from '@/assets/logo.svg';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
 // Stores
 import { useGlobal, useConfig } from '@/store';
+import useDrawerStore from '@/store/DrawerStore';
 
-// Components
-import DrawerComponent from '@/components/DrawerComponent.vue';
-
-import logo from '@/assets/logo.svg';
-
-// Mapbox CSS
-import 'mapbox-gl/dist/mapbox-gl.css';
+/** Using stores */
+const drawerStore = useDrawerStore();
+const globalStore = useGlobal();
+const configStore = useConfig();
 
 /** Vuetify Theme */
 const theme = useTheme();
 
-/** Global Store */
-const globalStore = useGlobal();
-/** Config Store */
-const configStore = useConfig();
-
 /** Title */
 const title = import.meta.env.VITE_APP_TITLE || 'NatureWatch';
 
-/** Drawer visibility */
-const drawer: Ref<boolean> = ref(true);
-
-/** Drawer width */
-const drawerWidth = ref('170');
+/** Drawer */
+const drawerVisible = computed(() => drawerStore.visible);
+const drawerWidth = computed(() => drawerStore.width);
+const toggleDrawerVisibility = drawerStore.toggleDrawerVisibility;
 
 /** loading overlay visibility */
 const loading: WritableComputedRef<boolean> = computed({
@@ -91,7 +87,7 @@ onMounted(() => {
 
 <template>
   <v-app :theme="isDark">
-    <v-navigation-drawer v-model="drawer" :width="drawerWidth">
+    <v-navigation-drawer v-model="drawerVisible" :width="drawerWidth">
       <drawer-component />
     </v-navigation-drawer>
 
@@ -112,10 +108,12 @@ onMounted(() => {
     <v-main class="pa-0">
       <v-btn
         class="drawer-button"
-        :style="drawer ? `left: ${parseInt(drawerWidth) - 15}px` : 'left: 15px'"
-        :icon="drawer ? 'mdi-menu-open' : 'mdi-menu'"
+        :style="
+          drawerVisible ? `left: ${parseInt(drawerWidth) - 15}px` : 'left: 15px'
+        "
+        :icon="drawerVisible ? 'mdi-menu-open' : 'mdi-menu'"
         elevation="2"
-        @click="drawer = !drawer"
+        @click="toggleDrawerVisibility"
       />
       <router-view v-slot="{ Component, route }">
         <component :is="Component" :key="route.path" />

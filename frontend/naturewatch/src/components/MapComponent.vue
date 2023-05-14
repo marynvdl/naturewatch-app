@@ -7,6 +7,7 @@ import { useConfig } from '@/store';
 import useBasemapStore from '@/store/BasemapStore';
 import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
+import useDrawerStore from '@/store/DrawerStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
 
 /** Using stores */
@@ -14,6 +15,7 @@ const configStore = useConfig();
 const basemapStore = useBasemapStore();
 const mapLayerStore = useMapLayerStore();
 const timelineStore = useTimelineStore();
+const drawerStore = useDrawerStore();
 
 /** Interfaces */
 interface MapboxMap {
@@ -38,6 +40,10 @@ const map = ref<mapboxgl.Map | null>(null);
 // Timeline visibility from store
 const timelineVisibility = computed(() => timelineStore.visible);
 const activeYear = computed(() => timelineStore.activeYear);
+
+// Drawer visibility and width
+const drawerVisible = computed(() => drawerStore.visible);
+const drawerWidth = computed(() => drawerStore.width);
 
 const mapOptions: MapboxMap = {
   accessToken:
@@ -219,7 +225,13 @@ function addSourceAndLayer(
         />
       </div>
       <!-- Timeline Component -->
-      <TimelineComponent v-show="timelineVisibility" class="timeline" />
+      <TimelineComponent
+        v-show="timelineVisibility"
+        class="timeline"
+        :style="
+          drawerVisible ? `left: ${parseInt(drawerWidth) + 80}px` : 'left: 95px'
+        "
+      />
     </v-responsive>
   </v-container>
 </template>
@@ -256,11 +268,10 @@ function addSourceAndLayer(
 .timeline {
   position: absolute;
   top: 50px;
-  left: 220px;
   width: 300px;
   z-index: 10;
+  transition: left 0.2s ease-in-out;
 }
-
 .map-parent {
   padding: 0;
 }
