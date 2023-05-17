@@ -31,7 +31,6 @@ const useBasemapStore = defineStore('basemap', () => {
       url.value = 'mapbox://styles/nature-watch/clhasye2x014301pg03i97sca';
     }
   }
-
   return { title, url, currentBasemap, toggleBasemap };
 });
 

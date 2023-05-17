@@ -45,6 +45,9 @@ const activeYear = computed(() => timelineStore.activeYear);
 const drawerVisible = computed(() => drawerStore.visible);
 const drawerWidth = computed(() => drawerStore.width);
 
+// Label visibility
+const areLabelsVisible = ref(false);
+
 const mapOptions: MapboxMap = {
   accessToken:
     'pk.eyJ1IjoibmF0dXJlLXdhdGNoIiwiYSI6ImNsZWU4MHN6MjBlZmwzcG12cTdnNGJwcGEifQ.gK_j2FlTCHa0bV0cUT_3IA',
@@ -103,6 +106,26 @@ onMounted(() => {
 });
 
 /** Methods */
+/** Toggle labels on basemap */
+function toggleLabels(map: mapboxgl.Map | null) {
+  if (map) {
+    let anyLabelIsVisible = false;
+    map.getStyle().layers.forEach(function (layer) {
+      if (layer.type === 'symbol' || layer.type === 'line') {
+        const visibility = map.getLayoutProperty(layer.id, 'visibility');
+        if (visibility === 'visible') {
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+        } else {
+          map.setLayoutProperty(layer.id, 'visibility', 'visible');
+          anyLabelIsVisible = true;
+        }
+      }
+    });
+    areLabelsVisible.value = anyLabelIsVisible;
+    console.log(`#MapComponent: ${areLabelsVisible.value}`);
+  }
+}
+
 /** Handle basemap change */
 function handleBasemapChanged(newStyleUrl: string) {
   if (map.value) {
@@ -217,6 +240,14 @@ function addSourceAndLayer(
           icon="mdi-theme-light-dark"
           @click="configStore.toggleTheme"
         />
+        <!-- Toggle basemap labels -->
+        <v-btn
+          id="labelsButton"
+          class="labels-button"
+          :class="{ 'labels-visible': areLabelsVisible }"
+          icon="mdi-format-title"
+          @click="toggleLabels(map)"
+        />
         <!-- Toggle Basemap type -->
         <BasemapButtonComponent
           id="basmapButton"
@@ -264,7 +295,15 @@ function addSourceAndLayer(
   right: 40px;
   z-index: 10;
 }
-
+.labels-button {
+  position: absolute;
+  bottom: 120px;
+  right: 40px;
+  z-index: 10;
+}
+.labels-button.labels-visible {
+  background-color: green;
+}
 .timeline {
   position: absolute;
   top: 50px;
