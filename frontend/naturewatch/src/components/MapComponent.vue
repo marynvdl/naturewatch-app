@@ -247,11 +247,14 @@ function addSourceAndLayer(
         <!-- Toggle basemap labels -->
         <v-btn
           id="labelsButton"
+          size="small"
+          variant="tonal"
           class="labels-button"
           :class="{ 'labels-visible': areLabelsVisible }"
-          icon="mdi-format-title"
           @click="handleLabelsChanged(map)"
-        />
+        >
+          Labels
+        </v-btn>
         <!-- Toggle Basemap type -->
         <BasemapButtonComponent
           id="basmapButton"
@@ -306,7 +309,7 @@ function addSourceAndLayer(
   z-index: 10;
 }
 .labels-button.labels-visible {
-  background-color: green;
+  background-color: rgb(115, 185, 85);
 }
 .timeline {
   position: absolute;
