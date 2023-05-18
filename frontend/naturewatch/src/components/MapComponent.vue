@@ -46,7 +46,8 @@ const drawerVisible = computed(() => drawerStore.visible);
 const drawerWidth = computed(() => drawerStore.width);
 
 // Label visibility
-const areLabelsVisible = ref(false);
+const areLabelsVisible = computed(() => basemapStore.labelsVisible);
+const toggleLabelsTo = basemapStore.toggleLabelsTo;
 
 const mapOptions: MapboxMap = {
   accessToken:
@@ -101,28 +102,31 @@ onMounted(() => {
       visibleMapLayers.value.forEach((layer, index) => {
         addSourceAndLayer(layer, activeYear.value, map.value);
       });
+      setLabels(map.value);
     });
   }
 });
 
 /** Methods */
-/** Toggle labels on basemap */
-function toggleLabels(map: mapboxgl.Map | null) {
+/** Handle labels change on basemap */
+function handleLabelsChanged(map: mapboxgl.Map | null) {
+  toggleLabelsTo(!areLabelsVisible.value);
+  setLabels(map);
+}
+
+/** Toggle label visibility of basemap */
+function setLabels(map: mapboxgl.Map | null) {
   if (map) {
-    let anyLabelIsVisible = false;
     map.getStyle().layers.forEach(function (layer) {
       if (layer.type === 'symbol' || layer.type === 'line') {
-        const visibility = map.getLayoutProperty(layer.id, 'visibility');
-        if (visibility === 'visible') {
-          map.setLayoutProperty(layer.id, 'visibility', 'none');
-        } else {
+        // Toggle visibility
+        if (areLabelsVisible.value) {
           map.setLayoutProperty(layer.id, 'visibility', 'visible');
-          anyLabelIsVisible = true;
+        } else {
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
         }
       }
     });
-    areLabelsVisible.value = anyLabelIsVisible;
-    console.log(`#MapComponent: ${areLabelsVisible.value}`);
   }
 }
 
@@ -246,7 +250,7 @@ function addSourceAndLayer(
           class="labels-button"
           :class="{ 'labels-visible': areLabelsVisible }"
           icon="mdi-format-title"
-          @click="toggleLabels(map)"
+          @click="handleLabelsChanged(map)"
         />
         <!-- Toggle Basemap type -->
         <BasemapButtonComponent
