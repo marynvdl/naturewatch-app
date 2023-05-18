@@ -7,32 +7,41 @@ const useBasemapStore = defineStore('basemap', () => {
   // State
   const title: Ref<string> = ref('Satellite');
   const url: Ref<string> = ref(
-    'mapbox://styles/nature-watch/clhasye2x014301pg03i97sca'
+    'mapbox://styles/nature-watch/clhasd44b012301pg7dilg74p'
   );
+  const labelsVisible: Ref<boolean> = ref(true);
 
   // Getters
-  /**
-   *
-   */
+  /** Get current active basemap style */
   function currentBasemap(): Basemap {
     return { title: title.value, url: url.value };
   }
 
   // Actions
-  /**
-   *
-   */
+  /** Toggle basemap style between Satellite and Streets*/
   function toggleBasemap() {
     if (title.value === 'Satellite') {
       title.value = 'Streets';
       url.value = 'mapbox://styles/mapbox/streets-v12';
     } else {
       title.value = 'Satellite';
-      url.value = 'mapbox://styles/nature-watch/clhasye2x014301pg03i97sca';
+      url.value = 'mapbox://styles/nature-watch/clhasd44b012301pg7dilg74p';
     }
   }
 
-  return { title, url, currentBasemap, toggleBasemap };
+  /** Toggle labels of basemap style */
+  function toggleLabelsTo(visible: boolean) {
+    labelsVisible.value = visible;
+  }
+
+  return {
+    title,
+    url,
+    labelsVisible,
+    currentBasemap,
+    toggleBasemap,
+    toggleLabelsTo,
+  };
 });
 
 export default useBasemapStore;

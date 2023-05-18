@@ -45,6 +45,10 @@ const activeYear = computed(() => timelineStore.activeYear);
 const drawerVisible = computed(() => drawerStore.visible);
 const drawerWidth = computed(() => drawerStore.width);
 
+// Label visibility
+const areLabelsVisible = computed(() => basemapStore.labelsVisible);
+const toggleLabelsTo = basemapStore.toggleLabelsTo;
+
 const mapOptions: MapboxMap = {
   accessToken:
     'pk.eyJ1IjoibmF0dXJlLXdhdGNoIiwiYSI6ImNsZWU4MHN6MjBlZmwzcG12cTdnNGJwcGEifQ.gK_j2FlTCHa0bV0cUT_3IA',
@@ -98,11 +102,34 @@ onMounted(() => {
       visibleMapLayers.value.forEach((layer, index) => {
         addSourceAndLayer(layer, activeYear.value, map.value);
       });
+      setLabels(map.value);
     });
   }
 });
 
 /** Methods */
+/** Handle labels change on basemap */
+function handleLabelsChanged(map: mapboxgl.Map | null) {
+  toggleLabelsTo(!areLabelsVisible.value);
+  setLabels(map);
+}
+
+/** Toggle label visibility of basemap */
+function setLabels(map: mapboxgl.Map | null) {
+  if (map) {
+    map.getStyle().layers.forEach(function (layer) {
+      if (layer.type === 'symbol' || layer.type === 'line') {
+        // Toggle visibility
+        if (areLabelsVisible.value) {
+          map.setLayoutProperty(layer.id, 'visibility', 'visible');
+        } else {
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+        }
+      }
+    });
+  }
+}
+
 /** Handle basemap change */
 function handleBasemapChanged(newStyleUrl: string) {
   if (map.value) {
@@ -175,11 +202,23 @@ function addSourceToMap(
 /** Add layer to the map */
 function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
   if (map) {
-    map.addLayer({
-      id: layer.title + activeYear.value,
-      type: 'raster',
-      source: layer.title + activeYear.value,
-    });
+    // Add layer below labels and lines
+    let firstSymbolId;
+
+    for (const layer of map.getStyle().layers) {
+      if (layer.type === 'symbol' || layer.type === 'line') {
+        firstSymbolId = layer.id;
+        break;
+      }
+    }
+    map.addLayer(
+      {
+        id: layer.title + activeYear.value,
+        type: 'raster',
+        source: layer.title + activeYear.value,
+      },
+      firstSymbolId
+    );
   }
 }
 
@@ -217,6 +256,17 @@ function addSourceAndLayer(
           icon="mdi-theme-light-dark"
           @click="configStore.toggleTheme"
         />
+        <!-- Toggle basemap labels -->
+        <v-btn
+          id="labelsButton"
+          size="small"
+          variant="tonal"
+          class="labels-button"
+          :class="{ 'labels-visible': areLabelsVisible }"
+          @click="handleLabelsChanged(map)"
+        >
+          Labels
+        </v-btn>
         <!-- Toggle Basemap type -->
         <BasemapButtonComponent
           id="basmapButton"
@@ -264,7 +314,15 @@ function addSourceAndLayer(
   right: 40px;
   z-index: 10;
 }
-
+.labels-button {
+  position: absolute;
+  bottom: 120px;
+  right: 40px;
+  z-index: 10;
+}
+.labels-button.labels-visible {
+  background-color: rgb(115, 185, 85);
+}
 .timeline {
   position: absolute;
   top: 50px;
