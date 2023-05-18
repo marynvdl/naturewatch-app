@@ -202,11 +202,23 @@ function addSourceToMap(
 /** Add layer to the map */
 function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
   if (map) {
-    map.addLayer({
-      id: layer.title + activeYear.value,
-      type: 'raster',
-      source: layer.title + activeYear.value,
-    });
+    // Add layer below labels and lines
+    let firstSymbolId;
+
+    for (const layer of map.getStyle().layers) {
+      if (layer.type === 'symbol' || layer.type === 'line') {
+        firstSymbolId = layer.id;
+        break;
+      }
+    }
+    map.addLayer(
+      {
+        id: layer.title + activeYear.value,
+        type: 'raster',
+        source: layer.title + activeYear.value,
+      },
+      firstSymbolId
+    );
   }
 }
 
