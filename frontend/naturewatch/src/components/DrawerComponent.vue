@@ -40,7 +40,7 @@ function handleButtonClick(title: string) {
 <template>
   <v-container class="position-relative d-flex justify-center align-center">
     <v-btn
-      class="elevation-0 bg-transparent"
+      class="elevation-0 bg-transparent overflow-hidden rounded-circle"
       nav
       :disabled="!homeItem.to"
       :to="homeItem.to"
