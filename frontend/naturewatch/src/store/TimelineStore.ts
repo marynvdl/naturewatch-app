@@ -6,6 +6,7 @@ const useTimelineStore = defineStore('timeline', () => {
   /** Loading overlay */
   const visible: Ref<boolean> = ref(false);
   const activeYear: Ref<number> = ref(2022);
+  const lastActiveYear: Ref<number> = ref(2016);
 
   // Getters
 
@@ -17,10 +18,17 @@ const useTimelineStore = defineStore('timeline', () => {
 
   /** Set active year*/
   function setActiveYear(newYear: number): void {
+    lastActiveYear.value = activeYear.value;
     activeYear.value = newYear;
   }
 
-  return { visible, activeYear, toggleTimelineVisibility, setActiveYear };
+  return {
+    visible,
+    activeYear,
+    lastActiveYear,
+    toggleTimelineVisibility,
+    setActiveYear,
+  };
 });
 
 export default useTimelineStore;

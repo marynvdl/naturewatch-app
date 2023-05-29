@@ -327,7 +327,7 @@ function addSourceAndLayer(
 .timeline {
   position: absolute;
   top: 50px;
-  width: 300px;
+  width: 260px;
   z-index: 10;
   transition: left 0.2s ease-in-out;
 }
