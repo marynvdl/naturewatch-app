@@ -321,12 +321,13 @@ function addSourceAndLayer(
   z-index: 10;
 }
 .labels-button.labels-visible {
-  background-color: rgb(115, 185, 85);
+  background-color: rgb(var(--v-theme-surface-variant));
+  color: rgb(var(--v-theme-on-surface-variant));
 }
 .timeline {
   position: absolute;
   top: 50px;
-  width: 300px;
+  width: 260px;
   z-index: 10;
   transition: left 0.2s ease-in-out;
 }

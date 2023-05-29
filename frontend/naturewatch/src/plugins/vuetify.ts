@@ -3,6 +3,7 @@
  */
 import { aliases, mdi } from 'vuetify/iconsets/mdi';
 import { createVuetify } from 'vuetify';
+import type { ThemeDefinition } from 'vuetify';
 
 // For test use. Do not include createVuetify()
 // see https://next.vuetifyjs.com/en/features/treeshaking/
@@ -19,6 +20,43 @@ loadFonts();
 // Styles
 import 'vuetify/styles';
 import '@mdi/font/css/materialdesignicons.css';
+
+// Custom themes
+const satelliteDark: ThemeDefinition = {
+  dark: true,
+  colors: {
+    background: '#121212',
+    surface: '#1E1E1E',
+    'surface-variant': '#f2e5f1',
+    'on-surface-variant': '#263238',
+    primary: '#FFFFFF',
+    'primary-darken-1': '#3700B3',
+    secondary: '#03DAC6',
+    'secondary-darken-1': '#018786',
+    error: '#CF6679',
+    info: '#2196F3',
+    success: '#00E676',
+    warning: '#FFD600',
+  },
+};
+
+const satelliteLight: ThemeDefinition = {
+  dark: false,
+  colors: {
+    background: '#FFFFFF',
+    surface: '#FFFFFF',
+    'surface-variant': '#f2e5f1',
+    'on-surface-variant': '#263238',
+    primary: '#6200EE',
+    'primary-darken-1': '#3700B3',
+    secondary: '#03DAC6',
+    'secondary-darken-1': '#018786',
+    error: '#B00020',
+    info: '#2196F3',
+    success: '#4CAF50',
+    warning: '#FFC107',
+  },
+};
 
 export default createVuetify({
   // Global configuration
@@ -53,6 +91,10 @@ export default createVuetify({
   // https://next.vuetifyjs.com/en/features/theme/
   theme: {
     defaultTheme: 'light',
+    themes: {
+      satelliteDark,
+      satelliteLight,
+    },
   },
 });
 

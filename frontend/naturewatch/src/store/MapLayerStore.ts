@@ -23,7 +23,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     {
       title: 'Built',
       button_type: 'small',
-      url: 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
+      url: 'https://storage.googleapis.com/nature-watch-bucket/tiles/built/2022/{z}/{x}/{y}.png',
       type: 'raster',
       visible: false,
       icon: 'mdi-office-building',
@@ -33,13 +33,13 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     {
       title: 'Treeloss',
       button_type: 'small',
-      url: 'https://tiles.globalforestwatch.org/umd_tree_cover_loss/v1.9/tcd_30/{z}/{x}/{y}.png',
+      url: 'https://tiles.globalforestwatch.org/umd_tree_cover_loss/latest/dynamic/{z}/{x}/{y}.png',
       type: 'raster',
       visible: false,
       icon: 'mdi-tree',
-      button_color: 'red-lighten-3',
+      button_color: '#ec96b7',
       active: true,
-      query_string: `start_year={year}&end_year={year}`,
+      query_string: `start_year=2000&end_year={year}`,
     },
     {
       title: 'Fire',
