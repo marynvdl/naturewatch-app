@@ -22,8 +22,24 @@ import 'vuetify/styles';
 import '@mdi/font/css/materialdesignicons.css';
 
 // Custom themes
-const satelliteTheme: ThemeDefinition = {
+const satelliteDark: ThemeDefinition = {
   dark: true,
+  colors: {
+    background: '#242862',
+    surface: '#242862',
+    primary: '#242862',
+    'primary-darken-1': '#3700B3',
+    secondary: '#03DAC6',
+    'secondary-darken-1': '#018786',
+    error: '#B00020',
+    info: '#242862',
+    success: '#242862',
+    warning: '#FB8C00',
+  },
+};
+
+const satelliteLight: ThemeDefinition = {
+  dark: false,
   colors: {
     background: '#FFFFFF',
     surface: '#FFFFFF',
@@ -72,7 +88,8 @@ export default createVuetify({
   theme: {
     defaultTheme: 'light',
     themes: {
-      satelliteTheme,
+      satelliteDark,
+      satelliteLight,
     },
   },
 });

@@ -17,17 +17,20 @@ import { useTheme } from 'vuetify';
 // Stores
 import { useGlobal, useConfig } from '@/store';
 import useDrawerStore from '@/store/DrawerStore';
+import useBasemapStore from '@/store/BasemapStore';
 
 /** Using stores */
 const drawerStore = useDrawerStore();
 const globalStore = useGlobal();
 const configStore = useConfig();
+const basemapStore = useBasemapStore();
 
 /** Title */
 const title = import.meta.env.VITE_APP_TITLE || 'NatureWatch';
 
 /** Theme */
 const theme = useTheme();
+const currentBasemap = computed(() => basemapStore.currentBasemap());
 
 watch(
   () => configStore.themeDark,
@@ -37,9 +40,24 @@ watch(
   { immediate: true }
 );
 
+watch(
+  () => basemapStore.title,
+  newVal => {
+    setTheme();
+  },
+  { immediate: true }
+);
+
 /** Methods */
 function setTheme() {
-  theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark';
+  const isSatellite = currentBasemap.value.title === 'Satellite';
+  const isDark = configStore.themeDark;
+
+  if (isSatellite) {
+    theme.global.name.value = isDark ? 'satelliteDark' : 'satelliteLight';
+  } else {
+    theme.global.name.value = isDark ? 'dark' : 'light';
+  }
 }
 
 /** Drawer */
