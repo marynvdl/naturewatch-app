@@ -20,7 +20,6 @@ watch(selectedYear, (newYear, oldYear) => {
 <template>
   <v-slider
     v-model="selectedYear"
-    color="white"
     show-ticks="always"
     tick-size="6"
     :min="2016"

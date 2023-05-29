@@ -25,16 +25,18 @@ import '@mdi/font/css/materialdesignicons.css';
 const satelliteDark: ThemeDefinition = {
   dark: true,
   colors: {
-    background: '#242862',
-    surface: '#242862',
-    primary: '#242862',
+    background: '#121212',
+    surface: '#1E1E1E',
+    'surface-variant': '#FFEBEE',
+    'on-surface-variant': '#263238',
+    primary: '#FFFFFF',
     'primary-darken-1': '#3700B3',
     secondary: '#03DAC6',
     'secondary-darken-1': '#018786',
-    error: '#B00020',
-    info: '#242862',
-    success: '#242862',
-    warning: '#FB8C00',
+    error: '#CF6679',
+    info: '#2196F3',
+    success: '#00E676',
+    warning: '#FFD600',
   },
 };
 
@@ -43,6 +45,8 @@ const satelliteLight: ThemeDefinition = {
   colors: {
     background: '#FFFFFF',
     surface: '#FFFFFF',
+    'surface-variant': '#FFEBEE',
+    'on-surface-variant': '#263238',
     primary: '#6200EE',
     'primary-darken-1': '#3700B3',
     secondary: '#03DAC6',
@@ -50,7 +54,7 @@ const satelliteLight: ThemeDefinition = {
     error: '#B00020',
     info: '#2196F3',
     success: '#4CAF50',
-    warning: '#FB8C00',
+    warning: '#FFC107',
   },
 };
 
