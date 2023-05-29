@@ -23,7 +23,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     {
       title: 'Built',
       button_type: 'small',
-      url: 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
+      url: 'https://storage.googleapis.com/nature-watch-bucket/tiles/built/2022/{z}/{x}/{y}.png',
       type: 'raster',
       visible: false,
       icon: 'mdi-office-building',

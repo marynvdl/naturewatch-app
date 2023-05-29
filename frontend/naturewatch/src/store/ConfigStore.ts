@@ -4,6 +4,8 @@ import { defineStore } from 'pinia';
 type ConfigState = {
   /** Dark Theme mode */
   _themeDark: boolean;
+  /** Satellite Theme mode (overrules themeDark) */
+  _themeSatellite: boolean;
   /** Language */
   _locale: string;
 };
@@ -13,6 +15,7 @@ export default defineStore('config', {
   // Default Config State
   state: (): ConfigState => ({
     _themeDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
+    _themeSatellite: false,
     _locale:
       (window.navigator.languages && window.navigator.languages[0]) ||
       window.navigator.language,
@@ -20,6 +23,7 @@ export default defineStore('config', {
   // Getters
   getters: {
     themeDark: (s): boolean => s._themeDark,
+    themeSatellite: (s): boolean => s._themeSatellite,
     locale: (s): string => s._locale,
   },
   // Actions
@@ -27,6 +31,10 @@ export default defineStore('config', {
     /** Toggle Dark/Light mode */
     toggleTheme() {
       this._themeDark = !this._themeDark;
+    },
+    /** Toggle Satellite mode */
+    toggleSatelliteTheme() {
+      this._themeSatellite = !this._themeSatellite;
     },
     /** Set Locale. */
     setLocale(locale: string) {

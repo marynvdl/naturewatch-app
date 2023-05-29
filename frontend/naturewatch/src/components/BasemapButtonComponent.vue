@@ -31,7 +31,12 @@ const buttonImageSrc = computed(() =>
 <template>
   <div>
     <v-btn style="width: 0; height: 0" @click="handleButtonClick">
-      <v-img class="basemap-btn" aspect-ratio="16/9" cover :src="buttonImageSrc" />
+      <v-img
+        class="basemap-btn"
+        aspect-ratio="16/9"
+        cover
+        :src="buttonImageSrc"
+      />
     </v-btn>
   </div>
 </template>

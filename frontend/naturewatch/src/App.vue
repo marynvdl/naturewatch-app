@@ -9,10 +9,10 @@ import {
   type Ref,
   type WritableComputedRef,
 } from 'vue';
-import { useTheme } from 'vuetify/lib/framework.mjs';
 import DrawerComponent from '@/components/DrawerComponent.vue';
 import logo from '@/assets/logo.svg';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { useTheme } from 'vuetify';
 
 // Stores
 import { useGlobal, useConfig } from '@/store';
@@ -23,11 +23,24 @@ const drawerStore = useDrawerStore();
 const globalStore = useGlobal();
 const configStore = useConfig();
 
-/** Vuetify Theme */
-const theme = useTheme();
-
 /** Title */
 const title = import.meta.env.VITE_APP_TITLE || 'NatureWatch';
+
+/** Theme */
+const theme = useTheme();
+
+watch(
+  () => configStore.themeDark,
+  newVal => {
+    setTheme();
+  },
+  { immediate: true }
+);
+
+/** Methods */
+function setTheme() {
+  theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark';
+}
 
 /** Drawer */
 const drawerVisible = computed(() => drawerStore.visible);
@@ -51,16 +64,6 @@ const snackbar: Ref<boolean> = ref(false);
 /** Snackbar text */
 const snackbarText: ComputedRef<string> = computed(() => globalStore.message);
 
-/** Toggle Dark mode */
-const isDark: ComputedRef<string> = computed(() =>
-  configStore._themeDark ? 'dark' : 'light'
-);
-
-/** Theme Color (Sync browser theme color to vuetify theme color) */
-const themeColor: ComputedRef<string> = computed(
-  () => theme.computedThemes.value[isDark.value].colors.primary
-);
-
 // When snackbar text has been set, show snackbar.
 watch(
   () => globalStore.message,
@@ -82,11 +85,12 @@ watch(loading, async () => nextTick());
 onMounted(() => {
   document.title = title;
   loading.value = false;
+  setTheme();
 });
 </script>
 
 <template>
-  <v-app :theme="isDark">
+  <v-app>
     <v-navigation-drawer v-model="drawerVisible" :width="drawerWidth">
       <drawer-component />
     </v-navigation-drawer>
@@ -134,7 +138,6 @@ onMounted(() => {
     </v-snackbar>
   </v-app>
   <teleport to="head">
-    <meta name="theme-color" :content="themeColor" />
     <link rel="icon" :href="logo" type="image/svg+xml" />
   </teleport>
 </template>
