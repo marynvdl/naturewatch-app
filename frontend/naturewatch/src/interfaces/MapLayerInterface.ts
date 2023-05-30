@@ -1,4 +1,5 @@
 import type { MapLayerType, MapLayerButtonType } from '../types/MapLayerType';
+import type MapLayerPaint from '../interfaces/MapLayerPaintInterface';
 
 /** Map Layer Interface */
 export default interface MapLayer {
@@ -8,8 +9,12 @@ export default interface MapLayer {
   button_type: MapLayerButtonType;
   /** Layer source url */
   url: string;
-  /** Layer type */
+  /** Layer type: one of raster, line, point */
   type: MapLayerType;
+  /** Source layer from Mapbox */
+  sourceLayer?: string;
+  /** Layer source url */
+  paint?: MapLayerPaint;
   /** Layer visible on map */
   visible: boolean;
   /** Button icon if small button */

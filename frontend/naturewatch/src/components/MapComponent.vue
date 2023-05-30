@@ -197,7 +197,7 @@ function addSourceToMap(
           tileSize: 256,
         });
       }
-    } else if (layer.type === 'vector') {
+    } else if (layer.type === 'circle' || layer.type === 'line') {
       if (!map?.getSource(layer.title + activeYear.value)) {
         map.addSource(layer.title + activeYear.value, {
           type: 'vector',
@@ -230,17 +230,14 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
         },
         firstSymbolId
       );
-    } else if (layer.type === 'vector') {
+    } else if (layer.type === 'circle' || layer.type === 'line') {
       map.addLayer(
         {
           id: layer.title + activeYear.value,
-          type: 'circle',
+          type: layer.type,
           source: layer.title + activeYear.value,
-          'source-layer': 'dams',
-          paint: {
-            'circle-color': '#61d2ec',
-            'circle-radius': 3,
-          },
+          'source-layer': layer.sourceLayer,
+          paint: layer.paint as any,
         },
         firstSymbolId
       );
