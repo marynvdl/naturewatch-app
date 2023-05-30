@@ -189,12 +189,21 @@ function addSourceToMap(
   map: mapboxgl.Map | null
 ) {
   if (map) {
-    if (!map?.getSource(layer.title + activeYear.value)) {
-      map.addSource(layer.title + activeYear.value, {
-        type: 'raster',
-        tiles: [layerUrl],
-        tileSize: 256,
-      });
+    if (layer.type === 'raster') {
+      if (!map?.getSource(layer.title + activeYear.value)) {
+        map.addSource(layer.title + activeYear.value, {
+          type: 'raster',
+          tiles: [layerUrl],
+          tileSize: 256,
+        });
+      }
+    } else if (layer.type === 'vector') {
+      if (!map?.getSource(layer.title + activeYear.value)) {
+        map.addSource(layer.title + activeYear.value, {
+          type: 'vector',
+          url: layerUrl,
+        });
+      }
     }
   }
 }
@@ -211,14 +220,31 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
         break;
       }
     }
-    map.addLayer(
-      {
-        id: layer.title + activeYear.value,
-        type: 'raster',
-        source: layer.title + activeYear.value,
-      },
-      firstSymbolId
-    );
+
+    if (layer.type === 'raster') {
+      map.addLayer(
+        {
+          id: layer.title + activeYear.value,
+          type: 'raster',
+          source: layer.title + activeYear.value,
+        },
+        firstSymbolId
+      );
+    } else if (layer.type === 'vector') {
+      map.addLayer(
+        {
+          id: layer.title + activeYear.value,
+          type: 'circle',
+          source: layer.title + activeYear.value,
+          'source-layer': 'dams',
+          paint: {
+            'circle-color': '#61d2ec',
+            'circle-radius': 3,
+          },
+        },
+        firstSymbolId
+      );
+    }
   }
 }
 
