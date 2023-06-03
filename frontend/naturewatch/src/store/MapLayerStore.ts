@@ -98,10 +98,9 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       url: 'mapbox://nature-watch.dam-test-tiles',
       type: 'circle',
       sourceLayer: 'dams',
-      paint: {
-        'circle-color': '#345459',
-        'circle-radius': 3,
-      },
+      layer_color_satellite: '#b7e6f1',
+      layer_color_streets: '#5b7378',
+      circle_radius: 4,
       visible: false,
       icon: 'mdi-bridge',
       button_color: '#b7e6f1',

@@ -37,6 +37,13 @@ const currentBasemap = computed(() => basemapStore.currentBasemap());
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
 
+// Determine layer color to use
+const layerColorKey = computed(() => {
+  return basemapStore.title === 'Satellite'
+    ? 'layer_color_satellite'
+    : 'layer_color_streets';
+});
+
 // Timeline visibility from store
 const timelineVisibility = computed(() => timelineStore.visible);
 const activeYear = computed(() => timelineStore.activeYear);
@@ -212,11 +219,14 @@ function addSourceToMap(
 function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
   if (map) {
     // Add layer below labels and lines
-    let firstSymbolId;
+    let firstLineId;
+    let firstLabelId;
 
     for (const layer of map.getStyle().layers) {
-      if (layer.type === 'symbol' || layer.type === 'line') {
-        firstSymbolId = layer.id;
+      if (layer.type === 'symbol') {
+        firstLabelId = layer.id;
+      } else if (layer.type === 'line') {
+        firstLineId = layer.id;
         break;
       }
     }
@@ -228,18 +238,31 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
           type: 'raster',
           source: layer.title + activeYear.value,
         },
-        firstSymbolId
+        firstLineId
       );
-    } else if (layer.type === 'circle' || layer.type === 'line') {
+    } else if (layer.type === 'circle') {
       map.addLayer(
         {
           id: layer.title + activeYear.value,
           type: layer.type,
           source: layer.title + activeYear.value,
           'source-layer': layer.sourceLayer,
-          paint: layer.paint as any,
+          paint: {
+            'circle-radius': layer.circle_radius,
+            'circle-color': layer[layerColorKey.value],
+          },
         },
-        firstSymbolId
+        firstLabelId
+      );
+    } else if (layer.type === 'line') {
+      map.addLayer(
+        {
+          id: layer.title + activeYear.value,
+          type: layer.type,
+          source: layer.title + activeYear.value,
+          'source-layer': layer.sourceLayer,
+        },
+        firstLineId
       );
     }
   }

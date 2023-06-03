@@ -1,5 +1,4 @@
 import type { MapLayerType, MapLayerButtonType } from '../types/MapLayerType';
-import type MapLayerPaint from '../interfaces/MapLayerPaintInterface';
 
 /** Map Layer Interface */
 export default interface MapLayer {
@@ -13,8 +12,12 @@ export default interface MapLayer {
   type: MapLayerType;
   /** Source layer from Mapbox */
   sourceLayer?: string;
-  /** Layer source url */
-  paint?: MapLayerPaint;
+  /** Layer hex color for satellite */
+  layer_color_satellite?: string;
+  /** Layer hex color for streets */
+  layer_color_streets?: string;
+  /** Circle radius if point layer */
+  circle_radius?: number;
   /** Layer visible on map */
   visible: boolean;
   /** Button icon if small button */
