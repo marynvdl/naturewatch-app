@@ -92,6 +92,20 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       button_color: 'brown-lighten-1',
       active: true,
     },
+    {
+      title: 'Dams',
+      button_type: 'small',
+      url: 'mapbox://nature-watch.dam-test-tiles',
+      type: 'circle',
+      sourceLayer: 'dams',
+      layer_color_satellite: '#b7e6f1',
+      layer_color_streets: '#5b7378',
+      circle_radius: 4,
+      visible: false,
+      icon: 'mdi-bridge',
+      button_color: '#b7e6f1',
+      active: true,
+    },
   ]);
 
   // Getters

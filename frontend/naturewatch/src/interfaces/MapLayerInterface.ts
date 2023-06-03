@@ -8,8 +8,16 @@ export default interface MapLayer {
   button_type: MapLayerButtonType;
   /** Layer source url */
   url: string;
-  /** Layer type */
+  /** Layer type: one of raster, line, point */
   type: MapLayerType;
+  /** Source layer from Mapbox */
+  sourceLayer?: string;
+  /** Layer hex color for satellite */
+  layer_color_satellite?: string;
+  /** Layer hex color for streets */
+  layer_color_streets?: string;
+  /** Circle radius if point layer */
+  circle_radius?: number;
   /** Layer visible on map */
   visible: boolean;
   /** Button icon if small button */
