@@ -27,7 +27,7 @@ const satelliteDark: ThemeDefinition = {
   colors: {
     background: '#121212',
     surface: '#1E1E1E',
-    'surface-variant': '#f2e5f1',
+    'surface-variant': '#ebebeb',
     'on-surface-variant': '#263238',
     primary: '#FFFFFF',
     'primary-darken-1': '#3700B3',
@@ -45,7 +45,7 @@ const satelliteLight: ThemeDefinition = {
   colors: {
     background: '#FFFFFF',
     surface: '#FFFFFF',
-    'surface-variant': '#f2e5f1',
+    'surface-variant': '#ebebeb',
     'on-surface-variant': '#263238',
     primary: '#6200EE',
     'primary-darken-1': '#3700B3',

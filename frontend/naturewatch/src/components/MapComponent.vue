@@ -285,14 +285,6 @@ function addSourceAndLayer(
 <template>
   <v-container fluid class="map-parent">
     <v-responsive class="d-flex align-center text-center fill-height">
-      <!-- Logo -->
-      <!-- <v-img
-        src="@/assets/logo.svg"
-        alt="vuetify"
-        :width="256"
-        class="logo mx-auto"
-      /> -->
-      <!-- <p>{{ msg }}</p> -->
       <div class="map-container">
         <div id="mapDiv" />
         <!-- Toggle Dark mode -->
@@ -306,6 +298,7 @@ function addSourceAndLayer(
         <v-btn
           id="labelsButton"
           size="small"
+          width="70"
           variant="tonal"
           class="labels-button"
           :class="{ 'labels-visible': areLabelsVisible }"
@@ -325,7 +318,7 @@ function addSourceAndLayer(
         v-show="timelineVisibility"
         class="timeline"
         :style="
-          drawerVisible ? `left: ${parseInt(drawerWidth) + 80}px` : 'left: 95px'
+          drawerVisible ? `left: ${parseInt(drawerWidth) + 40}px` : 'left: 95px'
         "
       />
     </v-responsive>
@@ -363,7 +356,7 @@ function addSourceAndLayer(
 .labels-button {
   position: absolute;
   bottom: 120px;
-  right: 40px;
+  right: 42px;
   z-index: 10;
 }
 .labels-button.labels-visible {

@@ -113,20 +113,6 @@ onMounted(() => {
       <drawer-component />
     </v-navigation-drawer>
 
-    <!-- <v-app-bar>
-      <v-app-bar-nav-icon @click="drawer = !drawer" />
-      <v-app-bar-title tag="h1">{{ title }}</v-app-bar-title>
-      <v-spacer />
-      <app-bar-menu-component />
-      <v-progress-linear
-        v-show="loading"
-        :active="loading"
-        :indeterminate="progress === null"
-        :model-value="progress !== null ? progress : 0"
-        color="blue-accent-3"
-      />
-    </v-app-bar> -->
-
     <v-main class="pa-0">
       <v-btn
         class="drawer-button"
@@ -209,7 +195,7 @@ html {
 
 .drawer-button {
   position: absolute;
-  top: 30px;
+  top: 80px;
   z-index: 1005;
   transition: left 0.2s ease-in-out;
 }
