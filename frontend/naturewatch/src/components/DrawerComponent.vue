@@ -53,36 +53,38 @@ function handleButtonClick(title: string) {
     <v-row align="center" justify="center">
       <template v-for="item in mapLayers" :key="item.title">
         <!-- Big buttons -->
-        <v-col v-if="item.button_type === 'big'" class="my-3" cols="auto">
-          <div
-            class="d-flex flex-column align-center position-relative aspect-ratio--1-1"
-          >
+        <v-col
+          v-if="item.button_type === 'big'"
+          class="mt-3 mb-0 px-4"
+          cols="auto"
+        >
+          <div class="d-flex flex-column align-center aspect-ratio--1-1">
             <v-btn
               :disabled="!item.active"
               :variant="item.visible ? undefined : 'tonal'"
-              block
+              :icon="item.icon"
               rounded="lg"
-              class="position-relative d-flex align-center justify-center"
-              size="80"
+              :color="item.visible ? item.button_color : 'default'"
               elevation="0"
               @click="handleButtonClick(item.title)"
             >
-              <v-img
-                class="position-absolute rounded-lg"
-                width="100%"
-                cover
-                :src="item.visible ? item.image_visible : item.image_notvisible"
-              />
-              <span class="text-center" style="z-index: 1">
-                {{ item.title }}
-              </span>
+              <template #default>
+                <v-icon color="grey-darken-3" />
+              </template>
             </v-btn>
+            <span
+              class="mb-0"
+              :class="!item.active ? 'text-disabled' : ''"
+              style="font-size: 12px"
+            >
+              {{ item.title }}
+            </span>
           </div>
         </v-col>
         <!-- Small buttons -->
         <v-col
           v-else-if="item.button_type === 'small'"
-          class="pa-2"
+          class="pa-1"
           cols="auto"
         >
           <div class="d-flex flex-column align-center aspect-ratio--1-1">
