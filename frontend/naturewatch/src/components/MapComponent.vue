@@ -17,15 +17,6 @@ const mapLayerStore = useMapLayerStore();
 const timelineStore = useTimelineStore();
 const drawerStore = useDrawerStore();
 
-/** Interfaces */
-interface MapboxMap {
-  accessToken: string;
-  container: string;
-  style: string;
-  center: [number, number];
-  zoom: number;
-}
-
 /** Props */
 defineProps<{
   msg: string;
@@ -56,13 +47,14 @@ const drawerWidth = computed(() => drawerStore.width);
 const areLabelsVisible = computed(() => basemapStore.labelsVisible);
 const toggleLabelsTo = basemapStore.toggleLabelsTo;
 
-const mapOptions: MapboxMap = {
+const mapOptions: mapboxgl.MapboxOptions = {
   accessToken:
     'pk.eyJ1IjoibmF0dXJlLXdhdGNoIiwiYSI6ImNsZWU4MHN6MjBlZmwzcG12cTdnNGJwcGEifQ.gK_j2FlTCHa0bV0cUT_3IA',
   container: 'mapDiv',
   style: currentBasemap.value.url,
   center: [20.23928, 7.35074],
   zoom: 5,
+  attributionControl: false,
 };
 
 // Watch for changes in the visible property of map layers
@@ -101,7 +93,14 @@ watch(
 );
 
 onMounted(() => {
+  // Create the controls
+  const nav = new mapboxgl.NavigationControl();
+
+  // Initiate map
   map.value = new mapboxgl.Map(mapOptions);
+
+  // Add the custom controls during map initialization
+  map.value.addControl(nav, 'top-right');
 
   // Add event listener for style.load
   if (map.value) {
@@ -295,23 +294,30 @@ function addSourceAndLayer(
           @click="configStore.toggleTheme"
         />
         <!-- Toggle basemap labels -->
-        <v-btn
-          id="labelsButton"
-          size="small"
-          width="70"
-          variant="tonal"
-          class="labels-button"
-          :class="{ 'labels-visible': areLabelsVisible }"
-          @click="handleLabelsChanged(map)"
-        >
-          Labels
-        </v-btn>
-        <!-- Toggle Basemap type -->
-        <BasemapButtonComponent
-          id="basmapButton"
+        <div
           class="basemap-button"
-          @basemap-changed="handleBasemapChanged"
-        />
+          :style="
+            drawerVisible
+              ? `left: ${parseInt(drawerWidth) + 20}px`
+              : 'left: 20px'
+          "
+        >
+          <v-btn
+            id="labelsButton"
+            size="small"
+            width="70"
+            variant="tonal"
+            :class="{ 'labels-visible': areLabelsVisible }"
+            @click="handleLabelsChanged(map)"
+          >
+            Labels
+          </v-btn>
+          <!-- Toggle Basemap type -->
+          <BasemapButtonComponent
+            id="basmapButton"
+            @basemap-changed="handleBasemapChanged"
+          />
+        </div>
       </div>
       <!-- Timeline Component -->
       <TimelineComponent
@@ -342,24 +348,19 @@ function addSourceAndLayer(
 
 .basemap-button {
   position: absolute;
-  bottom: 90px;
-  right: 45px;
+  bottom: 70px;
+  left: 0px;
   z-index: 10;
+  transition: left 0.2s ease-in-out;
 }
 
 .darkmode-button {
   position: absolute;
-  top: 30px;
-  right: 40px;
+  top: 110px;
+  right: 10px;
   z-index: 10;
 }
-.labels-button {
-  position: absolute;
-  bottom: 120px;
-  right: 42px;
-  z-index: 10;
-}
-.labels-button.labels-visible {
+.labels-visible {
   background-color: rgb(var(--v-theme-surface-variant));
   color: rgb(var(--v-theme-on-surface-variant));
 }
