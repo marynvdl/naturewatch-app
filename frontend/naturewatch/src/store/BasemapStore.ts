@@ -4,7 +4,7 @@ import type Basemap from '@/interfaces/BasemapInterface';
 import type MapLayer from '@/interfaces/MapLayerInterface';
 
 const SatelliteLayer: MapLayer = {
-  title: 'All',
+  title: 'Satellite',
   button_type: 'big',
   url: 'https://mt.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}',
   type: 'raster',
