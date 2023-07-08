@@ -12,7 +12,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     {
       title: 'All',
       button_type: 'big',
-      url: 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
+      url: 'https://mt.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}',
       type: 'raster',
       visible: false,
       icon: 'mdi-home-city',

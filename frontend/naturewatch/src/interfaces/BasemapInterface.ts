@@ -1,3 +1,5 @@
+import type MapLayer from '@/interfaces/MapLayerInterface';
+
 /** Drawer Menu Item Interface */
 export default interface Basemap {
   /** Item Name */
@@ -6,5 +8,6 @@ export default interface Basemap {
   url: string | '-';
   /** Item Icon */
   icon?: string;
-  /** Router Location */
+  /** Optional Map Layer */
+  layer?: MapLayer
 }

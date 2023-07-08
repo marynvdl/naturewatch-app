@@ -30,7 +30,7 @@ const title = import.meta.env.VITE_APP_TITLE || 'NatureWatch';
 
 /** Theme */
 const theme = useTheme();
-const currentBasemap = computed(() => basemapStore.currentBasemap());
+const currentBasemap = computed(() => basemapStore.currentBasemap);
 
 watch(
   () => configStore.themeDark,

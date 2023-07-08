@@ -24,13 +24,13 @@ defineProps<{
 
 /** Data */
 // Current basemap from store
-const currentBasemap = computed(() => basemapStore.currentBasemap());
+const currentBasemap = computed(() => basemapStore.currentBasemap);
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
 
 // Determine layer color to use
 const layerColorKey = computed(() => {
-  return basemapStore.title === 'Satellite'
+  return currentBasemap.value.title === 'Satellite'
     ? 'layer_color_satellite'
     : 'layer_color_streets';
 });
@@ -46,6 +46,7 @@ const drawerWidth = computed(() => drawerStore.width);
 // Label visibility
 const areLabelsVisible = computed(() => basemapStore.labelsVisible);
 const toggleLabelsTo = basemapStore.toggleLabelsTo;
+const toggleSatelliteLayerVisibility = basemapStore.toggleSatelliteLayerVisibility;
 
 const mapOptions: mapboxgl.MapboxOptions = {
   accessToken:
@@ -55,6 +56,7 @@ const mapOptions: mapboxgl.MapboxOptions = {
   center: [20.23928, 7.35074],
   zoom: 5,
   attributionControl: false,
+  projection: 'mercator' as unknown as mapboxgl.Projection
 };
 
 // Watch for changes in the visible property of map layers
@@ -105,6 +107,10 @@ onMounted(() => {
   // Add event listener for style.load
   if (map.value) {
     map.value.on('style.load', () => {
+      // Check if basemap has a Map Layer
+      if (currentBasemap.value.layer){
+        addSourceAndLayer(currentBasemap.value.layer, activeYear.value, map.value);
+      }
       visibleMapLayers.value.forEach((layer, index) => {
         addSourceAndLayer(layer, activeYear.value, map.value);
       });
@@ -140,6 +146,10 @@ function setLabels(map: mapboxgl.Map | null) {
 function handleBasemapChanged(newStyleUrl: string) {
   if (map.value) {
     map.value.setStyle(newStyleUrl);
+    if (currentBasemap.value.layer){
+      updateMapLayer(currentBasemap.value.layer, map.value);
+      toggleSatelliteLayerVisibility()
+    }
   }
 }
 
