@@ -19,7 +19,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       image_visible: allVisibleImg,
       image_notvisible: allNotVisibleImg,
       button_color: 'brown-lighten-1',
-      active: true,
+      active: false,
     },
     {
       title: 'Built',

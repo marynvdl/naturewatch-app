@@ -1,31 +1,46 @@
-import { ref, type Ref } from 'vue';
+import { ref } from 'vue';
 import { defineStore } from 'pinia';
 import type Basemap from '@/interfaces/BasemapInterface';
+import type MapLayer from '@/interfaces/MapLayerInterface';
+
+const SatelliteLayer: MapLayer = {
+  title: 'Satellite',
+  button_type: 'big',
+  url: 'https://mt.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}',
+  type: 'raster',
+  visible: true,
+};
+
+const SatelliteBasemap: Basemap = {
+  title: 'Satellite',
+  url: 'mapbox://styles/nature-watch/clhasd44b012301pg7dilg74p',
+  layer: SatelliteLayer
+};
+
+const StreetsBasemap: Basemap = {
+  title: 'Streets',
+  url: 'mapbox://styles/mapbox/streets-v12',
+  layer: undefined
+};
+
 
 /** Basemap Store */
 const useBasemapStore = defineStore('basemap', () => {
   // State
-  const title: Ref<string> = ref('Satellite');
-  const url: Ref<string> = ref(
-    'mapbox://styles/nature-watch/clhasd44b012301pg7dilg74p'
-  );
-  const labelsVisible: Ref<boolean> = ref(true);
-
-  // Getters
-  /** Get current active basemap style */
-  function currentBasemap(): Basemap {
-    return { title: title.value, url: url.value };
-  }
+  const currentBasemap = ref(StreetsBasemap);
+  const labelsVisible = ref(true);
 
   // Actions
   /** Toggle basemap style between Satellite and Streets*/
   function toggleBasemap() {
-    if (title.value === 'Satellite') {
-      title.value = 'Streets';
-      url.value = 'mapbox://styles/mapbox/streets-v12';
-    } else {
-      title.value = 'Satellite';
-      url.value = 'mapbox://styles/nature-watch/clhasd44b012301pg7dilg74p';
+    currentBasemap.value = currentBasemap.value.title === 'Satellite' ? StreetsBasemap : SatelliteBasemap;
+  }
+
+  /** Toggle layer visibility*/
+  function toggleSatelliteLayerVisibility(): void {
+    const layer = currentBasemap.value.layer;
+    if (layer){
+      layer.visible = !layer.visible;
     }
   }
 
@@ -35,12 +50,11 @@ const useBasemapStore = defineStore('basemap', () => {
   }
 
   return {
-    title,
-    url,
-    labelsVisible,
     currentBasemap,
+    labelsVisible,
     toggleBasemap,
     toggleLabelsTo,
+    toggleSatelliteLayerVisibility
   };
 });
 

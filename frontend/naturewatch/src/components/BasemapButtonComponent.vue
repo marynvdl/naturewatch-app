@@ -8,7 +8,7 @@ import streetsImg from '@/assets/streets.png';
 const basemapStore = useBasemapStore();
 
 // Accessing the currentBasemap and toggleBasemap from the store
-const currentBasemap = computed(() => basemapStore.currentBasemap());
+const currentBasemap = computed(() => basemapStore.currentBasemap);
 const toggleBasemap = basemapStore.toggleBasemap;
 
 /** Emits */
