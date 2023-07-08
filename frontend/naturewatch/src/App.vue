@@ -41,7 +41,7 @@ watch(
 );
 
 watch(
-  () => basemapStore.title,
+  () => basemapStore.currentBasemap.title,
   newVal => {
     setTheme();
   },
