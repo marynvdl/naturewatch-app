@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@mdi/font": "^7.1.96",
+    "@turf/turf": "^6.5.0",
     "core-js": "^3.29.0",
     "mapbox-gl": "^2.13.0",
     "pinia": "^2.0.32",
