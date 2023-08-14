@@ -12,7 +12,12 @@ const map = ref(props.mapInstance);
 
 onMounted(() => {
   const draw = new MapboxDraw({
-    displayControlsDefault: true,
+    displayControlsDefault: false,
+    controls: {
+          line_string: true,
+          polygon: true,
+          trash: true,
+        },
   });
 
   map.value?.addControl(draw, 'bottom-right');

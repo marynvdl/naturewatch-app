@@ -302,6 +302,7 @@ function addSourceAndLayer(
           id="darkmodeButton"
           class="darkmode-button"
           icon="mdi-theme-light-dark"
+          size="small"
           @click="configStore.toggleTheme"
         />
         <!-- Toggle basemap labels -->
@@ -369,7 +370,7 @@ function addSourceAndLayer(
 
 .darkmode-button {
   position: absolute;
-  top: 110px;
+  top: 240px;
   right: 10px;
   z-index: 10;
 }
