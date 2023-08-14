@@ -2,6 +2,7 @@
 import { onMounted, ref, computed, watch } from 'vue';
 import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
+import MeasureComponent from './MeasureComponent.vue';
 import TimelineComponent from '@/components/TimelineComponent.vue';
 import { useConfig } from '@/store';
 import useBasemapStore from '@/store/BasemapStore';
@@ -337,6 +338,8 @@ function addSourceAndLayer(
           drawerVisible ? `left: ${parseInt(drawerWidth) + 40}px` : 'left: 95px'
         "
       />
+      <!-- Measure Component -->
+      <MeasureComponent v-if="map" :mapInstance="map" />
     </v-responsive>
   </v-container>
 </template>
