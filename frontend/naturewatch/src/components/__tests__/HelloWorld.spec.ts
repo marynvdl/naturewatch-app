@@ -15,7 +15,6 @@ describe('HelloWorld', () => {
 
     const img = wrapper.findComponent(components.VImg);
     expect(img).toBeTruthy();
-
   });
 
   it('renders properly', () => {
