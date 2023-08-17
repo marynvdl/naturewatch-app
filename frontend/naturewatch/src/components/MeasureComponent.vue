@@ -5,13 +5,19 @@ import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import turfLength from '@turf/length';
 import turfArea from '@turf/area';
 import turfAlong from '@turf/along';import turfCentroid from '@turf/centroid';
-import { useConfig } from '@/store';
+import useBasemapStore from '@/store/BasemapStore';
 
 /** Using stores */
-const configStore = useConfig();
+const basemapStore = useBasemapStore();
 
 // Get current basemap from store
-const themeSatellite = computed(() => configStore._themeSatellite);
+const currentBasemap = computed(() => basemapStore.currentBasemap);
+
+const themeSatellite = computed(() => {
+  return currentBasemap.value.title === 'Satellite'
+    ? true
+    : false;
+});
 
 /* eslint-disable vue/require-default-prop */
 const props = defineProps({
