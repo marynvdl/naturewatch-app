@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import turfLength from '@turf/length';
 import turfArea from '@turf/area';
 import turfAlong from '@turf/along';import turfCentroid from '@turf/centroid';
+import { useConfig } from '@/store';
 
+/** Using stores */
+const configStore = useConfig();
+
+// Get current basemap from store
+const themeSatellite = computed(() => configStore._themeSatellite);
 
 /* eslint-disable vue/require-default-prop */
 const props = defineProps({
@@ -45,17 +51,20 @@ function measure(event: any) {
 
   if (geometry.type === 'LineString') {
     const distance = turfLength(geometry);
-    label = `${distance.toFixed(0)} km`;
+    // Format the distance with thousands separator
+    label = `${distance.toLocaleString(undefined, {maximumFractionDigits: 0})} km`;
 
     // Calculate position for the label for LineString
     position = turfAlong(geometry, distance / 2);
   } else if (geometry.type === 'Polygon') {
-    const area = turfArea(geometry);
-    label = `${(area / 1000000).toFixed(0)} km²`;
+    const area = turfArea(geometry) / 1000000; // Convert to km²
+    // Format the area with thousands separator
+    label = `${area.toLocaleString(undefined, {maximumFractionDigits: 0})} km²`;
 
     // Calculate position for the label for Polygon
     position = turfCentroid(geometry);
   }
+
 
   // Add source and layer to the map for the label
   map.value?.addSource(id, {
@@ -80,6 +89,9 @@ function measure(event: any) {
       'text-field': ['get', 'description'],
       'text-anchor': 'center',
     },
+    paint: {
+        'text-color': themeSatellite.value ? 'white' : 'black',
+    },
   });
 
   // Store the label
@@ -87,7 +99,7 @@ function measure(event: any) {
     id,
     description: label,
     coordinates: position?.geometry.coordinates
-});
+  });
 }
 
 function removeMeasurementLabel(event: any) {
@@ -151,10 +163,12 @@ map.value?.on('style.load', () => {
                 'text-field': ['get', 'description'],
                 'text-anchor': 'center',
             },
+            paint: {
+              'text-color': themeSatellite.value ? 'white' : 'black',
+            },            
         });
     });
 });
-
 
 
 </script>

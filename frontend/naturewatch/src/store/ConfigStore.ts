@@ -15,7 +15,7 @@ export default defineStore('config', {
   // Default Config State
   state: (): ConfigState => ({
     _themeDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
-    _themeSatellite: false,
+    _themeSatellite: true,
     _locale:
       (window.navigator.languages && window.navigator.languages[0]) ||
       window.navigator.language,

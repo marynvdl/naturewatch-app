@@ -4,7 +4,7 @@ import { computed } from 'vue';
 import satelliteImg from '@/assets/satellite.png';
 import streetsImg from '@/assets/streets.png';
 
-// Using the basemap store
+// Using stores
 const basemapStore = useBasemapStore();
 
 // Accessing the currentBasemap and toggleBasemap from the store
