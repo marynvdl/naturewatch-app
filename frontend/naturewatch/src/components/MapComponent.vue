@@ -2,6 +2,7 @@
 import { onMounted, ref, computed, watch } from 'vue';
 import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
+import MeasureComponent from './MeasureComponent.vue';
 import TimelineComponent from '@/components/TimelineComponent.vue';
 import { useConfig } from '@/store';
 import useBasemapStore from '@/store/BasemapStore';
@@ -301,6 +302,7 @@ function addSourceAndLayer(
           id="darkmodeButton"
           class="darkmode-button"
           icon="mdi-theme-light-dark"
+          size="small"
           @click="configStore.toggleTheme"
         />
         <!-- Toggle basemap labels -->
@@ -337,6 +339,8 @@ function addSourceAndLayer(
           drawerVisible ? `left: ${parseInt(drawerWidth) + 40}px` : 'left: 95px'
         "
       />
+      <!-- Measure Component -->
+      <MeasureComponent v-if="map" :mapInstance="map" />
     </v-responsive>
   </v-container>
 </template>
@@ -366,7 +370,7 @@ function addSourceAndLayer(
 
 .darkmode-button {
   position: absolute;
-  top: 110px;
+  top: 240px;
   right: 10px;
   z-index: 10;
 }

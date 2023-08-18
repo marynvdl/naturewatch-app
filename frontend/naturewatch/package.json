@@ -32,7 +32,9 @@
     "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false"
   },
   "dependencies": {
+    "@mapbox/mapbox-gl-draw": "^1.4.2",
     "@mdi/font": "^7.1.96",
+    "@turf/turf": "^6.5.0",
     "core-js": "^3.29.0",
     "mapbox-gl": "^2.13.0",
     "pinia": "^2.0.32",
@@ -44,6 +46,7 @@
   },
   "devDependencies": {
     "@types/jsdom": "^21.1.0",
+    "@types/mapbox__mapbox-gl-draw": "^1.4.0",
     "@types/mapbox-gl": "^2.7.10",
     "@types/node": "^18.14.6",
     "@types/webfontloader": "^1.6.35",

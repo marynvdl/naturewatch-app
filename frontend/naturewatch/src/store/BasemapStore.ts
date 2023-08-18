@@ -2,6 +2,7 @@ import { ref } from 'vue';
 import { defineStore } from 'pinia';
 import type Basemap from '@/interfaces/BasemapInterface';
 import type MapLayer from '@/interfaces/MapLayerInterface';
+import { useConfig } from '@/store';
 
 const SatelliteLayer: MapLayer = {
   title: 'Satellite',
@@ -26,6 +27,10 @@ const StreetsBasemap: Basemap = {
 
 /** Basemap Store */
 const useBasemapStore = defineStore('basemap', () => {
+
+  // Access Config Store
+  const configStore = useConfig();
+
   // State
   const currentBasemap = ref(StreetsBasemap);
   const labelsVisible = ref(true);
@@ -33,6 +38,7 @@ const useBasemapStore = defineStore('basemap', () => {
   // Actions
   /** Toggle basemap style between Satellite and Streets*/
   function toggleBasemap() {
+    configStore.toggleSatelliteTheme();
     currentBasemap.value = currentBasemap.value.title === 'Satellite' ? StreetsBasemap : SatelliteBasemap;
   }
 
