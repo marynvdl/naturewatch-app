@@ -24,7 +24,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     {
       title: 'Built',
       button_type: 'small',
-      url: 'https://storage.googleapis.com/nature-watch-bucket/tiles/built/2022/{z}/{x}/{y}.png',
+      url: 'https://storage.googleapis.com/nature-watch-tiles/built/2022/{z}/{x}/{y}.png',
       type: 'raster',
       visible: false,
       icon: 'mdi-office-building',
