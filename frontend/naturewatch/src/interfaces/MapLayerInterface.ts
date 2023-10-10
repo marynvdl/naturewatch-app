@@ -8,6 +8,8 @@ export default interface MapLayer {
   button_type: MapLayerButtonType;
   /** Layer source url */
   url: string;
+  /** Years for which layer is available */
+  years_available: number[];
   /** Layer type: one of raster, line, point */
   type: MapLayerType;
   /** Source layer from Mapbox */

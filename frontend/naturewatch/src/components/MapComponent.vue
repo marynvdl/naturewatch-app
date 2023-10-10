@@ -185,19 +185,35 @@ function updateMapLayer(
  * @param layer - The MapLayer to be updated.
  * @param activeYear - The year selected on the timeline.
  */
-function getLayerUrl(layer: MapLayer, activeYear: number) {
+ function getLayerUrl(layer: MapLayer, activeYear: number): string {
+  // Check if years_available is defined and not empty
+  if (layer.years_available && layer.years_available.length > 0) {
+    // Check if activeYear is not in years_available
+    if (!layer.years_available.includes(activeYear)) {
+      // Find the maximum year in years_available that is less than activeYear
+      const maxAvailableYear = Math.max(
+        ...layer.years_available.filter(year => year < activeYear)
+      );
+      // If maxAvailableYear is a number (not NaN), assign it to activeYear
+      if (!isNaN(maxAvailableYear)) {
+        activeYear = maxAvailableYear;
+      }
+    }
+  }
+
   let layerUrl: string;
   if (layer.query_string) {
     const queryString = layer.query_string.replace(
       /{year}/g,
       activeYear.toString()
     );
-    layerUrl = layer.url + '?' + queryString;
+    layerUrl = layer.url + queryString;
   } else {
     layerUrl = layer.url;
   }
   return layerUrl;
 }
+
 
 /** Add layer source to the map */
 function addSourceToMap(
