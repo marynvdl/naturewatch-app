@@ -30,7 +30,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       type: 'raster',
       visible: false,
       icon: 'mdi-office-building',
-      button_color: 'amber-lighten-4',
+      button_color: '#767676',
       active: true,
     },
     {
@@ -48,12 +48,12 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     {
       title: 'Fire',
       button_type: 'small',
-      url: 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
+      url: 'https://storage.googleapis.com/nature-watch-tiles/fire/2022/{z}/{x}/{y}.png',
       years_available: [2016, 2017, 2018, 2019, 2020, 2021, 2022],
       type: 'raster',
       visible: false,
       icon: 'mdi-fire',
-      button_color: 'amber-lighten-4',
+      button_color: '#f8674a',
       active: true,
     },
     {
@@ -101,7 +101,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       image_visible: riversVisibleImg,
       image_notvisible: riversNotVisibleImg,
       button_color: 'brown-lighten-1',
-      active: true,
+      active: false,
     },
     {
       title: 'Dams',
