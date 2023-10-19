@@ -7,6 +7,7 @@ import turfArea from '@turf/area';
 import turfAlong from '@turf/along';import turfCentroid from '@turf/centroid';
 import useBasemapStore from '@/store/BasemapStore';
 
+
 /** Using stores */
 const basemapStore = useBasemapStore();
 
@@ -47,6 +48,32 @@ map.value?.on('draw.create', measure);
 map.value?.on('draw.update', measure);
 map.value?.on('draw.delete', removeMeasurementLabel);
 
+// Function to format area
+function formatArea(areaM2: number): string {
+  if (areaM2 >= 1_000_000) {
+    // Convert to km² and format
+    return `${(areaM2 / 1_000_000).toLocaleString('en-US', {maximumFractionDigits: 2})} km²`;
+  } else if (areaM2 >= 10_000) {
+    // Convert to hectares and format
+    return `${(areaM2 / 10_000).toLocaleString('en-US', {maximumFractionDigits: 2})} ha`;
+  } else {
+    // Format as m²
+    return `${areaM2.toLocaleString('en-US', {maximumFractionDigits: 2})} m²`;
+  }
+}
+
+// Function to format distance
+function formatDistance(distanceM: number): string {
+  if (distanceM >= 1000) {
+    // Convert to km and format
+    return `${(distanceM / 1000).toLocaleString('en-US', {maximumFractionDigits: 2})} km`;
+  } else {
+    // Format as m
+    return `${distanceM.toLocaleString('en-US', {maximumFractionDigits: 2})} m`;
+  }
+}
+
+// Function to measure area or distance
 function measure(event: any) {
   const geometry = event.features[0].geometry;
   let label = '';
@@ -56,21 +83,18 @@ function measure(event: any) {
   const id = `label-${event.features[0].id}`;
 
   if (geometry.type === 'LineString') {
-    const distance = turfLength(geometry);
-    // Format the distance with thousands separator
-    label = `${distance.toLocaleString(undefined, {maximumFractionDigits: 0})} km`;
+    const distance = turfLength(geometry, { units: 'meters' }); // Ensure using meters
+    label = formatDistance(distance);
 
     // Calculate position for the label for LineString
-    position = turfAlong(geometry, distance / 2);
+    position = turfAlong(geometry, distance / 2, { units: 'meters' });
   } else if (geometry.type === 'Polygon') {
-    const area = turfArea(geometry) / 1000000; // Convert to km²
-    // Format the area with thousands separator
-    label = `${area.toLocaleString(undefined, {maximumFractionDigits: 0})} km²`;
+    const area = turfArea(geometry); // Returns area in square meters
+    label = formatArea(area);
 
     // Calculate position for the label for Polygon
     position = turfCentroid(geometry);
   }
-
 
   // Add source and layer to the map for the label
   map.value?.addSource(id, {
@@ -96,7 +120,7 @@ function measure(event: any) {
       'text-anchor': 'center',
     },
     paint: {
-        'text-color': themeSatellite.value ? 'white' : 'black',
+      'text-color': themeSatellite.value ? 'white' : 'black',
     },
   });
 
@@ -107,6 +131,7 @@ function measure(event: any) {
     coordinates: position?.geometry.coordinates
   });
 }
+
 
 function removeMeasurementLabel(event: any) {
     const id = `label-${event.features[0].id}`;
