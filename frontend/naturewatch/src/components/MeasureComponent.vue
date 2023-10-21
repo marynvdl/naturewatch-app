@@ -41,6 +41,36 @@ onMounted(() => {
   });
 
   map.value?.addControl(draw, 'bottom-right');
+
+  // After adding the Draw control, append your custom button
+  // Find the container with the trash button
+  const trashButton = document.querySelector('.mapbox-gl-draw_trash');
+  if (trashButton) {
+    const controlGroup = trashButton.closest('.mapboxgl-ctrl-group.mapboxgl-ctrl');
+    if (controlGroup) {
+      const deleteAllButton = document.createElement('button');
+      deleteAllButton.className = 'mapbox-gl-draw_ctrl-draw-btn delete-all';
+      deleteAllButton.title = 'Delete All';
+      deleteAllButton.innerHTML = 'DA'; 
+      deleteAllButton.onclick = () => {
+        draw.deleteAll();
+
+        // Remove all measurement labels
+        storedLabels.value.forEach(label => {
+        if (map.value?.getSource(label.id)) {
+          map.value.removeLayer(label.id);
+          map.value.removeSource(label.id);
+          }
+        });
+
+        // Clear the storedLabels
+        storedLabels.value = [];
+      };
+
+      controlGroup.appendChild(deleteAllButton);
+    }
+  }
+
 });
 
 // Measure with turf
