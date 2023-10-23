@@ -143,7 +143,11 @@ function handleLabelsChanged(map: mapboxgl.Map | null) {
 function setLabels(map: mapboxgl.Map | null) {
   if (map) {
     map.getStyle().layers.forEach(function (layer) {
-      if (layer.type === 'symbol' || layer.type === 'line') {
+      if ((layer.type === 'symbol' || layer.type === 'line') &&
+          // Keep labels added with the MeasureComponent
+          !layer.id.includes('measure-label') &&
+          // Keep lines and polygons added with the MeasureComponent
+          !layer.id.includes('gl-draw')) {
         // Toggle visibility
         if (areLabelsVisible.value) {
           map.setLayoutProperty(layer.id, 'visibility', 'visible');
@@ -154,6 +158,7 @@ function setLabels(map: mapboxgl.Map | null) {
     });
   }
 }
+
 
 /** Handle basemap change */
 function handleBasemapChanged(newStyleUrl: string) {

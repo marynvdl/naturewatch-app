@@ -106,7 +106,7 @@ function measure(event: any) {
   let position;
 
   // Unique ID for the source and layer
-  const id = `label-${event.features[0].id}`;
+  const id = `measure-label-${event.features[0].id}`;
 
   if (geometry.type === 'LineString') {
 
@@ -182,7 +182,7 @@ function measure(event: any) {
 
 // Function to remove measurement labels
 function removeMeasurementLabel(event: any) {
-    const id = `label-${event.features[0].id}`;
+    const id = `measure-label-${event.features[0].id}`;
     if (map.value?.getSource(id)) {
         map.value.removeLayer(id);
         map.value.removeSource(id);
