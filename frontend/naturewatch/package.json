@@ -37,6 +37,8 @@
     "@fortawesome/vue-fontawesome": "^3.0.3",
     "@mapbox/mapbox-gl-draw": "^1.4.2",
     "@mdi/font": "^7.1.96",
+    "@turf/bearing": "^6.5.0",
+    "@turf/destination": "^6.5.0",
     "@turf/turf": "^6.5.0",
     "core-js": "^3.29.0",
     "mapbox-gl": "^2.13.0",

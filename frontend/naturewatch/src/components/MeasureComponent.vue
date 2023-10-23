@@ -5,11 +5,15 @@ import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import turfLength from '@turf/length';
 import turfArea from '@turf/area';
 import turfAlong from '@turf/along';import turfCentroid from '@turf/centroid';
+import turfBearing from '@turf/bearing';
+import turfDestination from '@turf/destination';
 import useBasemapStore from '@/store/BasemapStore';
+import { useMeasureStore } from '@/store/MeasureStore';
 
 
 /** Using stores */
 const basemapStore = useBasemapStore();
+const measureStore = useMeasureStore();
 
 // Get current basemap from store
 const currentBasemap = computed(() => basemapStore.currentBasemap);
@@ -42,34 +46,26 @@ onMounted(() => {
 
   map.value?.addControl(draw, 'bottom-right');
 
-  // After adding the Draw control, append your custom button
-  // Find the container with the trash button
-  const trashButton = document.querySelector('.mapbox-gl-draw_trash');
-  if (trashButton) {
-    const controlGroup = trashButton.closest('.mapboxgl-ctrl-group.mapboxgl-ctrl');
-    if (controlGroup) {
-      const deleteAllButton = document.createElement('button');
-      deleteAllButton.className = 'mapbox-gl-draw_ctrl-draw-btn delete-all';
-      deleteAllButton.title = 'Delete All';
-      deleteAllButton.innerHTML = 'DA'; 
-      deleteAllButton.onclick = () => {
-        draw.deleteAll();
+  watch(() => measureStore.shouldDeleteAll, (newValue) => {
+    if (newValue) {
+      // Function to delete all drawn objects
+      draw.deleteAll();
 
-        // Remove all measurement labels
-        storedLabels.value.forEach(label => {
+      // Remove all measurement labels
+      storedLabels.value.forEach(label => {
         if (map.value?.getSource(label.id)) {
           map.value.removeLayer(label.id);
           map.value.removeSource(label.id);
-          }
-        });
+        }
+      });
 
-        // Clear the storedLabels
-        storedLabels.value = [];
-      };
-
-      controlGroup.appendChild(deleteAllButton);
+      // Clear the storedLabels
+      storedLabels.value = [];
+      // After deleting, reset the trigger in the store
+      measureStore.resetDeleteAllTrigger();
     }
-  }
+    });
+
 
 });
 
@@ -113,17 +109,39 @@ function measure(event: any) {
   const id = `label-${event.features[0].id}`;
 
   if (geometry.type === 'LineString') {
-    const distance = turfLength(geometry, { units: 'meters' }); // Ensure using meters
-    label = formatDistance(distance);
 
-    // Calculate position for the label for LineString
+    // Function to slightly offset label
+    const distance = turfLength(geometry, { units: 'meters' }); 
+    label = formatDistance(distance);
     position = turfAlong(geometry, distance / 2, { units: 'meters' });
-  } else if (geometry.type === 'Polygon') {
+
+    const [start, end] = geometry.coordinates;
+    
+    const bearingValue = turfBearing(start, end);
+    const offsetDistanceX = 0.02;
+    const offsetDistanceY = 0.01;
+
+    // Calculate horizontal and vertical offsets using trigonometry
+    const xOffset = Math.cos(toRadians(bearingValue)) * offsetDistanceX;
+    const yOffset = Math.sin(toRadians(bearingValue)) * offsetDistanceY;
+
+    // Apply the horizontal offset
+    const positionAfterXOffset = turfDestination(position, xOffset, 90);
+
+    // Apply the vertical offset
+    position = turfDestination(positionAfterXOffset, yOffset, 0);
+
+  }  else if (geometry.type === 'Polygon') {
     const area = turfArea(geometry); // Returns area in square meters
     label = formatArea(area);
 
     // Calculate position for the label for Polygon
     position = turfCentroid(geometry);
+  }
+
+  // Helper function to convert degrees to radians
+  function toRadians(degrees: number): number {
+    return degrees * (Math.PI / 180);
   }
 
   // Add source and layer to the map for the label
@@ -162,7 +180,7 @@ function measure(event: any) {
   });
 }
 
-
+// Function to remove measurement labels
 function removeMeasurementLabel(event: any) {
     const id = `label-${event.features[0].id}`;
     if (map.value?.getSource(id)) {
@@ -176,7 +194,6 @@ function removeMeasurementLabel(event: any) {
         storedLabels.value.splice(index, 1);
     }
 }
-
 
 // Remove event listeners when component is destroyed
 const unwatch = watch(map, (newValue, oldValue) => {

@@ -127,7 +127,6 @@ onMounted(() => {
         <component :is="Component" :key="route.path" />
       </router-view>
     </v-main>
-
     <v-overlay v-model="loading" app class="justify-center align-center">
       <v-progress-circular indeterminate size="64" />
     </v-overlay>
