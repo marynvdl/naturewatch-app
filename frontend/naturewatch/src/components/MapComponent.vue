@@ -4,15 +4,14 @@ import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
 import MeasureComponent from './MeasureComponent.vue';
 import TimelineComponent from '@/components/TimelineComponent.vue';
-import { useConfig } from '@/store';
 import useBasemapStore from '@/store/BasemapStore';
 import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
 import useDrawerStore from '@/store/DrawerStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
+import SideButtonsComponent from '@/components/SideButtonsComponent.vue';
 
 /** Using stores */
-const configStore = useConfig();
 const basemapStore = useBasemapStore();
 const mapLayerStore = useMapLayerStore();
 const timelineStore = useTimelineStore();
@@ -105,6 +104,19 @@ onMounted(() => {
   // Add the custom controls during map initialization
   map.value.addControl(nav, 'top-right');
 
+
+  map.value.addControl(
+    new mapboxgl.GeolocateControl({
+      positionOptions: {
+      enableHighAccuracy: true
+    },
+    // When active the map will receive updates to the device's location as it changes.
+    trackUserLocation: true,
+    // Draw an arrow next to the location dot to indicate which direction the device is heading.
+    showUserHeading: true
+    })
+  );   
+
   // Add event listener for style.load
   if (map.value) {
     map.value.on('style.load', () => {
@@ -131,7 +143,11 @@ function handleLabelsChanged(map: mapboxgl.Map | null) {
 function setLabels(map: mapboxgl.Map | null) {
   if (map) {
     map.getStyle().layers.forEach(function (layer) {
-      if (layer.type === 'symbol' || layer.type === 'line') {
+      if ((layer.type === 'symbol' || layer.type === 'line') &&
+          // Keep labels added with the MeasureComponent
+          !layer.id.includes('measure-label') &&
+          // Keep lines and polygons added with the MeasureComponent
+          !layer.id.includes('gl-draw')) {
         // Toggle visibility
         if (areLabelsVisible.value) {
           map.setLayoutProperty(layer.id, 'visibility', 'visible');
@@ -142,6 +158,7 @@ function setLabels(map: mapboxgl.Map | null) {
     });
   }
 }
+
 
 /** Handle basemap change */
 function handleBasemapChanged(newStyleUrl: string) {
@@ -313,14 +330,7 @@ function addSourceAndLayer(
     <v-responsive class="d-flex align-center text-center fill-height">
       <div class="map-container">
         <div id="mapDiv" />
-        <!-- Toggle Dark mode -->
-        <v-btn
-          id="darkmodeButton"
-          class="darkmode-button"
-          icon="mdi-theme-light-dark"
-          size="small"
-          @click="configStore.toggleTheme"
-        />
+        <SideButtonsComponent></SideButtonsComponent>
         <!-- Toggle basemap labels -->
         <div
           class="basemap-button"

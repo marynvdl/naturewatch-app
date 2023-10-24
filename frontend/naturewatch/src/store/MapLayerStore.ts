@@ -48,13 +48,14 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     {
       title: 'Fire',
       button_type: 'small',
-      url: 'https://storage.googleapis.com/nature-watch-tiles/fire/2022/{z}/{x}/{y}.png',
+      url: 'https://storage.googleapis.com/nature-watch-tiles/fire/',
       years_available: [2016, 2017, 2018, 2019, 2020, 2021, 2022],
       type: 'raster',
       visible: false,
       icon: 'mdi-fire',
       button_color: '#f8674a',
       active: true,
+      query_string: `{year}/{z}/{x}/{y}.png`,
     },
     {
       title: 'Bare',
