@@ -25,7 +25,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     {
       title: 'Built',
       button_type: 'small',
-      url: 'https://storage.googleapis.com/nature-watch-tiles/built/2022/{z}/{x}/{y}.png',
+      url: 'https://storage.googleapis.com/nature-watch-tiles/built/2023/{z}/{x}/{y}.png',
       years_available: [2016, 2017, 2018, 2019, 2020, 2021, 2022],
       type: 'raster',
       visible: false,
@@ -60,13 +60,13 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     {
       title: 'Bare',
       button_type: 'small',
-      url: 'https://tiles.globalforestwatch.org/umd_tree_cover_loss/v1.9/tcd_30/{z}/{x}/{y}.png',
+      url: 'https://storage.googleapis.com/nature-watch-tiles/built/2022/{z}/{x}/{y}.png',
       years_available: [2016, 2017, 2018, 2019, 2020, 2021, 2022],
       type: 'raster',
       visible: false,
       icon: 'mdi-square-rounded',
       button_color: 'red-lighten-3',
-      active: false,
+      active: true,
     },
     {
       title: 'Mines',

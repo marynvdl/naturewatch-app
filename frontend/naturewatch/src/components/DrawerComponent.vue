@@ -4,6 +4,7 @@ import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
 import { computed } from 'vue';
 import logo from '@/assets/logo_nw.png';
+import InfoButtonComponent from './InfoButtonComponent.vue';
 
 // Using stores
 const mapLayerStore = useMapLayerStore();
@@ -112,6 +113,9 @@ function handleButtonClick(title: string) {
         </v-col>
       </template>
     </v-row>
+  </v-container>
+  <v-container align-self="end">
+    <InfoButtonComponent></InfoButtonComponent>
   </v-container>
 </template>
 
