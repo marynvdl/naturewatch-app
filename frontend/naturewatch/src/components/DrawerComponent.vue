@@ -90,6 +90,7 @@ function handleButtonClick(title: string) {
         >
           <div class="d-flex flex-column align-center aspect-ratio--1-1">
             <v-btn
+              size="small"
               :disabled="!item.active"
               :variant="item.visible ? undefined : 'tonal'"
               :icon="item.icon"
@@ -114,7 +115,7 @@ function handleButtonClick(title: string) {
       </template>
     </v-row>
   </v-container>
-  <v-container align-self="end">
+  <v-container>
     <InfoButtonComponent></InfoButtonComponent>
   </v-container>
 </template>

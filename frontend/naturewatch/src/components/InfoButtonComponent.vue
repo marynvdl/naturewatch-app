@@ -6,7 +6,7 @@ const cardData = ref([
     title: 'Built',
     subtitle: '2022, 2023',
     icon: 'mdi-office-building',
-    content: 'For the 2023 layer, we used Google Open Buildings (2023)</a> and rasterised polygons with a high confidence score (>=0.80). For countries without Google Open Buildings data (Chad, Mali, Libya, Morocco and Western Morocco), we substituted with the Global Human Settlement Layer data of 2020. The older built layers are made up of a combination of Google Open Buildings (2022 to 2021) and Google Dynamic World with the class equal to "built".'
+    content: 'For the 2023 layer, we used Google Open Buildings (2023) and rasterised polygons with a high confidence score (>=0.80). For countries without Google Open Buildings data (Chad, Mali, Libya, Morocco and Western Morocco), we substituted with the Global Human Settlement Layer data of 2020. The older built layers are made up of a combination of Google Open Buildings (2022 to 2021) and Google Dynamic World with the class equal to "built".'
   },
   {
     title: 'Treeloss',
@@ -79,11 +79,11 @@ const cardData = ref([
             <v-scroll-y style="max-height: 80vh; overflow-y: auto;">
                 <v-expansion-panels variant="accordion">
                     <template v-for="card in cardData" :key="card.title">
-                        <v-expansion-panel :disabled="!card.content">
+                        <v-expansion-panel :readonly="!card.content">
                             <v-expansion-panel-title class="py-0">
                                 <v-card variant="flat" color="transparent" class="ma-0 pa-0" :prepend-icon="card.icon" >
                                 <template v-slot:title>
-                                {{ card.title }}
+                                <div class="text-subtitle-1">{{ card.title }}</div>
                                 </template>
                                 <template v-slot:subtitle>
                                 {{ card.subtitle }}
@@ -91,7 +91,7 @@ const cardData = ref([
                                 </v-card>
                             </v-expansion-panel-title>
                             <v-expansion-panel-text v-if="card.content">
-                        {{  card.content }}
+                                <div class="text-body-2">{{  card.content }}</div>
                     </v-expansion-panel-text>
                     </v-expansion-panel>
                     </template>
