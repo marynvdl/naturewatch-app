@@ -109,7 +109,7 @@ onMounted(() => {
 
 <template>
   <v-app>
-    <v-navigation-drawer v-model="drawerVisible" :width="drawerWidth">
+    <v-navigation-drawer v-model="drawerVisible" :width="drawerWidth" >
       <drawer-component />
     </v-navigation-drawer>
 

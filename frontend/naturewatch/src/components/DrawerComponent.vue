@@ -56,7 +56,7 @@ function handleButtonClick(title: string) {
         <v-col
           v-if="item.button_type === 'big'"
           class="mt-2 mb-0 px-2 pt-4 pb-1"
-          cols="auto"
+          cols="12"
         >
           <div class="d-flex flex-column align-center aspect-ratio--1-1">
             <v-btn
@@ -85,7 +85,7 @@ function handleButtonClick(title: string) {
         <v-col
           v-else-if="item.button_type === 'small'"
           class="pa-1"
-          cols="auto"
+          cols="6"
         >
           <div class="d-flex flex-column align-center aspect-ratio--1-1">
             <v-btn
