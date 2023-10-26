@@ -43,11 +43,11 @@ const buttonImageSrc = computed(() =>
 
 <style scoped>
 .basemap-btn {
-  width: 70px;
+  width: 50px;
   transition: transform 0.2s ease-in-out;
 }
 
 .basemap-btn:hover {
-  transform: scale(1.2);
+  transform: scale(1.13);
 }
 </style>

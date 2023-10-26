@@ -336,14 +336,14 @@ function addSourceAndLayer(
           class="basemap-button"
           :style="
             drawerVisible
-              ? `left: ${parseInt(drawerWidth) + 20}px`
-              : 'left: 20px'
+              ? `left: ${parseInt(drawerWidth) + 10}px`
+              : 'left: 10px'
           "
         >
           <v-btn
             id="labelsButton"
-            size="small"
-            width="70"
+            size="x-small"
+            width="50"
             variant="tonal"
             :class="{ 'labels-visible': areLabelsVisible }"
             @click="handleLabelsChanged(map)"
@@ -388,10 +388,10 @@ function addSourceAndLayer(
 
 .basemap-button {
   position: absolute;
-  bottom: 70px;
+  bottom: 50px;
   left: 0px;
   z-index: 10;
-  transition: left 0.2s ease-in-out;
+  transition: left 0.15s ease-in-out;
 }
 
 .darkmode-button {
