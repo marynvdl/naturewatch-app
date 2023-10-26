@@ -4,6 +4,12 @@ import fireLegend from '@/assets/fire_legend.png';
 
 const cardData = ref([
   {
+    title: 'All',
+    subtitle: 'Coming soon',
+    icon: 'mdi-home-city',
+    content: ''
+  },  
+  {
     title: 'Built',
     subtitle: '2022, 2023',
     icon: 'mdi-office-building',

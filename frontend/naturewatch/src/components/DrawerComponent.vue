@@ -4,7 +4,6 @@ import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
 import { computed } from 'vue';
 import logo from '@/assets/logo_nw.png';
-import InfoButtonComponent from './InfoButtonComponent.vue';
 
 // Using stores
 const mapLayerStore = useMapLayerStore();
@@ -45,7 +44,7 @@ function handleButtonClick(title: string) {
       nav
       :disabled="!homeItem.to"
       :to="homeItem.to"
-      size="80"
+      size="60"
     >
       <v-img class="position-absolute" width="100%" cover :src="logo" />
     </v-btn>
@@ -56,7 +55,7 @@ function handleButtonClick(title: string) {
         <!-- Big buttons -->
         <v-col
           v-if="item.button_type === 'big'"
-          class="mt-3 mb-0 px-4"
+          class="mt-2 mb-0 px-2"
           cols="auto"
         >
           <div class="d-flex flex-column align-center aspect-ratio--1-1">
@@ -116,7 +115,6 @@ function handleButtonClick(title: string) {
     </v-row>
   </v-container>
   <v-container>
-    <InfoButtonComponent></InfoButtonComponent>
   </v-container>
 </template>
 
