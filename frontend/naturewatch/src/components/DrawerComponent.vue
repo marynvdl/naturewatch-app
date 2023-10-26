@@ -38,7 +38,7 @@ function handleButtonClick(title: string) {
 </script>
 
 <template>
-  <v-container class="position-relative d-flex justify-center align-center">
+  <v-container class="pt-2 pb-0 position-relative d-flex justify-center align-center">
     <v-btn
       class="elevation-0 bg-transparent overflow-hidden rounded-circle"
       nav
@@ -49,13 +49,13 @@ function handleButtonClick(title: string) {
       <v-img class="position-absolute" width="100%" cover :src="logo" />
     </v-btn>
   </v-container>
-  <v-container>
+  <v-container class="pt-1 pb-0">
     <v-row align="center" justify="center">
       <template v-for="item in mapLayers" :key="item.title">
         <!-- Big buttons -->
         <v-col
           v-if="item.button_type === 'big'"
-          class="mt-2 mb-0 px-2"
+          class="mt-2 mb-0 px-2 pt-4 pb-1"
           cols="auto"
         >
           <div class="d-flex flex-column align-center aspect-ratio--1-1">
@@ -114,8 +114,6 @@ function handleButtonClick(title: string) {
       </template>
     </v-row>
   </v-container>
-  <v-container>
-  </v-container>
 </template>
 
 <style scoped>
@@ -125,4 +123,5 @@ function handleButtonClick(title: string) {
 .position-absolute {
   position: absolute;
 }
+
 </style>
