@@ -1,24 +1,34 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import fireLegend from '@/assets/fire_legend.png';
 
 const cardData = ref([
   {
     title: 'Built',
     subtitle: '2022, 2023',
     icon: 'mdi-office-building',
-    content: 'For the 2023 layer, we used Google Open Buildings (2023) and rasterised polygons with a high confidence score (>=0.80). For countries without Google Open Buildings data (Chad, Mali, Libya, Morocco and Western Morocco), we substituted with the Global Human Settlement Layer data of 2020. The older built layers are made up of a combination of Google Open Buildings (2022 to 2021) and Google Dynamic World with the class equal to "built".'
+    content: 'For the 2023 built layer, we primarily used the <a href="https://sites.research.google/open-buildings/" target="_blank">Google Open Buildings (2023)</a> dataset, specifically polygons with a high confidence score (>=0.80). In areas where Google Open Buildings data were unavailable—specifically in <b>Chad, Mali, Libya, Morocco and Western Morocco</b>—we integrated data from the <a href="https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php" target="_blank">Global Human Settlement Layer</a> from 2020. For reference, older built layers combine data from Google Open Buildings (spanning 2022 to 2021) and Google Dynamic World, specifically the "built" class.'
   },
   {
     title: 'Treeloss',
     subtitle: '2016, 2017, 2018, 2019, 2020, 2021, 2022',
     icon: 'mdi-tree',
-    content: 'The treeloss layer is Global Forest Watch\'s v1.9 UMD tree cover loss with the tree cover density higher than 30%'
+    content: 'The treeloss layer sources its data from <a href="https://www.globalforestwatch.org/" target="_blank">Global Forest Watch</a>\'s  v1.9 UMD tree cover loss dataset. Specifically, we\'ve focused on areas with a tree cover density exceeding 30%.'
   },
   {
     title: 'Fire',
     subtitle: '2016, 2017, 2018, 2019, 2020, 2021, 2022',
     icon: 'mdi-fire',
-    content: 'We processed FIRMS data and calculated how many times a pixel burned in the year. We created 14-day periods and checked if a pixel burned during that time. Counting the number of 14-day periods a pixel burned, we calculated the total number of times it burned in the year. Thus, the maximum number is 26 times a pixel could have burned during the year. The legend is as follows: Yellow: burned one time (possibly natural or management fires). Light orange: burned 2-3 times (possibly people moving through). Red: burned more than 3 times (possibly agriculture, permanent settlements or people moving through frequently). Dark red: burned more than 8 times (possibly mines, volcanoes, or industry)'
+    image: fireLegend,
+    content: `For the fire layers, we utilised <a href="https://firms.modaps.eosdis.nasa.gov/map/" target="_blank">FIRMS</a> data to determine the number of times a pixel burned in the year. Our methodology involved first dividing the year into 14-day intervals and then assessing if a pixel burned within each 14-day period. Finally, we summed up the number of 14-day periods a pixel experienced a fire. As a result, the maximum count for a pixel is 26 burn events within a year.
+    The data is visualised as follows:
+    <ul>
+    <li> Light yellow: Pixel burned once, suggesting potential natural occurrences or management fires.</li>
+    <li> Orange: Pixel burned 2-3 times, possibly indicating human activity or transit.</li>
+    <li> Red: Pixel burned more than 3 times, hinting at agriculture, consistent human presence, or frequent transit.</li>
+    <li> Dark red: Pixel burned over 8 times, which may suggest industrial activities, mines, or volcanic activity.</li>
+</ul>
+    `
   },
   {
     title: 'Bare',
@@ -36,7 +46,7 @@ const cardData = ref([
     title: 'Crops',
     subtitle: '2015, 2018',
     icon: 'mdi-barley',
-    content: 'We used Global cropland expansion in the 21st century and working to create layers for other years. (P. Potapov, S. Turubanova, M.C. Hansen, A. Tyukavina, V. Zalles, A. Khan, X.-P. Song, A. Pickens, Q. Shen, J. Cortez. (2021) Global maps of cropland extent and change show accelerated cropland expansion in the twenty-first century. Nature Food. https://doi.org/10.1038/s43016-021-00429-z)'
+    content: 'We sourced data from the <a href="https://glad.umd.edu/dataset/croplands" target="_blank">Global Cropland Expansion in the 21st Century</a> dataset. We are currently working to expand our layers with information from other years'
   },
   {
     title: 'Rivers',
@@ -65,7 +75,7 @@ const cardData = ref([
       
       <template v-slot:default="{ isActive }">
         <v-card title="About Nature Watch"
-        subtitle="We aim to include the most accurate data layers showing our interaction with landscapes. Do you know of a more accurate or up to date layer? Let us know!">
+        subtitle="We're all about presenting clear and accurate data layers of how we interact with the Earth from space. Found a better or more recent layer? Give us a shout!">
             <template v-slot:append>
                 <div class="me-n2">
                     <v-btn
@@ -90,8 +100,11 @@ const cardData = ref([
                                 </template>
                                 </v-card>
                             </v-expansion-panel-title>
-                            <v-expansion-panel-text v-if="card.content">
-                                <div class="text-body-2">{{  card.content }}</div>
+                            <v-expansion-panel-text v-if="card.content" class="pb-2">
+                              <!-- eslint-disable vue/no-v-html -->
+                                <div class="text-body-2 px-5" v-html="card.content"></div>
+                              <!--eslint-enable-->
+                              <img v-if="card.image" :src="card.image" alt="Image" class="pt-3 card-image">
                     </v-expansion-panel-text>
                     </v-expansion-panel>
                     </template>
@@ -109,4 +122,8 @@ const cardData = ref([
 
 
 <style scoped>
+.card-image {
+    max-width: 350px;
+}
+
 </style>

@@ -2,6 +2,6 @@
 .yarn/
 coverage/
 dist/
-public/src/assets/
+public/src/assets/*
 tsconfig.*.json
 LICENSE
