@@ -74,7 +74,7 @@ const cardData = ref([
 <template>
     <v-dialog width="1500">
       <template v-slot:activator="{ props }">
-        <v-btn size="x-small" icon variant="tonal" v-bind="props" title="More info">
+        <v-btn size="x-small" icon variant="flat" v-bind="props" title="More info">
           <v-icon>mdi-information-variant</v-icon>
         </v-btn>
       </template>
