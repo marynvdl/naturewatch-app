@@ -109,7 +109,7 @@ onMounted(() => {
 
 <template>
   <v-app>
-    <v-navigation-drawer v-model="drawerVisible" :width="drawerWidth" >
+    <v-navigation-drawer v-model="drawerVisible" :width="drawerWidth">
       <drawer-component />
     </v-navigation-drawer>
 
@@ -198,6 +198,9 @@ html {
   z-index: 1005;
   transition: left 0.2s ease-in-out;
 }
-
-
+// Removes overlay when navigation-drawer is open
+.v-navigation-drawer__scrim {
+  width: 0;
+  height: 0;
+}
 </style>
