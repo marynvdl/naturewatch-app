@@ -4,7 +4,7 @@
 version: 2
 updates:
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/frontent/naturewatch/"
     schedule:
       interval: "weekly"
     target-branch: "develop"
