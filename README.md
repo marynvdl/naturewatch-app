@@ -26,7 +26,7 @@ Feature or fix branches should be created off the `develop` branch. After develo
 - `test`: For experimenting something which is not an issue
 
 ### Releases
-When a set of features is ready for release, a release branch is created from `develop`. After final testing and preparations, the release branch is merged into `main` and tagged with a version number.
+When a set of features is ready for release, open a Pull Request to merge `develop` into `main`. Create a new GitHub Version from `main` and tag it with an appropriate version number.
 
 ## Deployment
 We use fly.io configuration file to run the Test Suite and deploy apps. See `fly.toml` for more details.

@@ -186,7 +186,7 @@ function updateMapLayer(
   if (map) {
     if (layer.visible) {
       addSourceAndLayer(layer, activeYear.value, map);
-      if (previousYear) {
+      if (previousYear && map.getLayer(layer.title + previousYear)) {
         map.removeLayer(layer.title + previousYear);
       }
     } else if (map.getSource(layer.title + activeYear.value)) {
@@ -215,11 +215,17 @@ function updateMapLayer(
       if (!isNaN(maxAvailableYear)) {
         activeYear = maxAvailableYear;
       }
+      if (maxAvailableYear === -Infinity){
+        activeYear = NaN;
+      }
+
     }
   }
 
   let layerUrl: string;
-  if (layer.query_string) {
+  if (Number.isNaN(activeYear)){
+    layerUrl = 'None'
+  } else if (layer.query_string) {
     const queryString = layer.query_string.replace(
       /{year}/g,
       activeYear.toString()
@@ -319,8 +325,10 @@ function addSourceAndLayer(
 ) {
   if (map) {
     const layerUrl = getLayerUrl(layer, activeYear);
-    addSourceToMap(layer, layerUrl, map);
-    addLayerToMap(layer, map);
+    if (layerUrl!='None'){
+      addSourceToMap(layer, layerUrl, map);
+      addLayerToMap(layer, map);
+    }
   }
 }
 </script>
