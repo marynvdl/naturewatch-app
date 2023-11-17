@@ -186,7 +186,7 @@ function updateMapLayer(
   if (map) {
     if (layer.visible) {
       addSourceAndLayer(layer, activeYear.value, map);
-      if (previousYear) {
+      if (previousYear && map.getLayer(layer.title + previousYear)) {
         map.removeLayer(layer.title + previousYear);
       }
     } else if (map.getSource(layer.title + activeYear.value)) {
