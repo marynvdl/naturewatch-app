@@ -8,6 +8,9 @@ import {
 } from 'vue-router';
 import { nextTick } from 'vue';
 
+// Import Posthog
+import { usePosthog } from './plugins/posthog';
+
 // Pinia Store
 import { useGlobal } from '@/store';
 
@@ -79,10 +82,19 @@ router.beforeEach(
 
 // Global After Hooks
 // https://router.vuejs.org/guide/advanced/navigation-guards.html#global-after-hooks}
-router.afterEach(() => {
+router.afterEach((to, from) => {
   const globalStore = useGlobal();
   // Hide Loading
   globalStore.setLoading(false);
+
+  const posthog = usePosthog();
+
+  posthog.capture('$pageview', {
+    path: to.path,
+    referrer: from.fullPath,
+    search: to.fullPath.includes('?') ? to.fullPath.split('?')[1] : '',
+  });
+  
 });
 
 export default router;
