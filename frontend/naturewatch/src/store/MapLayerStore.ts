@@ -26,7 +26,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       title: 'Built',
       button_type: 'small',
       url: 'https://storage.googleapis.com/nature-watch-tiles/built/2023/{z}/{x}/{y}.png',
-      years_available: [2016, 2017, 2018, 2019, 2020, 2021, 2022],
+      years_available: [2022],
       type: 'raster',
       visible: false,
       icon: 'mdi-office-building',
@@ -66,7 +66,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       visible: false,
       icon: 'mdi-square-rounded',
       button_color: 'red-lighten-3',
-      active: true,
+      active: false,
     },
     {
       title: 'Mines',

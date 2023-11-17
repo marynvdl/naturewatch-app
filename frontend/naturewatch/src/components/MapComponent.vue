@@ -215,11 +215,17 @@ function updateMapLayer(
       if (!isNaN(maxAvailableYear)) {
         activeYear = maxAvailableYear;
       }
+      if (maxAvailableYear === -Infinity){
+        activeYear = NaN;
+      }
+
     }
   }
 
   let layerUrl: string;
-  if (layer.query_string) {
+  if (Number.isNaN(activeYear)){
+    layerUrl = 'None'
+  } else if (layer.query_string) {
     const queryString = layer.query_string.replace(
       /{year}/g,
       activeYear.toString()
@@ -319,8 +325,10 @@ function addSourceAndLayer(
 ) {
   if (map) {
     const layerUrl = getLayerUrl(layer, activeYear);
-    addSourceToMap(layer, layerUrl, map);
-    addLayerToMap(layer, map);
+    if (layerUrl!='None'){
+      addSourceToMap(layer, layerUrl, map);
+      addLayerToMap(layer, map);
+    }
   }
 }
 </script>
