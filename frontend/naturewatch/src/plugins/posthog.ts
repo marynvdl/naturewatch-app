@@ -9,7 +9,9 @@ const token = import.meta.env.VITE_APP_POSTHOG_TOKEN;
 
 let posthogInstance: any;
 
-if (window.location.hostname === 'test.naturewatch.space') {
+const allowedHostnames = ['test.naturewatch.space', 'naturewatch.space'];
+
+if (allowedHostnames.includes(window.location.hostname)) {
   posthogInstance = PostHog.init(token || 'default-token', {
     api_host: 'https://app.posthog.com',
   }) as typeof PostHog;
