@@ -8,6 +8,8 @@ jobs:
     name: Test suite
     runs-on: ubuntu-latest
     steps:
+      - name: Debug Token
+        run: echo "Token starts with: ${VITE_APP_POSTHOG_TOKEN:0:4}"
       - name: Check out source code
         uses: actions/checkout@v3
       - name: Spin up environment
