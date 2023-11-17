@@ -22,7 +22,7 @@ jobs:
       - name: Run integration test suite in docker
         run: docker-compose exec -T naturewatch-test pytest -m integration app/tests -vv
       - name: Try a full docker compile to flag any JS issues too
-        run: docker build -t naturewatch .
+        run: docker build --build-arg VITE_APP_POSTHOG_TOKEN=${{ secrets.POSTHOG_TOKEN }} -t naturewatch .
 
   deploy_test_app:
       name: Deploy Test App

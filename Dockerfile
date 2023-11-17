@@ -29,6 +29,9 @@ RUN npm install
 # Copy Frontend source files
 COPY ./frontend/naturewatch/ ./
 
+# Make the build argument available as an environment variable
+ENV VITE_APP_POSTHOG_TOKEN $VITE_APP_POSTHOG_TOKEN
+
 # Compile and Minify for Production
 RUN npm run build
 
