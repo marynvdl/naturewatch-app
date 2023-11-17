@@ -2,7 +2,6 @@ name: Test Suite and Deployment
 on: push
 env:
   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-  VITE_APP_POSTHOG_TOKEN: ${{ secrets.POSTHOG_TOKEN }}
 jobs:
   test_suite:
     name: Test suite
