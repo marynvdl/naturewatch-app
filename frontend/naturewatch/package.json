@@ -51,7 +51,7 @@
     "@types/jsdom": "^21.1.0",
     "@types/mapbox__mapbox-gl-draw": "^1.4.0",
     "@types/mapbox-gl": "^2.7.17",
-    "@types/node": "^20.9.0",
+    "@types/node": "^20.9.2",
     "@types/webfontloader": "^1.6.36",
     "@typescript-eslint/eslint-plugin": "^5.54.0",
     "@typescript-eslint/parser": "^5.54.0",
