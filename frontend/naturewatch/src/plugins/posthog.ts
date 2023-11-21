@@ -5,13 +5,9 @@ import type { App } from 'vue';
 
 
 // Initialize PostHog and export the instance
-// const token = import.meta.env.VITE_APP_POSTHOG_TOKEN;
-
-const token = 'phc_x6R5jNEWcEhWrbZGXkQrpntjcvfjwo5yQb9aFKbOupc';
-
+const token = import.meta.env.VITE_APP_POSTHOG_TOKEN;
 
 let posthogInstance: any;
-console.log(token)
 
 const allowedHostnames = ['test.naturewatch.space', 'naturewatch.space'];
 if (allowedHostnames.includes(window.location.hostname)) {
