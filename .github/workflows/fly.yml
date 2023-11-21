@@ -28,6 +28,9 @@ jobs:
       name: Deploy Test App
       needs: test_suite
       runs-on: ubuntu-latest
+      concurrency: 
+        group: deploy-test-app-${{ github.ref }}
+        cancel-in-progress: true
       if: github.ref == 'refs/heads/develop'
       steps:
         - name: Check out source code
@@ -37,12 +40,15 @@ jobs:
         - name: Setup flyctl for test app
           uses: superfly/flyctl-actions/setup-flyctl@master
         - name: Deploy test app using flyctl
-          run: flyctl deploy --app naturewatch --remote-only
+          run: flyctl deploy --build-arg VITE_APP_POSTHOG_TOKEN=${{ secrets.POSTHOG_TOKEN }} --app naturewatch --remote-only
 
   deploy_demo_app:
       name: Deploy Demo App
       needs: test_suite
       runs-on: ubuntu-latest
+      concurrency: 
+        group: deploy-demo-app-${{ github.ref }}
+        cancel-in-progress: true
       if: github.ref == 'refs/heads/main'
       steps:
         - name: Check out source code
@@ -52,4 +58,4 @@ jobs:
         - name: Setup flyctl for demo app
           uses: superfly/flyctl-actions/setup-flyctl@master
         - name: Deploy demo app using flyctl
-          run: flyctl deploy --app naturewatch-demo --remote-only
+          run: flyctl deploy --build-arg VITE_APP_POSTHOG_TOKEN=${{ secrets.POSTHOG_TOKEN }} --app naturewatch-demo --remote-only

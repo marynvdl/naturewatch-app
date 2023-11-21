@@ -36,3 +36,7 @@ coverage/
 
 # Special File
 src/Meta.ts
+
+
+# env
+.env

@@ -13,11 +13,16 @@ import vuetify from './plugins/vuetify';
 // Load Layout vue.
 import App from './App.vue';
 
+// Import Posthog
+import posthogPlugin from './plugins/posthog';
+
+
 /** Register Vue */
 const vue = createApp(App);
 vue.use(router);
 vue.use(store);
 vue.use(vuetify);
+vue.use(posthogPlugin);
 
 // Run!
 router.isReady().then(() => {

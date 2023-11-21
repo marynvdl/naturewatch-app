@@ -11,9 +11,9 @@ const cardData = ref([
   },  
   {
     title: 'Built',
-    subtitle: '2022, 2023',
+    subtitle: '2022',
     icon: 'mdi-office-building',
-    content: 'For the 2023 built layer, we primarily used the <a href="https://sites.research.google/open-buildings/" target="_blank">Google Open Buildings (2023)</a> dataset, specifically polygons with a high confidence score (>=0.80). In areas where Google Open Buildings data were unavailable—specifically in <b>Chad, Mali, Libya, Morocco and Western Morocco</b>—we integrated data from the <a href="https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php" target="_blank">Global Human Settlement Layer</a> from 2020. For reference, older built layers combine data from Google Open Buildings (spanning 2022 to 2021) and Google Dynamic World, specifically the "built" class.'
+    content: 'For the 2022 built layer, we primarily used the <a href="https://sites.research.google/open-buildings/" target="_blank">Google Open Buildings (2023)</a> dataset, specifically polygons with a high confidence score (>=0.80). In areas where Google Open Buildings data were unavailable—specifically in <b>Chad, Mali, Libya, Morocco and Western Morocco</b>—we integrated data from the <a href="https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php" target="_blank">Global Human Settlement Layer</a> from 2020. For reference, older built layers combine data from Google Open Buildings (spanning 2022 to 2021) and Google Dynamic World, specifically the "built" class.'
   },
   {
     title: 'Treeloss',
@@ -81,7 +81,7 @@ const cardData = ref([
       
       <template v-slot:default="{ isActive }">
         <v-card title="About Nature Watch"
-        subtitle="We're all about presenting clear and accurate data layers of how we interact with the Earth from space. Found a better or more recent layer? Give us a shout!">
+        subtitle="We're all about presenting clear and accurate data layers of how we interact with the Earth from space. Found a better or more recent layer or have feedback? Send us an email at top.map4835@fastmail.com">
             <template v-slot:append>
                 <div class="me-n2">
                     <v-btn
