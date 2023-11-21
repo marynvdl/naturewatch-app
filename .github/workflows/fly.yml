@@ -28,6 +28,9 @@ jobs:
       name: Deploy Test App
       needs: test_suite
       runs-on: ubuntu-latest
+      concurrency: 
+        group: deploy-test-app-${{ github.ref }}
+        cancel-in-progress: true
       if: github.ref == 'refs/heads/develop'
       steps:
         - name: Check out source code
@@ -43,6 +46,9 @@ jobs:
       name: Deploy Demo App
       needs: test_suite
       runs-on: ubuntu-latest
+      concurrency: 
+        group: deploy-demo-app-${{ github.ref }}
+        cancel-in-progress: true
       if: github.ref == 'refs/heads/main'
       steps:
         - name: Check out source code
