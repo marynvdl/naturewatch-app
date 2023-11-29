@@ -39,7 +39,7 @@
     "@turf/turf": "^6.5.0",
     "core-js": "^3.33.3",
     "mapbox-gl": "^2.15.0",
-    "pinia": "^2.0.32",
+    "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^3.1.0",
     "posthog-js": "^1.87.6",
     "vue": "^3.2.47",
