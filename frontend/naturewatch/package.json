@@ -48,7 +48,7 @@
     "webfontloader": "^1.6.28"
   },
   "devDependencies": {
-    "@types/jsdom": "^21.1.0",
+    "@types/jsdom": "^21.1.6",
     "@types/mapbox__mapbox-gl-draw": "^1.4.6",
     "@types/mapbox-gl": "^2.7.19",
     "@types/node": "^20.9.2",
