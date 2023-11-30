@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@mapbox/mapbox-gl-draw": "^1.4.3",
-    "@mdi/font": "^7.1.96",
+    "@mdi/font": "^7.3.67",
     "@turf/bearing": "^6.5.0",
     "@turf/destination": "^6.5.0",
     "@turf/turf": "^6.5.0",
