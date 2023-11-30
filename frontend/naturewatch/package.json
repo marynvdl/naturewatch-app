@@ -38,7 +38,7 @@
     "@turf/destination": "^6.5.0",
     "@turf/turf": "^6.5.0",
     "core-js": "^3.33.3",
-    "mapbox-gl": "^2.15.0",
+    "mapbox-gl": "^3.0.0",
     "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^3.2.0",
     "posthog-js": "^1.87.6",
