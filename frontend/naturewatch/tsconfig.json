@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/tsconfig.json",
   "files": [],
   "compilerOptions": {
-    "newLine": "lf"
+    "newLine": "lf",
   },
   "references": [
     { "path": "./tsconfig.config.json" },

@@ -6,7 +6,6 @@ import vuetify from 'vite-plugin-vuetify';
 
 /**
  * Vitest Configure
- *
  * @see {@link https://vitest.dev/config/}
  */
 export default defineConfig({

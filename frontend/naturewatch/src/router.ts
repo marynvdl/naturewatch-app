@@ -40,7 +40,6 @@ const routes: RouteRecordRaw[] = [
 const router: Router = createRouter({
   /**
    * History Mode
-   *
    * @see {@link https://router.vuejs.org/guide/essentials/history-mode.html}
    */
   history: createWebHistory(import.meta.env.BASE_URL), // createWebHashHistory(import.meta.env.BASE_URL)
@@ -94,7 +93,6 @@ router.afterEach((to, from) => {
     referrer: from.fullPath,
     search: to.fullPath.includes('?') ? to.fullPath.split('?')[1] : '',
   });
-  
 });
 
 export default router;

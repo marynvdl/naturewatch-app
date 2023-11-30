@@ -16,19 +16,17 @@ const SatelliteLayer: MapLayer = {
 const SatelliteBasemap: Basemap = {
   title: 'Satellite',
   url: 'mapbox://styles/nature-watch/clhasd44b012301pg7dilg74p',
-  layer: SatelliteLayer
+  layer: SatelliteLayer,
 };
 
 const StreetsBasemap: Basemap = {
   title: 'Streets',
   url: 'mapbox://styles/mapbox/streets-v12',
-  layer: undefined
+  layer: undefined,
 };
-
 
 /** Basemap Store */
 const useBasemapStore = defineStore('basemap', () => {
-
   // Access Config Store
   const configStore = useConfig();
 
@@ -40,18 +38,24 @@ const useBasemapStore = defineStore('basemap', () => {
   /** Toggle basemap style between Satellite and Streets*/
   function toggleBasemap() {
     configStore.toggleSatelliteTheme();
-    currentBasemap.value = currentBasemap.value.title === 'Satellite' ? StreetsBasemap : SatelliteBasemap;
+    currentBasemap.value =
+      currentBasemap.value.title === 'Satellite'
+        ? StreetsBasemap
+        : SatelliteBasemap;
   }
 
   /** Toggle layer visibility*/
   function toggleSatelliteLayerVisibility(): void {
     const layer = currentBasemap.value.layer;
-    if (layer){
+    if (layer) {
       layer.visible = !layer.visible;
     }
   }
 
-  /** Toggle labels of basemap style */
+  /**
+   * Toggle labels of basemap style
+   * @param {boolean} visible - A parameter specifying if labels are visble or not
+   */
   function toggleLabelsTo(visible: boolean) {
     labelsVisible.value = visible;
   }
@@ -61,7 +65,7 @@ const useBasemapStore = defineStore('basemap', () => {
     labelsVisible,
     toggleBasemap,
     toggleLabelsTo,
-    toggleSatelliteLayerVisibility
+    toggleSatelliteLayerVisibility,
   };
 });
 

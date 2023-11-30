@@ -1,6 +1,5 @@
 import { fileURLToPath, URL } from 'node:url';
 import fs from 'node:fs';
-
 import { defineConfig, type UserConfig } from 'vite';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { checker } from 'vite-plugin-checker';
@@ -9,7 +8,6 @@ import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify';
 
 /**
  * Vite Configure
- *
  * @see {@link https://vitejs.dev/config/}
  */
 export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
@@ -39,7 +37,7 @@ export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
         vueTsc: true,
         eslint: {
           lintCommand:
-            'eslint . --fix --cache --cache-location ./node_modules/.vite/vite-plugin-eslint', // for example, lint .ts & .tsx
+            'eslint . --cache --cache-location ./node_modules/.vite/vite-plugin-eslint', // for example, lint .ts & .tsx
         },
       }),
     ],
@@ -71,7 +69,6 @@ export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
       // Rollup Options
       // https://vitejs.dev/config/build-options.html#build-rollupoptions
       rollupOptions: {
-        // @ts-ignore
         output: {
           manualChunks: {
             // Split external library from transpiled code.
