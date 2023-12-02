@@ -1,14 +1,14 @@
 import { defineStore } from 'pinia';
 
 /** Config State */
-type ConfigState = {
+interface ConfigState {
   /** Dark Theme mode */
   _themeDark: boolean;
   /** Satellite Theme mode (overrules themeDark) */
   _themeSatellite: boolean;
   /** Language */
   _locale: string;
-};
+}
 
 /** Config Store */
 export default defineStore('config', {
@@ -36,8 +36,11 @@ export default defineStore('config', {
     toggleSatelliteTheme() {
       this._themeSatellite = !this._themeSatellite;
     },
-    /** Set Locale. */
-    setLocale(locale: string) {
+    /**
+     * Set Locale.
+     * @param locale
+     */
+    setLocale(locale: string): void {
       this._locale = locale;
     },
   },

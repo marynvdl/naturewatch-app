@@ -1,7 +1,6 @@
 import { load } from 'webfontloader';
 /**
  * Webfont loader
- *
  * @see {@link https://github.com/typekit/webfontloader | Webfontloader documentation}
  */
 export async function loadFonts() {

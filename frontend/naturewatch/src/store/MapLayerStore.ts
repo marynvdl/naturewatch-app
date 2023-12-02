@@ -128,7 +128,10 @@ const useMapLayerStore = defineStore('mapLayer', () => {
   }
 
   // Actions
-  /** Toggle layer visibility*/
+  /**
+   * Toggle layer visibility
+   * @param title
+   */
   function toggleLayerVisibility(title: string): void {
     const layerToUpdate = MapLayers.value.find(layer => layer.title === title);
     if (layerToUpdate) {

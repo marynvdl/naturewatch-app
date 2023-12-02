@@ -14,7 +14,10 @@ const useGlobalStore = defineStore('global', () => {
 
   // Actions
 
-  /** Show loading Overlay */
+  /**
+   * Show loading Overlay
+   * @param display
+   */
   function setLoading(display: boolean) {
     loading.value = display;
     if (!display) {
@@ -23,7 +26,10 @@ const useGlobalStore = defineStore('global', () => {
     }
   }
 
-  /** Update progress value */
+  /**
+   * Update progress value
+   * @param v
+   */
   function setProgress(v: number | null = null) {
     // update progress value
     progress.value = v;
@@ -31,8 +37,11 @@ const useGlobalStore = defineStore('global', () => {
     loading.value = true;
   }
 
-  /** Show snackbar message */
-  function setMessage(msg: string = '') {
+  /**
+   * Show snackbar message
+   * @param msg
+   */
+  function setMessage(msg = '') {
     // put snackbar text
     message.value = msg;
   }

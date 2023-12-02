@@ -11,12 +11,18 @@ const useTimelineStore = defineStore('timeline', () => {
   // Getters
 
   // Actions
-  /** Set timeline visibility to true or false*/
+  /**
+   * Set timeline visibility to true or false
+   * @param setVisible
+   */
   function toggleTimelineVisibility(setVisible: boolean): void {
     visible.value = setVisible;
   }
 
-  /** Set active year*/
+  /**
+   * Set active year
+   * @param {number} newYear - The year to be set as the active year.
+   */
   function setActiveYear(newYear: number): void {
     lastActiveYear.value = activeYear.value;
     activeYear.value = newYear;

@@ -16,7 +16,6 @@ import App from './App.vue';
 // Import Posthog
 import posthogPlugin from './plugins/posthog';
 
-
 /** Register Vue */
 const vue = createApp(App);
 vue.use(router);

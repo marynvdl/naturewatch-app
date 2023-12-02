@@ -9,5 +9,5 @@ export default interface Basemap {
   /** Item Icon */
   icon?: string;
   /** Optional Map Layer */
-  layer?: MapLayer
+  layer?: MapLayer;
 }
