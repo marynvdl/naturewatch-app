@@ -54,7 +54,7 @@
     "@types/mapbox-gl": "^2.7.19",
     "@types/node": "^20.10.1",
     "@types/webfontloader": "^1.6.38",
-    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/eslint-plugin": "^6.13.2",
     "@typescript-eslint/parser": "^6.13.1",
     "@vitejs/plugin-vue": "^4.5.1",
     "@vitest/coverage-c8": "^0.29.2",
