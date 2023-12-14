@@ -2,7 +2,9 @@
   "$schema": "https://json.schemastore.org/tsconfig.json",
   "files": [],
   "compilerOptions": {
-    "newLine": "lf",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "newLine": "lf"
   },
   "references": [
     { "path": "./tsconfig.config.json" },

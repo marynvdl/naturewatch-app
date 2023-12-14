@@ -9,9 +9,8 @@ const measureStore = useMeasureStore();
 const handleButtonClick = (type: string) => {
   if (type === 'delete-all') {
     measureStore.triggerDeleteAll();
-    }
+  }
 };
-
 </script>
 
 <template>
@@ -19,12 +18,24 @@ const handleButtonClick = (type: string) => {
   <v-container flat color="transparent" class="floating-toolbar m-0" dense>
     <v-row class="d-flex flex-column">
       <v-col class="pa-1" cols="12">
-        <v-btn size="small" icon @click="handleButtonClick('delete-all')" variant="flat" title="Delete All">
+        <v-btn
+          size="small"
+          icon
+          @click="handleButtonClick('delete-all')"
+          variant="flat"
+          title="Delete All"
+        >
           <v-icon>mdi-delete-empty</v-icon>
         </v-btn>
       </v-col>
       <v-col class="pa-1" cols="12">
-        <v-btn size="small" icon variant="flat" @click="configStore.toggleTheme" title = "Toggle Dark Mode">
+        <v-btn
+          size="small"
+          icon
+          variant="flat"
+          @click="configStore.toggleTheme"
+          title="Toggle Dark Mode"
+        >
           <v-icon>mdi-theme-light-dark</v-icon>
         </v-btn>
       </v-col>
@@ -59,6 +70,4 @@ const handleButtonClick = (type: string) => {
   width: 80px;
   box-shadow: none;
 }
-
 </style>
-
