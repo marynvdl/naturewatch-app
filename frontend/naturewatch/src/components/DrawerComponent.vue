@@ -38,7 +38,9 @@ function handleButtonClick(title: string) {
 </script>
 
 <template>
-  <v-container class="pt-2 pb-0 position-relative d-flex justify-center align-center">
+  <v-container
+    class="pt-2 pb-0 position-relative d-flex justify-center align-center"
+  >
     <v-btn
       class="elevation-0 bg-transparent overflow-hidden rounded-circle"
       nav
@@ -82,11 +84,7 @@ function handleButtonClick(title: string) {
           </div>
         </v-col>
         <!-- Small buttons -->
-        <v-col
-          v-else-if="item.button_type === 'small'"
-          class="pa-1"
-          cols="6"
-        >
+        <v-col v-else-if="item.button_type === 'small'" class="pa-1" cols="6">
           <div class="d-flex flex-column align-center aspect-ratio--1-1">
             <v-btn
               size="small"
@@ -123,5 +121,4 @@ function handleButtonClick(title: string) {
 .position-absolute {
   position: absolute;
 }
-
 </style>

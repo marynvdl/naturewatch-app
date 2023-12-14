@@ -46,7 +46,8 @@ const drawerWidth = computed(() => drawerStore.width);
 // Label visibility
 const areLabelsVisible = computed(() => basemapStore.labelsVisible);
 const toggleLabelsTo = basemapStore.toggleLabelsTo;
-const toggleSatelliteLayerVisibility = basemapStore.toggleSatelliteLayerVisibility;
+const toggleSatelliteLayerVisibility =
+  basemapStore.toggleSatelliteLayerVisibility;
 
 const mapOptions: mapboxgl.MapboxOptions = {
   accessToken:
@@ -56,7 +57,7 @@ const mapOptions: mapboxgl.MapboxOptions = {
   center: [20.23928, 7.35074],
   zoom: 5,
   attributionControl: false,
-  projection: 'mercator' as unknown as mapboxgl.Projection
+  projection: 'mercator' as unknown as mapboxgl.Projection,
 };
 
 // Watch for changes in the visible property of map layers
@@ -104,25 +105,28 @@ onMounted(() => {
   // Add the custom controls during map initialization
   map.value.addControl(nav, 'top-right');
 
-
   map.value.addControl(
     new mapboxgl.GeolocateControl({
       positionOptions: {
-      enableHighAccuracy: true
-    },
-    // When active the map will receive updates to the device's location as it changes.
-    trackUserLocation: true,
-    // Draw an arrow next to the location dot to indicate which direction the device is heading.
-    showUserHeading: true
+        enableHighAccuracy: true,
+      },
+      // When active the map will receive updates to the device's location as it changes.
+      trackUserLocation: true,
+      // Draw an arrow next to the location dot to indicate which direction the device is heading.
+      showUserHeading: true,
     })
-  );   
+  );
 
   // Add event listener for style.load
   if (map.value) {
     map.value.on('style.load', () => {
       // Check if basemap has a Map Layer
-      if (currentBasemap.value.layer){
-        addSourceAndLayer(currentBasemap.value.layer, activeYear.value, map.value);
+      if (currentBasemap.value.layer) {
+        addSourceAndLayer(
+          currentBasemap.value.layer,
+          activeYear.value,
+          map.value
+        );
       }
       visibleMapLayers.value.forEach((layer, index) => {
         addSourceAndLayer(layer, activeYear.value, map.value);
@@ -143,11 +147,13 @@ function handleLabelsChanged(map: mapboxgl.Map | null) {
 function setLabels(map: mapboxgl.Map | null) {
   if (map) {
     map.getStyle().layers.forEach(function (layer) {
-      if ((layer.type === 'symbol' || layer.type === 'line') &&
-          // Keep labels added with the MeasureComponent
-          !layer.id.includes('measure-label') &&
-          // Keep lines and polygons added with the MeasureComponent
-          !layer.id.includes('gl-draw')) {
+      if (
+        (layer.type === 'symbol' || layer.type === 'line') &&
+        // Keep labels added with the MeasureComponent
+        !layer.id.includes('measure-label') &&
+        // Keep lines and polygons added with the MeasureComponent
+        !layer.id.includes('gl-draw')
+      ) {
         // Toggle visibility
         if (areLabelsVisible.value) {
           map.setLayoutProperty(layer.id, 'visibility', 'visible');
@@ -159,14 +165,13 @@ function setLabels(map: mapboxgl.Map | null) {
   }
 }
 
-
 /** Handle basemap change */
 function handleBasemapChanged(newStyleUrl: string) {
   if (map.value) {
     map.value.setStyle(newStyleUrl);
-    if (currentBasemap.value.layer){
+    if (currentBasemap.value.layer) {
       updateMapLayer(currentBasemap.value.layer, map.value);
-      toggleSatelliteLayerVisibility()
+      toggleSatelliteLayerVisibility();
     }
   }
 }
@@ -202,7 +207,7 @@ function updateMapLayer(
  * @param layer - The MapLayer to be updated.
  * @param activeYear - The year selected on the timeline.
  */
- function getLayerUrl(layer: MapLayer, activeYear: number): string {
+function getLayerUrl(layer: MapLayer, activeYear: number): string {
   // Check if years_available is defined and not empty
   if (layer.years_available && layer.years_available.length > 0) {
     // Check if activeYear is not in years_available
@@ -215,16 +220,15 @@ function updateMapLayer(
       if (!isNaN(maxAvailableYear)) {
         activeYear = maxAvailableYear;
       }
-      if (maxAvailableYear === -Infinity){
+      if (maxAvailableYear === -Infinity) {
         activeYear = NaN;
       }
-
     }
   }
 
   let layerUrl: string;
-  if (Number.isNaN(activeYear)){
-    layerUrl = 'None'
+  if (Number.isNaN(activeYear)) {
+    layerUrl = 'None';
   } else if (layer.query_string) {
     const queryString = layer.query_string.replace(
       /{year}/g,
@@ -236,7 +240,6 @@ function updateMapLayer(
   }
   return layerUrl;
 }
-
 
 /** Add layer source to the map */
 function addSourceToMap(
@@ -325,7 +328,7 @@ function addSourceAndLayer(
 ) {
   if (map) {
     const layerUrl = getLayerUrl(layer, activeYear);
-    if (layerUrl!='None'){
+    if (layerUrl != 'None') {
       addSourceToMap(layer, layerUrl, map);
       addLayerToMap(layer, map);
     }
