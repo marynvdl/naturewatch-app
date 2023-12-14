@@ -42,7 +42,7 @@
     "posthog-js": "^1.93.3",
     "vue": "^3.3.9",
     "vue-router": "^4.2.5",
-    "vuetify": "^3.4.6",
+    "vuetify": "^3.4.7",
     "webfontloader": "^1.6.28"
   },
   "devDependencies": {
@@ -86,7 +86,7 @@
     "stylelint-config-recommended-scss": "^14.0.0",
     "stylelint-config-recommended-vue": "^1.5.0",
     "stylelint-order": "^6.0.4",
-    "typescript": "^5.0.0",
+    "typescript": "^5.3.3",
     "vite": "^4.5.0",
     "vite-plugin-checker": "0.6.2",
     "vite-plugin-vuetify": "^1.0.2",
