@@ -26,7 +26,7 @@ const configStore = useConfig();
 const basemapStore = useBasemapStore();
 
 /** Title */
-const title = import.meta.env.VITE_APP_TITLE || 'NatureWatch';
+const title = import.meta.env.VITE_APP_TITLE || 'Nature Watch';
 
 /** Theme */
 const theme = useTheme();
