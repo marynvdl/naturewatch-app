@@ -30,6 +30,7 @@ parserOptions:
   sourceType: module
   createDefaultProgram: true
   project: ['./tsconfig.eslint.json']
+  extraFileExtensions: ['.vue']
 rules:
   '@typescript-eslint/no-explicit-any': 'off'
   '@typescript-eslint/no-unused-vars': 'off'
