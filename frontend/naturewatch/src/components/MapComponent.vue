@@ -178,7 +178,6 @@ function handleBasemapChanged(newStyleUrl: string) {
 
 /**
  * Updates the map layer's visibility and manages layer removal based on previous year.
- *
  * @param layer - The MapLayer to be updated.
  * @param map - The Mapbox map instance
  * @param previousYear - Optional. The previous year of the layer to be removed.
@@ -203,7 +202,6 @@ function updateMapLayer(
 
 /**
  * Builds the layer's url to be used in the tile request.
- *
  * @param layer - The MapLayer to be updated.
  * @param activeYear - The year selected on the timeline.
  */
@@ -341,7 +339,7 @@ function addSourceAndLayer(
     <v-responsive class="d-flex align-center text-center fill-height">
       <div class="map-container">
         <div id="mapDiv" />
-        <SideButtonsComponent></SideButtonsComponent>
+        <SideButtonsComponent />
         <!-- Toggle basemap labels -->
         <div
           class="basemap-button"
@@ -377,7 +375,7 @@ function addSourceAndLayer(
         "
       />
       <!-- Measure Component -->
-      <MeasureComponent v-if="map" :mapInstance="map" />
+      <MeasureComponent v-if="map" :map-instance="map" />
     </v-responsive>
   </v-container>
 </template>
@@ -404,7 +402,6 @@ function addSourceAndLayer(
   z-index: 10;
   transition: left 0.15s ease-in-out;
 }
-
 .darkmode-button {
   position: absolute;
   top: 240px;
@@ -424,5 +421,11 @@ function addSourceAndLayer(
 }
 .map-parent {
   padding: 0;
+}
+
+@media (max-width: 600px) {
+  .basemap-button {
+    bottom: calc(env(safe-area-inset-bottom + 50px));
+  }
 }
 </style>
