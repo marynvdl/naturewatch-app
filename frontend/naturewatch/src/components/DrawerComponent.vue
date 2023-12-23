@@ -84,30 +84,32 @@ function handleButtonClick(title: string) {
           </div>
         </v-col>
         <!-- Small buttons -->
-        <v-col v-else-if="item.button_type === 'small'" class="pa-1" cols="6">
-          <div class="d-flex flex-column align-center aspect-ratio--1-1">
-            <v-btn
-              size="small"
-              :disabled="!item.active"
-              :variant="item.visible ? undefined : 'tonal'"
-              :icon="item.icon"
-              rounded="lg"
-              :color="item.visible ? item.button_color : 'default'"
-              elevation="0"
-              @click="handleButtonClick(item.title)"
-            >
-              <template #default>
-                <v-icon color="grey-darken-3" />
-              </template>
-            </v-btn>
-            <span
-              class="mb-0"
-              :class="!item.active ? 'text-disabled' : ''"
-              style="font-size: 12px"
-            >
-              {{ item.title }}
-            </span>
-          </div>
+        <v-col v-else-if="item.button_type === 'small'" class="pa-1" cols="12">
+          <v-row no-gutters align="center">
+            <v-col cols="auto" class="pr-1">
+              <v-btn
+                class="small-button"
+                size="small"
+                :disabled="!item.active"
+                :variant="item.visible ? undefined : 'tonal'"
+                :prepend-icon="item.icon"
+                rounded="lg"
+                :color="item.visible ? item.button_color : 'default'"
+                elevation="0"
+                width="90px"
+                @click="handleButtonClick(item.title)"
+              >
+                <span class="button-text pa-0 ma-0">
+                  {{ item.title }}
+                </span>
+              </v-btn>
+            </v-col>
+            <v-col cols="auto" class="pa-0 ma-0">
+              <v-icon v-if="item.visible" size="x-small" color="grey-darken-2">
+                mdi-circle-opacity
+              </v-icon>
+            </v-col>
+          </v-row>
         </v-col>
       </template>
     </v-row>
@@ -120,5 +122,15 @@ function handleButtonClick(title: string) {
 }
 .position-absolute {
   position: absolute;
+}
+.button-text {
+  text-transform: capitalize;
+  font-size: 11px;
+  margin-left: 8px;
+}
+.small-button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
 }
 </style>

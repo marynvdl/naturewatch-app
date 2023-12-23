@@ -4,7 +4,7 @@ import { ref, type Ref } from 'vue';
 const useDrawerStore = defineStore('drawer', () => {
   // State
   const visible: Ref<boolean> = ref(true);
-  const width = ref('115');
+  const width = ref('128');
 
   // Getters
 

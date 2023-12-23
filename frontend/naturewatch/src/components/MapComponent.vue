@@ -425,7 +425,7 @@ function addSourceAndLayer(
 
 @media (max-width: 600px) {
   .basemap-button {
-    bottom: calc(env(safe-area-inset-bottom + 50px));
+    bottom: 100px;
   }
 }
 </style>
