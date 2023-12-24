@@ -30,7 +30,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       years_available: [2022],
       type: 'raster',
       visible: false,
-      opacity: 50,
+      opacity: 100,
       icon: 'mdi-office-building',
       button_color: '#767676',
       active: true,

@@ -95,6 +95,56 @@ watch(
   }
 );
 
+const mapLayersForWatching = computed(() => {
+  return mapLayerStore.MapLayers.map(layer => {
+    return { title: layer.title, opacity: layer.opacity };
+  });
+});
+
+watch(
+  mapLayersForWatching,
+  (newLayers, oldLayers) => {
+    newLayers.forEach((layer, index) => {
+      const oldLayer = oldLayers[index];
+      if (layer.opacity !== oldLayer.opacity) {
+        updateLayerOpacityOnMap(layer.title, layer.opacity, map.value);
+      }
+    });
+  },
+  { deep: true }
+);
+
+/**
+ * Updates the opacity of a Mapbox layer.
+ * @param {string} layerTitle - The title of the layer to update.
+ * @param {number} opacity - The new opacity value.
+ * @param {mapboxgl.Map | null} map - The Mapbox map instance.
+ */
+function updateLayerOpacityOnMap(
+  layerTitle: string,
+  opacity: number,
+  map: mapboxgl.Map | null
+) {
+  const fullLayerId = layerTitle + activeYear.value; // Construct the full layer ID
+  if (map && map.getLayer(fullLayerId)) {
+    const opacityValue = opacity / 100;
+
+    // Determine the correct opacity property based on layer type
+    const layerType = map.getLayer(fullLayerId).type;
+    let opacityProperty = '';
+    if (layerType === 'raster') {
+      opacityProperty = 'raster-opacity';
+    } else if (layerType === 'circle') {
+      opacityProperty = 'circle-opacity';
+    }
+    // Add more conditions for other layer types if needed
+
+    if (opacityProperty) {
+      map.setPaintProperty(fullLayerId, opacityProperty, opacityValue);
+    }
+  }
+}
+
 onMounted(() => {
   // Create the controls
   const nav = new mapboxgl.NavigationControl();
@@ -194,7 +244,6 @@ function updateMapLayer(
         map.removeLayer(layer.title + previousYear);
       }
     } else if (map.getSource(layer.title + activeYear.value)) {
-      // Remove the layer from the map
       map.removeLayer(layer.title + activeYear.value);
     }
   }
