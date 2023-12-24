@@ -2,7 +2,7 @@
 import type DrawerMenuItem from '@/interfaces/DrawerMenuItemInterface';
 import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
-import { computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import logo from '@/assets/logo_nw.png';
 
 // Using stores
@@ -35,6 +35,52 @@ function handleButtonClick(title: string) {
     toggleTimelineVisibility(true);
   }
 }
+
+/** Opacity slider */
+
+// New reactive property for tracking which slider is visible
+const sliderVisible = ref(false);
+const sliderStyles = ref({});
+const currentOpacity = ref(100);
+const currentLayerTitle = ref('');
+
+/**
+ * Updates the opacity of a layer.
+ * @param {string} title - The title of the layer.
+ * @param {number} opacity - The new opacity value.
+ */
+function updateOpacity(title: string, opacity: number) {
+  mapLayerStore.updateLayerOpacity(title, opacity);
+}
+
+/**
+ * Opens the slider next to the clicked icon and sets its position.
+ * @param {MouseEvent} event - The mouse event.
+ * @param {string} title - The title of the layer.
+ */
+function openSlider(event: MouseEvent, title: string) {
+  if (currentLayerTitle.value === title && sliderVisible.value) {
+    sliderVisible.value = false;
+    return;
+  }
+
+  const iconRect = (event.target as HTMLElement).getBoundingClientRect();
+  sliderStyles.value = {
+    position: 'absolute',
+    top: `${iconRect.top - 8}px`,
+    left: `${iconRect.right + 10}px`, // 10px to the right of the icon
+    zIndex: 1000, // Ensure it's above other elements
+  };
+  currentOpacity.value = mapLayerStore.getLayerOpacity(title);
+  currentLayerTitle.value = title;
+  sliderVisible.value = true;
+}
+
+watch(currentOpacity, newOpacity => {
+  if (sliderVisible.value) {
+    updateOpacity(currentLayerTitle.value, newOpacity);
+  }
+});
 </script>
 
 <template>
@@ -105,7 +151,16 @@ function handleButtonClick(title: string) {
               </v-btn>
             </v-col>
             <v-col cols="auto" class="pa-0 ma-0">
-              <v-icon v-if="item.visible" size="x-small" color="grey-darken-2">
+              <v-icon
+                v-if="item.visible"
+                size="x-small"
+                :color="
+                  currentLayerTitle === item.title && sliderVisible
+                    ? 'grey-darken-4'
+                    : 'grey-lighten-2'
+                "
+                @click="event => openSlider(event, item.title)"
+              >
                 mdi-circle-opacity
               </v-icon>
             </v-col>
@@ -114,6 +169,9 @@ function handleButtonClick(title: string) {
       </template>
     </v-row>
   </v-container>
+  <div v-if="sliderVisible" :style="sliderStyles" class="slider-container">
+    <v-slider v-model="currentOpacity" min="0" max="100" step="1" />
+  </div>
 </template>
 
 <style scoped>
@@ -132,5 +190,10 @@ function handleButtonClick(title: string) {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+}
+.slider-container {
+  position: absolute;
+  z-index: 1005;
+  width: 100px;
 }
 </style>
