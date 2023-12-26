@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/**/*",
+    "vitest/**/*",
+    "vitest.config.ts",
+    "vite.config.ts",
+    "env.d.ts"
+    // Add any other directories or files you want ESLint to check
+  ]
+}

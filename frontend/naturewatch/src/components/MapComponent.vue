@@ -46,7 +46,8 @@ const drawerWidth = computed(() => drawerStore.width);
 // Label visibility
 const areLabelsVisible = computed(() => basemapStore.labelsVisible);
 const toggleLabelsTo = basemapStore.toggleLabelsTo;
-const toggleSatelliteLayerVisibility = basemapStore.toggleSatelliteLayerVisibility;
+const toggleSatelliteLayerVisibility =
+  basemapStore.toggleSatelliteLayerVisibility;
 
 const mapOptions: mapboxgl.MapboxOptions = {
   accessToken:
@@ -56,7 +57,7 @@ const mapOptions: mapboxgl.MapboxOptions = {
   center: [20.23928, 7.35074],
   zoom: 5,
   attributionControl: false,
-  projection: 'mercator' as unknown as mapboxgl.Projection
+  projection: 'mercator' as unknown as mapboxgl.Projection,
 };
 
 // Watch for changes in the visible property of map layers
@@ -72,11 +73,15 @@ watch(
       const oldLayer = prevMapLayers.value[index];
 
       if (newLayer.visible !== oldLayer.visible) {
+        // Fetch the latest opacity value
+        const currentOpacity = mapLayerStore.getLayerOpacity(newLayer.title);
         // Updating the map
         updateMapLayer(newLayer, map.value);
+        // Update opacity
+        updateLayerOpacityOnMap(newLayer.title, currentOpacity, map.value);
 
-        // Update the previous state only when there's a change in the visible or id property
-        prevMapLayers.value[index] = JSON.parse(JSON.stringify(newLayer));
+        // Update the previous state only when there's a change in the visible property
+        prevMapLayers.value[index] = { ...newLayer, opacity: currentOpacity };
       }
     });
   },
@@ -87,12 +92,65 @@ watch(
 watch(
   () => timelineStore.activeYear,
   (newActiveYear, oldActiveYear) => {
-    prevMapLayers.value.forEach((layer, index) => {
+    mapLayerStore.MapLayers.forEach(layer => {
+      // Fetch the latest opacity value
+      const currentOpacity = mapLayerStore.getLayerOpacity(layer.title);
       // Updating the map
       updateMapLayer(layer, map.value, oldActiveYear);
+      // Update opacity
+      updateLayerOpacityOnMap(layer.title, currentOpacity, map.value);
     });
   }
 );
+const mapLayersForWatching = computed(() => {
+  return mapLayerStore.MapLayers.map(layer => {
+    return { title: layer.title, opacity: layer.opacity };
+  });
+});
+
+watch(
+  mapLayersForWatching,
+  (newLayers, oldLayers) => {
+    newLayers.forEach((layer, index) => {
+      const oldLayer = oldLayers[index];
+      if (layer.opacity !== oldLayer.opacity) {
+        updateLayerOpacityOnMap(layer.title, layer.opacity, map.value);
+      }
+    });
+  },
+  { deep: true }
+);
+
+/**
+ * Updates the opacity of a Mapbox layer.
+ * @param {string} layerTitle - The title of the layer to update.
+ * @param {number} opacity - The new opacity value.
+ * @param {mapboxgl.Map | null} map - The Mapbox map instance.
+ */
+function updateLayerOpacityOnMap(
+  layerTitle: string,
+  opacity: number,
+  map: mapboxgl.Map | null
+) {
+  const fullLayerId = layerTitle + activeYear.value; // Construct the full layer ID
+  if (map && map.getLayer(fullLayerId)) {
+    const opacityValue = opacity / 100;
+
+    // Determine the correct opacity property based on layer type
+    const layerType = map.getLayer(fullLayerId).type;
+    let opacityProperty = '';
+    if (layerType === 'raster') {
+      opacityProperty = 'raster-opacity';
+    } else if (layerType === 'circle') {
+      opacityProperty = 'circle-opacity';
+    }
+    // Add more conditions for other layer types if needed
+
+    if (opacityProperty) {
+      map.setPaintProperty(fullLayerId, opacityProperty, opacityValue);
+    }
+  }
+}
 
 onMounted(() => {
   // Create the controls
@@ -104,25 +162,28 @@ onMounted(() => {
   // Add the custom controls during map initialization
   map.value.addControl(nav, 'top-right');
 
-
   map.value.addControl(
     new mapboxgl.GeolocateControl({
       positionOptions: {
-      enableHighAccuracy: true
-    },
-    // When active the map will receive updates to the device's location as it changes.
-    trackUserLocation: true,
-    // Draw an arrow next to the location dot to indicate which direction the device is heading.
-    showUserHeading: true
+        enableHighAccuracy: true,
+      },
+      // When active the map will receive updates to the device's location as it changes.
+      trackUserLocation: true,
+      // Draw an arrow next to the location dot to indicate which direction the device is heading.
+      showUserHeading: true,
     })
-  );   
+  );
 
   // Add event listener for style.load
   if (map.value) {
     map.value.on('style.load', () => {
       // Check if basemap has a Map Layer
-      if (currentBasemap.value.layer){
-        addSourceAndLayer(currentBasemap.value.layer, activeYear.value, map.value);
+      if (currentBasemap.value.layer) {
+        addSourceAndLayer(
+          currentBasemap.value.layer,
+          activeYear.value,
+          map.value
+        );
       }
       visibleMapLayers.value.forEach((layer, index) => {
         addSourceAndLayer(layer, activeYear.value, map.value);
@@ -143,11 +204,13 @@ function handleLabelsChanged(map: mapboxgl.Map | null) {
 function setLabels(map: mapboxgl.Map | null) {
   if (map) {
     map.getStyle().layers.forEach(function (layer) {
-      if ((layer.type === 'symbol' || layer.type === 'line') &&
-          // Keep labels added with the MeasureComponent
-          !layer.id.includes('measure-label') &&
-          // Keep lines and polygons added with the MeasureComponent
-          !layer.id.includes('gl-draw')) {
+      if (
+        (layer.type === 'symbol' || layer.type === 'line') &&
+        // Keep labels added with the MeasureComponent
+        !layer.id.includes('measure-label') &&
+        // Keep lines and polygons added with the MeasureComponent
+        !layer.id.includes('gl-draw')
+      ) {
         // Toggle visibility
         if (areLabelsVisible.value) {
           map.setLayoutProperty(layer.id, 'visibility', 'visible');
@@ -159,21 +222,19 @@ function setLabels(map: mapboxgl.Map | null) {
   }
 }
 
-
 /** Handle basemap change */
 function handleBasemapChanged(newStyleUrl: string) {
   if (map.value) {
     map.value.setStyle(newStyleUrl);
-    if (currentBasemap.value.layer){
+    if (currentBasemap.value.layer) {
       updateMapLayer(currentBasemap.value.layer, map.value);
-      toggleSatelliteLayerVisibility()
+      toggleSatelliteLayerVisibility();
     }
   }
 }
 
 /**
  * Updates the map layer's visibility and manages layer removal based on previous year.
- *
  * @param layer - The MapLayer to be updated.
  * @param map - The Mapbox map instance
  * @param previousYear - Optional. The previous year of the layer to be removed.
@@ -190,7 +251,6 @@ function updateMapLayer(
         map.removeLayer(layer.title + previousYear);
       }
     } else if (map.getSource(layer.title + activeYear.value)) {
-      // Remove the layer from the map
       map.removeLayer(layer.title + activeYear.value);
     }
   }
@@ -198,11 +258,10 @@ function updateMapLayer(
 
 /**
  * Builds the layer's url to be used in the tile request.
- *
  * @param layer - The MapLayer to be updated.
  * @param activeYear - The year selected on the timeline.
  */
- function getLayerUrl(layer: MapLayer, activeYear: number): string {
+function getLayerUrl(layer: MapLayer, activeYear: number): string {
   // Check if years_available is defined and not empty
   if (layer.years_available && layer.years_available.length > 0) {
     // Check if activeYear is not in years_available
@@ -215,16 +274,15 @@ function updateMapLayer(
       if (!isNaN(maxAvailableYear)) {
         activeYear = maxAvailableYear;
       }
-      if (maxAvailableYear === -Infinity){
+      if (maxAvailableYear === -Infinity) {
         activeYear = NaN;
       }
-
     }
   }
 
   let layerUrl: string;
-  if (Number.isNaN(activeYear)){
-    layerUrl = 'None'
+  if (Number.isNaN(activeYear)) {
+    layerUrl = 'None';
   } else if (layer.query_string) {
     const queryString = layer.query_string.replace(
       /{year}/g,
@@ -236,7 +294,6 @@ function updateMapLayer(
   }
   return layerUrl;
 }
-
 
 /** Add layer source to the map */
 function addSourceToMap(
@@ -267,6 +324,9 @@ function addSourceToMap(
 /** Add layer to the map */
 function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
   if (map) {
+    // Fetch the current opacity value
+    const currentOpacity = mapLayerStore.getLayerOpacity(layer.title) / 100;
+
     // Add layer below labels and lines
     let firstLineId;
     let firstLabelId;
@@ -280,36 +340,45 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
       }
     }
 
+    const layerId = layer.title + activeYear.value;
     if (layer.type === 'raster') {
       map.addLayer(
         {
-          id: layer.title + activeYear.value,
+          id: layerId,
           type: 'raster',
-          source: layer.title + activeYear.value,
+          source: layerId,
+          paint: {
+            'raster-opacity': currentOpacity, // Set the opacity here
+          },
         },
         firstLineId
       );
     } else if (layer.type === 'circle') {
       map.addLayer(
         {
-          id: layer.title + activeYear.value,
+          id: layerId,
           type: layer.type,
-          source: layer.title + activeYear.value,
+          source: layerId,
           'source-layer': layer.sourceLayer,
           paint: {
             'circle-radius': layer.circle_radius,
             'circle-color': layer[layerColorKey.value],
+            'circle-opacity': currentOpacity, // Set the opacity here
           },
         },
         firstLabelId
       );
     } else if (layer.type === 'line') {
+      // If there are additional paint properties for lines, include them here
       map.addLayer(
         {
-          id: layer.title + activeYear.value,
+          id: layerId,
           type: layer.type,
-          source: layer.title + activeYear.value,
+          source: layerId,
           'source-layer': layer.sourceLayer,
+          paint: {
+            // 'line-opacity': currentOpacity, // Uncomment and set if line opacity is used
+          },
         },
         firstLineId
       );
@@ -325,7 +394,7 @@ function addSourceAndLayer(
 ) {
   if (map) {
     const layerUrl = getLayerUrl(layer, activeYear);
-    if (layerUrl!='None'){
+    if (layerUrl != 'None') {
       addSourceToMap(layer, layerUrl, map);
       addLayerToMap(layer, map);
     }
@@ -338,7 +407,7 @@ function addSourceAndLayer(
     <v-responsive class="d-flex align-center text-center fill-height">
       <div class="map-container">
         <div id="mapDiv" />
-        <SideButtonsComponent></SideButtonsComponent>
+        <SideButtonsComponent />
         <!-- Toggle basemap labels -->
         <div
           class="basemap-button"
@@ -374,7 +443,7 @@ function addSourceAndLayer(
         "
       />
       <!-- Measure Component -->
-      <MeasureComponent v-if="map" :mapInstance="map" />
+      <MeasureComponent v-if="map" :map-instance="map" />
     </v-responsive>
   </v-container>
 </template>
@@ -401,7 +470,6 @@ function addSourceAndLayer(
   z-index: 10;
   transition: left 0.15s ease-in-out;
 }
-
 .darkmode-button {
   position: absolute;
   top: 240px;
@@ -421,5 +489,11 @@ function addSourceAndLayer(
 }
 .map-parent {
   padding: 0;
+}
+
+@media (max-width: 600px) {
+  .basemap-button {
+    bottom: 100px;
+  }
 }
 </style>

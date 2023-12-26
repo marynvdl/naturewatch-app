@@ -36,6 +36,4 @@ const jsonLd = JSON.stringify(
   </teleport>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

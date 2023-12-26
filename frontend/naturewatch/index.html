@@ -1,17 +1,84 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.ico" type="image/vnd.microsoft.icon" />
-    <title>vite-vuetify-ts-starter</title>
+    <title>Nature Watch</title>
   </head>
 
   <body>
     <div id="app">
-      We're sorry but this site doesn't work properly without JavaScript
-      enabled. Please enable it to continue.
+      <div id="preloader" style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+        <div id="loading-wrapper">
+          <div id="loading-content"></div>
+        </div>
+      </div>
+      <noscript>
+        We're sorry but this site doesn't work properly without JavaScript enabled. Please enable it to continue.
+      </noscript>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
+  
 </html>
+
+<style>
+  #loading-wrapper {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+  }
+
+  #loading-text {
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    color: rgb(34, 34, 34);
+    width: 100px;
+    height: 30px;
+    margin: -7px 0 0 -45px;
+    text-align: center;
+    font-family: 'PT Sans Narrow', sans-serif;
+    font-size: 20px;
+  }
+
+  #loading-content {
+    display: block;
+    position: relative;
+    left: 50%;
+    top: 50%;
+    width: 170px;
+    height: 170px;
+    margin: -85px 0 0 -85px;
+    border: 3px solid rgb(34, 34, 34);
+  }
+
+  #loading-content {
+    border: 3px solid transparent;
+    border-top-color: rgb(58, 93, 61);
+    border-bottom-color: rgb(58, 93, 61);
+    border-radius: 50%;
+    -webkit-animation: loader 2s linear infinite;
+    -moz-animation: loader 2s linear infinite;
+    -o-animation: loader 2s linear infinite;
+    animation: loader 2s linear infinite;
+  }
+
+  @keyframes loader {
+    0% {
+      -webkit-transform: rotate(0deg);
+      -ms-transform: rotate(0deg);
+      transform: rotate(0deg);
+    }
+
+    100% {
+      -webkit-transform: rotate(360deg);
+      -ms-transform: rotate(360deg);
+      transform: rotate(360deg);
+    }
+  }
+</style>

@@ -26,7 +26,7 @@ const configStore = useConfig();
 const basemapStore = useBasemapStore();
 
 /** Title */
-const title = import.meta.env.VITE_APP_TITLE || 'NatureWatch';
+const title = import.meta.env.VITE_APP_TITLE || 'Nature Watch';
 
 /** Theme */
 const theme = useTheme();
@@ -104,6 +104,10 @@ onMounted(() => {
   document.title = title;
   loading.value = false;
   setTheme();
+  const preloader = document.getElementById('preloader');
+  if (preloader) {
+    preloader.style.display = 'none';
+  }
 });
 </script>
 

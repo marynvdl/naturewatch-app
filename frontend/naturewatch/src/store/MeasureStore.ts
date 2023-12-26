@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 
 export const useMeasureStore = defineStore('measure', {
   state: () => ({
-    shouldDeleteAll: false
+    shouldDeleteAll: false,
   }),
   actions: {
     triggerDeleteAll() {
@@ -10,6 +10,6 @@ export const useMeasureStore = defineStore('measure', {
     },
     resetDeleteAllTrigger() {
       this.shouldDeleteAll = false;
-    }
-  }
+    },
+  },
 });

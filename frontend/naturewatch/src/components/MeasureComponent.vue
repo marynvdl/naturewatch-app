@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
-import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
+import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import turfLength from '@turf/length';
 import turfArea from '@turf/area';
-import turfAlong from '@turf/along';import turfCentroid from '@turf/centroid';
+import turfAlong from '@turf/along';
+import turfCentroid from '@turf/centroid';
 import turfBearing from '@turf/bearing';
 import turfDestination from '@turf/destination';
 import useBasemapStore from '@/store/BasemapStore';
 import { useMeasureStore } from '@/store/MeasureStore';
-
 
 /** Using stores */
 const basemapStore = useBasemapStore();
@@ -19,9 +19,7 @@ const measureStore = useMeasureStore();
 const currentBasemap = computed(() => basemapStore.currentBasemap);
 
 const themeSatellite = computed(() => {
-  return currentBasemap.value.title === 'Satellite'
-    ? true
-    : false;
+  return currentBasemap.value.title === 'Satellite' ? true : false;
 });
 
 /* eslint-disable vue/require-default-prop */
@@ -32,41 +30,44 @@ const props = defineProps({
 const map = ref(props.mapInstance);
 
 // Keep track of stored labels
-const storedLabels = ref<Array<{ id: string, description: string, coordinates: number[] | undefined }>>([]);
+const storedLabels = ref<
+  Array<{ id: string; description: string; coordinates: number[] | undefined }>
+>([]);
 
 onMounted(() => {
   const draw = new MapboxDraw({
     displayControlsDefault: false,
     controls: {
-          line_string: true,
-          polygon: true,
-          trash: true,
-        },
+      line_string: true,
+      polygon: true,
+      trash: true,
+    },
   });
 
   map.value?.addControl(draw, 'bottom-right');
 
-  watch(() => measureStore.shouldDeleteAll, (newValue) => {
-    if (newValue) {
-      // Function to delete all drawn objects
-      draw.deleteAll();
+  watch(
+    () => measureStore.shouldDeleteAll,
+    newValue => {
+      if (newValue) {
+        // Function to delete all drawn objects
+        draw.deleteAll();
 
-      // Remove all measurement labels
-      storedLabels.value.forEach(label => {
-        if (map.value?.getSource(label.id)) {
-          map.value.removeLayer(label.id);
-          map.value.removeSource(label.id);
-        }
-      });
+        // Remove all measurement labels
+        storedLabels.value.forEach(label => {
+          if (map.value?.getSource(label.id)) {
+            map.value.removeLayer(label.id);
+            map.value.removeSource(label.id);
+          }
+        });
 
-      // Clear the storedLabels
-      storedLabels.value = [];
-      // After deleting, reset the trigger in the store
-      measureStore.resetDeleteAllTrigger();
+        // Clear the storedLabels
+        storedLabels.value = [];
+        // After deleting, reset the trigger in the store
+        measureStore.resetDeleteAllTrigger();
+      }
     }
-    });
-
-
+  );
 });
 
 // Measure with turf
@@ -78,13 +79,17 @@ map.value?.on('draw.delete', removeMeasurementLabel);
 function formatArea(areaM2: number): string {
   if (areaM2 >= 1_000_000) {
     // Convert to km² and format
-    return `${(areaM2 / 1_000_000).toLocaleString('en-US', {maximumFractionDigits: 2})} km²`;
+    return `${(areaM2 / 1_000_000).toLocaleString('en-US', {
+      maximumFractionDigits: 2,
+    })} km²`;
   } else if (areaM2 >= 10_000) {
     // Convert to hectares and format
-    return `${(areaM2 / 10_000).toLocaleString('en-US', {maximumFractionDigits: 2})} ha`;
+    return `${(areaM2 / 10_000).toLocaleString('en-US', {
+      maximumFractionDigits: 2,
+    })} ha`;
   } else {
     // Format as m²
-    return `${areaM2.toLocaleString('en-US', {maximumFractionDigits: 2})} m²`;
+    return `${areaM2.toLocaleString('en-US', { maximumFractionDigits: 2 })} m²`;
   }
 }
 
@@ -92,10 +97,14 @@ function formatArea(areaM2: number): string {
 function formatDistance(distanceM: number): string {
   if (distanceM >= 1000) {
     // Convert to km and format
-    return `${(distanceM / 1000).toLocaleString('en-US', {maximumFractionDigits: 2})} km`;
+    return `${(distanceM / 1000).toLocaleString('en-US', {
+      maximumFractionDigits: 2,
+    })} km`;
   } else {
     // Format as m
-    return `${distanceM.toLocaleString('en-US', {maximumFractionDigits: 2})} m`;
+    return `${distanceM.toLocaleString('en-US', {
+      maximumFractionDigits: 2,
+    })} m`;
   }
 }
 
@@ -109,14 +118,13 @@ function measure(event: any) {
   const id = `measure-label-${event.features[0].id}`;
 
   if (geometry.type === 'LineString') {
-
     // Function to slightly offset label
-    const distance = turfLength(geometry, { units: 'meters' }); 
+    const distance = turfLength(geometry, { units: 'meters' });
     label = formatDistance(distance);
     position = turfAlong(geometry, distance / 2, { units: 'meters' });
 
     const [start, end] = geometry.coordinates;
-    
+
     const bearingValue = turfBearing(start, end);
     const offsetDistanceX = 0.02;
     const offsetDistanceY = 0.01;
@@ -130,8 +138,7 @@ function measure(event: any) {
 
     // Apply the vertical offset
     position = turfDestination(positionAfterXOffset, yOffset, 0);
-
-  }  else if (geometry.type === 'Polygon') {
+  } else if (geometry.type === 'Polygon') {
     const area = turfArea(geometry); // Returns area in square meters
     label = formatArea(area);
 
@@ -176,23 +183,23 @@ function measure(event: any) {
   storedLabels.value.push({
     id,
     description: label,
-    coordinates: position?.geometry.coordinates
+    coordinates: position?.geometry.coordinates,
   });
 }
 
 // Function to remove measurement labels
 function removeMeasurementLabel(event: any) {
-    const id = `measure-label-${event.features[0].id}`;
-    if (map.value?.getSource(id)) {
-        map.value.removeLayer(id);
-        map.value.removeSource(id);
-    }
+  const id = `measure-label-${event.features[0].id}`;
+  if (map.value?.getSource(id)) {
+    map.value.removeLayer(id);
+    map.value.removeSource(id);
+  }
 
-    // Remove the label from storedLabels
-    const index = storedLabels.value.findIndex(label => label.id === id);
-    if (index !== -1) {
-        storedLabels.value.splice(index, 1);
-    }
+  // Remove the label from storedLabels
+  const index = storedLabels.value.findIndex(label => label.id === id);
+  if (index !== -1) {
+    storedLabels.value.splice(index, 1);
+  }
 }
 
 // Remove event listeners when component is destroyed
@@ -209,51 +216,45 @@ const unwatch = watch(map, (newValue, oldValue) => {
   }
 });
 
-
 onBeforeUnmount(() => {
   unwatch();
 });
 
-
 map.value?.on('style.load', () => {
-    // Re-add the labels
-    storedLabels.value.forEach(label => {
-        // Re-add the label
-        map.value?.addSource(label.id, {
-            type: 'geojson',
-            data: {
-                type: 'Feature',
-                geometry: {
-                    type: 'Point',
-                    coordinates: label.coordinates
-                },
-                properties: {
-                    description: label.description,
-                },
-            },
-        });
-
-        map.value?.addLayer({
-            id: label.id,
-            type: 'symbol',
-            source: label.id,
-            layout: {
-                'text-field': ['get', 'description'],
-                'text-anchor': 'center',
-            },
-            paint: {
-              'text-color': themeSatellite.value ? 'white' : 'black',
-            },            
-        });
+  // Re-add the labels
+  storedLabels.value.forEach(label => {
+    // Re-add the label
+    map.value?.addSource(label.id, {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: label.coordinates,
+        },
+        properties: {
+          description: label.description,
+        },
+      },
     });
+
+    map.value?.addLayer({
+      id: label.id,
+      type: 'symbol',
+      source: label.id,
+      layout: {
+        'text-field': ['get', 'description'],
+        'text-anchor': 'center',
+      },
+      paint: {
+        'text-color': themeSatellite.value ? 'white' : 'black',
+      },
+    });
+  });
 });
-
-
 </script>
 
 <!-- <template>
 </template> -->
 
-<style scoped>
-
-</style>
+<style scoped></style>
