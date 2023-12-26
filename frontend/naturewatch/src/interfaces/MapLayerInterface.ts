@@ -22,6 +22,8 @@ export default interface MapLayer {
   circle_radius?: number;
   /** Layer visible on map */
   visible: boolean;
+  /** Layer opacity on map */
+  opacity: number;
   /** Button icon if small button */
   icon?: string;
   /** Button image if big button and layer visible*/

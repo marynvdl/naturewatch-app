@@ -73,11 +73,15 @@ watch(
       const oldLayer = prevMapLayers.value[index];
 
       if (newLayer.visible !== oldLayer.visible) {
+        // Fetch the latest opacity value
+        const currentOpacity = mapLayerStore.getLayerOpacity(newLayer.title);
         // Updating the map
         updateMapLayer(newLayer, map.value);
+        // Update opacity
+        updateLayerOpacityOnMap(newLayer.title, currentOpacity, map.value);
 
-        // Update the previous state only when there's a change in the visible or id property
-        prevMapLayers.value[index] = JSON.parse(JSON.stringify(newLayer));
+        // Update the previous state only when there's a change in the visible property
+        prevMapLayers.value[index] = { ...newLayer, opacity: currentOpacity };
       }
     });
   },
@@ -88,12 +92,65 @@ watch(
 watch(
   () => timelineStore.activeYear,
   (newActiveYear, oldActiveYear) => {
-    prevMapLayers.value.forEach((layer, index) => {
+    mapLayerStore.MapLayers.forEach(layer => {
+      // Fetch the latest opacity value
+      const currentOpacity = mapLayerStore.getLayerOpacity(layer.title);
       // Updating the map
       updateMapLayer(layer, map.value, oldActiveYear);
+      // Update opacity
+      updateLayerOpacityOnMap(layer.title, currentOpacity, map.value);
     });
   }
 );
+const mapLayersForWatching = computed(() => {
+  return mapLayerStore.MapLayers.map(layer => {
+    return { title: layer.title, opacity: layer.opacity };
+  });
+});
+
+watch(
+  mapLayersForWatching,
+  (newLayers, oldLayers) => {
+    newLayers.forEach((layer, index) => {
+      const oldLayer = oldLayers[index];
+      if (layer.opacity !== oldLayer.opacity) {
+        updateLayerOpacityOnMap(layer.title, layer.opacity, map.value);
+      }
+    });
+  },
+  { deep: true }
+);
+
+/**
+ * Updates the opacity of a Mapbox layer.
+ * @param {string} layerTitle - The title of the layer to update.
+ * @param {number} opacity - The new opacity value.
+ * @param {mapboxgl.Map | null} map - The Mapbox map instance.
+ */
+function updateLayerOpacityOnMap(
+  layerTitle: string,
+  opacity: number,
+  map: mapboxgl.Map | null
+) {
+  const fullLayerId = layerTitle + activeYear.value; // Construct the full layer ID
+  if (map && map.getLayer(fullLayerId)) {
+    const opacityValue = opacity / 100;
+
+    // Determine the correct opacity property based on layer type
+    const layerType = map.getLayer(fullLayerId).type;
+    let opacityProperty = '';
+    if (layerType === 'raster') {
+      opacityProperty = 'raster-opacity';
+    } else if (layerType === 'circle') {
+      opacityProperty = 'circle-opacity';
+    }
+    // Add more conditions for other layer types if needed
+
+    if (opacityProperty) {
+      map.setPaintProperty(fullLayerId, opacityProperty, opacityValue);
+    }
+  }
+}
 
 onMounted(() => {
   // Create the controls
@@ -194,7 +251,6 @@ function updateMapLayer(
         map.removeLayer(layer.title + previousYear);
       }
     } else if (map.getSource(layer.title + activeYear.value)) {
-      // Remove the layer from the map
       map.removeLayer(layer.title + activeYear.value);
     }
   }
@@ -268,6 +324,9 @@ function addSourceToMap(
 /** Add layer to the map */
 function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
   if (map) {
+    // Fetch the current opacity value
+    const currentOpacity = mapLayerStore.getLayerOpacity(layer.title) / 100;
+
     // Add layer below labels and lines
     let firstLineId;
     let firstLabelId;
@@ -281,36 +340,45 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
       }
     }
 
+    const layerId = layer.title + activeYear.value;
     if (layer.type === 'raster') {
       map.addLayer(
         {
-          id: layer.title + activeYear.value,
+          id: layerId,
           type: 'raster',
-          source: layer.title + activeYear.value,
+          source: layerId,
+          paint: {
+            'raster-opacity': currentOpacity, // Set the opacity here
+          },
         },
         firstLineId
       );
     } else if (layer.type === 'circle') {
       map.addLayer(
         {
-          id: layer.title + activeYear.value,
+          id: layerId,
           type: layer.type,
-          source: layer.title + activeYear.value,
+          source: layerId,
           'source-layer': layer.sourceLayer,
           paint: {
             'circle-radius': layer.circle_radius,
             'circle-color': layer[layerColorKey.value],
+            'circle-opacity': currentOpacity, // Set the opacity here
           },
         },
         firstLabelId
       );
     } else if (layer.type === 'line') {
+      // If there are additional paint properties for lines, include them here
       map.addLayer(
         {
-          id: layer.title + activeYear.value,
+          id: layerId,
           type: layer.type,
-          source: layer.title + activeYear.value,
+          source: layerId,
           'source-layer': layer.sourceLayer,
+          paint: {
+            // 'line-opacity': currentOpacity, // Uncomment and set if line opacity is used
+          },
         },
         firstLineId
       );
@@ -425,7 +493,7 @@ function addSourceAndLayer(
 
 @media (max-width: 600px) {
   .basemap-button {
-    bottom: calc(env(safe-area-inset-bottom + 50px));
+    bottom: 100px;
   }
 }
 </style>

@@ -38,7 +38,7 @@ rules:
   new-cap: off
   no-invalid-this: off
   no-unused-vars: warn
-  require-jsdoc: warn
+  require-jsdoc: off
   valid-jsdoc: off
   jsdoc/require-param-type: off
   jsdoc/require-param-description: off

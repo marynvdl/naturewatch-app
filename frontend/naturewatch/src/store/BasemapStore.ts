@@ -11,6 +11,7 @@ const SatelliteLayer: MapLayer = {
   years_available: [2022],
   type: 'raster',
   visible: true,
+  opacity: 100,
 };
 
 const SatelliteBasemap: Basemap = {
