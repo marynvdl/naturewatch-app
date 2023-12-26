@@ -48,7 +48,7 @@ const iconRefs = ref<Record<string, HTMLElement | undefined>>({});
 
 /**
  * Generate ref name for each icon
- * @param {title} string - Layer title.
+ * @param {string} title - Layer title.
  */
 // eslint-disable-next-line no-unused-vars
 function iconRefName(title: string) {
@@ -107,10 +107,10 @@ function updateOpacity(title: string, opacity: number) {
 /**
  * Opens the slider next to the clicked icon and sets its position.
  * @param {MouseEvent} event - The mouse event.
- * @param {string} title - The title of the layer.
+ * @param {title} title - The title of the layer.
  */
 function openSlider(event: MouseEvent, title: string) {
-  iconRefs.value[title] = event.currentTarget;
+  iconRefs.value[title] = event.currentTarget as HTMLElement;
 
   if (currentLayerTitle.value === title && sliderVisible.value) {
     sliderVisible.value = false;
@@ -138,7 +138,7 @@ watch(currentOpacity, newOpacity => {
 
 <template>
   <v-container
-    class="pt-2 pb-0 position-relative d-flex justify-center align-center"
+    class="pt-2 pb-5 position-relative d-flex justify-center align-center"
   >
     <v-btn
       class="elevation-0 bg-transparent overflow-hidden rounded-circle"
@@ -156,31 +156,44 @@ watch(currentOpacity, newOpacity => {
         <!-- Big buttons -->
         <v-col
           v-if="item.button_type === 'big'"
-          class="mt-2 mb-0 px-2 pt-4 pb-1"
+          class="px-1 pt-5 pb-3"
           cols="12"
         >
-          <div class="d-flex flex-column align-center aspect-ratio--1-1">
-            <v-btn
-              :disabled="!item.active"
-              :variant="item.visible ? undefined : 'tonal'"
-              :icon="item.icon"
-              rounded="lg"
-              :color="item.visible ? item.button_color : 'default'"
-              elevation="0"
-              @click="handleButtonClick(item.title)"
-            >
-              <template #default>
-                <v-icon color="grey-darken-3" />
-              </template>
-            </v-btn>
-            <span
-              class="mb-0"
-              :class="!item.active ? 'text-disabled' : ''"
-              style="font-size: 12px"
-            >
-              {{ item.title }}
-            </span>
-          </div>
+          <v-row no-gutters align="center">
+            <v-col cols="auto" class="pr-1">
+              <v-btn
+                class="small-button"
+                size="small"
+                :disabled="!item.active"
+                :variant="item.visible ? undefined : 'tonal'"
+                :prepend-icon="item.icon"
+                rounded="lg"
+                :color="item.visible ? item.button_color : 'default'"
+                elevation="0"
+                width="90px"
+                @click="handleButtonClick(item.title)"
+              >
+                <span class="big-button-text pa-0 ma-0">
+                  {{ item.title }}
+                </span>
+              </v-btn>
+            </v-col>
+            <v-col cols="auto" class="pa-0 ma-0">
+              <v-icon
+                v-if="item.visible"
+                ref="iconRefs[iconRefName(item.title)]"
+                size="x-small"
+                :color="
+                  currentLayerTitle === item.title && sliderVisible
+                    ? 'grey-darken-4'
+                    : 'grey-lighten-2'
+                "
+                @click="event => openSlider(event, item.title)"
+              >
+                mdi-circle-opacity
+              </v-icon>
+            </v-col>
+          </v-row>
         </v-col>
         <!-- Small buttons -->
         <v-col v-else-if="item.button_type === 'small'" class="pa-1" cols="12">
@@ -252,6 +265,11 @@ watch(currentOpacity, newOpacity => {
   text-transform: capitalize;
   font-size: 11px;
   margin-left: 8px;
+}
+.big-button-text {
+  text-transform: capitalize;
+  font-size: 13px;
+  margin-left: 1px;
 }
 .small-button {
   display: flex;

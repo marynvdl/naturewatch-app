@@ -125,7 +125,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       visible: false,
       opacity: 100,
       icon: 'mdi-bridge',
-      button_color: '#b7e6f1',
+      button_color: '#80a1a8',
       active: true,
     },
   ]);
