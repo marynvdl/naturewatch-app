@@ -44,7 +44,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       visible: false,
       opacity: 100,
       icon: 'mdi-tree',
-      button_color: '#ec96b7',
+      button_color: '#D487A4',
       active: true,
       query_string: `?start_year=2000&end_year={year}`,
     },

@@ -44,11 +44,46 @@ const sliderStyles = ref({});
 const currentOpacity = ref(100);
 const currentLayerTitle = ref('');
 const sliderRef = ref<HTMLElement | null>(null);
+const iconRefs = ref<Record<string, HTMLElement | undefined>>({});
 
-// Function to check if the click is outside the slider
+/**
+ * Generate ref name for each icon
+ * @param {title} string - Layer title.
+ */
+// eslint-disable-next-line no-unused-vars
+function iconRefName(title: string) {
+  return `icon-${title}`;
+}
+
+/**
+ * Handle click event outside of opacity slider.
+ * @param {event} event - The mouse click event.
+ */
 function handleClickOutside(event: MouseEvent) {
-  if (sliderRef.value && !sliderRef.value.contains(event.target as Node)) {
-    sliderVisible.value = false;
+  const buffer = 0; // Buffer size in pixels
+
+  if (sliderRef.value) {
+    const { top, right, bottom, left } =
+      sliderRef.value.getBoundingClientRect();
+
+    // Check if the click is within the buffer zone around the slider
+    const isClickInsideBuffer =
+      event.clientX >= left - buffer &&
+      event.clientX <= right + buffer + 70 &&
+      event.clientY >= top - buffer &&
+      event.clientY <= bottom + buffer;
+
+    if (!isClickInsideBuffer) {
+      const isClickInsideIcon = Object.values(iconRefs.value).some(
+        iconEl =>
+          iconEl &&
+          (iconEl === event.target || iconEl.contains(event.target as Node))
+      );
+
+      if (!isClickInsideIcon) {
+        sliderVisible.value = false;
+      }
+    }
   }
 }
 
@@ -75,6 +110,8 @@ function updateOpacity(title: string, opacity: number) {
  * @param {string} title - The title of the layer.
  */
 function openSlider(event: MouseEvent, title: string) {
+  iconRefs.value[title] = event.currentTarget;
+
   if (currentLayerTitle.value === title && sliderVisible.value) {
     sliderVisible.value = false;
     return;
@@ -169,6 +206,7 @@ watch(currentOpacity, newOpacity => {
             <v-col cols="auto" class="pa-0 ma-0">
               <v-icon
                 v-if="item.visible"
+                ref="iconRefs[iconRefName(item.title)]"
                 size="x-small"
                 :color="
                   currentLayerTitle === item.title && sliderVisible
@@ -187,11 +225,19 @@ watch(currentOpacity, newOpacity => {
   </v-container>
   <div
     v-if="sliderVisible"
+    ref="sliderRef"
     :style="sliderStyles"
     class="slider-container"
-    ref="sliderRef"
   >
-    <v-slider v-model="currentOpacity" min="0" max="100" step="1" />
+    <v-slider
+      v-model="currentOpacity"
+      min="0"
+      max="100"
+      step="5"
+      track-size="3"
+      :thumb-size="13"
+      thumb-label="always"
+    />
   </div>
 </template>
 
@@ -215,6 +261,6 @@ watch(currentOpacity, newOpacity => {
 .slider-container {
   position: absolute;
   z-index: 1005;
-  width: 100px;
+  width: 110px;
 }
 </style>
