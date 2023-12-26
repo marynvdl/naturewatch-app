@@ -43,6 +43,22 @@ const sliderVisible = ref(false);
 const sliderStyles = ref({});
 const currentOpacity = ref(100);
 const currentLayerTitle = ref('');
+const sliderRef = ref<HTMLElement | null>(null);
+
+// Function to check if the click is outside the slider
+function handleClickOutside(event: MouseEvent) {
+  if (sliderRef.value && !sliderRef.value.contains(event.target as Node)) {
+    sliderVisible.value = false;
+  }
+}
+
+watch(sliderVisible, newVal => {
+  if (newVal) {
+    window.addEventListener('click', handleClickOutside, true);
+  } else {
+    window.removeEventListener('click', handleClickOutside, true);
+  }
+});
 
 /**
  * Updates the opacity of a layer.
@@ -169,7 +185,12 @@ watch(currentOpacity, newOpacity => {
       </template>
     </v-row>
   </v-container>
-  <div v-if="sliderVisible" :style="sliderStyles" class="slider-container">
+  <div
+    v-if="sliderVisible"
+    :style="sliderStyles"
+    class="slider-container"
+    ref="sliderRef"
+  >
     <v-slider v-model="currentOpacity" min="0" max="100" step="1" />
   </div>
 </template>
