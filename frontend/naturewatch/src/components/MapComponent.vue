@@ -216,9 +216,6 @@ function displayCoordinates(lngLat: mapboxgl.LngLat, event: MouseEvent) {
   clickedPositionY.value = event.clientY;
 
   coordinatesComponentRef.value?.openPopup();
-  console.log(clickedPositionX.value);
-  console.log(clickedPositionY.value);
-
 }
 
 /** Handle labels change on basemap */

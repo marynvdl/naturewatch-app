@@ -29,15 +29,11 @@ const y = computed(() => props.positionY || 0);
 
 // Method to open the popup
 function openPopup() {
-  x.value = props.positionX || 0;
-  y.value = props.positionY || 0;
   show.value = true;
 }
 
 function copyCoordinates() {
-  navigator.clipboard.writeText(coordinates.value).then(() => {
-    console.log('Coordinates copied to clipboard!');
-  });
+  navigator.clipboard.writeText(coordinates.value);
 }
 
 // Expose methods
@@ -47,19 +43,30 @@ defineExpose({
 </script>
 
 <template>
-  <v-menu v-model="show" absolute :style="{ top: y + 'px', left: x + 'px' }">
+  <v-menu
+    v-model="show"
+    absolute
+    class="pa-0"
+    :style="{ top: y + 'px', left: x + 'px' }"
+  >
     <v-card>
-      <v-card-title> {{  }}</v-card-title>
-      <v-card-text>{{ coordinates }}</v-card-text>
-      <v-card-actions>
+      <v-card-text class="px-2 py-1 coordinate-text">
+        {{ coordinates }}
         <v-btn
+          class="px-2"
+          variant="plain"
+          size="x-small"
           density="compact"
           icon="mdi-content-copy"
           @click="copyCoordinates"
         />
-      </v-card-actions>
+      </v-card-text>
     </v-card>
   </v-menu>
 </template>
 
-<style scoped></style>
+<style scoped>
+.coordinate-text {
+  font-size: 0.75rem;
+}
+</style>
