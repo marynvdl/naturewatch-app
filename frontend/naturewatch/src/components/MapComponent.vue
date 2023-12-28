@@ -51,10 +51,10 @@ const toggleSatelliteLayerVisibility =
   basemapStore.toggleSatelliteLayerVisibility;
 
 // Add state for CoordinatesComponent
-const showCoordinatesPopup = ref(false);
 const clickedLngLat = ref({ lng: 0, lat: 0 });
 const clickedPositionX = ref(0);
 const clickedPositionY = ref(0);
+const coordinatesComponentRef = ref();
 
 const mapOptions: mapboxgl.MapboxOptions = {
   accessToken:
@@ -212,9 +212,10 @@ onMounted(() => {
  */
 function displayCoordinates(lngLat: mapboxgl.LngLat, event: MouseEvent) {
   clickedLngLat.value = lngLat;
-  showCoordinatesPopup.value = true;
   clickedPositionX.value = event.clientX;
   clickedPositionY.value = event.clientY;
+
+  coordinatesComponentRef.value?.openPopup();
 }
 
 /** Handle labels change on basemap */
@@ -471,8 +472,8 @@ function addSourceAndLayer(
   </v-container>
   <!-- Coordinates Component -->
   <CoordinatesComponent
+    ref="coordinatesComponentRef"
     :lng-lat="clickedLngLat"
-    :open="showCoordinatesPopup"
     :position-x="clickedPositionX"
     :position-y="clickedPositionY"
   />

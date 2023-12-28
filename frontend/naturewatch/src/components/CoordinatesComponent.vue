@@ -1,20 +1,19 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, computed, defineExpose } from 'vue';
 
 const props = defineProps({
   lngLat: Object,
-  open: Boolean,
   positionX: {
     type: Number,
-    default: 0
+    default: 0,
   },
   positionY: {
     type: Number,
-    default: 0
+    default: 0,
   },
 });
 
-const show = ref(props.open);
+const show = ref(false);
 const coordinates = computed(() => {
   if (props.lngLat) {
     const lat = props.lngLat.lat.toFixed(5);
@@ -28,22 +27,23 @@ const coordinates = computed(() => {
 const x = ref(props.positionX || 0);
 const y = ref(props.positionY || 0);
 
-watch(
-  () => props.open,
-  newVal => {
-    show.value = newVal;
-    if (newVal) {
-      x.value = props.positionX || 0;
-      y.value = props.positionY || 0;
-    }
-  }
-);
+// Method to open the popup
+function openPopup() {
+  x.value = props.positionX || 0;
+  y.value = props.positionY || 0;
+  show.value = true;
+}
 
 function copyCoordinates() {
   navigator.clipboard.writeText(coordinates.value).then(() => {
     console.log('Coordinates copied to clipboard!');
   });
 }
+
+// Expose methods
+defineExpose({
+  openPopup,
+});
 </script>
 
 <template>
@@ -52,7 +52,11 @@ function copyCoordinates() {
       <v-card-title>Coordinates</v-card-title>
       <v-card-text>{{ coordinates }}</v-card-text>
       <v-card-actions>
-        <v-btn density="compact" icon="mdi-content-copy" @click="copyCoordinates" />
+        <v-btn
+          density="compact"
+          icon="mdi-content-copy"
+          @click="copyCoordinates"
+        />
       </v-card-actions>
     </v-card>
   </v-menu>
