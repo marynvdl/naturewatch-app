@@ -10,6 +10,7 @@ import useTimelineStore from '@/store/TimelineStore';
 import useDrawerStore from '@/store/DrawerStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
 import SideButtonsComponent from '@/components/SideButtonsComponent.vue';
+import CoordinatesComponent from '@/components/CoordinatesComponent.vue';
 
 /** Using stores */
 const basemapStore = useBasemapStore();
@@ -48,6 +49,12 @@ const areLabelsVisible = computed(() => basemapStore.labelsVisible);
 const toggleLabelsTo = basemapStore.toggleLabelsTo;
 const toggleSatelliteLayerVisibility =
   basemapStore.toggleSatelliteLayerVisibility;
+
+// Add state for CoordinatesComponent
+const showCoordinatesPopup = ref(false);
+const clickedLngLat = ref({ lng: 0, lat: 0 });
+const clickedPositionX = ref(0);
+const clickedPositionY = ref(0);
 
 const mapOptions: mapboxgl.MapboxOptions = {
   accessToken:
@@ -191,9 +198,25 @@ onMounted(() => {
       setLabels(map.value);
     });
   }
+
+  // Add right-click event listener
+  map.value.on('contextmenu', e => {
+    displayCoordinates(e.lngLat, e.originalEvent);
+  });
 });
 
 /** Methods */
+/**
+ * Display the coordinates where the user right-clicked.
+ * @param {mapboxgl.LngLat} lngLat - The longitude and latitude of the clicked location.
+ */
+function displayCoordinates(lngLat: mapboxgl.LngLat, event: MouseEvent) {
+  clickedLngLat.value = lngLat;
+  showCoordinatesPopup.value = true;
+  clickedPositionX.value = event.clientX;
+  clickedPositionY.value = event.clientY;
+}
+
 /** Handle labels change on basemap */
 function handleLabelsChanged(map: mapboxgl.Map | null) {
   toggleLabelsTo(!areLabelsVisible.value);
@@ -446,6 +469,13 @@ function addSourceAndLayer(
       <MeasureComponent v-if="map" :map-instance="map" />
     </v-responsive>
   </v-container>
+  <!-- Coordinates Component -->
+  <CoordinatesComponent
+    :lng-lat="clickedLngLat"
+    :open="showCoordinatesPopup"
+    :position-x="clickedPositionX"
+    :position-y="clickedPositionY"
+  />
 </template>
 
 <style scoped>
