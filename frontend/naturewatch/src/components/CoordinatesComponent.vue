@@ -2,7 +2,10 @@
 import { ref, computed, defineExpose } from 'vue';
 
 const props = defineProps({
-  lngLat: Object,
+  lngLat: {
+    type: Object,
+    default: () => null,
+  },
   positionX: {
     type: Number,
     default: 0,
@@ -27,11 +30,16 @@ const coordinates = computed(() => {
 const x = computed(() => props.positionX || 0);
 const y = computed(() => props.positionY || 0);
 
-// Method to open the popup
+/**
+ * Method to open the popup.
+ */
 function openPopup() {
   show.value = true;
 }
 
+/**
+ * Copies coordinates to clipboard.
+ */
 function copyCoordinates() {
   navigator.clipboard.writeText(coordinates.value);
 }
