@@ -24,8 +24,8 @@ const coordinates = computed(() => {
   }
   return '';
 });
-const x = ref(props.positionX || 0);
-const y = ref(props.positionY || 0);
+const x = computed(() => props.positionX || 0);
+const y = computed(() => props.positionY || 0);
 
 // Method to open the popup
 function openPopup() {
@@ -47,9 +47,9 @@ defineExpose({
 </script>
 
 <template>
-  <v-menu v-model="show" absolute>
+  <v-menu v-model="show" absolute :style="{ top: y + 'px', left: x + 'px' }">
     <v-card>
-      <v-card-title>Coordinates</v-card-title>
+      <v-card-title> {{  }}</v-card-title>
       <v-card-text>{{ coordinates }}</v-card-text>
       <v-card-actions>
         <v-btn
