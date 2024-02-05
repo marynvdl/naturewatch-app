@@ -88,7 +88,7 @@
     "stylelint-order": "^6.0.4",
     "typescript": "^5.3.3",
     "vite": "^4.5.0",
-    "vite-plugin-checker": "0.6.2",
+    "vite-plugin-checker": "0.6.4",
     "vite-plugin-vuetify": "^1.0.2",
     "vitest": "^0.29.2",
     "vue-eslint-parser": "^9.3.2",
