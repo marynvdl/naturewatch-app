@@ -42,7 +42,7 @@
     "posthog-js": "^1.103.1",
     "vue": "^3.3.9",
     "vue-router": "^4.2.5",
-    "vuetify": "^3.4.8",
+    "vuetify": "^3.5.13",
     "webfontloader": "^1.6.28"
   },
   "devDependencies": {
