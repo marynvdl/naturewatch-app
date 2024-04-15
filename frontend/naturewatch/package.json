@@ -58,7 +58,7 @@
     "@vitejs/plugin-vue": "^4.6.2",
     "@vitest/coverage-c8": "^0.29.2",
     "@vue/eslint-config-prettier": "^9.0.0",
-    "@vue/test-utils": "^2.4.4",
+    "@vue/test-utils": "^2.4.5",
     "@vue/tsconfig": "^0.4.0",
     "eslint": "^8.56.0",
     "eslint-config-google": "^0.14.0",
