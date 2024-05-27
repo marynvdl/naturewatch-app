@@ -41,7 +41,7 @@
     "pinia-plugin-persistedstate": "^3.2.1",
     "posthog-js": "^1.103.1",
     "vue": "^3.3.9",
-    "vue-router": "^4.2.5",
+    "vue-router": "^4.3.2",
     "vuetify": "^3.5.14",
     "webfontloader": "^1.6.28"
   },
