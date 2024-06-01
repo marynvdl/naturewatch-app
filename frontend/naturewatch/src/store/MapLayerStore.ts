@@ -27,7 +27,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       title: 'Built',
       button_type: 'small',
       url: 'https://storage.googleapis.com/nature-watch-tiles/built/2023/{z}/{x}/{y}.png',
-      years_available: [2022],
+      years_available: [2023],
       type: 'raster',
       visible: false,
       opacity: 100,

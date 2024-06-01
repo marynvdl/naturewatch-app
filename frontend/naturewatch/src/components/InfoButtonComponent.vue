@@ -11,10 +11,10 @@ const cardData = ref([
   },
   {
     title: 'Built',
-    subtitle: '2022',
+    subtitle: '2023',
     icon: 'mdi-office-building',
     content:
-      'For the 2022 built layer, we primarily used the <a href="https://sites.research.google/open-buildings/" target="_blank">Google Open Buildings (2023)</a> dataset, specifically polygons with a high confidence score (>=0.80). In areas where Google Open Buildings data were unavailable—specifically in <b>Chad, Mali, Libya, Morocco and Western Morocco</b>—we integrated data from the <a href="https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php" target="_blank">Global Human Settlement Layer</a> from 2020. For reference, older built layers combine data from Google Open Buildings (spanning 2022 to 2021) and Google Dynamic World, specifically the "built" class.',
+      'For the 2023 built layer, we primarily used the <a href="https://sites.research.google/open-buildings/" target="_blank">Google Open Buildings (2023)</a> dataset, specifically polygons with a high confidence score (>=0.80). In areas where Google Open Buildings data were unavailable—specifically in <b>Chad, Mali, Libya, Morocco and Western Morocco</b>—we integrated data from the <a href="https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php" target="_blank">Global Human Settlement Layer</a> from 2020. For reference, older built layers combine data from Google Open Buildings (spanning 2022 to 2021) and Google Dynamic World, specifically the "built" class.',
   },
   {
     title: 'Treeloss',
@@ -98,7 +98,7 @@ const cardData = ref([
               icon="$close"
               size="large"
               variant="text"
-            ></v-btn>
+            />
           </div>
         </template>
         <v-scroll-y style="max-height: 80vh; overflow-y: auto">
@@ -122,7 +122,7 @@ const cardData = ref([
                 </v-expansion-panel-title>
                 <v-expansion-panel-text v-if="card.content" class="pb-2">
                   <!-- eslint-disable vue/no-v-html -->
-                  <div class="text-body-2 px-5" v-html="card.content"></div>
+                  <div class="text-body-2 px-5" v-html="card.content"/>
                   <!--eslint-enable-->
                   <img
                     v-if="card.image"
