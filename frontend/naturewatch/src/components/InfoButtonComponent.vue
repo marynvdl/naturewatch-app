@@ -18,14 +18,14 @@ const cardData = ref([
   },
   {
     title: 'Treeloss',
-    subtitle: '2016, 2017, 2018, 2019, 2020, 2021, 2022',
+    subtitle: '2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023',
     icon: 'mdi-tree',
     content:
       'The treeloss layer sources its data from <a href="https://www.globalforestwatch.org/" target="_blank">Global Forest Watch</a>\'s  v1.9 UMD tree cover loss dataset. Specifically, we\'ve focused on areas with a tree cover density exceeding 30%.',
   },
   {
     title: 'Fire',
-    subtitle: '2016, 2017, 2018, 2019, 2020, 2021, 2022',
+    subtitle: '2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023',
     icon: 'mdi-fire',
     image: fireLegend,
     content: `For the fire layers, we utilised <a href="https://firms.modaps.eosdis.nasa.gov/map/" target="_blank">FIRMS</a> data to determine the number of times a pixel burned in the year. Our methodology involved first dividing the year into 14-day intervals and then assessing if a pixel burned within each 14-day period. Finally, we summed up the number of 14-day periods a pixel experienced a fire. As a result, the maximum count for a pixel is 26 burn events within a year.

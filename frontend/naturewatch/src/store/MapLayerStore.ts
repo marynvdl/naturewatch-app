@@ -52,7 +52,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       title: 'Fire',
       button_type: 'small',
       url: 'https://storage.googleapis.com/nature-watch-tiles/fire/',
-      years_available: [2016, 2017, 2018, 2019, 2020, 2021, 2022],
+      years_available: [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
       type: 'raster',
       visible: false,
       opacity: 100,
