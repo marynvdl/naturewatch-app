@@ -34,7 +34,7 @@
   "dependencies": {
     "@mapbox/mapbox-gl-draw": "^1.4.3",
     "@mdi/font": "^7.4.47",
-    "@turf/turf": "^6.5.0",
+    "@turf/turf": "^7.0.0",
     "core-js": "^3.37.0",
     "mapbox-gl": "^3.3.0",
     "pinia": "^2.1.7",
