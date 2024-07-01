@@ -92,7 +92,7 @@
     "vite-plugin-vuetify": "^2.0.3",
     "vitest": "^0.29.2",
     "vue-eslint-parser": "^9.3.2",
-    "vue-tsc": "^1.8.27"
+    "vue-tsc": "^2.0.24"
   },
   "lint-staged": {
     "*.{js,ts,json,yaml,yml,yaml,vue,htm,html,md}": "eslint --fix --cache --cache-location ./node_modules/.vite/vite-plugin-eslint",
