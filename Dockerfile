@@ -3,8 +3,12 @@ FROM python:3.9 AS naturewatch-base
 
 WORKDIR /code
 
+# Upgrade pip/setuptools and install base dependencies
 COPY ./requirements.txt /code/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools \
+ && pip install --no-cache-dir -r /code/requirements.txt
+
+# Copy application code
 COPY ./app /code/app
 
 # Special build for automated testing of the API
