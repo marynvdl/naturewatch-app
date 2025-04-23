@@ -4,7 +4,7 @@
     "src/**/*",
     "vitest/**/*",
     "vitest.config.ts",
-    "vite.config.ts",
+    "vite.config.mts",
     "env.d.ts"
     // Add any other directories or files you want ESLint to check
   ]
