@@ -38,7 +38,7 @@
     "core-js": "^3.39.0",
     "mapbox-gl": "^3.11.0",
     "pinia": "^3.0.2",
-    "pinia-plugin-persistedstate": "^4.1.2",
+    "pinia-plugin-persistedstate": "^4.2.0",
     "posthog-js": "^1.150.1",
     "vue": "^3.5.12",
     "vue-router": "^4.4.5",
