@@ -37,7 +37,7 @@ watch(selectedYear, (newYear, oldYear) => {
           show-ticks="always"
           tick-size="6"
           :min="2016"
-          :max="2023"
+          :max="2024"
           :step="1"
           thumb-label="always"
         />
