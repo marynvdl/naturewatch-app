@@ -38,7 +38,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
     {
       title: 'Treeloss',
       button_type: 'small',
-      url: 'https://tiles.globalforestwatch.org/umd_tree_cover_loss/latest/dynamic/{z}/{x}/{y}.png',
+      url: 'https://tiles.globalforestwatch.org/umd_tree_cover_loss/v1.12/dynamic/{z}/{x}/{y}.png',
       years_available: [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
       type: 'raster',
       visible: false,
@@ -46,7 +46,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       icon: 'mdi-tree',
       button_color: '#D487A4',
       active: true,
-      query_string: `?start_year=2000&end_year={year}`,
+      query_string: `?&start_year=2001&end_year={year}&render_type=true_color`,
     },
     {
       title: 'Fire',
