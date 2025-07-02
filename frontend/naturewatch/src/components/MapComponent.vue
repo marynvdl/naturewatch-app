@@ -83,9 +83,11 @@ watch(
         // Fetch the latest opacity value
         const currentOpacity = mapLayerStore.getLayerOpacity(newLayer.title);
         // Updating the map
-        updateMapLayer(newLayer, map.value);
+        if (map.value) {
+          updateMapLayer(newLayer as any, map.value as any);
+        }
         // Update opacity
-        updateLayerOpacityOnMap(newLayer.title, currentOpacity, map.value);
+        updateLayerOpacityOnMap(newLayer.title, currentOpacity, map.value as any);
 
         // Update the previous state only when there's a change in the visible property
         prevMapLayers.value[index] = { ...newLayer, opacity: currentOpacity };
@@ -103,9 +105,11 @@ watch(
       // Fetch the latest opacity value
       const currentOpacity = mapLayerStore.getLayerOpacity(layer.title);
       // Updating the map
-      updateMapLayer(layer, map.value, oldActiveYear);
-      // Update opacity
-      updateLayerOpacityOnMap(layer.title, currentOpacity, map.value);
+      if (map.value) {
+        updateMapLayer(layer, map.value as any, oldActiveYear);
+        // Update opacity
+        updateLayerOpacityOnMap(layer.title, currentOpacity, map.value as any);
+      }
     });
   }
 );
@@ -121,7 +125,7 @@ watch(
     newLayers.forEach((layer, index) => {
       const oldLayer = oldLayers[index];
       if (layer.opacity !== oldLayer.opacity) {
-        updateLayerOpacityOnMap(layer.title, layer.opacity, map.value);
+        updateLayerOpacityOnMap(layer.title, layer.opacity, map.value as any);
       }
     });
   },
@@ -134,27 +138,30 @@ watch(
  * @param {number} opacity - The new opacity value.
  * @param {mapboxgl.Map | null} map - The Mapbox map instance.
  */
-function updateLayerOpacityOnMap(
+ function updateLayerOpacityOnMap(
   layerTitle: string,
   opacity: number,
   map: mapboxgl.Map | null
 ) {
   const fullLayerId = layerTitle + activeYear.value; // Construct the full layer ID
-  if (map && map.getLayer(fullLayerId)) {
-    const opacityValue = opacity / 100;
+  if (map) {
+    const layer = map.getLayer(fullLayerId);
+    if (layer) {
+      const opacityValue = opacity / 100;
 
-    // Determine the correct opacity property based on layer type
-    const layerType = map.getLayer(fullLayerId).type;
-    let opacityProperty = '';
-    if (layerType === 'raster') {
-      opacityProperty = 'raster-opacity';
-    } else if (layerType === 'circle') {
-      opacityProperty = 'circle-opacity';
-    }
-    // Add more conditions for other layer types if needed
+      // Determine the correct opacity property based on layer type
+      const layerType = layer.type;
+      let opacityProperty: 'raster-opacity' | 'circle-opacity' | '' = '';
+      if (layerType === 'raster') {
+        opacityProperty = 'raster-opacity';
+      } else if (layerType === 'circle') {
+        opacityProperty = 'circle-opacity';
+      }
+      // Add more conditions for other layer types if needed
 
-    if (opacityProperty) {
-      map.setPaintProperty(fullLayerId, opacityProperty, opacityValue);
+      if (opacityProperty) {
+        map.setPaintProperty(fullLayerId, opacityProperty, opacityValue);
+      }
     }
   }
 }
@@ -164,12 +171,13 @@ onMounted(() => {
   const nav = new mapboxgl.NavigationControl();
 
   // Initiate map
-  map.value = new mapboxgl.Map(mapOptions);
+  const mapInstance = new mapboxgl.Map(mapOptions) as mapboxgl.Map;
+  map.value = mapInstance;
 
   // Add the custom controls during map initialization
-  map.value.addControl(nav, 'top-right');
+  mapInstance.addControl(nav, 'top-right');
 
-  map.value.addControl(
+  mapInstance.addControl(
     new mapboxgl.GeolocateControl({
       positionOptions: {
         enableHighAccuracy: true,
@@ -182,25 +190,23 @@ onMounted(() => {
   );
 
   // Add event listener for style.load
-  if (map.value) {
-    map.value.on('style.load', () => {
-      // Check if basemap has a Map Layer
-      if (currentBasemap.value.layer) {
-        addSourceAndLayer(
-          currentBasemap.value.layer,
-          activeYear.value,
-          map.value
-        );
-      }
-      visibleMapLayers.value.forEach((layer, index) => {
-        addSourceAndLayer(layer, activeYear.value, map.value);
-      });
-      setLabels(map.value);
+  mapInstance.on('style.load', () => {
+    // Check if basemap has a Map Layer
+    if (currentBasemap.value.layer) {
+      addSourceAndLayer(
+        currentBasemap.value.layer,
+        activeYear.value,
+        mapInstance
+      );
+    }
+    visibleMapLayers.value.forEach((layer, index) => {
+      addSourceAndLayer(layer, activeYear.value, mapInstance);
     });
-  }
+    setLabels(mapInstance);
+  });
 
   // Add right-click event listener
-  map.value.on('contextmenu', e => {
+  mapInstance.on('contextmenu', e => {
     displayCoordinates(e.lngLat, e.originalEvent);
   });
 });
@@ -210,7 +216,7 @@ onMounted(() => {
  * Display the coordinates where the user right-clicked.
  * @param {mapboxgl.LngLat} lngLat - The longitude and latitude of the clicked location.
  */
-function displayCoordinates(lngLat: mapboxgl.LngLat, event: MouseEvent) {
+ function displayCoordinates(lngLat: mapboxgl.LngLat, event: MouseEvent) {
   clickedLngLat.value = lngLat;
   clickedPositionX.value = event.clientX;
   clickedPositionY.value = event.clientY;
@@ -227,22 +233,25 @@ function handleLabelsChanged(map: mapboxgl.Map | null) {
 /** Toggle label visibility of basemap */
 function setLabels(map: mapboxgl.Map | null) {
   if (map) {
-    map.getStyle().layers.forEach(function (layer) {
-      if (
-        (layer.type === 'symbol' || layer.type === 'line') &&
-        // Keep labels added with the MeasureComponent
-        !layer.id.includes('measure-label') &&
-        // Keep lines and polygons added with the MeasureComponent
-        !layer.id.includes('gl-draw')
-      ) {
-        // Toggle visibility
-        if (areLabelsVisible.value) {
-          map.setLayoutProperty(layer.id, 'visibility', 'visible');
-        } else {
-          map.setLayoutProperty(layer.id, 'visibility', 'none');
+    const style = map.getStyle();
+    if (style && style.layers) {
+      style.layers.forEach(function (layer) {
+        if (
+          (layer.type === 'symbol' || layer.type === 'line') &&
+          // Keep labels added with the MeasureComponent
+          !layer.id.includes('measure-label') &&
+          // Keep lines and polygons added with the MeasureComponent
+          !layer.id.includes('gl-draw')
+        ) {
+          // Toggle visibility
+          if (areLabelsVisible.value) {
+            map.setLayoutProperty(layer.id, 'visibility', 'visible');
+          } else {
+            map.setLayoutProperty(layer.id, 'visibility', 'none');
+          }
         }
-      }
-    });
+      });
+    }
   }
 }
 
@@ -250,9 +259,12 @@ function setLabels(map: mapboxgl.Map | null) {
 function handleBasemapChanged(newStyleUrl: string) {
   if (map.value) {
     map.value.setStyle(newStyleUrl);
-    if (currentBasemap.value.layer) {
-      updateMapLayer(currentBasemap.value.layer, map.value);
-      toggleSatelliteLayerVisibility();
+    const layer = currentBasemap.value.layer;
+    if (layer) {
+      if (map.value) {
+        updateMapLayer(layer, map.value as any);
+      }
+    toggleSatelliteLayerVisibility();
     }
   }
 }
@@ -263,20 +275,18 @@ function handleBasemapChanged(newStyleUrl: string) {
  * @param map - The Mapbox map instance
  * @param previousYear - Optional. The previous year of the layer to be removed.
  */
-function updateMapLayer(
+ function updateMapLayer(
   layer: MapLayer,
-  map: mapboxgl.Map | null,
+  map: mapboxgl.Map,
   previousYear?: number
 ) {
-  if (map) {
-    if (layer.visible) {
-      addSourceAndLayer(layer, activeYear.value, map);
-      if (previousYear && map.getLayer(layer.title + previousYear)) {
-        map.removeLayer(layer.title + previousYear);
-      }
-    } else if (map.getSource(layer.title + activeYear.value)) {
-      map.removeLayer(layer.title + activeYear.value);
+  if (layer.visible) {
+    addSourceAndLayer(layer, activeYear.value, map);
+    if (previousYear && map.getLayer(layer.title + previousYear)) {
+      map.removeLayer(layer.title + previousYear);
     }
+  } else if (map.getSource(layer.title + activeYear.value)) {
+    map.removeLayer(layer.title + activeYear.value);
   }
 }
 
@@ -355,12 +365,15 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
     let firstLineId;
     let firstLabelId;
 
-    for (const layer of map.getStyle().layers) {
-      if (layer.type === 'symbol') {
-        firstLabelId = layer.id;
-      } else if (layer.type === 'line') {
-        firstLineId = layer.id;
-        break;
+    const style = map.getStyle();
+    if (style && style.layers) {
+      for (const layer of style.layers) {
+        if (layer.type === 'symbol') {
+          firstLabelId = layer.id;
+        } else if (layer.type === 'line') {
+          firstLineId = layer.id;
+          break;
+        }
       }
     }
 
@@ -447,7 +460,7 @@ function addSourceAndLayer(
             width="50"
             variant="tonal"
             :class="{ 'labels-visible': areLabelsVisible }"
-            @click="handleLabelsChanged(map)"
+            @click="handleLabelsChanged(map as any)"
           >
             Labels
           </v-btn>

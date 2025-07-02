@@ -188,7 +188,7 @@ watch(currentOpacity, newOpacity => {
                     ? 'grey-darken-4'
                     : 'grey-lighten-2'
                 "
-                @click="event => openSlider(event, item.title)"
+                @click="(event: MouseEvent) => openSlider(event, item.title)"
               >
                 mdi-circle-opacity
               </v-icon>
@@ -226,7 +226,7 @@ watch(currentOpacity, newOpacity => {
                     ? 'grey-darken-4'
                     : 'grey-lighten-2'
                 "
-                @click="event => openSlider(event, item.title)"
+                @click="(event: MouseEvent) => openSlider(event, item.title)"
               >
                 mdi-circle-opacity
               </v-icon>
