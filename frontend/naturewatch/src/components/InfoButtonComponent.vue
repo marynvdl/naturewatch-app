@@ -7,7 +7,7 @@ const cardData = buildInfoCards(catalog);
 
 <template>
   <v-dialog width="1500">
-    <template v-slot:activator="{ props }">
+    <template #activator="{ props }">
       <v-btn
         size="x-small"
         icon
@@ -19,18 +19,18 @@ const cardData = buildInfoCards(catalog);
       </v-btn>
     </template>
 
-    <template v-slot:default="{ isActive }">
+    <template #default="{ isActive }">
       <v-card
         title="About Nature Watch"
         subtitle="We're all about presenting clear and accurate data layers of how we interact with the Earth from space. Found a better or more recent layer or have feedback? Send us an email at top.map4835@fastmail.com"
       >
-        <template v-slot:append>
+        <template #append>
           <div class="me-n2">
             <v-btn
-              @click="isActive.value = false"
               icon="$close"
               size="large"
               variant="text"
+              @click="isActive.value = false"
             />
           </div>
         </template>
@@ -45,17 +45,17 @@ const cardData = buildInfoCards(catalog);
                     class="ma-0 pa-0"
                     :prepend-icon="card.icon"
                   >
-                    <template v-slot:title>
+                    <template #title>
                       <div class="text-subtitle-1">{{ card.title }}</div>
                     </template>
-                    <template v-slot:subtitle>
+                    <template #subtitle>
                       {{ card.subtitle }}
                     </template>
                   </v-card>
                 </v-expansion-panel-title>
                 <v-expansion-panel-text v-if="card.content" class="pb-2">
                   <!-- eslint-disable vue/no-v-html -->
-                  <div class="text-body-2 px-5" v-html="card.content"/>
+                  <div class="text-body-2 px-5" v-html="card.content" />
                   <!--eslint-enable-->
                   <img
                     v-if="card.image"
