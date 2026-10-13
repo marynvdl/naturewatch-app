@@ -32,6 +32,12 @@ jobs:
       - name: Run integration test suite in docker
         run: docker compose exec -T naturewatch-test pytest -m integration app/tests -vv
 
+      - name: Check the layer catalog (frontend tests)
+        working-directory: frontend/naturewatch
+        run: |
+          npm ci
+          npx vitest run src/catalog
+
       - name: Try a full docker compile to flag any JS issues too
         run: docker build -t naturewatch .
 

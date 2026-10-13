@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import useTimelineStore from '@/store/TimelineStore';
+import { timelineRange } from '@/catalog';
 
 // Using stores
 const timelineStore = useTimelineStore();
@@ -36,8 +37,8 @@ watch(selectedYear, (newYear, oldYear) => {
           class="timeline"
           show-ticks="always"
           tick-size="6"
-          :min="2016"
-          :max="2024"
+          :min="timelineRange.min"
+          :max="timelineRange.max"
           :step="1"
           thumb-label="always"
         />
