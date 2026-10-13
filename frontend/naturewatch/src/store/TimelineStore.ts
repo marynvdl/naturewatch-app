@@ -5,7 +5,7 @@ const useTimelineStore = defineStore('timeline', () => {
   // State
   /** Loading overlay */
   const visible: Ref<boolean> = ref(false);
-  const activeYear: Ref<number> = ref(2023);
+  const activeYear: Ref<number> = ref(2024);
   const lastActiveYear: Ref<number> = ref(2016);
 
   // Getters

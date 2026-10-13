@@ -39,7 +39,7 @@ const useMapLayerStore = defineStore('mapLayer', () => {
       title: 'Treeloss',
       button_type: 'small',
       url: 'https://tiles.globalforestwatch.org/umd_tree_cover_loss/v1.12/dynamic/{z}/{x}/{y}.png',
-      years_available: [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
+      years_available: [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
       type: 'raster',
       visible: false,
       opacity: 100,
