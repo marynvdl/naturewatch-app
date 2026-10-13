@@ -5,3 +5,6 @@ dist/
 public/src/assets/*
 tsconfig.*.json
 LICENSE
+package.json
+package-lock.json
+src/catalog/*.json

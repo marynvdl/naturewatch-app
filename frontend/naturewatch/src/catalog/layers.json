@@ -1,0 +1,220 @@
+{
+  "$schema": "./layers.schema.json",
+  "schemaVersion": 1,
+  "timeline": {
+    "minYear": 2016
+  },
+  "layers": [
+    {
+      "id": "all",
+      "title": "All",
+      "status": "coming-soon",
+      "display": {
+        "buttonType": "big",
+        "icon": "mdi-home-city",
+        "color": "brown-lighten-1",
+        "images": {
+          "visible": "all_visible",
+          "hidden": "all_notvisible"
+        }
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg"
+      },
+      "years": {
+        "available": [2016, 2017, 2018, 2019, 2020, 2021, 2022]
+      }
+    },
+    {
+      "id": "built",
+      "title": "Built",
+      "status": "published",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-office-building",
+        "color": "#767676"
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://storage.googleapis.com/nature-watch-tiles/built/2023/{z}/{x}/{y}.png"
+      },
+      "years": {
+        "available": [2023],
+        "meaning": "snapshot"
+      },
+      "source": {
+        "name": "Google Open Buildings 2023 (confidence 0.80 or higher), with GHSL 2020 where Open Buildings has no coverage",
+        "url": "https://sites.research.google/open-buildings/"
+      },
+      "info": {
+        "content": "For the 2023 built layer, we primarily used the <a href=\"https://sites.research.google/open-buildings/\" target=\"_blank\">Google Open Buildings (2023)</a> dataset, specifically polygons with a high confidence score (>=0.80). In areas where Google Open Buildings data were unavailable—specifically in <b>Chad, Mali, Libya, Morocco and Western Morocco</b>—we integrated data from the <a href=\"https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php\" target=\"_blank\">Global Human Settlement Layer</a> from 2020. For reference, older built layers combine data from Google Open Buildings (spanning 2022 to 2021) and Google Dynamic World, specifically the \"built\" class."
+      }
+    },
+    {
+      "id": "treeloss",
+      "title": "Treeloss",
+      "status": "published",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-tree",
+        "color": "#D487A4"
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://tiles.globalforestwatch.org/umd_tree_cover_loss/v1.13/dynamic/{z}/{x}/{y}.png",
+        "query": "?&start_year=2001&end_year={year}&render_type=true_color"
+      },
+      "years": {
+        "available": [
+          2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025
+        ],
+        "meaning": "cumulative",
+        "since": 2001
+      },
+      "source": {
+        "name": "UMD GLAD tree cover loss via Global Forest Watch",
+        "version": "v1.13",
+        "url": "https://www.globalforestwatch.org/"
+      },
+      "info": {
+        "content": "The treeloss layer shows cumulative tree cover loss from 2001 up to the selected year. It sources its data from the v1.13 University of Maryland (GLAD) tree cover loss dataset, served by <a href=\"https://www.globalforestwatch.org/\" target=\"_blank\">Global Forest Watch</a>. Specifically, we've focused on areas with a tree cover density exceeding 30%. Version 1.13 adds 2025 and also updates earlier years, so earlier years can look slightly different from before. Tree cover loss is not always deforestation: it includes any stand-replacing disturbance, such as fire and forestry."
+      }
+    },
+    {
+      "id": "fire",
+      "title": "Fire",
+      "status": "published",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-fire",
+        "color": "#f8674a"
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://storage.googleapis.com/nature-watch-tiles/fire/",
+        "query": "{year}/{z}/{x}/{y}.png"
+      },
+      "years": {
+        "available": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
+        "meaning": "annual"
+      },
+      "source": {
+        "name": "NASA FIRMS active fire detections, counted in 14-day intervals per year",
+        "url": "https://firms.modaps.eosdis.nasa.gov/map/"
+      },
+      "info": {
+        "content": "For the fire layers, we utilised <a href=\"https://firms.modaps.eosdis.nasa.gov/map/\" target=\"_blank\">FIRMS</a> data to determine the number of times a pixel burned in the year. Our methodology involved first dividing the year into 14-day intervals and then assessing if a pixel burned within each 14-day period. Finally, we summed up the number of 14-day periods a pixel experienced a fire. As a result, the maximum count for a pixel is 26 burn events within a year.\n    The data is visualised as follows:\n    <ul>\n    <li> Light yellow: Pixel burned once, suggesting potential natural occurrences or management fires.</li>\n    <li> Orange: Pixel burned 2-3 times, possibly indicating human activity or transit.</li>\n    <li> Red: Pixel burned more than 3 times, hinting at agriculture, consistent human presence, or frequent transit.</li>\n    <li> Dark red: Pixel burned over 8 times, which may suggest industrial activities, mines, or volcanic activity.</li>\n</ul>\n    ",
+        "image": "fire_legend"
+      }
+    },
+    {
+      "id": "bare",
+      "title": "Bare",
+      "status": "coming-soon",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-square-rounded",
+        "color": "red-lighten-3"
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://storage.googleapis.com/nature-watch-tiles/built/2022/{z}/{x}/{y}.png"
+      },
+      "years": {
+        "available": [2016, 2017, 2018, 2019, 2020, 2021, 2022]
+      }
+    },
+    {
+      "id": "mines",
+      "title": "Mines",
+      "status": "coming-soon",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-shovel",
+        "color": "amber-lighten-4"
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg"
+      },
+      "years": {
+        "available": [2016, 2017, 2018, 2019, 2020, 2021, 2022]
+      }
+    },
+    {
+      "id": "crops",
+      "title": "Crops",
+      "status": "published",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-barley",
+        "color": "#e59139"
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://storage.googleapis.com/nature-watch-tiles/crop/",
+        "query": "{year}/{z}/{x}/{y}.png"
+      },
+      "years": {
+        "available": [2015, 2019],
+        "meaning": "snapshot"
+      },
+      "source": {
+        "name": "UMD GLAD Global Cropland Expansion in the 21st Century",
+        "url": "https://glad.umd.edu/dataset/croplands"
+      },
+      "info": {
+        "content": "We sourced data from the <a href=\"https://glad.umd.edu/dataset/croplands\" target=\"_blank\">Global Cropland Expansion in the 21st Century</a> dataset. We are currently working to expand our layers with information from other years"
+      }
+    },
+    {
+      "id": "rivers",
+      "title": "Rivers",
+      "status": "coming-soon",
+      "display": {
+        "buttonType": "big",
+        "icon": "mdi-water",
+        "color": "brown-lighten-1",
+        "images": {
+          "visible": "rivers_visible",
+          "hidden": "rivers_notvisible"
+        }
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg"
+      },
+      "years": {
+        "available": [2016, 2017, 2018, 2019, 2020, 2021, 2022]
+      }
+    },
+    {
+      "id": "dams",
+      "title": "Dams",
+      "status": "published",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-bridge",
+        "color": "#80a1a8"
+      },
+      "tiles": {
+        "type": "circle",
+        "url": "mapbox://nature-watch.dam-test-tiles",
+        "sourceLayer": "dams",
+        "circle": {
+          "radius": 4,
+          "colorSatellite": "#b7e6f1",
+          "colorStreets": "#5b7378"
+        }
+      },
+      "years": {
+        "available": [2016, 2017, 2018, 2019, 2020, 2021, 2022],
+        "meaning": "static"
+      },
+      "info": {
+        "subtitle": "Coming soon"
+      }
+    }
+  ]
+}
