@@ -8,10 +8,10 @@ env:
 jobs:
   test_suite:
     name: Test suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Clean Docker build cache
         run: docker builder prune --all --force
@@ -38,14 +38,14 @@ jobs:
   deploy_test_app:
     name: Deploy Test App
     needs: test_suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     concurrency:
       group: deploy-test-app-${{ github.ref }}
       cancel-in-progress: true
     if: github.ref == 'refs/heads/develop'
     steps:
       - name: Check out source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           ref: 'develop'
 
@@ -58,14 +58,14 @@ jobs:
   deploy_demo_app:
     name: Deploy Demo App
     needs: test_suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     concurrency:
       group: deploy-demo-app-${{ github.ref }}
       cancel-in-progress: true
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Check out source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           ref: 'main'
 
