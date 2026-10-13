@@ -62,21 +62,23 @@
       },
       "tiles": {
         "type": "raster",
-        "url": "https://tiles.globalforestwatch.org/umd_tree_cover_loss/v1.12/dynamic/{z}/{x}/{y}.png",
+        "url": "https://tiles.globalforestwatch.org/umd_tree_cover_loss/v1.13/dynamic/{z}/{x}/{y}.png",
         "query": "?&start_year=2001&end_year={year}&render_type=true_color"
       },
       "years": {
-        "available": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
+        "available": [
+          2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025
+        ],
         "meaning": "cumulative",
         "since": 2001
       },
       "source": {
         "name": "UMD GLAD tree cover loss via Global Forest Watch",
-        "version": "v1.12",
+        "version": "v1.13",
         "url": "https://www.globalforestwatch.org/"
       },
       "info": {
-        "content": "The treeloss layer sources its data from <a href=\"https://www.globalforestwatch.org/\" target=\"_blank\">Global Forest Watch</a>'s  v1.9 UMD tree cover loss dataset. Specifically, we've focused on areas with a tree cover density exceeding 30%."
+        "content": "The treeloss layer shows cumulative tree cover loss from 2001 up to the selected year. It sources its data from the v1.13 University of Maryland (GLAD) tree cover loss dataset, served by <a href=\"https://www.globalforestwatch.org/\" target=\"_blank\">Global Forest Watch</a>. Specifically, we've focused on areas with a tree cover density exceeding 30%. Version 1.13 adds 2025 and also updates earlier years, so earlier years can look slightly different from before. Tree cover loss is not always deforestation: it includes any stand-replacing disturbance, such as fire and forestry."
       }
     },
     {

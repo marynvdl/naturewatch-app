@@ -46,6 +46,16 @@ describe('layer catalog', () => {
       });
   });
 
+  it('keeps the declared source version in step with the tile URL', () => {
+    catalog.layers
+      .filter(layer => layer.source?.version)
+      .forEach(layer => {
+        expect(layer.tiles.url, layer.id).toContain(
+          `/${layer.source?.version}/`
+        );
+      });
+  });
+
   it('only refers to images registered in assets.ts', () => {
     catalog.layers.forEach(layer => {
       const keys = [
