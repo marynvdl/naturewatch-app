@@ -1,0 +1,163 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://naturewatch.space/schemas/layers.schema.json",
+  "title": "Nature Watch layer catalog",
+  "description": "One record per map layer. The app builds its layer buttons, tile requests, timeline range and info dialog from this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "timeline", "layers"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "timeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minYear"],
+      "properties": {
+        "minYear": {
+          "type": "integer",
+          "minimum": 1990,
+          "description": "First year on the timeline slider. The last year is the latest year of any published layer."
+        }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Layers in the order they appear in the drawer.",
+      "items": { "$ref": "#/definitions/layer" }
+    }
+  },
+  "definitions": {
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "status", "display", "tiles", "years"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Stable identifier. Lower case, digits and hyphens."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name shown on the button and used for the map layer ids."
+        },
+        "status": {
+          "enum": ["published", "coming-soon"],
+          "description": "published layers can be switched on. coming-soon layers are shown disabled."
+        },
+        "display": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["buttonType"],
+          "properties": {
+            "buttonType": { "enum": ["big", "small"] },
+            "icon": {
+              "type": "string",
+              "description": "Material Design Icons name, for small buttons."
+            },
+            "color": {
+              "type": "string",
+              "description": "Button colour when selected."
+            },
+            "images": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["visible", "hidden"],
+              "description": "Image keys for big buttons. Keys are registered in assets.ts.",
+              "properties": {
+                "visible": { "type": "string" },
+                "hidden": { "type": "string" }
+              }
+            }
+          }
+        },
+        "tiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "url"],
+          "properties": {
+            "type": { "enum": ["raster", "line", "circle"] },
+            "url": { "type": "string", "minLength": 1 },
+            "query": {
+              "type": "string",
+              "description": "Appended to url. {year} is replaced by the resolved year."
+            },
+            "sourceLayer": {
+              "type": "string",
+              "description": "Source layer name for Mapbox vector tilesets."
+            },
+            "circle": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["radius", "colorSatellite", "colorStreets"],
+              "properties": {
+                "radius": { "type": "number", "exclusiveMinimum": 0 },
+                "colorSatellite": { "type": "string" },
+                "colorStreets": { "type": "string" }
+              }
+            }
+          },
+          "if": {
+            "properties": { "type": { "const": "circle" } },
+            "required": ["type"]
+          },
+          "then": { "required": ["sourceLayer", "circle"] }
+        },
+        "years": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["available"],
+          "properties": {
+            "available": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "integer", "minimum": 1990 },
+              "description": "Years with data, ascending. If the selected year is missing, the app uses the latest earlier year."
+            },
+            "meaning": {
+              "enum": ["annual", "cumulative", "snapshot", "static"],
+              "description": "What a year means for this layer. Documentation for now; not yet used by the app."
+            },
+            "since": {
+              "type": "integer",
+              "description": "For cumulative layers: the first year included. Documentation for now."
+            }
+          }
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "description": "Where the data comes from. Documentation for now; not yet used by the app.",
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "string" },
+            "url": { "type": "string" }
+          }
+        },
+        "info": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "subtitle": {
+              "type": "string",
+              "description": "Overrides the subtitle in the info dialog. By default it lists the available years, or says Coming soon."
+            },
+            "content": {
+              "type": "string",
+              "description": "HTML shown in the info dialog."
+            },
+            "image": {
+              "type": "string",
+              "description": "Image key, registered in assets.ts."
+            }
+          }
+        }
+      }
+    }
+  }
+}
