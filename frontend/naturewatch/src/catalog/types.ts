@@ -22,6 +22,10 @@ export interface CatalogLayer {
     type: MapLayerType;
     url: string;
     query?: string;
+    /** Highest zoom level the tiles exist for. Beyond it the map enlarges the last level. */
+    maxzoom?: number;
+    /** How raster pixels are drawn when enlarged. Use nearest for data pixels that should stay sharp. */
+    resampling?: 'linear' | 'nearest';
     sourceLayer?: string;
     circle?: { radius: number; colorSatellite: string; colorStreets: string };
   };

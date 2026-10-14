@@ -342,6 +342,8 @@ function addSourceToMap(
           type: 'raster',
           tiles: [layerUrl],
           tileSize: 256,
+          // Without this the map requests tiles that do not exist beyond maxzoom
+          ...(layer.max_zoom !== undefined && { maxzoom: layer.max_zoom }),
         });
       }
     } else if (layer.type === 'circle' || layer.type === 'line') {
@@ -386,6 +388,7 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
           source: layerId,
           paint: {
             'raster-opacity': currentOpacity, // Set the opacity here
+            ...(layer.resampling && { 'raster-resampling': layer.resampling }),
           },
         },
         firstLineId
