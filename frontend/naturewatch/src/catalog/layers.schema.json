@@ -85,6 +85,16 @@
               "type": "string",
               "description": "Appended to url. {year} is replaced by the resolved year."
             },
+            "maxzoom": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 22,
+              "description": "Highest zoom level the tiles exist for. Beyond it the map enlarges the last level instead of requesting missing tiles. Leave out to request every zoom level."
+            },
+            "resampling": {
+              "enum": ["linear", "nearest"],
+              "description": "Raster only. How pixels are drawn when enlarged. nearest keeps data pixels sharp. Leave out for the Mapbox default (linear)."
+            },
             "sourceLayer": {
               "type": "string",
               "description": "Source layer name for Mapbox vector tilesets."

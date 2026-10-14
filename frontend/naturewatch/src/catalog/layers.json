@@ -93,10 +93,12 @@
       "tiles": {
         "type": "raster",
         "url": "https://storage.googleapis.com/nature-watch-tiles/fire/",
-        "query": "{year}/{z}/{x}/{y}.png"
+        "query": "{year}/{z}/{x}/{y}.png",
+        "maxzoom": 9,
+        "resampling": "nearest"
       },
       "years": {
-        "available": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
+        "available": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
         "meaning": "annual"
       },
       "source": {

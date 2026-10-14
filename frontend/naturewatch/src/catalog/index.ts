@@ -49,6 +49,8 @@ export function buildMapLayers(source: Catalog): MapLayer[] {
       mapLayer.image_notvisible = resolveCatalogImage(display.images.hidden);
     }
     if (tiles.query) mapLayer.query_string = tiles.query;
+    if (tiles.maxzoom !== undefined) mapLayer.max_zoom = tiles.maxzoom;
+    if (tiles.resampling) mapLayer.resampling = tiles.resampling;
     if (tiles.sourceLayer) mapLayer.sourceLayer = tiles.sourceLayer;
     if (tiles.circle) {
       mapLayer.circle_radius = tiles.circle.radius;
