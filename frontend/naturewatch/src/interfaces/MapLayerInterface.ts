@@ -36,4 +36,8 @@ export default interface MapLayer {
   active?: boolean;
   /** Optional query string */
   query_string?: string;
+  /** Highest zoom level the tiles exist for; the map enlarges that level beyond it */
+  max_zoom?: number;
+  /** How raster pixels are drawn when enlarged */
+  resampling?: 'linear' | 'nearest';
 }

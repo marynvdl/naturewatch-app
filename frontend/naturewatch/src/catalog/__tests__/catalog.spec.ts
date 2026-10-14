@@ -124,6 +124,28 @@ describe('layer catalog', () => {
     });
   });
 
+  it('passes the tile zoom limit and resampling on to the map layer', () => {
+    const fire = catalog.layers.find(layer => layer.id === 'fire');
+    expect(fire?.tiles.maxzoom).toBe(9);
+    const layers = buildMapLayers(catalog);
+    const fireLayer = layers.find(layer => layer.title === fire?.title);
+    expect(fireLayer?.max_zoom).toBe(9);
+    expect(fireLayer?.resampling).toBe('nearest');
+    // Layers that do not set them keep the Mapbox defaults
+    const treeloss = layers.find(layer => layer.title === 'Treeloss');
+    expect(treeloss?.max_zoom).toBeUndefined();
+    expect(treeloss?.resampling).toBeUndefined();
+  });
+
+  it('rejects an impossible zoom limit or resampling mode', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const validate = ajv.compile(schema);
+    const broken = JSON.parse(JSON.stringify(rawCatalog));
+    broken.layers[0].tiles.maxzoom = 40;
+    broken.layers[1].tiles.resampling = 'cubic';
+    expect(validate(broken)).toBe(false);
+  });
+
   it('only enables published layers', () => {
     const layers = buildMapLayers(catalog);
     catalog.layers.forEach((layer, index) => {
