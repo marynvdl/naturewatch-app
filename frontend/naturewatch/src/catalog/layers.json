@@ -108,7 +108,7 @@
         "url": "https://firms.modaps.eosdis.nasa.gov/map/"
       },
       "info": {
-        "content": "Each coloured square is a count of <a href=\"https://firms.modaps.eosdis.nasa.gov/map/\" target=\"_blank\">NASA FIRMS</a> detections, not a judgement about why a place burned. The year is split into 14-day windows. A square’s number is how many of those windows contained a detection. The count can reach 27: there are 27 windows, and the last one runs about 13 days into January of the next year. Squares are about 1 km across. Empty squares had no detection in those windows.\n    <ul>\n    <li>Light yellow: 1 window</li>\n    <li>Orange: 2 or 3 windows</li>\n    <li>Red: 4 to 8 windows</li>\n    <li>Dark red: 9 or more windows</li>\n</ul>\n    Colour does not identify agriculture, mining, or a natural fire. Coverage is the Africa export blocks, including some ocean."
+        "content": "Each coloured square is a count of <a href=\"https://firms.modaps.eosdis.nasa.gov/map/\" target=\"_blank\">NASA FIRMS</a> detections, not a judgement about why a place burned. The year is split into 14-day windows. A square’s number is how many of those windows contained a detection. The count can reach 27: there are 27 windows, and the last one runs about 13 days into January of the next year. Squares are about 1 km across. Empty squares had no detection in those windows.\n    <ul>\n    <li>Light yellow: 1 window</li>\n    <li>Orange: 2 or 3 windows</li>\n    <li>Red: 4 to 8 windows</li>\n    <li>Dark red: 9 or more windows</li>\n</ul>\n    Colour does not identify agriculture, mining, or a natural fire. Coverage is the Africa export blocks, including some ocean.",
         "image": "fire_legend"
       }
     },

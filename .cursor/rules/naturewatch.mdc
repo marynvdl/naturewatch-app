@@ -12,6 +12,7 @@ alwaysApply: true
 - Follow the blueprint's public-serving versus analytical-storage policy. Do not infer access from bucket names or change access policies without authorization.
 - Inspect workflow triggers before pushing: a push or merge may launch processing or deploy. Before triggering billable processing, provisioning cloud resources, or deploying production, explain the action and expected cost or impact and obtain approval unless that exact action is already authorized.
 - Authorized local edits and relevant local checks may proceed without repeated confirmation.
+- Before pushing or opening a pull request, run the relevant test suite and confirm it passed. For the app, that is the catalog vitest suite when the catalog or frontend changed, and the Test suite workflow on the pull request before treating the change as ready. A push is not a passing test.
 - Long Earth Engine jobs must run independently of the chat. After an authorized submission, record the task ID, output location, status-check method and cancellation method. Report and return rather than repeatedly polling or waiting for completion. Never equate submission with success.
 
 ## Documentation
