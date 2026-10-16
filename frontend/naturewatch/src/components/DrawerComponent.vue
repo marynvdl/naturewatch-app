@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { catalog } from '@/catalog';
 import type DrawerMenuItem from '@/interfaces/DrawerMenuItemInterface';
 import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
@@ -12,6 +13,13 @@ const timelineStore = useTimelineStore();
 // Accessing values from the stores
 // Map layers and their visibility
 const mapLayers = computed(() => mapLayerStore.MapLayers);
+const layerGroups = computed(() =>
+  catalog.groups.map(group => ({
+    id: group.id,
+    title: group.title,
+    layers: mapLayers.value.filter(layer => layer.group === group.id),
+  }))
+);
 const toggleLayerVisibility = mapLayerStore.toggleLayerVisibility;
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 // Timeline visibility
@@ -152,87 +160,128 @@ watch(currentOpacity, newOpacity => {
   </v-container>
   <v-container class="pt-1 pb-0">
     <v-row align="center" justify="center">
-      <template v-for="item in mapLayers" :key="item.title">
-        <!-- Big buttons -->
+      <template v-for="group in layerGroups" :key="group.id">
         <v-col
-          v-if="item.button_type === 'big'"
-          class="px-1 pt-5 pb-3"
           cols="12"
+          class="group-heading text-caption text-medium-emphasis font-weight-bold text-uppercase px-2 pt-4 pb-1"
         >
-          <v-row no-gutters align="center">
-            <v-col cols="auto" class="pr-1">
-              <v-btn
-                class="small-button"
-                size="small"
-                :disabled="!item.active"
-                :variant="item.visible ? undefined : 'tonal'"
-                :prepend-icon="item.icon"
-                rounded="lg"
-                :color="item.visible ? item.button_color : 'default'"
-                elevation="0"
-                width="90px"
-                @click="handleButtonClick(item.title)"
-              >
-                <span class="big-button-text pa-0 ma-0">
-                  {{ item.title }}
-                </span>
-              </v-btn>
-            </v-col>
-            <v-col cols="auto" class="pa-0 ma-0">
-              <v-icon
-                v-if="item.visible"
-                ref="iconRefs[iconRefName(item.title)]"
-                size="x-small"
-                :color="
-                  currentLayerTitle === item.title && sliderVisible
-                    ? 'grey-darken-4'
-                    : 'grey-lighten-2'
-                "
-                @click="(event: MouseEvent) => openSlider(event, item.title)"
-              >
-                mdi-circle-opacity
-              </v-icon>
-            </v-col>
-          </v-row>
+          {{ group.title }}
         </v-col>
-        <!-- Small buttons -->
-        <v-col v-else-if="item.button_type === 'small'" class="pa-1" cols="12">
-          <v-row no-gutters align="center">
-            <v-col cols="auto" class="pr-1">
-              <v-btn
-                class="small-button"
-                size="small"
-                :disabled="!item.active"
-                :variant="item.visible ? undefined : 'tonal'"
-                :prepend-icon="item.icon"
-                rounded="lg"
-                :color="item.visible ? item.button_color : 'default'"
-                elevation="0"
-                width="90px"
-                @click="handleButtonClick(item.title)"
-              >
-                <span class="button-text pa-0 ma-0">
-                  {{ item.title }}
-                </span>
-              </v-btn>
-            </v-col>
-            <v-col cols="auto" class="pa-0 ma-0">
-              <v-icon
-                v-if="item.visible"
-                ref="iconRefs[iconRefName(item.title)]"
-                size="x-small"
-                :color="
-                  currentLayerTitle === item.title && sliderVisible
-                    ? 'grey-darken-4'
-                    : 'grey-lighten-2'
-                "
-                @click="(event: MouseEvent) => openSlider(event, item.title)"
-              >
-                mdi-circle-opacity
-              </v-icon>
-            </v-col>
-          </v-row>
-        </v-col>
+        <template v-for="item in group.layers" :key="item.title">
+          <!-- Big buttons -->
+          <v-col
+            v-if="item.button_type === 'big'"
+            class="px-1 pt-5 pb-3"
+            cols="12"
+          >
+            <v-row no-gutters align="center">
+              <v-col cols="auto" class="pr-1">
+                <v-tooltip
+                  :disabled="!item.tooltip"
+                  content-class="year-tooltip"
+                  location="top"
+                  :offset="0"
+                  :open-on-focus="false"
+                  :text="item.tooltip"
+                >
+                  <template #activator="{ props: tooltipProps }">
+                    <v-btn
+                      v-bind="tooltipProps"
+                      class="small-button"
+                      size="small"
+                      :disabled="!item.active"
+                      :variant="item.visible ? undefined : 'tonal'"
+                      :prepend-icon="item.icon"
+                      rounded="lg"
+                      :color="item.visible ? item.button_color : 'default'"
+                      elevation="0"
+                      width="90px"
+                      @click="handleButtonClick(item.title)"
+                    >
+                      <span class="big-button-text pa-0 ma-0">
+                        {{ item.title }}
+                      </span>
+                    </v-btn>
+                  </template>
+                </v-tooltip>
+              </v-col>
+              <v-col cols="auto" class="pa-0 ma-0">
+                <v-icon
+                  v-if="item.visible"
+                  ref="iconRefs[iconRefName(item.title)]"
+                  size="x-small"
+                  :color="
+                    currentLayerTitle === item.title && sliderVisible
+                      ? 'grey-darken-4'
+                      : 'grey-lighten-2'
+                  "
+                  @click="(event: MouseEvent) => openSlider(event, item.title)"
+                >
+                  mdi-circle-opacity
+                </v-icon>
+              </v-col>
+            </v-row>
+          </v-col>
+          <!-- Small buttons -->
+          <v-col
+            v-else-if="item.button_type === 'small'"
+            class="pa-1"
+            cols="12"
+          >
+            <v-row no-gutters align="center">
+              <v-col cols="auto" class="pr-1">
+                <v-tooltip
+                  :disabled="!item.tooltip"
+                  content-class="year-tooltip"
+                  location="top"
+                  :offset="0"
+                  :open-on-focus="false"
+                  :text="item.tooltip"
+                >
+                  <template #activator="{ props: tooltipProps }">
+                    <v-btn
+                      v-bind="tooltipProps"
+                      class="small-button"
+                      size="small"
+                      :disabled="!item.active"
+                      :variant="item.visible ? undefined : 'tonal'"
+                      :prepend-icon="item.icon"
+                      rounded="lg"
+                      :color="item.visible ? item.button_color : 'default'"
+                      elevation="0"
+                      width="90px"
+                      @click="handleButtonClick(item.title)"
+                    >
+                      <span
+                        class="button-text pa-0 ma-0"
+                        :class="{
+                          'button-text-compact': item.title.length > 8,
+                        }"
+                      >
+                        {{ item.title }}
+                      </span>
+                    </v-btn>
+                  </template>
+                </v-tooltip>
+              </v-col>
+              <v-col cols="auto" class="pa-0 ma-0">
+                <v-icon
+                  v-if="item.visible"
+                  ref="iconRefs[iconRefName(item.title)]"
+                  size="x-small"
+                  :color="
+                    currentLayerTitle === item.title && sliderVisible
+                      ? 'grey-darken-4'
+                      : 'grey-lighten-2'
+                  "
+                  @click="(event: MouseEvent) => openSlider(event, item.title)"
+                >
+                  mdi-circle-opacity
+                </v-icon>
+              </v-col>
+            </v-row>
+          </v-col>
+        </template>
       </template>
     </v-row>
   </v-container>
@@ -265,11 +314,21 @@ watch(currentOpacity, newOpacity => {
   text-transform: capitalize;
   font-size: 11px;
   margin-left: 8px;
+  white-space: nowrap;
+}
+.button-text-compact {
+  font-size: 9px;
+  letter-spacing: 0;
+  margin-left: 4px;
 }
 .big-button-text {
   text-transform: capitalize;
   font-size: 13px;
   margin-left: 1px;
+}
+.group-heading {
+  letter-spacing: 0.06em;
+  text-align: left;
 }
 .small-button {
   display: flex;
@@ -280,5 +339,15 @@ watch(currentOpacity, newOpacity => {
   position: absolute;
   z-index: 1005;
   width: 110px;
+}
+</style>
+
+<style>
+.year-tooltip.v-overlay__content {
+  font-size: 9px;
+  line-height: 1.15;
+  min-height: 0;
+  min-width: 0;
+  padding: 0 4px;
 }
 </style>

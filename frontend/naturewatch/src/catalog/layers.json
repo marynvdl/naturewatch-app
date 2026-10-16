@@ -4,10 +4,15 @@
   "timeline": {
     "minYear": 2016
   },
+  "groups": [
+    { "id": "threats", "title": "Threats" },
+    { "id": "interest", "title": "Interest" }
+  ],
   "layers": [
     {
       "id": "all",
       "title": "All",
+      "group": "threats",
       "status": "coming-soon",
       "display": {
         "buttonType": "big",
@@ -29,6 +34,7 @@
     {
       "id": "built",
       "title": "Built",
+      "group": "threats",
       "status": "published",
       "display": {
         "buttonType": "small",
@@ -54,6 +60,7 @@
     {
       "id": "treeloss",
       "title": "Treeloss",
+      "group": "threats",
       "status": "published",
       "display": {
         "buttonType": "small",
@@ -84,6 +91,7 @@
     {
       "id": "fire",
       "title": "Fire",
+      "group": "threats",
       "status": "published",
       "display": {
         "buttonType": "small",
@@ -115,6 +123,7 @@
     {
       "id": "bare",
       "title": "Bare",
+      "group": "threats",
       "status": "coming-soon",
       "display": {
         "buttonType": "small",
@@ -132,6 +141,7 @@
     {
       "id": "mines",
       "title": "Mines",
+      "group": "threats",
       "status": "coming-soon",
       "display": {
         "buttonType": "small",
@@ -149,6 +159,7 @@
     {
       "id": "crops",
       "title": "Crops",
+      "group": "threats",
       "status": "published",
       "display": {
         "buttonType": "small",
@@ -175,6 +186,7 @@
     {
       "id": "rivers",
       "title": "Rivers",
+      "group": "threats",
       "status": "coming-soon",
       "display": {
         "buttonType": "big",
@@ -196,6 +208,7 @@
     {
       "id": "dams",
       "title": "Dams",
+      "group": "threats",
       "status": "published",
       "display": {
         "buttonType": "small",
@@ -218,6 +231,34 @@
       },
       "info": {
         "subtitle": "Coming soon"
+      }
+    },
+    {
+      "id": "tree-height",
+      "title": "Tree height",
+      "group": "interest",
+      "status": "published",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-tree",
+        "color": "#1a751a",
+        "tooltip": "2020"
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://tiles.globalforestwatch.org/umd_tree_cover_height_2020/v2022/tch_3/{z}/{x}/{y}.png"
+      },
+      "years": {
+        "available": [2020],
+        "meaning": "static"
+      },
+      "source": {
+        "name": "UMD GLAD tree cover height 2020 via Global Forest Watch",
+        "version": "v2022",
+        "url": "https://doi.org/10.1016/j.rse.2020.112165"
+      },
+      "info": {
+        "content": "Estimated tree canopy height in 2020, in metres. The tiles are already coloured. Pale green is about 3 m, the middle green is about 15 m, and dark green is about 30 m. Canopy taller than 30 m stays dark green. Moving the timeline does not change this layer.\n<div style=\"margin:12px 0 4px;height:12px;max-width:280px;border-radius:2px;background:linear-gradient(to right, rgb(230, 240, 230), rgb(130, 180, 130), rgb(0, 102, 0));\"></div>\n<div style=\"display:flex;justify-content:space-between;max-width:280px;font-size:12px;\"><span>3 m</span><span>15 m</span><span>30 m</span></div>\n<p>Source: University of Maryland GLAD dataset umd_tree_cover_height_2020, version v2022, drawn from <a href=\"https://www.globalforestwatch.org/\" target=\"_blank\">Global Forest Watch</a> tiles (canopy of at least 3 m). <a href=\"https://doi.org/10.1016/j.rse.2020.112165\" target=\"_blank\">Potapov et al. 2021</a> describe the canopy-height model. Global Forest Watch lists 2000 and 2020 as the mapped years and links further description to the <a href=\"https://glad.umd.edu/dataset/GLCLUC2020\" target=\"_blank\">GLAD 2000–2020 land-cover dataset</a>. Licence <a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\">CC BY 4.0</a>.</p>\n<p>Limits: global coverage at about 30 m. North of 52°N the source calls the map a prototype. The model was calibrated on GEDI relative height at 95% and can overestimate height on slopes, including in New Zealand and Lesotho. In cities it can mix building height with tree height. Canopy below 3 m is not drawn, and heights above 30 m are not separated.</p>"
       }
     }
   ]
