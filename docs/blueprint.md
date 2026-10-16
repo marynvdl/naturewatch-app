@@ -28,7 +28,7 @@ flowchart TD
     F[Fly.io serves the app] --> E
 ```
 
-This export-to-tile automation is implemented for fire. Built, bare ground and crops retain older VM-based tile workflows. Tree loss is served externally by Global Forest Watch; dams use a Mapbox tileset.
+This export-to-tile automation is implemented for fire. Built, bare ground and crops retain older VM-based tile workflows. Tree loss and 2020 tree height are served externally by Global Forest Watch; dams use a Mapbox tileset. Tree height tiles cover the globe. The other published layers keep their existing coverage.
 
 The connection between data and app is defined by **published object paths** and the **layer catalogue** at `frontend/naturewatch/src/catalog/layers.json`.
 
@@ -43,7 +43,7 @@ Both buckets belong to GCP project `nature-watch-387210`. The inspected machineâ
 
 ## 3. Behavior that must remain explicit
 
-- **Dates:** when a layer lacks the selected year, the app uses its latest available earlier year. A timeline selection does not guarantee that every layer represents that year. Crops currently list 2015 and 2019.
+- **Dates:** when a layer lacks the selected year, the app uses its latest available earlier year. If every listed year is later, the layer is not requested, except a layer marked static, which stays visible on its latest listed year. Tree height is a static 2020 layer. A timeline selection does not guarantee that every layer represents that year. Crops currently list 2015 and 2019.
 - **Fire processing:** FIRMS `T21` detections are counted in 14-day windows on a grid using scale 1,000 m in `EPSG:3857`, then exported as 30 m COGs in `EPSG:4326` across 25 Africa blocks.
 - **Fire display:** GDAL resamples to the 1 km display grid, applies baked colors and creates XYZ PNG tiles for zooms 0â€“9. Zero is transparent; the app uses nearest-neighbor rendering.
 - **Fire compatibility:** the current export uses 27 windows and includes about 13 days of the following January. These quirks were intentionally retained for comparability with previous years. The legend still says 26 and needs reconciliation. Do not change the method for one year without addressing comparability.

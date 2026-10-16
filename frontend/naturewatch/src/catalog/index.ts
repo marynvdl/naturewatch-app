@@ -1,7 +1,7 @@
 import type MapLayer from '@/interfaces/MapLayerInterface';
 import rawCatalog from './layers.json';
 import { resolveCatalogImage } from './assets';
-import type { Catalog, InfoCard } from './types';
+import type { Catalog, CatalogYearMeaning, InfoCard } from './types';
 
 /** The layer catalog. Edit src/catalog/layers.json, not this file. */
 export const catalog = rawCatalog as unknown as Catalog;
@@ -25,6 +25,29 @@ export function getTimelineRange(source: Catalog): {
 }
 
 /**
+ * Year to request for a layer.
+ * A missing later year falls back to the latest earlier year.
+ * A static layer also stays on the map when every listed year is later, using its latest year.
+ * @param available - Years the layer publishes.
+ * @param selected - Year chosen on the timeline.
+ * @param meaning - Catalog year meaning, when set.
+ * @returns The year to use, or null when the layer should not be requested.
+ */
+export function resolveLayerYear(
+  available: number[],
+  selected: number,
+  meaning?: CatalogYearMeaning
+): number | null {
+  if (available.includes(selected)) return selected;
+  const earlier = available.filter(year => year < selected);
+  if (earlier.length > 0) return Math.max(...earlier);
+  if (meaning === 'static' && available.length > 0) {
+    return Math.max(...available);
+  }
+  return null;
+}
+
+/**
  * Build the map layers the drawer and map use.
  * @param source - The catalog to read.
  * @returns One MapLayer per catalog layer, in catalog order. All start hidden at 100% opacity.
@@ -35,6 +58,7 @@ export function buildMapLayers(source: Catalog): MapLayer[] {
     const mapLayer: MapLayer = {
       title: layer.title,
       button_type: display.buttonType,
+      group: layer.group,
       url: tiles.url,
       years_available: [...years.available],
       type: tiles.type,
@@ -44,6 +68,8 @@ export function buildMapLayers(source: Catalog): MapLayer[] {
     };
     if (display.icon) mapLayer.icon = display.icon;
     if (display.color) mapLayer.button_color = display.color;
+    if (display.tooltip) mapLayer.tooltip = display.tooltip;
+    if (years.meaning) mapLayer.year_meaning = years.meaning;
     if (display.images) {
       mapLayer.image_visible = resolveCatalogImage(display.images.visible);
       mapLayer.image_notvisible = resolveCatalogImage(display.images.hidden);

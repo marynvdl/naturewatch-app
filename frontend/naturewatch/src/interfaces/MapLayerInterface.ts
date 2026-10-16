@@ -1,3 +1,4 @@
+import type { CatalogYearMeaning } from '@/catalog/types';
 import type { MapLayerType, MapLayerButtonType } from '../types/MapLayerType';
 
 /** Map Layer Interface */
@@ -6,10 +7,16 @@ export default interface MapLayer {
   title: string | '-';
   /** Button type */
   button_type: MapLayerButtonType;
+  /** Drawer group id. Basemap layers omit this. */
+  group?: string;
+  /** Text shown when hovering the layer button */
+  tooltip?: string;
   /** Layer source url */
   url: string;
   /** Years for which layer is available */
   years_available: number[];
+  /** How a listed year relates to the timeline. static stays visible for earlier years. */
+  year_meaning?: CatalogYearMeaning;
   /** Layer type: one of raster, line, point */
   type: MapLayerType;
   /** Source layer from Mapbox */
