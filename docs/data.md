@@ -2,7 +2,7 @@
 
 What the published layers measure, and what this repository can and cannot vouch for. How to read the map is in [Using the map](using-the-map.md). Pipeline and storage are in the [blueprint](blueprint.md).
 
-Years and tile addresses below are from `frontend/naturewatch/src/catalog/layers.json` on the app’s `main` branch, except tree height, which this change adds to the catalog. Fire processing details are from `naturewatch-analysis` `origin/main` at `ec9746c` (`gee/fire/export_fire.py`, `gee/README.md`, `tasks/fireTiles/color.txt`). That analysis checkout is not the copy currently checked out on this machine.
+Years and tile addresses below are from `frontend/naturewatch/src/catalog/layers.json` on the app’s `main` branch. Fire processing details are from `naturewatch-analysis` `origin/main` at `ec9746c` (`gee/fire/export_fire.py`, `gee/README.md`, `tasks/fireTiles/color.txt`). That analysis checkout is not the copy currently checked out on this machine.
 
 ## Fire
 

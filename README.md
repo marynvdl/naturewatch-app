@@ -13,7 +13,7 @@ Map interface for Nature Watch. Data processing lives in [`marynvdl/naturewatch-
 
 Create `feature/…` and `bugfix/…` branches from `develop`, and merge them back with a pull request.
 
-A release is a pull request from `develop` into `main`. Tag the GitHub release from `main`, then open a pull request that syncs that merge commit back into `develop`. The latest tagged release is v1.1.2.
+A release is a pull request from `develop` into `main`. Tag the GitHub release from `main`, then open a pull request that syncs that merge commit back into `develop`. The latest tagged release is v1.1.3.
 
 Pushing to `develop` deploys the Fly app `naturewatch`. Pushing to `main` deploys `naturewatch-demo` (naturewatch.space). Both deploys run only after the Test suite in [`.github/workflows/fly.yml`](.github/workflows/fly.yml). `fly.toml` names the test app; the production app name is only in the workflow.
 

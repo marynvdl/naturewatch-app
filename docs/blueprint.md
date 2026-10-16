@@ -55,7 +55,7 @@ For the app:
 
 1. Create feature or bugfix branches from `develop` and merge back through a pull request.
 2. Release through a pull request from `develop` to `main`.
-3. The recent release practice adds a version tag on `main`, then syncs the release merge back into `develop` through a pull request. Latest recorded release: `v1.1.2`.
+3. The recent release practice adds a version tag on `main`, then syncs the release merge back into `develop` through a pull request. Latest recorded release: `v1.1.3`.
 
 The app workflow runs tests and a Docker build on every push. Pushes to `develop` deploy Fly app `naturewatch`; pushes to `main` deploy `naturewatch-demo`.
 
