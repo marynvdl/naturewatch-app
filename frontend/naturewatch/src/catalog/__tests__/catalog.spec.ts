@@ -8,6 +8,7 @@ import {
   buildMapLayers,
   catalog,
   getTimelineRange,
+  resolveLayerYear,
 } from '../index';
 import type { Catalog } from '../types';
 
@@ -87,10 +88,12 @@ describe('layer catalog', () => {
     const custom: Catalog = {
       schemaVersion: 1,
       timeline: { minYear: 2010 },
+      groups: [{ id: 'threats', title: 'Threats' }],
       layers: [
         {
           id: 'a',
           title: 'A',
+          group: 'threats',
           status: 'published',
           display: { buttonType: 'small' },
           tiles: { type: 'raster', url: 'https://example.com/{z}/{x}/{y}.png' },
@@ -99,6 +102,7 @@ describe('layer catalog', () => {
         {
           id: 'b',
           title: 'B',
+          group: 'threats',
           status: 'coming-soon',
           display: { buttonType: 'small' },
           tiles: { type: 'raster', url: 'https://example.com/{z}/{x}/{y}.png' },
@@ -144,6 +148,74 @@ describe('layer catalog', () => {
     broken.layers[0].tiles.maxzoom = 40;
     broken.layers[1].tiles.resampling = 'cubic';
     expect(validate(broken)).toBe(false);
+  });
+
+  it('puts existing layers under Threats and tree height under Interest', () => {
+    expect(catalog.groups.map(group => group.title)).toEqual([
+      'Threats',
+      'Interest',
+    ]);
+    const threats = catalog.layers
+      .filter(layer => layer.group === 'threats')
+      .map(layer => layer.id);
+    const interest = catalog.layers
+      .filter(layer => layer.group === 'interest')
+      .map(layer => layer.id);
+    expect(threats).toEqual([
+      'all',
+      'built',
+      'treeloss',
+      'fire',
+      'bare',
+      'mines',
+      'crops',
+      'rivers',
+      'dams',
+    ]);
+    expect(interest).toEqual(['tree-height']);
+    catalog.layers.forEach(layer => {
+      expect(catalog.groups.map(group => group.id)).toContain(layer.group);
+    });
+  });
+
+  it('keeps 2020 tree height visible for earlier and later timeline years', () => {
+    const height = catalog.layers.find(layer => layer.id === 'tree-height');
+    expect(height?.status).toBe('published');
+    expect(height?.years).toEqual({ available: [2020], meaning: 'static' });
+    expect(height?.tiles.url).toBe(
+      'https://tiles.globalforestwatch.org/umd_tree_cover_height_2020/v2022/tch_3/{z}/{x}/{y}.png'
+    );
+    expect(height?.display.icon).toBe('mdi-tree');
+    expect(height?.display.tooltip).toBe('2020');
+    expect(resolveLayerYear([2020], 2016, 'static')).toBe(2020);
+    expect(resolveLayerYear([2020], 2020, 'static')).toBe(2020);
+    expect(resolveLayerYear([2020], 2025, 'static')).toBe(2020);
+    // A non-static layer still stays off when every year is later
+    expect(resolveLayerYear([2023], 2016, 'snapshot')).toBeNull();
+    // Later years still fall back to the latest earlier year
+    expect(resolveLayerYear([2015, 2019], 2025, 'snapshot')).toBe(2019);
+    // Dams already list the early years, so static does not change that match
+    expect(
+      resolveLayerYear(
+        [2016, 2017, 2018, 2019, 2020, 2021, 2022],
+        2018,
+        'static'
+      )
+    ).toBe(2018);
+
+    const layers = buildMapLayers(catalog);
+    const heightLayer = layers.find(layer => layer.title === 'Tree height');
+    expect(heightLayer?.group).toBe('interest');
+    expect(heightLayer?.tooltip).toBe('2020');
+    expect(heightLayer?.year_meaning).toBe('static');
+    expect(heightLayer?.active).toBe(true);
+    const cards = buildInfoCards(catalog);
+    const card = cards.find(entry => entry.title === 'Tree height');
+    expect(card?.subtitle).toBe('2020');
+    expect(card?.content).toContain('3 m');
+    expect(card?.content).toContain('30 m');
+    expect(card?.content).toContain('v2022');
+    expect(card?.content).toContain('CC BY 4.0');
   });
 
   it('only enables published layers', () => {

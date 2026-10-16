@@ -4,10 +4,15 @@
   "timeline": {
     "minYear": 2016
   },
+  "groups": [
+    { "id": "threats", "title": "Threats" },
+    { "id": "interest", "title": "Interest" }
+  ],
   "layers": [
     {
       "id": "all",
       "title": "All",
+      "group": "threats",
       "status": "coming-soon",
       "display": {
         "buttonType": "big",
@@ -29,6 +34,7 @@
     {
       "id": "built",
       "title": "Built",
+      "group": "threats",
       "status": "published",
       "display": {
         "buttonType": "small",
@@ -48,12 +54,13 @@
         "url": "https://sites.research.google/open-buildings/"
       },
       "info": {
-        "content": "For the 2023 built layer, we primarily used the <a href=\"https://sites.research.google/open-buildings/\" target=\"_blank\">Google Open Buildings (2023)</a> dataset, specifically polygons with a high confidence score (>=0.80). In areas where Google Open Buildings data were unavailable—specifically in <b>Chad, Mali, Libya, Morocco and Western Morocco</b>—we integrated data from the <a href=\"https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php\" target=\"_blank\">Global Human Settlement Layer</a> from 2020. For reference, older built layers combine data from Google Open Buildings (spanning 2022 to 2021) and Google Dynamic World, specifically the \"built\" class."
+        "content": "The map shows one built snapshot, for 2023. It uses <a href=\"https://sites.research.google/open-buildings/\" target=\"_blank\">Google Open Buildings (2023)</a> polygons with a confidence score of 0.80 or higher. Where that dataset has no coverage — Chad, Mali, Libya, Morocco and Western Morocco — it uses the <a href=\"https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php\" target=\"_blank\">Global Human Settlement Layer</a> for 2020. A mark means the source recorded a building. It does not say how the building is used. Choosing another year on the timeline still shows this 2023 snapshot, because no other built year is published."
       }
     },
     {
       "id": "treeloss",
       "title": "Treeloss",
+      "group": "threats",
       "status": "published",
       "display": {
         "buttonType": "small",
@@ -78,12 +85,13 @@
         "url": "https://www.globalforestwatch.org/"
       },
       "info": {
-        "content": "The treeloss layer shows cumulative tree cover loss from 2001 up to the selected year. It sources its data from the v1.13 University of Maryland (GLAD) tree cover loss dataset, served by <a href=\"https://www.globalforestwatch.org/\" target=\"_blank\">Global Forest Watch</a>. Specifically, we've focused on areas with a tree cover density exceeding 30%. Version 1.13 adds 2025 and also updates earlier years, so earlier years can look slightly different from before. Tree cover loss is not always deforestation: it includes any stand-replacing disturbance, such as fire and forestry."
+        "content": "Tree cover loss from 2001 through the selected year, from University of Maryland GLAD version 1.13, drawn from <a href=\"https://www.globalforestwatch.org/\" target=\"_blank\">Global Forest Watch</a> tiles. Loss means the dataset recorded a stand-replacing disturbance, which includes fire and forestry as well as clearing. It is not a measure of deforestation by itself. Version 1.13 adds 2025 and also revises earlier years, so a past year can look different from an older copy of this map. This app does not set a tree-cover density cutoff in the tile request."
       }
     },
     {
       "id": "fire",
       "title": "Fire",
+      "group": "threats",
       "status": "published",
       "display": {
         "buttonType": "small",
@@ -108,13 +116,14 @@
         "url": "https://firms.modaps.eosdis.nasa.gov/map/"
       },
       "info": {
-        "content": "For the fire layers, we utilised <a href=\"https://firms.modaps.eosdis.nasa.gov/map/\" target=\"_blank\">FIRMS</a> data to determine the number of times a pixel burned in the year. Our methodology involved first dividing the year into 14-day intervals and then assessing if a pixel burned within each 14-day period. Finally, we summed up the number of 14-day periods a pixel experienced a fire. As a result, the maximum count for a pixel is 26 burn events within a year.\n    The data is visualised as follows:\n    <ul>\n    <li> Light yellow: Pixel burned once, suggesting potential natural occurrences or management fires.</li>\n    <li> Orange: Pixel burned 2-3 times, possibly indicating human activity or transit.</li>\n    <li> Red: Pixel burned more than 3 times, hinting at agriculture, consistent human presence, or frequent transit.</li>\n    <li> Dark red: Pixel burned over 8 times, which may suggest industrial activities, mines, or volcanic activity.</li>\n</ul>\n    ",
+        "content": "Each coloured square is a count of <a href=\"https://firms.modaps.eosdis.nasa.gov/map/\" target=\"_blank\">NASA FIRMS</a> detections, not a judgement about why a place burned. The year is split into 14-day windows. A square’s number is how many of those windows contained a detection. The count can reach 27: there are 27 windows, and the last one runs about 13 days into January of the next year. Squares are about 1 km across. Empty squares had no detection in those windows.\n    <ul>\n    <li>Light yellow: 1 window</li>\n    <li>Orange: 2 or 3 windows</li>\n    <li>Red: 4 to 8 windows</li>\n    <li>Dark red: 9 or more windows</li>\n</ul>\n    Colour does not identify agriculture, mining, or a natural fire. Coverage is the Africa export blocks, including some ocean.",
         "image": "fire_legend"
       }
     },
     {
       "id": "bare",
       "title": "Bare",
+      "group": "threats",
       "status": "coming-soon",
       "display": {
         "buttonType": "small",
@@ -132,6 +141,7 @@
     {
       "id": "mines",
       "title": "Mines",
+      "group": "threats",
       "status": "coming-soon",
       "display": {
         "buttonType": "small",
@@ -149,6 +159,7 @@
     {
       "id": "crops",
       "title": "Crops",
+      "group": "threats",
       "status": "published",
       "display": {
         "buttonType": "small",
@@ -169,12 +180,13 @@
         "url": "https://glad.umd.edu/dataset/croplands"
       },
       "info": {
-        "content": "We sourced data from the <a href=\"https://glad.umd.edu/dataset/croplands\" target=\"_blank\">Global Cropland Expansion in the 21st Century</a> dataset. We are currently working to expand our layers with information from other years"
+        "content": "Cropland from the <a href=\"https://glad.umd.edu/dataset/croplands\" target=\"_blank\">UMD GLAD Global Cropland Expansion</a> dataset. The map publishes two snapshots, 2015 and 2019. For any timeline year after 2019, the crops layer still shows 2019. A coloured area means the dataset classed that place as cropland in the snapshot year. It does not show crop type or yield."
       }
     },
     {
       "id": "rivers",
       "title": "Rivers",
+      "group": "threats",
       "status": "coming-soon",
       "display": {
         "buttonType": "big",
@@ -196,6 +208,7 @@
     {
       "id": "dams",
       "title": "Dams",
+      "group": "threats",
       "status": "published",
       "display": {
         "buttonType": "small",
@@ -217,7 +230,36 @@
         "meaning": "static"
       },
       "info": {
-        "subtitle": "Coming soon"
+        "subtitle": "Same points every year",
+        "content": "The same dam points are drawn for every year from 2016 through 2022. Moving the timeline does not change them. This catalog does not name the source dataset."
+      }
+    },
+    {
+      "id": "tree-height",
+      "title": "Tree height",
+      "group": "interest",
+      "status": "published",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-tree",
+        "color": "#1a751a",
+        "tooltip": "2020"
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://tiles.globalforestwatch.org/umd_tree_cover_height_2020/v2022/tch_3/{z}/{x}/{y}.png"
+      },
+      "years": {
+        "available": [2020],
+        "meaning": "static"
+      },
+      "source": {
+        "name": "UMD GLAD tree cover height 2020 via Global Forest Watch",
+        "version": "v2022",
+        "url": "https://doi.org/10.1016/j.rse.2020.112165"
+      },
+      "info": {
+        "content": "Estimated tree canopy height in 2020, in metres. The tiles are already coloured. Pale green is about 3 m, the middle green is about 15 m, and dark green is about 30 m. Canopy taller than 30 m stays dark green. Moving the timeline does not change this layer.\n<div style=\"margin:12px 0 4px;height:12px;max-width:280px;border-radius:2px;background:linear-gradient(to right, rgb(230, 240, 230), rgb(130, 180, 130), rgb(0, 102, 0));\"></div>\n<div style=\"display:flex;justify-content:space-between;max-width:280px;font-size:12px;\"><span>3 m</span><span>15 m</span><span>30 m</span></div>\n<p>Source: University of Maryland GLAD dataset umd_tree_cover_height_2020, version v2022, drawn from <a href=\"https://www.globalforestwatch.org/\" target=\"_blank\">Global Forest Watch</a> tiles (canopy of at least 3 m). <a href=\"https://doi.org/10.1016/j.rse.2020.112165\" target=\"_blank\">Potapov et al. 2021</a> describe the canopy-height model. Global Forest Watch lists 2000 and 2020 as the mapped years and links further description to the <a href=\"https://glad.umd.edu/dataset/GLCLUC2020\" target=\"_blank\">GLAD 2000–2020 land-cover dataset</a>. Licence <a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\">CC BY 4.0</a>.</p>\n<p>Limits: global coverage at about 30 m. North of 52°N the source calls the map a prototype. The model was calibrated on GEDI relative height at 95% and can overestimate height on slopes, including in New Zealand and Lesotho. In cities it can mix building height with tree height. Canopy below 3 m is not drawn, and heights above 30 m are not separated.</p>"
       }
     }
   ]

@@ -1,124 +1,75 @@
-# Project NatureWatch App
+# Nature Watch app
 
+Map interface for Nature Watch. Data processing lives in [`marynvdl/naturewatch-analysis`](https://github.com/marynvdl/naturewatch-analysis). How the two fit together is the [blueprint](docs/blueprint.md).
 
-- [Project NatureWatch App](#project-naturewatch-app)
-  - [Required environment variables](#required-environment-variables)
-  - [Development Workflow](#development-workflow)
-  - [Deployment](#deployment)
-    - [Test Site Deployment](#test-site-deployment)
-    - [Demo Site Deployment](#demo-site-deployment)
-  - [Dependency Management](#dependency-management)
-  - [Tests](#tests)
-  - [Development](#development)
-    - [Backend](#backend)
-    - [Frontend](#frontend)
-      - [Commands](#commands)
+| Read this | For |
+| --- | --- |
+| [Using the map](docs/using-the-map.md) | What the timeline, colours, and year fallback do |
+| [Data notes](docs/data.md) | Sources, units, coverage, and limits of each published layer |
+| [Blueprint](docs/blueprint.md) | Architecture, storage, and release rules |
+| [Technical reference](docs/blueprint-notes.md) | Dated inspection record behind the blueprint |
 
+## Development workflow
 
-## Development Workflow
+Create `feature/…` and `bugfix/…` branches from `develop`, and merge them back with a pull request.
 
-### Feature Development and Bug Fixes
-Feature or fix branches should be created off the `develop` branch. After development and initial testing are complete, feature branches are merged back into `develop`. Follow the naming convention of `feature/your-feature-name` or `bugfix/your-fix-name`
+A release is a pull request from `develop` into `main`. Tag the GitHub release from `main`, then open a pull request that syncs that merge commit back into `develop`. The latest tagged release is v1.1.3.
 
-- `feature`: For adding, removing or modifying a feature, 
-- `bugfix`: For fixing a bug
-- `hotfix`: For quickly fixing critical issues, usually with a temporary solution
-- `test`: For experimenting something which is not an issue
-
-### Releases
-When a set of features is ready for release, open a Pull Request to merge `develop` into `main`. Create a new GitHub Version from `main` and tag it with an appropriate version number.
-
-## Deployment
-We use fly.io configuration file to run the Test Suite and deploy apps. See `fly.toml` for more details.
-
-
-### Test Site Deployment
-The test site is automatically deployed on [Fly.io](https://fly.io) via GitHub Actions when changes are pushed to the `develop` branch.
-
-### Demo Site Deployment
-The demo site is automatically deployed on [Fly.io](https://fly.io) via GitHub Actions when changes are pushed to the `main` branch. This should be the result of merging a release branch into `main`.
-
-
-## Dependency Management
-Dependency updates are managed by **Dependabot**, which automatically opens pull requests for outdated `npm` packages in the develop branch on a weekly basis.
-
-
+Pushing to `develop` deploys the Fly app `naturewatch`. Pushing to `main` deploys `naturewatch-demo` (naturewatch.space). Both deploys run only after the Test suite in [`.github/workflows/fly.yml`](.github/workflows/fly.yml). `fly.toml` names the test app; the production app name is only in the workflow.
 
 ## Tests
 
-To run Unit Tests with a coverage report:
-```bash
-pytest -m unittest --cov=app --cov-report=term-missing app/tests -vv
-```
+Backend tests run from the repository root, with the dependencies in `requirements-dev.txt` (there is no `app/requirements-dev.txt`):
 
-To run Integration tests:
 ```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest -m unittest --cov=app --cov-report=term-missing app/tests -vv
 pytest -m integration -vv app/tests
 ```
 
-## Development
-
-### Backend
-
-The backend is a python webserver based on FastAPI.
-
-A `.vscode` directory is included for development in VSCode. You can use the launch configurations to run the app.
-
-Here are a few commands to get you started, assuming you are developing in a Linux environment.
-```bash
-# Make sure you are running Python 3.x
-python -V # e.g. returns `Python 3.8.10`
-
-# Create a virtual environment called '.venv'
-python -m venv .venv
-
-# Activate the virtual environment
-source .venv/bin/activate
-
-# Install the project's development dependencies
-pip install -r app/requirements-dev.txt
-```
-
-### Frontend
-
-The recommended IDE setup is [Visual Studio Code](https://code.visualstudio.com/) + [Volar extension](https://marketplace.visualstudio.com/items?itemName=Vue.volar).
-
-Make sure you have an up-to-date version of [Node.js](https://nodejs.org/en/) installed:
+The GitHub workflow runs those pytest commands inside Docker (`docker compose up -d --build`, service `naturewatch-test`), then the catalog tests:
 
 ```bash
-node -v && npm -v
-# e.g. returns:
-# v18.14.2
-# 9.5.0
+cd frontend/naturewatch
+npm ci
+npx vitest run src/catalog
 ```
 
-Install the dependencies, then run the dev server:
+## Frontend
+
+Needs Node.js 18.14.2 or newer (`engines` in `frontend/naturewatch/package.json`).
+
 ```bash
 cd frontend/naturewatch
 npm install
 npm run dev
 ```
 
-- This project uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
-- Includes [vue-router](https://router.vuejs.org/) and [Pinia](https://pinia.vuejs.org/).
-- In addition, [ESLint](https://eslint.org/), [Stylelint](https://stylelint.io/), and [Prettier](https://prettier.io/) are also included and are set to be executed automatically at runtime.
-- Also, when the development server is executed, it is checked in real time by [vite-plugin-checker](https://github.com/fi3ework/vite-plugin-checker).
+Use `http://localhost` for the dev server. The tile bucket’s browser rules allow that host.
 
-#### Commands
+| Command | Script |
+| --- | --- |
+| `npm run dev` | Vite dev server |
+| `npm run clean` | Clear the Vite cache |
+| `npm run type-check` | `vue-tsc` |
+| `npm run lint` | ESLint and Prettier |
+| `npm run lint:style` | Stylelint and Prettier |
+| `npm run test:unit` | Vitest |
+| `npm run test:coverage` | Vitest with coverage |
+| `npm run build` | Type-check and production build |
+| `npm run build-only` | Production build without the type-check |
+| `npm run build:analyze` | Bundle analyzer |
+| `npm run build:clean` | Delete `dist` |
+| `npm run preview` | Serve the production build |
 
-| Command       | Description                                            |
-| ------------- | ------------------------------------------------------ |
-| dev           | Start devserver.                                       |
-| clean         | Clear devserver cache.                                 |
-| type-check    | Check vue markup.                                      |
-| lint          | Run ESLint and prettier.                               |
-| lint:style    | Run Stylelint.                                         |
-| test          | Run vitest                                             |
-| test:unit     | Run Unit test                                          |
-| coverage      | Output Coverage Report.                                |
-| build         | Build for production.                                  |
-| build:analyze | Execute Bundle Analyzer                                |
-| build:clean   | Clear production build files.                          |
-| build-only    | Build for production without checking. For Deploy use. |
-| preview       | Run the program generated by the production build.     |
+There is no `npm test` or `npm run coverage` script.
 
+## Backend
+
+FastAPI (`app/main.py`). A `.vscode` launch configuration is included. Dependabot opens weekly npm pull requests against `develop`.
+
+## Analysis docs
+
+Fire export and tile steps are documented in the analysis repository (`gee/README.md` and `README.md` on its `main` branch). As of `ec9746c`, `README.md` still says to create fire GeoTIFFs with `fire_exportFirms.ipynb`, while `gee/README.md` and `gee/fire/export_fire.py` are the export that the Fire export workflow runs. This checkout of the analysis repo is not `main`, so that README was not edited here.

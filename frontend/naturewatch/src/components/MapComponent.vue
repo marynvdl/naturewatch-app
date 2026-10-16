@@ -9,6 +9,7 @@ import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
 import useDrawerStore from '@/store/DrawerStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
+import { resolveLayerYear } from '@/catalog';
 import SideButtonsComponent from '@/components/SideButtonsComponent.vue';
 import CoordinatesComponent from '@/components/CoordinatesComponent.vue';
 
@@ -87,7 +88,11 @@ watch(
           updateMapLayer(newLayer as any, map.value as any);
         }
         // Update opacity
-        updateLayerOpacityOnMap(newLayer.title, currentOpacity, map.value as any);
+        updateLayerOpacityOnMap(
+          newLayer.title,
+          currentOpacity,
+          map.value as any
+        );
 
         // Update the previous state only when there's a change in the visible property
         prevMapLayers.value[index] = { ...newLayer, opacity: currentOpacity };
@@ -138,7 +143,7 @@ watch(
  * @param {number} opacity - The new opacity value.
  * @param {mapboxgl.Map | null} map - The Mapbox map instance.
  */
- function updateLayerOpacityOnMap(
+function updateLayerOpacityOnMap(
   layerTitle: string,
   opacity: number,
   map: mapboxgl.Map | null
@@ -216,7 +221,7 @@ onMounted(() => {
  * Display the coordinates where the user right-clicked.
  * @param {mapboxgl.LngLat} lngLat - The longitude and latitude of the clicked location.
  */
- function displayCoordinates(lngLat: mapboxgl.LngLat, event: MouseEvent) {
+function displayCoordinates(lngLat: mapboxgl.LngLat, event: MouseEvent) {
   clickedLngLat.value = lngLat;
   clickedPositionX.value = event.clientX;
   clickedPositionY.value = event.clientY;
@@ -264,7 +269,7 @@ function handleBasemapChanged(newStyleUrl: string) {
       if (map.value) {
         updateMapLayer(layer, map.value as any);
       }
-    toggleSatelliteLayerVisibility();
+      toggleSatelliteLayerVisibility();
     }
   }
 }
@@ -275,7 +280,7 @@ function handleBasemapChanged(newStyleUrl: string) {
  * @param map - The Mapbox map instance
  * @param previousYear - Optional. The previous year of the layer to be removed.
  */
- function updateMapLayer(
+function updateMapLayer(
   layer: MapLayer,
   map: mapboxgl.Map,
   previousYear?: number
@@ -298,19 +303,15 @@ function handleBasemapChanged(newStyleUrl: string) {
 function getLayerUrl(layer: MapLayer, activeYear: number): string {
   // Check if years_available is defined and not empty
   if (layer.years_available && layer.years_available.length > 0) {
-    // Check if activeYear is not in years_available
-    if (!layer.years_available.includes(activeYear)) {
-      // Find the maximum year in years_available that is less than activeYear
-      const maxAvailableYear = Math.max(
-        ...layer.years_available.filter(year => year < activeYear)
-      );
-      // If maxAvailableYear is a number (not NaN), assign it to activeYear
-      if (!isNaN(maxAvailableYear)) {
-        activeYear = maxAvailableYear;
-      }
-      if (maxAvailableYear === -Infinity) {
-        activeYear = NaN;
-      }
+    const resolvedYear = resolveLayerYear(
+      layer.years_available,
+      activeYear,
+      layer.year_meaning
+    );
+    if (resolvedYear === null) {
+      activeYear = NaN;
+    } else {
+      activeYear = resolvedYear;
     }
   }
 

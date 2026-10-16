@@ -8,14 +8,23 @@ export type CatalogYearMeaning =
   | 'snapshot'
   | 'static';
 
+export interface CatalogGroup {
+  id: string;
+  title: string;
+}
+
 export interface CatalogLayer {
   id: string;
   title: string;
+  /** Id of a catalog group. Controls which drawer section shows the layer. */
+  group: string;
   status: CatalogLayerStatus;
   display: {
     buttonType: MapLayerButtonType;
     icon?: string;
     color?: string;
+    /** Text shown when hovering the button, such as a fixed observation year. */
+    tooltip?: string;
     images?: { visible: string; hidden: string };
   };
   tiles: {
@@ -41,6 +50,7 @@ export interface CatalogLayer {
 export interface Catalog {
   schemaVersion: 1;
   timeline: { minYear: number };
+  groups: CatalogGroup[];
   layers: CatalogLayer[];
 }
 

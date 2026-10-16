@@ -2,13 +2,30 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://naturewatch.space/schemas/layers.schema.json",
   "title": "Nature Watch layer catalog",
-  "description": "One record per map layer. The app builds its layer buttons, tile requests, timeline range and info dialog from this file.",
+  "description": "One record per map layer. The app builds its layer groups, buttons, tile requests, timeline range and info dialog from this file.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "timeline", "layers"],
+  "required": ["schemaVersion", "timeline", "groups", "layers"],
   "properties": {
     "$schema": { "type": "string" },
     "schemaVersion": { "const": 1 },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Drawer sections, in display order. Basemap controls are not a group.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "title": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "timeline": {
       "type": "object",
       "additionalProperties": false,
@@ -32,7 +49,15 @@
     "layer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "title", "status", "display", "tiles", "years"],
+      "required": [
+        "id",
+        "title",
+        "group",
+        "status",
+        "display",
+        "tiles",
+        "years"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -43,6 +68,11 @@
           "type": "string",
           "minLength": 1,
           "description": "Name shown on the button and used for the map layer ids."
+        },
+        "group": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Id of the drawer group this layer belongs to."
         },
         "status": {
           "enum": ["published", "coming-soon"],
@@ -61,6 +91,10 @@
             "color": {
               "type": "string",
               "description": "Button colour when selected."
+            },
+            "tooltip": {
+              "type": "string",
+              "description": "Text shown when hovering the button, such as a fixed observation year."
             },
             "images": {
               "type": "object",
@@ -130,7 +164,7 @@
             },
             "meaning": {
               "enum": ["annual", "cumulative", "snapshot", "static"],
-              "description": "What a year means for this layer. Documentation for now; not yet used by the app."
+              "description": "What a year means. static layers stay visible when the timeline is earlier than every listed year, using the latest listed year. The other values are documentation."
             },
             "since": {
               "type": "integer",
