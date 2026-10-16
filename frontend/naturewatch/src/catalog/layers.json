@@ -48,7 +48,7 @@
         "url": "https://sites.research.google/open-buildings/"
       },
       "info": {
-        "content": "For the 2023 built layer, we primarily used the <a href=\"https://sites.research.google/open-buildings/\" target=\"_blank\">Google Open Buildings (2023)</a> dataset, specifically polygons with a high confidence score (>=0.80). In areas where Google Open Buildings data were unavailable—specifically in <b>Chad, Mali, Libya, Morocco and Western Morocco</b>—we integrated data from the <a href=\"https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php\" target=\"_blank\">Global Human Settlement Layer</a> from 2020. For reference, older built layers combine data from Google Open Buildings (spanning 2022 to 2021) and Google Dynamic World, specifically the \"built\" class."
+        "content": "The map shows one built snapshot, for 2023. It uses <a href=\"https://sites.research.google/open-buildings/\" target=\"_blank\">Google Open Buildings (2023)</a> polygons with a confidence score of 0.80 or higher. Where that dataset has no coverage — Chad, Mali, Libya, Morocco and Western Morocco — it uses the <a href=\"https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php\" target=\"_blank\">Global Human Settlement Layer</a> for 2020. A mark means the source recorded a building. It does not say how the building is used. Choosing another year on the timeline still shows this 2023 snapshot, because no other built year is published."
       }
     },
     {
@@ -78,7 +78,7 @@
         "url": "https://www.globalforestwatch.org/"
       },
       "info": {
-        "content": "The treeloss layer shows cumulative tree cover loss from 2001 up to the selected year. It sources its data from the v1.13 University of Maryland (GLAD) tree cover loss dataset, served by <a href=\"https://www.globalforestwatch.org/\" target=\"_blank\">Global Forest Watch</a>. Specifically, we've focused on areas with a tree cover density exceeding 30%. Version 1.13 adds 2025 and also updates earlier years, so earlier years can look slightly different from before. Tree cover loss is not always deforestation: it includes any stand-replacing disturbance, such as fire and forestry."
+        "content": "Tree cover loss from 2001 through the selected year, from University of Maryland GLAD version 1.13, drawn from <a href=\"https://www.globalforestwatch.org/\" target=\"_blank\">Global Forest Watch</a> tiles. Loss means the dataset recorded a stand-replacing disturbance, which includes fire and forestry as well as clearing. It is not a measure of deforestation by itself. Version 1.13 adds 2025 and also revises earlier years, so a past year can look different from an older copy of this map. This app does not set a tree-cover density cutoff in the tile request."
       }
     },
     {
@@ -108,7 +108,7 @@
         "url": "https://firms.modaps.eosdis.nasa.gov/map/"
       },
       "info": {
-        "content": "For the fire layers, we utilised <a href=\"https://firms.modaps.eosdis.nasa.gov/map/\" target=\"_blank\">FIRMS</a> data to determine the number of times a pixel burned in the year. Our methodology involved first dividing the year into 14-day intervals and then assessing if a pixel burned within each 14-day period. Finally, we summed up the number of 14-day periods a pixel experienced a fire. As a result, the maximum count for a pixel is 26 burn events within a year.\n    The data is visualised as follows:\n    <ul>\n    <li> Light yellow: Pixel burned once, suggesting potential natural occurrences or management fires.</li>\n    <li> Orange: Pixel burned 2-3 times, possibly indicating human activity or transit.</li>\n    <li> Red: Pixel burned more than 3 times, hinting at agriculture, consistent human presence, or frequent transit.</li>\n    <li> Dark red: Pixel burned over 8 times, which may suggest industrial activities, mines, or volcanic activity.</li>\n</ul>\n    ",
+        "content": "Each coloured square is a count of <a href=\"https://firms.modaps.eosdis.nasa.gov/map/\" target=\"_blank\">NASA FIRMS</a> detections, not a judgement about why a place burned. The year is split into 14-day windows. A square’s number is how many of those windows contained a detection. The count can reach 27: there are 27 windows, and the last one runs about 13 days into January of the next year. Squares are about 1 km across. Empty squares had no detection in those windows.\n    <ul>\n    <li>Light yellow: 1 window</li>\n    <li>Orange: 2 or 3 windows</li>\n    <li>Red: 4 to 8 windows</li>\n    <li>Dark red: 9 or more windows</li>\n</ul>\n    Colour does not identify agriculture, mining, or a natural fire. Coverage is the Africa export blocks, including some ocean.",
         "image": "fire_legend"
       }
     },
@@ -169,7 +169,7 @@
         "url": "https://glad.umd.edu/dataset/croplands"
       },
       "info": {
-        "content": "We sourced data from the <a href=\"https://glad.umd.edu/dataset/croplands\" target=\"_blank\">Global Cropland Expansion in the 21st Century</a> dataset. We are currently working to expand our layers with information from other years"
+        "content": "Cropland from the <a href=\"https://glad.umd.edu/dataset/croplands\" target=\"_blank\">UMD GLAD Global Cropland Expansion</a> dataset. The map publishes two snapshots, 2015 and 2019. For any timeline year after 2019, the crops layer still shows 2019. A coloured area means the dataset classed that place as cropland in the snapshot year. It does not show crop type or yield."
       }
     },
     {
@@ -217,7 +217,8 @@
         "meaning": "static"
       },
       "info": {
-        "subtitle": "Coming soon"
+        "subtitle": "Same points every year",
+        "content": "The same dam points are drawn for every year from 2016 through 2022. Moving the timeline does not change them. This catalog does not name the source dataset."
       }
     }
   ]
