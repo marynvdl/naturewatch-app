@@ -1,0 +1,12 @@
+---
+description: Sooty Earth work stays off the public site until a production release is requested
+alwaysApply: true
+---
+
+# Sooty Earth release freeze
+
+Do not open or merge a pull request from `develop` into `main` until a production release is explicitly requested. `main` deploys Fly app `naturewatch-demo` (naturewatch.space). `develop` deploys Fly app `naturewatch` and is where this work lands.
+
+Before implementing a roadmap step, read `docs/sooty-earth-roadmap.md`. One step per branch and chat. Merge that step into `develop` only. Pipelines stay in `marynvdl/naturewatch-analysis`, outside the existing `tasks/` folders that start virtual machines on push.
+
+Do not start the next step until the current step's done-when is met.

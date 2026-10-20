@@ -7,6 +7,7 @@ Map interface for Nature Watch. Data processing lives in [`marynvdl/naturewatch-
 | [Using the map](docs/using-the-map.md) | What the timeline, colours, and year fallback do |
 | [Data notes](docs/data.md) | Sources, units, coverage, and limits of each published layer |
 | [Blueprint](docs/blueprint.md) | Architecture, storage, and release rules |
+| [Sooty Earth roadmap](docs/sooty-earth-roadmap.md) | Agreed steps for the next release. The public site stays on `main` until that release is requested |
 | [Technical reference](docs/blueprint-notes.md) | Dated inspection record behind the blueprint |
 
 ## Development workflow
