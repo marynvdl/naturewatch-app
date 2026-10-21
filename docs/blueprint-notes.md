@@ -48,7 +48,7 @@ They meet in two places: object paths in Cloud Storage, and the year list in `fr
 3. `tasks/fireTiles/build_tiles.sh` resamples to 1 km, applies `tasks/fireTiles/color.txt` (value 0 is transparent), and builds XYZ PNG tiles for zooms 0–9.
 4. The catalog points Fire at `https://storage.googleapis.com/nature-watch-tiles/fire/{year}/{z}/{x}/{y}.png` with `maxzoom: 9` and `resampling: nearest`.
 
-**Implemented, older path.** Built, bare, and crop tiles are produced by VM workflows (`createBuiltTiles.yml`, `createBareTiles.yml`, `createCropTiles.yml`). A push that touches those task paths starts a Compute Engine VM. The workflow does not stop the VM.
+**Retired.** Built, bare, and crop tiles used to be produced by virtual-machine workflows (`createBuiltTiles.yml`, `createBareTiles.yml`, `createCropTiles.yml`). Those workflows no longer start a machine. The task folders are in `archive/vm-tile-tasks/`.
 
 **Implemented, not produced by this analysis repo.** Treeloss tiles come from Global Forest Watch. Dams are Mapbox circle tiles (`mapbox://nature-watch.dam-test-tiles`). The recipe file is `mapbox_recipes/damsRecipe.json` in the analysis repo.
 
@@ -80,7 +80,7 @@ They meet in two places: object paths in Cloud Storage, and the year list in `fr
 | `.github/workflows/fireExport.yml` | Manual actions: `check`, `export-dry-run`, `export`, `status`. |
 | `.github/workflows/fireTiles.yml` | Manual tile build. Dry run on pull requests that touch `tasks/fireTiles/**`. |
 | `tasks/fireTiles/build_tiles.sh`, `tasks/fireTiles/color.txt` | Tile build and baked colours. |
-| `tasks/createBuiltTiles/`, `tasks/createBareTiles/`, `tasks/createCropTiles/` | VM tile builds. |
+| `archive/vm-tile-tasks/` | Retired built, bare, and crop tile tasks. The workflows do not start a virtual machine. |
 
 Fire tile workflow constants in `fireTiles.yml`: GDAL image `ghcr.io/osgeo/gdal:ubuntu-small-3.11.4`, `MAX_ZOOM` 9, source `gs://nature-watch-bucket/COGS/fire`, destination `gs://nature-watch-tiles/fire`.
 

@@ -14,7 +14,7 @@ Do not open or merge a pull request from `develop` into `main` until a productio
 
 One step per branch and per chat. Merge it into `develop` when its done-when is met, then start the next step. Pipelines stay in `marynvdl/naturewatch-analysis`. App, database migrations, catalog, and interface stay in this repository.
 
-In the analysis repository, do not edit `tasks/createCropTiles/`, `tasks/createBuiltTiles/`, `tasks/createBareTiles/`, or `tasks/createFireTiles/`. A push that touches those paths starts a Compute Engine VM. New pipeline code lives outside `tasks/` until a workflow is added on purpose, started by hand. The `tasks/*/` can once be retired to remove the risk of starting VMs.
+In the analysis repository, the crop, built, and bare virtual-machine tasks are retired. Their workflows do not start a machine, and the folders are in `archive/vm-tile-tasks/`. `tasks/fireTiles/` builds fire tiles on a GitHub-hosted runner, started by hand. New pipeline code lives outside `tasks/` until a workflow is added on purpose, started by hand. Do not push a commit that restores the old virtual-machine workflows: GitHub runs the workflow in the commit you push.
 
 ## Pilot
 
