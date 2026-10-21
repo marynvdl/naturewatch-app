@@ -1,0 +1,11 @@
+# Supabase
+.branches
+.temp
+
+# Import downloads. The geodatabase is not a source of record.
+.cache/
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local
