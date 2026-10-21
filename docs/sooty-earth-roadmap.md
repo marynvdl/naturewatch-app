@@ -18,7 +18,7 @@ In the analysis repository, the crop, built, and bare virtual-machine tasks are 
 
 ## Pilot
 
-- Places: terrestrial protected areas in South Africa with reported area of at least 10 km² (`REALM = Terrestrial`, `ISO3 = ZAF`, `GIS_AREA >= 10`). The October 2026 file is the World Database on Protected and Conserved Areas. The note’s count is 941 places; re-count it on import.
+- Places: terrestrial protected areas in South Africa with calculated area of at least 10 km² (`REALM = Terrestrial`, `ISO3 = ZAF`, `area_km2 >= 10`). The October 2026 file is the World Database on Protected and Conserved Areas. An earlier note counted 941 places with `GIS_AREA >= 10`; re-count on import using calculated `area_km2`.
 - Layer: [GLAD annual cropland](https://glad.umd.edu/dataset/annual-croplands) for 2024. Pixel value 100 means cropland. This is a different product from the 2015 and 2019 cropland snapshots already on the map.
 - Facts: square kilometres, percent, and valid coverage, calculated from the source raster and stored for that layer version.
 - Geometries stay private until written permission covers a public boundary service. Statistics may be readable. Attribution, release month, and a Protected Planet link are required wherever protected-area information is shown.

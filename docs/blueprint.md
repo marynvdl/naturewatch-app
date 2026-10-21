@@ -6,7 +6,7 @@ This document describes the working system and agreed direction. Detailed file p
 
 How to read the published map: [Using the map](using-the-map.md). Sources and limits of each layer: [Data notes](data.md). Commands and branches: the [app README](../README.md).
 
-*Updated 20 October 2026. The system description is still the 16 October inspection; cloud checks were not repeated. The Sooty Earth release rule and roadmap were accepted on 20 October.*
+*Updated 21 October 2026. The system description is still the 16 October inspection; cloud checks were not repeated. The Sooty Earth release rule and roadmap were accepted on 20 October.*
 
 ## 1. How the system fits together
 
@@ -31,6 +31,8 @@ flowchart TD
 This export-to-tile automation is implemented for fire. Built, bare ground and crops retain older VM-based tile workflows. Tree loss and 2020 tree height are served externally by Global Forest Watch; dams use a Mapbox tileset. Tree height tiles cover the globe. The other published layers keep their existing coverage.
 
 The connection between data and app is defined by **published object paths** and the **layer catalogue** at `frontend/naturewatch/src/catalog/layers.json`.
+
+The `sources`, `places`, and `facts` tables are in Supabase, and the FastAPI service is unchanged.
 
 ## 2. Storage and access
 
@@ -79,9 +81,10 @@ The cropland discussion established the following direction:
 Accepted for the first Sooty Earth release, and not yet built:
 
 - The first layer year is GLAD annual cropland 2024, clipped to South Africa. It is a new catalog layer, separate from the 2015 and 2019 cropland snapshots.
-- The first places are terrestrial protected areas in South Africa with reported area of at least 10 km².
-- Place records and facts live in Supabase (Postgres and PostGIS). The FastAPI service stays as it is until a later need. Source rasters and tiles stay in Cloud Storage.
+- Cropland facts for the pilot places. The `facts` table stays empty until that step.
 - The interface is rebranded to Sooty Earth on `develop` before any production release. The sequence and done-when for each step are in the [roadmap](sooty-earth-roadmap.md).
+
+The first places are terrestrial protected areas in South Africa with calculated `area_km2` of at least 10. Source rasters and tiles stay in Cloud Storage.
 
 ## 6. Decisions still needed
 

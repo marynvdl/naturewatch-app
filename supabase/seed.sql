@@ -1,0 +1,1 @@
+-- Pilot places are loaded by supabase/import_wdpa.py, not by this seed.
