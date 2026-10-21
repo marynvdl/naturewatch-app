@@ -64,7 +64,7 @@ The `tch_3` tiles are the published rendering of canopy at least 3 m. The same v
 
 **Source named in the catalog.** UMD GLAD Global Cropland Expansion, https://glad.umd.edu/dataset/croplands. The catalog calls 2015 and 2019 snapshots. Tile URL pattern: `https://storage.googleapis.com/nature-watch-tiles/crop/{year}/{z}/{x}/{y}.png`.
 
-**Not verified here.** Pixel values, resolution, and geographic coverage of those tiles are not described in this repository. The analysis repo has a crop tile task (`tasks/createCropTiles/`) that starts a virtual machine; this pass did not read its colour table or source paths as a dataset definition.
+**Not verified here.** Pixel values, resolution, and geographic coverage of those tiles are not described in this repository. The crop tile task used to live at `tasks/createCropTiles/` and started a virtual machine. It is retired, in `archive/vm-tile-tasks/createCropTiles/`. This pass did not read its colour table or source paths as a dataset definition.
 
 ## Dams
 
