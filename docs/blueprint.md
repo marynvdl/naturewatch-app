@@ -6,7 +6,7 @@ This document describes the working system and agreed direction. Detailed file p
 
 How to read the published map: [Using the map](using-the-map.md). Sources and limits of each layer: [Data notes](data.md). Commands and branches: the [app README](../README.md).
 
-*Updated 16 October 2026. Simplified from Cursor’s supplied inspection record; repository and cloud checks were not repeated during this edit.*
+*Updated 20 October 2026. The system description is still the 16 October inspection; cloud checks were not repeated. The Sooty Earth release rule and roadmap were accepted on 20 October.*
 
 ## 1. How the system fits together
 
@@ -59,6 +59,8 @@ For the app:
 
 The app workflow runs tests and a Docker build on every push. Pushes to `develop` deploy Fly app `naturewatch`; pushes to `main` deploy `naturewatch-demo`.
 
+Sooty Earth is built on `develop`. Do not open a pull request from `develop` into `main` until that public-site change is explicitly requested. naturewatch.space stays on the current release until then. The step-by-step plan is the [Sooty Earth roadmap](sooty-earth-roadmap.md).
+
 In the analysis repository, fire export and tile production are manually triggered, apart from the tile dry run on relevant pull requests. Built, bare-ground and crop workflows trigger on relevant pushes and can create VMs. Those workflows do not automatically stop the VMs.
 
 Inspect workflow triggers before pushing. Obtain authorization before billable processing or production deployment. After an authorized long Earth Engine submission, record its identifiers, outputs and monitoring instructions rather than keeping the chat waiting.
@@ -74,11 +76,19 @@ The cropland discussion established the following direction:
 - Precompute statistics for known spaces when publishing a layer year, then serve those results for catalogue comparisons.
 - Consider a 1 km or H3 grid for flexible queries later. Official figures for small spaces should come from the source raster. On-demand tiling is a possible later delivery option.
 
+Accepted for the first Sooty Earth release, and not yet built:
+
+- The first layer year is GLAD annual cropland 2024, clipped to South Africa. It is a new catalog layer, separate from the 2015 and 2019 cropland snapshots.
+- The first places are terrestrial protected areas in South Africa with reported area of at least 10 km².
+- Place records and facts live in Supabase (Postgres and PostGIS). The FastAPI service stays as it is until a later need. Source rasters and tiles stay in Cloud Storage.
+- The interface is rebranded to Sooty Earth on `develop` before any production release. The sequence and done-when for each step are in the [roadmap](sooty-earth-roadmap.md).
+
 ## 6. Decisions still needed
 
 - Whether to make source rasters private, and which services need access.
-- The first cropland year, geographic extent and spaces to support.
-- Where space statistics will be stored and how close-zoom cropland will be served.
+- How close-zoom cropland will be served.
+- Whether public map geometries are permitted under the WDPCA licence, or only stored statistics.
 - The Earth Engine billing project and the continuing role of `naturewatch-gee`, which was not inspected.
+- The production domain, and when the GitHub repositories are renamed. Bucket names, Fly app names, and the GCP project stay as they are through that rename.
 
 Other proposals, known inconsistencies and the exact inspected commits remain in [Technical reference](blueprint-notes.md). Update this blueprint when the architecture or an accepted decision changes; keep experiments and longer discussions in Notion.
