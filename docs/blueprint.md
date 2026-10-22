@@ -76,14 +76,15 @@ The cropland discussion established the following direction:
 - Precompute statistics for known spaces when publishing a layer year, then serve those results for catalogue comparisons.
 - Consider a 1 km or H3 grid for flexible queries later. Official figures for small spaces should come from the source raster. On-demand tiling is a possible later delivery option.
 
-The cropland seed objects are at `gs://nature-watch-bucket/seeds/cropland/glad/2024/v1/`. The sprout raster is not written. The 2015 and 2019 crop tiles stay as they are.
+The cropland seed objects are at `gs://nature-watch-bucket/seeds/cropland/glad/2024/v1/`. The sprout raster is `gs://nature-watch-bucket/sprouts/cropland/2024/v1/cropland-2024-zaf.tif`, with `collection.json` and `cropland-2024-zaf.json` in that folder. The 2015 and 2019 crop tiles stay as they are.
 
-`frontend/naturewatch/src/catalog/layers.json` is what the map reads. A static STAC catalogue is a generated view of a recipe, written later beside the sprout raster. The app does not read STAC.
+`frontend/naturewatch/src/catalog/layers.json` is what the map reads. A static STAC catalogue is a generated view of a recipe, written beside the sprout raster. The app does not read STAC.
+
+Cropland facts for the 941 pilot places are stored for sprout `cropland-2024-v1`, method `area-weighted-spheroid-v1`.
 
 Accepted for the first Sooty Earth release, and not yet built:
 
 - The map layer for GLAD annual cropland 2024, clipped to South Africa. There is no annual-cropland entry in `layers.json`. It is separate from the 2015 and 2019 cropland snapshots.
-- Cropland facts for the pilot places. The `facts` table is still empty.
 - The interface is rebranded to Sooty Earth on `develop` before any production release. The sequence and done-when for each step are in the [roadmap](sooty-earth-roadmap.md).
 
 The first places are terrestrial protected areas in South Africa with calculated `area_km2` of at least 10. Source rasters and tiles stay in Cloud Storage.

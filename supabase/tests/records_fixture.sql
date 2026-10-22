@@ -36,9 +36,27 @@ begin
     from information_schema.columns
     where table_schema = 'public'
       and table_name = 'facts'
-      and column_name in ('area_km2', 'percent', 'valid_coverage')
-  ) <> 3 then
-    raise exception 'facts is missing area_km2, percent, or valid_coverage';
+      and column_name in ('area_km2', 'percent', 'valid_coverage', 'method_id', 'sprout_id')
+  ) <> 5 then
+    raise exception 'facts is missing area_km2, percent, valid_coverage, method_id, or sprout_id';
+  end if;
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'facts'
+      and column_name in ('layer', 'layer_version')
+  ) then
+    raise exception 'facts still has layer or layer_version';
+  end if;
+  if not exists (
+    select 1
+    from public.fact_methods
+    where id = 'area-weighted-spheroid-v1'
+      and summary like '%WGS84%'
+      and summary like '%kept in both%'
+  ) then
+    raise exception 'area-weighted-spheroid-v1 summary is missing';
   end if;
 end $$;
 
@@ -205,6 +223,39 @@ begin
     or has_table_privilege('authenticated', 'public.places', 'INSERT') then
     raise exception 'anon or authenticated can insert places';
   end if;
+
+  insert into public.facts (
+    place_id, sprout_id, method_id, area_km2, percent, valid_coverage
+  )
+  select id, 'cropland-2024-v1', 'area-weighted-spheroid-v1', 1.5, 100.0 / 3.0, 0.98
+  from public.places
+  where source_id = 'fixture-pilot';
+
+  begin
+    insert into public.facts (
+      place_id, sprout_id, method_id, area_km2, percent, valid_coverage
+    )
+    select id, 'cropland-2024-v1', 'area-weighted-spheroid-v1', 2, 20, 1
+    from public.places
+    where source_id = 'fixture-pilot';
+    raise exception 'duplicate fact was inserted';
+  exception
+    when unique_violation then
+      null;
+  end;
+
+  begin
+    insert into public.facts (
+      place_id, sprout_id, method_id, area_km2, percent, valid_coverage
+    )
+    select id, 'cropland-2024-v1', 'missing-method', 1, 1, 1
+    from public.places
+    where source_id = 'fixture-pilot';
+    raise exception 'fact with an unknown method was inserted';
+  exception
+    when foreign_key_violation then
+      null;
+  end;
 end $$;
 
 do $$
@@ -236,6 +287,19 @@ begin
     where release_month = date '2026-10-01';
     if pilot_count <> 1 then
       raise exception '% saw % October 2026 pilot rows, expected 1', role_name, pilot_count;
+    end if;
+
+    if (
+      select method_id
+      from public.facts
+    ) <> 'area-weighted-spheroid-v1' then
+      raise exception '% could not read the fact method', role_name;
+    end if;
+    if (
+      select id
+      from public.fact_methods
+    ) <> 'area-weighted-spheroid-v1' then
+      raise exception '% could not read fact_methods', role_name;
     end if;
   end loop;
 end $$;
