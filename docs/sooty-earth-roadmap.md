@@ -32,7 +32,7 @@ Keep both repositories. Rename them to match Sooty Earth only when the productio
 | Step | Where | Done when | Estimate |
 | --- | --- | --- | --- |
 | 1. Records | This repo, applied to Supabase | Places and facts tables exist. The pilot places are imported. Geometries are not world-readable. A query returns the filtered set, with the WDPCA release month recorded. | 1–2 days |
-| 2. Registry | Analysis repo | One YAML recipe names the seed, sprout, and published paths for cropland 2024. Those folders exist. The recipe is the only catalog edited by hand. | 0.5–1 day |
+| 2. Cookbook | Analysis repo | One YAML recipe names the seed and sprout paths for cropland 2024. The sprout path is the raster later steps read. Those prefixes exist. The recipe is the only catalog edited by hand. | 0.5–1 day |
 | 3. Seed | Analysis repo | The 10° GLAD tiles that cover South Africa are downloaded and checked: value 100, 0.00025° grid, WGS84. A South Africa clip is stored under the recipe path. | 1–2 days, plus download time |
 | 4. Sprout | Analysis repo | One versioned Cloud-Optimized GeoTIFF is written, with version, class values, nodata, and CRS. A static STAC Collection and Item are generated from the YAML recipe. Oil-palm fusion is not built. | 0.5–1 day |
 | 5. Facts | Analysis repo, writing to Supabase | km², percent, and valid coverage are stored for the pilot places. A few parks match an independent check. Overlapping areas have a stated rule before any places are added together. | 2–3 days |

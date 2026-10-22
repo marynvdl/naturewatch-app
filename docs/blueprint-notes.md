@@ -2,6 +2,8 @@
 
 > Companion to [the technical blueprint](blueprint.md). This preserves Cursor’s original detailed inspection record from 16 October 2026, including file indexes, historical run notes, unresolved proposals and reported cloud checks. It is a dated reference, not a second current blueprint. Repository and cloud checks were not repeated during the editorial reorganization. References to “this document” below refer to the original inspection record.
 >
+> On 22 October 2026, `gs://nature-watch-bucket` was made private and public access prevention was enforced. The storage table in section 4 records the 16 October check, when that bucket was still public. Current access is in the blueprint. The proposal to make the bucket private is done.
+
 > Later the same day, the About text in `layers.json` was edited. The fire legend no longer says the maximum is 26 or assigns causes to colours. Dams no longer use the subtitle “Coming soon”. The tree-loss About text no longer states a 30% density cutoff. Those gap notes below describe the catalog as inspected, not as it reads now. See [Data notes](data.md).
 
 Initial blueprint, 16 October 2026. Documentation only.
@@ -136,7 +138,7 @@ From the cropland discussion (GLAD annual croplands, https://glad.umd.edu/datase
 
 ### Proposed, not confirmed
 
-- Make `nature-watch-bucket` private before large new rasters are stored there. Tiles would stay public.
+- Make `nature-watch-bucket` private before large new rasters are stored there. Tiles would stay public. Done on 22 October 2026: public read removed, public access prevention enforced. Tiles stayed public.
 - Postgres (hosted or otherwise) as the table for space statistics.
 - Two colour ramps in the client (topographic and satellite) once tiles are unstyled values.
 - Moving built, bare, and crop off VMs onto the fire-tile pattern. The analysis README states this direction; there is no schedule.
