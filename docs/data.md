@@ -66,6 +66,20 @@ The `tch_3` tiles are the published rendering of canopy at least 3 m. The same v
 
 **Not verified here.** Pixel values, resolution, and geographic coverage of those tiles are not described in this repository. The crop tile task used to live at `tasks/createCropTiles/` and started a virtual machine. It is retired, in `archive/vm-tile-tasks/createCropTiles/`. This pass did not read its colour table or source paths as a dataset definition.
 
+## Cropland
+
+**Source named in the catalog.** UMD GLAD annual cropland, https://glad.umd.edu/dataset/annual-croplands. One snapshot, 2024, clipped to South Africa. This is a different product from the Crops snapshots above.
+
+**Tile address.** `https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v1/{z}/{x}/{y}.png`. Zooms 0–12. A missing tile is empty. Beyond zoom 12 the map enlarges zoom 12 with nearest resampling.
+
+**Values.** Each pixel is an 8-bit gray value plus alpha. Gray 1 is cropland and gray 0 is other land. Alpha 0 is nodata, including land outside South Africa. The files are not coloured. The map is set to colour class 1 orange (`#e59139`) and leave class 0 clear.
+
+**Browser read.** Mapbox asks for each tile with a browser read. The bucket allows `https://naturewatch.fly.dev`, `http://localhost:5173`, and `http://127.0.0.1:5173`. A response saved before that permission existed is reused for up to an hour and then fails in the console even though a new request would succeed. The catalog tile addresses end in `?v=1` so the map does not reuse those saved responses.
+
+**Year.** 2024 only. A later timeline year still requests 2024. A year before 2024 does not request the layer.
+
+**Places.** Stored figures for the pilot protected areas use sprout `cropland-2024-v1` and method `area-weighted-spheroid-v1`. The place page and the map popup show `area_km2` to two decimal places and `percent` to one. The map draws the stored boundary from `pilot_place_map`. The app does not offer a polygon download.
+
 ## Dams
 
 Circle tiles from the Mapbox tileset `nature-watch.dam-test-tiles`. The catalog marks the years 2016–2022 as `static`. A static layer stays on the map when the timeline is earlier than every listed year, using the latest listed year. The timeline starts in 2016, which is also the first year dams list, so that case does not arise for dams. The URL has no year, so the points stay the same as the timeline moves.

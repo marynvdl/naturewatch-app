@@ -2,13 +2,18 @@
 import { catalog } from '@/catalog';
 import type DrawerMenuItem from '@/interfaces/DrawerMenuItemInterface';
 import useMapLayerStore from '@/store/MapLayerStore';
+import usePlacesStore from '@/store/PlacesStore';
 import useTimelineStore from '@/store/TimelineStore';
 import { ref, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import logo from '@/assets/logo_nw.png';
 
 // Using stores
 const mapLayerStore = useMapLayerStore();
+const placesStore = usePlacesStore();
 const timelineStore = useTimelineStore();
+const route = useRoute();
+const router = useRouter();
 
 // Accessing values from the stores
 // Map layers and their visibility
@@ -41,6 +46,14 @@ function handleButtonClick(title: string) {
     toggleTimelineVisibility(false);
   } else if (visibleMapLayers.value.length > 0) {
     toggleTimelineVisibility(true);
+  }
+}
+
+/** Show the protected-area boundaries on the map. */
+function showPlaces() {
+  placesStore.toggle();
+  if (placesStore.visible && route.name !== 'Home') {
+    void router.push({ name: 'Home' });
   }
 }
 
@@ -158,6 +171,25 @@ watch(currentOpacity, newOpacity => {
       <v-img class="position-absolute" width="100%" cover :src="logo" />
     </v-btn>
   </v-container>
+  <div class="text-center pb-2">
+    <v-btn
+      variant="text"
+      class="text-none"
+      :color="placesStore.visible ? 'primary' : undefined"
+      @click="showPlaces"
+    >
+      Places
+    </v-btn>
+    <p v-if="placesStore.status === 'loading'" class="text-caption">
+      Loading places.
+    </p>
+    <p v-else-if="placesStore.status === 'error'" class="text-caption">
+      The places could not be drawn.
+    </p>
+    <p v-else-if="placesStore.status === 'unconfigured'" class="text-caption">
+      The place store is not configured.
+    </p>
+  </div>
   <v-container class="pt-1 pb-0">
     <v-row align="center" justify="center">
       <template v-for="group in layerGroups" :key="group.id">

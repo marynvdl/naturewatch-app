@@ -210,6 +210,15 @@ begin
     raise exception 'row level security is not enabled on places';
   end if;
 
+  if exists (
+    select 1
+    from public.pilot_place_map as mapped
+    join public.places on places.id = mapped.id
+    where not extensions.st_equals(mapped.geom, places.geom)
+  ) then
+    raise exception 'pilot_place_map does not return the stored boundary';
+  end if;
+
   if has_column_privilege('anon', 'public.places', 'geom', 'SELECT')
     or has_column_privilege('authenticated', 'public.places', 'geom', 'SELECT') then
     raise exception 'anon or authenticated can select places.geom';
@@ -287,6 +296,13 @@ begin
     where release_month = date '2026-10-01';
     if pilot_count <> 1 then
       raise exception '% saw % October 2026 pilot rows, expected 1', role_name, pilot_count;
+    end if;
+
+    select count(*) into pilot_count
+    from public.pilot_place_map
+    where name = 'Pilot Park';
+    if pilot_count <> 1 then
+      raise exception '% saw % map boundaries, expected 1', role_name, pilot_count;
     end if;
 
     if (

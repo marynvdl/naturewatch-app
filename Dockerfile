@@ -25,6 +25,9 @@ FROM node:18 AS naturewatch-frontend
 
 # Accept the build argument for PostHog token
 ARG VITE_APP_POSTHOG_TOKEN
+# Places page. Names only; the values come from the deploy environment.
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
 
 WORKDIR /frontend
 
@@ -35,8 +38,10 @@ RUN npm install
 # Copy Frontend source files
 COPY ./frontend/naturewatch/ ./
 
-# Compile and Minify for Production
-# The VITE_APP_POSTHOG_TOKEN will be injected here by Vite during build
+# The VITE_* values are injected here by Vite during the build.
+ENV VITE_APP_POSTHOG_TOKEN=$VITE_APP_POSTHOG_TOKEN
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 RUN npm run build
 
 # Final production image

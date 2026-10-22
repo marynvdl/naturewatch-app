@@ -10,6 +10,7 @@ import {
   getTimelineRange,
   resolveLayerYear,
 } from '../index';
+import { classRasterPaint } from '../rasterColor';
 import type { Catalog } from '../types';
 
 describe('layer catalog', () => {
@@ -44,6 +45,9 @@ describe('layer catalog', () => {
         expect(full, layer.id).toContain('{z}');
         expect(full, layer.id).toContain('{x}');
         expect(full, layer.id).toContain('{y}');
+        if (full.includes('nature-watch-tiles')) {
+          expect(full, layer.id).toContain('?v=1');
+        }
       });
   });
 
@@ -169,6 +173,7 @@ describe('layer catalog', () => {
       'bare',
       'mines',
       'crops',
+      'cropland',
       'rivers',
       'dams',
     ]);
@@ -216,6 +221,41 @@ describe('layer catalog', () => {
     expect(card?.content).toContain('30 m');
     expect(card?.content).toContain('v2022');
     expect(card?.content).toContain('CC BY 4.0');
+  });
+
+  it('colours cropland class 1 and leaves class 0 clear', () => {
+    const layer = catalog.layers.find(entry => entry.id === 'cropland');
+    expect(layer?.title).toBe('Cropland');
+    expect(layer?.status).toBe('published');
+    expect(layer?.years).toEqual({ available: [2024], meaning: 'snapshot' });
+    expect(layer?.tiles).toMatchObject({
+      url: 'https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v1/{z}/{x}/{y}.png?v=1',
+      maxzoom: 12,
+      resampling: 'nearest',
+      colorClasses: [{ value: 1, color: '#e59139' }],
+    });
+    expect(resolveLayerYear([2024], 2024, 'snapshot')).toBe(2024);
+    expect(resolveLayerYear([2024], 2025, 'snapshot')).toBe(2024);
+    expect(resolveLayerYear([2024], 2016, 'snapshot')).toBeNull();
+
+    const paint = classRasterPaint(layer?.tiles.colorClasses ?? []);
+    expect(paint['raster-color-mix']).toEqual([255, 0, 0, 0]);
+    expect(paint['raster-color-range']).toEqual([0, 1]);
+    expect(paint['raster-color']).toEqual([
+      'step',
+      ['raster-value'],
+      'rgba(0,0,0,0)',
+      0.5,
+      '#e59139',
+    ]);
+
+    const mapLayer = buildMapLayers(catalog).find(
+      entry => entry.title === 'Cropland'
+    );
+    expect(mapLayer?.color_classes).toEqual([{ value: 1, color: '#e59139' }]);
+    expect(mapLayer?.max_zoom).toBe(12);
+    expect(mapLayer?.resampling).toBe('nearest');
+    expect(mapLayer?.tooltip).toBe('2024');
   });
 
   it('only enables published layers', () => {

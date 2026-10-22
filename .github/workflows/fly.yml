@@ -59,7 +59,7 @@ jobs:
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy test app using flyctl
-        run: flyctl deploy --build-arg VITE_APP_POSTHOG_TOKEN=${{ secrets.POSTHOG_TOKEN }} --app naturewatch --remote-only
+        run: flyctl deploy --build-arg VITE_APP_POSTHOG_TOKEN=${{ secrets.POSTHOG_TOKEN }} --build-arg VITE_SUPABASE_URL=${{ secrets.SUPABASE_URL }} --build-arg VITE_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --app naturewatch --remote-only
 
   deploy_demo_app:
     name: Deploy Demo App
