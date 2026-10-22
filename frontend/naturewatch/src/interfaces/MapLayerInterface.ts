@@ -47,4 +47,6 @@ export default interface MapLayer {
   max_zoom?: number;
   /** How raster pixels are drawn when enlarged */
   resampling?: 'linear' | 'nearest';
+  /** Class values the client colours. Unlisted classes stay transparent. */
+  color_classes?: { value: number; color: string }[];
 }

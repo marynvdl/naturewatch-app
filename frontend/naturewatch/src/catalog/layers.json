@@ -43,7 +43,7 @@
       },
       "tiles": {
         "type": "raster",
-        "url": "https://storage.googleapis.com/nature-watch-tiles/built/2023/{z}/{x}/{y}.png"
+        "url": "https://storage.googleapis.com/nature-watch-tiles/built/2023/{z}/{x}/{y}.png?v=1"
       },
       "years": {
         "available": [2023],
@@ -101,7 +101,7 @@
       "tiles": {
         "type": "raster",
         "url": "https://storage.googleapis.com/nature-watch-tiles/fire/",
-        "query": "{year}/{z}/{x}/{y}.png",
+        "query": "{year}/{z}/{x}/{y}.png?v=1",
         "maxzoom": 9,
         "resampling": "nearest"
       },
@@ -132,7 +132,7 @@
       },
       "tiles": {
         "type": "raster",
-        "url": "https://storage.googleapis.com/nature-watch-tiles/built/2022/{z}/{x}/{y}.png"
+        "url": "https://storage.googleapis.com/nature-watch-tiles/built/2022/{z}/{x}/{y}.png?v=1"
       },
       "years": {
         "available": [2016, 2017, 2018, 2019, 2020, 2021, 2022]
@@ -169,7 +169,7 @@
       "tiles": {
         "type": "raster",
         "url": "https://storage.googleapis.com/nature-watch-tiles/crop/",
-        "query": "{year}/{z}/{x}/{y}.png"
+        "query": "{year}/{z}/{x}/{y}.png?v=1"
       },
       "years": {
         "available": [2015, 2019],
@@ -181,6 +181,37 @@
       },
       "info": {
         "content": "Cropland from the <a href=\"https://glad.umd.edu/dataset/croplands\" target=\"_blank\">UMD GLAD Global Cropland Expansion</a> dataset. The map publishes two snapshots, 2015 and 2019. For any timeline year after 2019, the crops layer still shows 2019. A coloured area means the dataset classed that place as cropland in the snapshot year. It does not show crop type or yield."
+      }
+    },
+    {
+      "id": "cropland",
+      "title": "Cropland",
+      "group": "threats",
+      "status": "published",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-barley",
+        "color": "#e59139",
+        "tooltip": "2024"
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v1/{z}/{x}/{y}.png?v=1",
+        "maxzoom": 12,
+        "resampling": "nearest",
+        "colorClasses": [{ "value": 1, "color": "#e59139" }]
+      },
+      "years": {
+        "available": [2024],
+        "meaning": "snapshot"
+      },
+      "source": {
+        "name": "UMD GLAD annual cropland",
+        "version": "v1",
+        "url": "https://glad.umd.edu/dataset/annual-croplands"
+      },
+      "info": {
+        "content": "Cropland for 2024 from the <a href=\"https://glad.umd.edu/dataset/annual-croplands\" target=\"_blank\">UMD GLAD annual cropland</a> dataset, clipped to South Africa. This is a different product from the 2015 and 2019 crops snapshots. Orange marks class 1, the dataset's cropland class. The tiles store the class value, and the map applies the colour. Other land and missing data stay clear. It does not show crop type or yield. Tiles run through zoom 12, and closer zoom enlarges them. A timeline year before 2024 does not show this layer."
       }
     },
     {

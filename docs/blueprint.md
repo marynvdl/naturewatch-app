@@ -30,20 +30,20 @@ Fire is the pipeline that runs today: Earth Engine to `nature-watch-bucket`, the
 
 The connection between data and app is defined by **published object paths** and the **layer catalogue** at `frontend/naturewatch/src/catalog/layers.json`.
 
-The `sources`, `places`, and `facts` tables are in Supabase, and the FastAPI service is unchanged.
+The `sources`, `places`, and `facts` tables are in Supabase. The places page reads `pilot_places` and `facts` in the browser with the anon key. It does not read `places.geom`. The FastAPI service does not read these tables.
 
 ## 2. Storage and access
 
 | Bucket | Contents | Access |
 | --- | --- | --- |
 | `gs://nature-watch-bucket` | Source rasters, including `COGS/fire/<year>/` and the cropland seed and sprout prefixes | Private since 22 October 2026. Public access prevention is enforced. `gee-1-238@nature-watch-387210.iam.gserviceaccount.com` has `roles/storage.objectAdmin`. |
-| `gs://nature-watch-tiles` | Display tiles, including `fire/<year>/{z}/{x}/{y}.png` | Public read; keeping map tiles public is agreed |
+| `gs://nature-watch-tiles` | Display tiles, including `fire/<year>/{z}/{x}/{y}.png` and `cropland/2024/v1/{z}/{x}/{y}.png` | Public read; keeping map tiles public is agreed |
 
 Both buckets belong to GCP project `nature-watch-387210`. The inspected machine’s default project was `science-428407`; confirm the intended project before cloud operations. The Earth Engine billing project remains unresolved.
 
 ## 3. Behavior that must remain explicit
 
-- **Dates:** when a layer lacks the selected year, the app uses its latest available earlier year. If every listed year is later, the layer is not requested, except a layer marked static, which stays visible on its latest listed year. Tree height is a static 2020 layer. A timeline selection does not guarantee that every layer represents that year. Crops currently list 2015 and 2019.
+- **Dates:** when a layer lacks the selected year, the app uses its latest available earlier year. If every listed year is later, the layer is not requested, except a layer marked static, which stays visible on its latest listed year. Tree height is a static 2020 layer. A timeline selection does not guarantee that every layer represents that year. Crops currently list 2015 and 2019. Cropland lists 2024 only, so a year before 2024 does not request it, and a later year still shows 2024.
 - **Fire processing:** FIRMS `T21` detections are counted in 14-day windows on a grid using scale 1,000 m in `EPSG:3857`, then exported as 30 m COGs in `EPSG:4326` across 25 Africa blocks.
 - **Fire display:** GDAL resamples to the 1 km display grid, applies baked colors and creates XYZ PNG tiles for zooms 0–9. Zero is transparent; the app uses nearest-neighbor rendering.
 - **Fire compatibility:** the current export uses 27 windows and includes about 13 days of the following January. These quirks were intentionally retained for comparability with previous years. Do not change the method for one year without addressing comparability.
@@ -82,9 +82,10 @@ The cropland seed objects are at `gs://nature-watch-bucket/seeds/cropland/glad/2
 
 Cropland facts for the 941 pilot places are stored for sprout `cropland-2024-v1`, method `area-weighted-spheroid-v1`.
 
+The catalog layer `cropland` publishes that 2024 product for South Africa. Its tiles are class values at `gs://nature-watch-tiles/cropland/2024/v1/{z}/{x}/{y}.png`, zooms 0–12. The client colours class 1 and leaves class 0 clear. The tile bucket allows the develop app and local dev (`http://localhost:5173` and `http://127.0.0.1:5173`) to read those pixels. Closer than zoom 12 enlarges the zoom 12 tiles. `/places` lists the pilot protected areas. `/places/:id` shows the name, the stored cropland square kilometres and percent, the WDPCA release month, attribution, and a Protected Planet link. **Places** on the map draws the stored boundary from `pilot_place_map`. The `places.geom` column itself stays ungranted. A click shows the name, cropland figure, release month, attribution, and Protected Planet link. The app does not offer a polygon download. The page and the overlay need `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` at build time. The develop deploy reads those from GitHub secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+
 Accepted for the first Sooty Earth release, and not yet built:
 
-- The map layer for GLAD annual cropland 2024, clipped to South Africa. There is no annual-cropland entry in `layers.json`. It is separate from the 2015 and 2019 cropland snapshots.
 - The interface is rebranded to Sooty Earth on `develop` before any production release. The sequence and done-when for each step are in the [roadmap](sooty-earth-roadmap.md).
 
 The first places are terrestrial protected areas in South Africa with calculated `area_km2` of at least 10. Source rasters and tiles stay in Cloud Storage.
@@ -92,8 +93,8 @@ The first places are terrestrial protected areas in South Africa with calculated
 ## 6. Decisions still needed
 
 - Source rasters in `nature-watch-bucket` are private as of 22 October 2026. Map tiles stay public. Still to confirm on the next fire-tile run: the GitHub Actions identity can read the private bucket, and its write access to `nature-watch-tiles` was not rechecked.
-- How close-zoom cropland will be served.
-- Whether public map geometries are permitted under the WDPCA licence, or only stored statistics.
+- Whether cropland closer than zoom 12 should be a new tile product. The map currently enlarges zoom 12.
+- A confirmation with UNEP-WCMC is planned when the app is relaunched. Until then, stored protected-area boundaries are shown for non-commercial use, with no polygon download.
 - The Earth Engine billing project and the continuing role of `naturewatch-gee`, which was not inspected.
 - The production domain, and when the GitHub repositories are renamed. Bucket names, Fly app names, and the GCP project stay as they are through that rename.
 

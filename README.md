@@ -48,6 +48,8 @@ npm install
 npm run dev
 ```
 
+Copy `frontend/naturewatch/.env.example` to `.env` in that folder. The places page reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Leave them blank and the page says the store is not configured. Do not commit the anon key, and do not put the service-role key in the frontend.
+
 Use `http://localhost` for the dev server. The tile bucket’s browser rules allow that host.
 
 | Command | Script |

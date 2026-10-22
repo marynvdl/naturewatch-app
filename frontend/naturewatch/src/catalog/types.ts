@@ -35,6 +35,8 @@ export interface CatalogLayer {
     maxzoom?: number;
     /** How raster pixels are drawn when enlarged. Use nearest for data pixels that should stay sharp. */
     resampling?: 'linear' | 'nearest';
+    /** Class values the client colours. Unlisted classes stay transparent. */
+    colorClasses?: { value: number; color: string }[];
     sourceLayer?: string;
     circle?: { radius: number; colorSatellite: string; colorStreets: string };
   };

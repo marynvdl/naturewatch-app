@@ -10,6 +10,12 @@ import useTimelineStore from '@/store/TimelineStore';
 import useDrawerStore from '@/store/DrawerStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
 import { resolveLayerYear } from '@/catalog';
+import { classRasterPaint } from '@/catalog/rasterColor';
+import {
+  placePopupElement,
+  type PlaceFeatureProperties,
+} from '@/places/display';
+import usePlacesStore from '@/store/PlacesStore';
 import SideButtonsComponent from '@/components/SideButtonsComponent.vue';
 import CoordinatesComponent from '@/components/CoordinatesComponent.vue';
 
@@ -18,6 +24,7 @@ const basemapStore = useBasemapStore();
 const mapLayerStore = useMapLayerStore();
 const timelineStore = useTimelineStore();
 const drawerStore = useDrawerStore();
+const placesStore = usePlacesStore();
 
 /** Props */
 defineProps<{
@@ -171,6 +178,105 @@ function updateLayerOpacityOnMap(
   }
 }
 
+const PLACE_SOURCE = 'pilot-places';
+const PLACE_FILL = 'pilot-places-fill';
+const PLACE_LINE = 'pilot-places-line';
+let placesPopup: mapboxgl.Popup | null = null;
+let placesListening = false;
+
+/**
+ * First symbol layer, so place boundaries sit under the labels.
+ * @param mapInstance - The map.
+ * @returns The layer id, when the style has a symbol.
+ */
+function firstSymbolId(mapInstance: mapboxgl.Map): string | undefined {
+  return mapInstance.getStyle()?.layers?.find(layer => layer.type === 'symbol')
+    ?.id;
+}
+
+/** Remove the place boundaries and any open popup. */
+function removePlaceOverlay(mapInstance: mapboxgl.Map) {
+  placesPopup?.remove();
+  placesPopup = null;
+  if (mapInstance.getLayer(PLACE_LINE)) mapInstance.removeLayer(PLACE_LINE);
+  if (mapInstance.getLayer(PLACE_FILL)) mapInstance.removeLayer(PLACE_FILL);
+  if (mapInstance.getSource(PLACE_SOURCE))
+    mapInstance.removeSource(PLACE_SOURCE);
+}
+
+/**
+ * Draw or clear the protected-area boundaries.
+ * @param mapInstance - The map.
+ */
+function syncPlaceOverlay(mapInstance: mapboxgl.Map) {
+  if (!placesStore.visible || !placesStore.features) {
+    removePlaceOverlay(mapInstance);
+    return;
+  }
+  const before = firstSymbolId(mapInstance);
+  if (!mapInstance.getSource(PLACE_SOURCE)) {
+    mapInstance.addSource(PLACE_SOURCE, {
+      type: 'geojson',
+      data: placesStore.features,
+    });
+    mapInstance.addLayer(
+      {
+        id: PLACE_FILL,
+        type: 'fill',
+        source: PLACE_SOURCE,
+        paint: { 'fill-color': '#1f4b3a', 'fill-opacity': 0.18 },
+      },
+      before
+    );
+    mapInstance.addLayer(
+      {
+        id: PLACE_LINE,
+        type: 'line',
+        source: PLACE_SOURCE,
+        paint: { 'line-color': '#1f4b3a', 'line-width': 1.5 },
+      },
+      before
+    );
+    if (!placesListening) {
+      mapInstance.on('click', PLACE_FILL, onPlaceClick);
+      mapInstance.on('mouseenter', PLACE_FILL, () => {
+        mapInstance.getCanvas().style.cursor = 'pointer';
+      });
+      mapInstance.on('mouseleave', PLACE_FILL, () => {
+        mapInstance.getCanvas().style.cursor = '';
+      });
+      placesListening = true;
+    }
+  } else {
+    const source = mapInstance.getSource(
+      PLACE_SOURCE
+    ) as mapboxgl.GeoJSONSource;
+    source.setData(placesStore.features);
+  }
+}
+
+/**
+ * Open the name and cropland figure for the clicked boundary.
+ * @param event - The map click.
+ */
+function onPlaceClick(event: mapboxgl.MapMouseEvent) {
+  const feature = event.features?.[0];
+  const properties = feature?.properties as PlaceFeatureProperties | undefined;
+  if (!properties || !map.value) return;
+  placesPopup?.remove();
+  placesPopup = new mapboxgl.Popup({ closeButton: true, maxWidth: '280px' })
+    .setLngLat(event.lngLat)
+    .setDOMContent(placePopupElement(properties))
+    .addTo(map.value);
+}
+
+watch(
+  () => [placesStore.visible, placesStore.features] as const,
+  () => {
+    if (map.value?.isStyleLoaded()) syncPlaceOverlay(map.value);
+  }
+);
+
 onMounted(() => {
   // Create the controls
   const nav = new mapboxgl.NavigationControl();
@@ -207,6 +313,7 @@ onMounted(() => {
     visibleMapLayers.value.forEach((layer, index) => {
       addSourceAndLayer(layer, activeYear.value, mapInstance);
     });
+    syncPlaceOverlay(mapInstance);
     setLabels(mapInstance);
   });
 
@@ -390,6 +497,9 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
           paint: {
             'raster-opacity': currentOpacity, // Set the opacity here
             ...(layer.resampling && { 'raster-resampling': layer.resampling }),
+            ...(layer.color_classes?.length
+              ? classRasterPaint(layer.color_classes)
+              : {}),
           },
         },
         firstLineId
@@ -448,6 +558,12 @@ function addSourceAndLayer(
     <v-responsive class="d-flex align-center text-center fill-height">
       <div class="map-container">
         <div id="mapDiv" />
+        <p
+          v-if="placesStore.visible && placesStore.notice"
+          class="place-notice"
+        >
+          {{ placesStore.notice }}
+        </p>
         <SideButtonsComponent />
         <!-- Toggle basemap labels -->
         <div
@@ -509,6 +625,20 @@ function addSourceAndLayer(
 
 #mapDiv {
   height: 100vh;
+}
+
+.place-notice {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  z-index: 10;
+  max-width: 420px;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .basemap-button {
