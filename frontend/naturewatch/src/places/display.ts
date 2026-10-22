@@ -73,7 +73,7 @@ export interface PlaceBoundary {
   site_id: string | null;
   source_name: string;
   release_month: string;
-  geom: { type: string; coordinates: unknown } | null;
+  geom: GeoJSON.MultiPolygon | null;
 }
 
 /** Stored cropland figure joined onto a boundary for the popup. */
@@ -95,14 +95,10 @@ export interface PlaceFeatureProperties {
 }
 
 /** GeoJSON the map draws. There is no file download of this shape. */
-export interface PlaceFeatureCollection {
-  type: 'FeatureCollection';
-  features: {
-    type: 'Feature';
-    geometry: { type: string; coordinates: unknown };
-    properties: PlaceFeatureProperties;
-  }[];
-}
+export type PlaceFeatureCollection = GeoJSON.FeatureCollection<
+  GeoJSON.MultiPolygon,
+  PlaceFeatureProperties
+>;
 
 /**
  * Join stored boundaries to the stored cropland figures.
@@ -174,7 +170,7 @@ export function placePopupContent(properties: PlaceFeatureProperties): {
  * @returns The popup body.
  */
 export function placePopupElement(
-  properties: Partial<PlaceFeatureProperties> & Record<string, unknown>
+  properties: Partial<PlaceFeatureProperties>
 ): HTMLElement {
   const numberOrNull = (value: unknown): number | null => {
     if (value === null || value === undefined || value === '') return null;

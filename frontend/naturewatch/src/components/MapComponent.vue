@@ -267,13 +267,15 @@ function onPlaceClick(event: mapboxgl.MapMouseEvent) {
   placesPopup = new mapboxgl.Popup({ closeButton: true, maxWidth: '280px' })
     .setLngLat(event.lngLat)
     .setDOMContent(placePopupElement(properties))
-    .addTo(map.value);
+    .addTo(map.value as unknown as mapboxgl.Map);
 }
 
 watch(
   () => [placesStore.visible, placesStore.features] as const,
   () => {
-    if (map.value?.isStyleLoaded()) syncPlaceOverlay(map.value);
+    if (map.value?.isStyleLoaded()) {
+      syncPlaceOverlay(map.value as unknown as mapboxgl.Map);
+    }
   }
 );
 
