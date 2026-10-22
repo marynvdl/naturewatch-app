@@ -6,7 +6,7 @@ This document describes the working system and agreed direction. Detailed file p
 
 How to read the published map: [Using the map](using-the-map.md). Sources and limits of each layer: [Data notes](data.md). Commands and branches: the [app README](../README.md).
 
-*Updated 21 October 2026. The system description is still the 16 October inspection; cloud checks were not repeated. The Sooty Earth release rule and roadmap were accepted on 20 October.*
+*Updated 22 October 2026. `nature-watch-bucket` access was checked again that day and made private. The rest of the system description is still the 16 October inspection. The Sooty Earth release rule and roadmap were accepted on 20 October.*
 
 ## 1. How the system fits together
 
@@ -36,9 +36,9 @@ The `sources`, `places`, and `facts` tables are in Supabase, and the FastAPI ser
 
 ## 2. Storage and access
 
-| Bucket | Contents | Access reported by Cursor on 16 October |
+| Bucket | Contents | Access |
 | --- | --- | --- |
-| `gs://nature-watch-bucket` | Source rasters, including `COGS/fire/<year>/` | Public read; making it private is still a proposal |
+| `gs://nature-watch-bucket` | Source rasters, including `COGS/fire/<year>/` and the cropland seed and sprout prefixes | Private since 22 October 2026. Public access prevention is enforced. `gee-1-238@nature-watch-387210.iam.gserviceaccount.com` has `roles/storage.objectAdmin`. |
 | `gs://nature-watch-tiles` | Display tiles, including `fire/<year>/{z}/{x}/{y}.png` | Public read; keeping map tiles public is agreed |
 
 Both buckets belong to GCP project `nature-watch-387210`. The inspected machine’s default project was `science-428407`; confirm the intended project before cloud operations. The Earth Engine billing project remains unresolved.
@@ -88,7 +88,7 @@ The first places are terrestrial protected areas in South Africa with calculated
 
 ## 6. Decisions still needed
 
-- Whether to make source rasters private, and which services need access.
+- Source rasters in `nature-watch-bucket` are private as of 22 October 2026. Map tiles stay public. Still to confirm on the next fire-tile run: the GitHub `GCP_SA_KEY` is `gee-1-238@nature-watch-387210.iam.gserviceaccount.com`, which can read the private bucket. Its write access to `nature-watch-tiles` was not rechecked.
 - How close-zoom cropland will be served.
 - Whether public map geometries are permitted under the WDPCA licence, or only stored statistics.
 - The Earth Engine billing project and the continuing role of `naturewatch-gee`, which was not inspected.
