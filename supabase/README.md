@@ -6,6 +6,8 @@ The October 2026 WDPCA row is pinned in the migration: release month `2026-10-01
 
 `site_id` is the Protected Planet id (`https://www.protectedplanet.net/<site_id>`).
 
+`fact_methods` names the formula for a facts row. `facts.method_id` points at it. `facts.sprout_id` is the sprout id from the recipe, which is also the STAC collection id. The stored area, percent, and valid coverage are full precision. Square kilometres are shown to two decimal places, percent to one, and valid coverage to three.
+
 ## Local database
 
 ```bash
