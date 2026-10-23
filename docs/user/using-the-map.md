@@ -1,6 +1,6 @@
 # Using the map
 
-What the published map does today. How the data are made is in [Data notes](data.md). How to run the project is in the [README](../README.md).
+What the published map does today. What each layer shows, and where it stops, is in [Data notes](data.md). How to run the project is in the [README](../../README.md).
 
 The timeline starts at 2016. The last year on the slider is the latest year of any published layer.
 

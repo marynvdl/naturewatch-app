@@ -4,11 +4,10 @@ Map interface for Nature Watch. Data processing lives in [`marynvdl/naturewatch-
 
 | Read this | For |
 | --- | --- |
-| [Using the map](docs/using-the-map.md) | What the timeline, colours, and year fallback do |
-| [Data notes](docs/data.md) | Sources, units, coverage, and limits of each published layer |
-| [Blueprint](docs/blueprint.md) | Architecture, storage, and release rules |
+| [Using the map](docs/user/using-the-map.md) | What the timeline, colours, and year fallback do |
+| [Data notes](docs/user/data.md) | What each published layer shows, and its limits |
+| [Blueprint](docs/blueprint.md) | Database tables, bucket paths, and how the app reads layers |
 | [Sooty Earth roadmap](docs/sooty-earth-roadmap.md) | Agreed steps for the next release. The public site stays on `main` until that release is requested |
-| [Technical reference](docs/blueprint-notes.md) | Dated inspection record behind the blueprint |
 
 ## Development workflow
 

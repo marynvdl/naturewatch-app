@@ -1,21 +1,22 @@
 # Nature Watch — technical blueprint
 
-Nature Watch helps people explore environmental pressures and natural landscapes. The current app focuses on Africa, with a longer-term ambition of global coverage and ecological assessment.
+Nature Watch (soon to be rebranded as Sooty Earth) helps people explore environmental pressures and natural landscapes. The current app focuses on Africa, with a longer-term ambition of global coverage and ecological assessment.
 
 This document describes the working system and agreed direction. Commands and branches: the [app README](../README.md).
 
 | Subject | Source of truth |
 | --- | --- |
-| How to read the published map | [docs/using-the-map.md](using-the-map.md) in this repo |
-| What each map layer shows, and its limits | [docs/data.md](data.md) in this repo |
-| The running system and the published contract: buckets, object paths, catalogue | [docs/blueprint.md](blueprint.md) in this repo |
-| Dated inspection notes | [docs/blueprint-notes.md](blueprint-notes.md) in this repo |
-| The first Sooty Earth release plan | [docs/sooty-earth-roadmap.md](sooty-earth-roadmap.md) in this repo |
-| How a dataset becomes published objects | [docs/pipelines.md](https://github.com/marynvdl/naturewatch-analysis/blob/main/docs/pipelines.md) in marynvdl/naturewatch-analysis |
+| Database tables, bucket paths, and how the app reads layers | This file |
+| How to read the published map | [docs/user/using-the-map.md](user/using-the-map.md) |
+| What each map layer shows, and its limits | [docs/user/data.md](user/data.md) |
+| The first Sooty Earth release plan | [docs/sooty-earth-roadmap.md](sooty-earth-roadmap.md) |
+| How a dataset becomes published objects, including transformations, costs, and scripts | [docs/pipelines.md](https://github.com/marynvdl/naturewatch-analysis/blob/main/docs/pipelines.md) in marynvdl/naturewatch-analysis |
 | The hand-edited layer catalog | [cookbook/recipes/](https://github.com/marynvdl/naturewatch-analysis/tree/main/cookbook/recipes) in marynvdl/naturewatch-analysis |
 | How to run a step, and what that run cost | The step README in marynvdl/naturewatch-analysis |
+| Work parcels | `.cursor/parcels/` in this repo |
+| A single task | `.cursor/tasks/` in the repo that does the work |
 
-*Updated 22 October 2026. The pipeline description moved to `docs/pipelines.md` in marynvdl/naturewatch-analysis that day. `nature-watch-bucket` access was checked again that day and made private. The Sooty Earth release rule and roadmap were accepted on 20 October.*
+*Updated 23 October 2026. Reader docs live in `docs/user/`. Pipeline procedure, cost, and scripts stay in naturewatch-analysis. `nature-watch-bucket` was made private on 22 October 2026.*
 
 ## 1. How the system fits together
 
@@ -44,10 +45,8 @@ Both buckets belong to GCP project `nature-watch-387210`. The inspected machine�
 ## 3. Behavior that must remain explicit
 
 - **Dates:** when a layer lacks the selected year, the app uses its latest available earlier year. If every listed year is later, the layer is not requested, except a layer marked static, which stays visible on its latest listed year. Tree height is a static 2020 layer. A timeline selection does not guarantee that every layer represents that year. Crops currently list 2015 and 2019. Cropland lists 2024 only, so a year before 2024 does not request it, and a later year still shows 2024.
-- **Fire processing:** FIRMS `T21` detections are counted in 14-day windows on a grid using scale 1,000 m in `EPSG:3857`, then exported as 30 m COGs in `EPSG:4326` across 25 Africa blocks.
-- **Fire display:** GDAL resamples to the 1 km display grid, applies baked colors and creates XYZ PNG tiles for zooms 0–9. Zero is transparent; the app uses nearest-neighbor rendering.
-- **Fire compatibility:** the current export uses 27 windows and includes about 13 days of the following January. These quirks were intentionally retained for comparability with previous years. Do not change the method for one year without addressing comparability.
-- **Layer status:** placeholder URLs and “Coming soon” labels are not evidence of published data. The detailed reference lists current inconsistencies.
+- **Fire:** the app reads `fire/<year>/{z}/{x}/{y}.png` and renders those tiles with nearest-neighbor. Zero is transparent. The count method and the tile build are in the analysis pipelines doc. Do not change that method for one year without addressing comparability with previous years.
+- **Layer status:** placeholder URLs and “Coming soon” labels are not evidence of published data.
 
 ## 4. Development and release
 
@@ -59,11 +58,7 @@ For the app:
 
 The app workflow runs tests and a Docker build on every push. Pushes to `develop` deploy Fly app `naturewatch`; pushes to `main` deploy `naturewatch-demo`.
 
-Sooty Earth is built on `develop`. Do not open a pull request from `develop` into `main` until that public-site change is explicitly requested. naturewatch.space stays on the current release until then. The step-by-step plan is the [Sooty Earth roadmap](sooty-earth-roadmap.md).
-
-In the analysis repository, fire export and fire tiles are started by hand, apart from the tile dry run on relevant pull requests.
-
-Inspect workflow triggers before pushing. Obtain authorization before billable processing or production deployment. After an authorized long Earth Engine submission, record its identifiers, outputs and monitoring instructions rather than keeping the chat waiting.
+Sooty Earth is built on `develop`. Do not open a pull request from `develop` into `main` until that public-site change is explicitly requested. naturewatch.space stays on the current release until then.
 
 ## 5. Agreed direction, not yet implemented
 
@@ -71,10 +66,10 @@ The cropland discussion established the following direction:
 
 - Keep Google Cloud Storage and retain numerical source rasters separately from display products.
 - Separate **visual aggregation** from **analytical statistics**: maximum overviews preserve sparse features visually; area and percentage come from original class-pixel counts.
-- Aim for class-value display tiles with client-side coloring. Current fire tiles are already colored and do not implement this design.
-- Prebuild a bounded range of low zooms; choose the higher-zoom approach later.
+- Aim for class-value display tiles with client-side coloring. Current fire tiles are already colored and do not yet implement this design.
+- Prebuild a bounded range of zooms 0 to 12 at most to keep computational costs low; a zoom of 13 can later be considered.
+- Published tiles are individual XYZ files on `nature-watch-tiles`. PMTiles for a later pipeline is not built.
 - Precompute statistics for known spaces when publishing a layer year, then serve those results for catalogue comparisons.
-- Consider a 1 km or H3 grid for flexible queries later. Official figures for small spaces should come from the source raster. On-demand tiling is a possible later delivery option.
 
 The cropland seed objects are at `gs://nature-watch-bucket/seeds/cropland/glad/2024/v1/`. The sprout raster is `gs://nature-watch-bucket/sprouts/cropland/2024/v1/cropland-2024-zaf.tif`, with `collection.json` and `cropland-2024-zaf.json` in that folder. The 2015 and 2019 crop tiles stay as they are.
 
@@ -93,9 +88,8 @@ The first places are terrestrial protected areas in South Africa with calculated
 ## 6. Decisions still needed
 
 - Source rasters in `nature-watch-bucket` are private as of 22 October 2026. Map tiles stay public. Still to confirm on the next fire-tile run: the GitHub Actions identity can read the private bucket, and its write access to `nature-watch-tiles` was not rechecked.
-- Whether cropland closer than zoom 12 should be a new tile product. The map currently enlarges zoom 12.
-- A confirmation with UNEP-WCMC is planned when the app is relaunched. Until then, stored protected-area boundaries are shown for non-commercial use, with no polygon download.
+- For cropland: choose between resampling of `q3` or `max`. 
 - The Earth Engine billing project and the continuing role of `naturewatch-gee`, which was not inspected.
 - The production domain, and when the GitHub repositories are renamed. Bucket names, Fly app names, and the GCP project stay as they are through that rename.
 
-Other proposals, known inconsistencies and the exact inspected commits remain in [Technical reference](blueprint-notes.md). Update this blueprint when the architecture or an accepted decision changes; keep experiments and longer discussions in Notion.
+Update this blueprint when a table, an object path, or the way the app reads a layer changes. Keep experiments and longer discussions in Notion.
