@@ -1,0 +1,45 @@
+---
+description: Nature Watch repositories, documents, parcels, and git rules
+alwaysApply: true
+---
+
+# Nature Watch
+
+`marynvdl/naturewatch-app` is the master repository. It holds the web app, the map catalogue, the database schema, and the work parcels. `marynvdl/naturewatch-analysis` publishes rasters and map tiles. A file in the other repository is not available locally.
+
+The app is Vue 3, Vuetify, Mapbox, FastAPI, and Supabase. Do not introduce another UI framework unless the task says to.
+
+## Where a fact lives
+
+Write each fact once.
+
+- `docs/blueprint.md`: database tables, bucket object paths, and how the app reads layers.
+- `docs/user/`: what a person using the web app needs. `using-the-map.md` is the controls. `data.md` is what each layer shows and where it stops.
+- `.cursor/parcels/` in this repo: the active work. `docs/archive/sooty-earth-roadmap.md` is the 20 October 2026 plan. Steps 1–6 were carried out. Do not add tasks to it.
+- `docs/pipelines.md` in naturewatch-analysis: how a dataset becomes published objects, including transformations, cloud costs, and scripts. Do not copy that procedure into this repo.
+- `cookbook/recipes/` in naturewatch-analysis: the hand-edited layer catalog. The map reads `frontend/naturewatch/src/catalog/layers.json`. The app does not read STAC.
+- The step README in naturewatch-analysis: how to run that step, and what the run cost.
+
+## Parcels and tasks
+
+Parcels live in `.cursor/parcels/` in this repo. A parcel lists tasks. Each task points at one `.cursor/tasks/<file>.md`.
+
+- A task marked for naturewatch-app is done in this repo.
+- A task marked for naturewatch-analysis is done in that repo, from its own checkout.
+- Do the named task only. Do not start the next task until that one is finished.
+
+## Secrets
+
+Never commit, push, or paste a key or token. That includes a service-account JSON key, a private key, an API token, a password, and the contents of a GitHub secret or `.env` file. A workflow names a secret as `${{ secrets.SECRET_NAME }}`. A service-account email and a secret's name are identifiers. If a secret value is already in the repo, do not repeat it. Tell Maryn so it can be rotated.
+
+## Git
+
+Branch from `develop` and merge back through a pull request. `develop` is protected. Do not push commits straight to `develop` or `main`.
+
+Do not open or merge a pull request from `develop` into `main` until a production release is explicitly requested. See the Sooty Earth release rule.
+
+Before a pull request, run the relevant local tests. For catalog or frontend changes, run the catalog vitest suite. After opening the pull request, do not wait for GitHub Actions. Report the pull request and the required checks. Do not treat it as ready to merge until those checks have passed.
+
+Do not commit unrelated files. Do not add AI or tool attribution to commits or pull requests.
+
+Inspect workflow triggers before pushing. A push to `develop` deploys Fly app `naturewatch`. Explain billable processing, cloud provisioning, or a production deploy and get approval before starting it. After an authorized Earth Engine submission, record the task id, output, status check, and how to cancel it, then return. Do not wait in the chat for the job.

@@ -1,8 +1,8 @@
 # Sooty Earth roadmap
 
-Agreed plan for the first Sooty Earth release. This is not a description of the running system. The running system stays in the [blueprint](blueprint.md).
+Archived 23 October 2026. This is the plan accepted on 20 October 2026, not a list of remaining work. Steps 1–6 were carried out. The interface rebrand (step 7) and the production release (step 8) were not. New work is a parcel in `.cursor/parcels/`.
 
-Accepted 20 October 2026. Build on `develop`. The public site stays on `main`.
+Do not follow the “one step per branch” instructions below. The production freeze is unchanged: do not open or merge a pull request from `develop` into `main` until a production release is explicitly requested. That rule lives in `.cursor/rules/sooty-earth.mdc`. The running system is the [blueprint](../blueprint.md).
 
 ## Release rule
 
@@ -46,7 +46,7 @@ A static STAC catalog is a generated view of the recipe, written when the sprout
 
 ## Cost record
 
-Each pipeline step records, for the area it covered: bytes stored, wall time, and peak memory. Tile steps also record zoom range, tile count, and tile bytes. The facts step records place count and wall time, and whether a few large polygons dominate that time. Note any virtual machine left running, and for how long.
+The numbers for a run stay in that step's README in marynvdl/naturewatch-analysis. Do not copy them into this repo. Each note should cover, for the area it ran: bytes stored, wall time, and peak memory. Tile steps also record zoom range, tile count, and tile bytes. The facts step records place count and wall time, and whether a few large polygons dominate that time. Note any virtual machine left running, and for how long.
 
 Those figures are how a later global year is estimated. Storage scales from the sprout raster’s bytes per km². Facts scale from time per place, with large polygons called out separately. Low-zoom tiles scale with land area and zoom, not with the source pixel count. Map views are a separate, ongoing egress cost, and the pilot will not show it.
 
