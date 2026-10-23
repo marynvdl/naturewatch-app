@@ -1,8 +1,8 @@
 # Sooty Earth roadmap
 
-Agreed plan for the first Sooty Earth release. This is not a description of the running system. The running system stays in the [blueprint](blueprint.md).
+Archived 23 October 2026. This is the plan accepted on 20 October 2026, not a list of remaining work. Steps 1–6 were carried out. The interface rebrand (step 7) and the production release (step 8) were not. New work is a parcel in `.cursor/parcels/`.
 
-Accepted 20 October 2026. Build on `develop`. The public site stays on `main`.
+Do not follow the “one step per branch” instructions below. The production freeze is unchanged: do not open or merge a pull request from `develop` into `main` until a production release is explicitly requested. That rule lives in `.cursor/rules/sooty-earth.mdc`. The running system is the [blueprint](../blueprint.md).
 
 ## Release rule
 

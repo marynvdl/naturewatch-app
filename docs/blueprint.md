@@ -9,14 +9,14 @@ This document describes the working system and agreed direction. Commands and br
 | Database tables, bucket paths, and how the app reads layers | This file |
 | How to read the published map | [docs/user/using-the-map.md](user/using-the-map.md) |
 | What each map layer shows, and its limits | [docs/user/data.md](user/data.md) |
-| The first Sooty Earth release plan | [docs/sooty-earth-roadmap.md](sooty-earth-roadmap.md) |
+| The archived first-release plan | [docs/archive/sooty-earth-roadmap.md](archive/sooty-earth-roadmap.md) |
 | How a dataset becomes published objects, including transformations, costs, and scripts | [docs/pipelines.md](https://github.com/marynvdl/naturewatch-analysis/blob/main/docs/pipelines.md) in marynvdl/naturewatch-analysis |
 | The hand-edited layer catalog | [cookbook/recipes/](https://github.com/marynvdl/naturewatch-analysis/tree/main/cookbook/recipes) in marynvdl/naturewatch-analysis |
 | How to run a step, and what that run cost | The step README in marynvdl/naturewatch-analysis |
 | Work parcels | `.cursor/parcels/` in this repo |
 | A single task | `.cursor/tasks/` in the repo that does the work |
 
-*Updated 23 October 2026. Reader docs live in `docs/user/`. Pipeline procedure, cost, and scripts stay in naturewatch-analysis. `nature-watch-bucket` was made private on 22 October 2026.*
+*Updated 23 October 2026. Reader docs live in `docs/user/`. The first-release roadmap is archived. Pipeline procedure, cost, and scripts stay in naturewatch-analysis. `nature-watch-bucket` was made private on 22 October 2026.*
 
 ## 1. How the system fits together
 
@@ -81,7 +81,7 @@ The catalog layer `cropland` publishes that 2024 product for South Africa. Its t
 
 Accepted for the first Sooty Earth release, and not yet built:
 
-- The interface is rebranded to Sooty Earth on `develop` before any production release. The sequence and done-when for each step are in the [roadmap](sooty-earth-roadmap.md).
+- The interface is rebranded to Sooty Earth on `develop` before any production release. That work is a parcel. The old step list is archived.
 
 The first places are terrestrial protected areas in South Africa with calculated `area_km2` of at least 10. Source rasters and tiles stay in Cloud Storage.
 

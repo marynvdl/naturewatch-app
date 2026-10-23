@@ -7,4 +7,4 @@ alwaysApply: true
 
 Do not open or merge a pull request from `develop` into `main` until a production release is explicitly requested.
 
-`develop` deploys Fly app `naturewatch`. `main` deploys Fly app `naturewatch-demo` (naturewatch.space). Feature work merges into `develop` only. The release plan is `docs/sooty-earth-roadmap.md`.
+`develop` deploys Fly app `naturewatch`. `main` deploys Fly app `naturewatch-demo` (naturewatch.space). Feature work merges into `develop` only.
