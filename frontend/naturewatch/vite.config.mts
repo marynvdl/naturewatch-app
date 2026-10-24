@@ -4,6 +4,7 @@ import path from 'node:path';
 import { defineConfig, type UserConfig } from 'vite';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { checker } from 'vite-plugin-checker';
+import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify';
 
@@ -17,6 +18,7 @@ export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
           transformAssetUrls,
         },
       }),
+      tailwindcss(),
       vuetify({
         autoImport: true,
         styles: { configFile: 'src/styles/settings.scss' },

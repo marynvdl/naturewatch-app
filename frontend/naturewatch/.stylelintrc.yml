@@ -8,6 +8,7 @@ plugins:
   - stylelint-scss
 ignoreFiles:
   - 'dist/**/*'
+  - 'src/styles/visual.css'
 rules:
   color-function-notation: legacy
   function-no-unknown: null
