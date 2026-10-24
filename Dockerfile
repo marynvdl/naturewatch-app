@@ -21,7 +21,9 @@ RUN pip install -r /code/requirements-dev.txt
 ENV PYTHONPATH "${PYTHONPATH}:/code"
 
 # Build Frontend on Node.js
-FROM node:18 AS naturewatch-frontend
+# Tailwind's native package requires Node 20 or newer. Node 18 skips that
+# package on ARM, which is what the Fly builder uses.
+FROM node:22 AS naturewatch-frontend
 
 # Accept the build argument for PostHog token
 ARG VITE_APP_POSTHOG_TOKEN
@@ -33,7 +35,7 @@ WORKDIR /frontend
 
 # Install Frontend requirements
 COPY ./frontend/naturewatch/package* ./
-RUN npm install
+RUN npm ci
 
 # Copy Frontend source files
 COPY ./frontend/naturewatch/ ./
