@@ -7,5 +7,6 @@
     "vite.config.mts",
     "env.d.ts"
     // Add any other directories or files you want ESLint to check
-  ]
+  ],
+  "exclude": ["src/styles/visual.css"]
 }

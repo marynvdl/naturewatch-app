@@ -8,3 +8,5 @@ LICENSE
 package.json
 package-lock.json
 src/catalog/*.json
+src/styles/visual.css
+*.json

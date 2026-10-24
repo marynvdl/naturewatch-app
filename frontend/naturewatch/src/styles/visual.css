@@ -1,0 +1,141 @@
+/*
+ * Light visual system for the controls added beside Vuetify.
+ * Preflight is omitted so this file does not restyle the current screens.
+ * Roboto still comes from the existing font loader.
+ */
+
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme) prefix(nw);
+/*
+ * Prefixed, important utilities beat Vuetify's button reset without
+ * matching Vuetify class names such as pt-2 or bg-transparent.
+ */
+@import 'tailwindcss/utilities.css' layer(utilities) prefix(nw) important;
+@import 'tw-animate-css';
+
+/*
+ * This Baskerville has regular and semibold, and weight 500 on the
+ * system family still draws regular. The semibold cut is the medium.
+ */
+@font-face {
+  font-family: 'Baskerville Text';
+  src: local('Baskerville');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Baskerville Text';
+  src: local('Baskerville Italic');
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Baskerville Text';
+  src: local('Baskerville SemiBold');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Baskerville Text';
+  src: local('Baskerville SemiBold Italic');
+  font-weight: 500;
+  font-style: italic;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: Roboto, 'Noto Color Emoji', sans-serif;
+  --font-serif: 'Baskerville Text', Baskerville, 'Libre Baskerville', serif;
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
+  --shadow-lg: 0 0 #0000;
+  --shadow-xl: 0 0 #0000;
+  --shadow-2xl: 0 0 #0000;
+  --drop-shadow-xs: 0 0 #0000;
+  --drop-shadow-sm: 0 0 #0000;
+  --drop-shadow-md: 0 0 #0000;
+  --drop-shadow-lg: 0 0 #0000;
+  --drop-shadow-xl: 0 0 #0000;
+  --drop-shadow-2xl: 0 0 #0000;
+  --spacing-panel: 1.5rem;
+  --spacing-stack: 1.25rem;
+  --spacing-control: 0.5rem;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --color-on: var(--on);
+  --color-on-foreground: var(--on-foreground);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  /* Panels stay near-square. Buttons set their own pill radius. */
+  --radius: 0.25rem;
+  --background: #ffffff;
+  --foreground: #3a3935;
+  --card: #ffffff;
+  --card-foreground: #3a3935;
+  --popover: #ffffff;
+  --popover-foreground: #3a3935;
+  --primary: #3a3935;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #3a3935;
+  --muted: #f4f4f5;
+  /* Muted blue-grey, close to slate-500. */
+  --muted-foreground: #64748b;
+  /* Quiet hover. This is not the "on" colour. */
+  --accent: #f4f4f5;
+  --accent-foreground: #3a3935;
+  /* The one colour that means on: a selected segment, an enabled toggle, the slider. */
+  --on: #e6e5df;
+  --on-foreground: #3a3935;
+  --destructive: #b42318;
+  /* zinc-200 at 80%. */
+  --border: oklch(92% 0.004 286.32 / 80%);
+  --input: oklch(92% 0.004 286.32 / 80%);
+  --ring: #3a3935;
+}
+
+@layer base {
+  .nw {
+    box-sizing: border-box;
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+
+  .nw *,
+  .nw *::before,
+  .nw *::after {
+    box-sizing: border-box;
+  }
+}

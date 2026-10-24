@@ -3,10 +3,14 @@
   "files": [],
   "compilerOptions": {
     "module": "ESNext",
-    "target": "ESNext",    
+    "target": "ESNext",
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "newLine": "lf"
+    "newLine": "lf",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "references": [
     { "path": "./tsconfig.config.json" },

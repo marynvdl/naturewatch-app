@@ -56,6 +56,18 @@ rules:
   vue/multi-word-component-names: warn
 overrides:
   - files:
+      - '*.json'
+    parserOptions:
+      project: null
+      extraFileExtensions:
+        - '.json'
+  - files:
+      - src/components/ui/**/*.{vue,ts}
+    rules:
+      '@typescript-eslint/prefer-function-type': off
+      vue/multi-word-component-names: off
+      vue/require-default-prop: off
+  - files:
       - '*.html'
     processor: vue/.vue
 settings:
