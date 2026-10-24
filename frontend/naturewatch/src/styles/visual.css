@@ -50,7 +50,7 @@
 
 @theme {
   --font-sans: Roboto, 'Noto Color Emoji', sans-serif;
-  --font-serif: 'Baskerville Text', Baskerville, 'Libre Baskerville', 'Iowan Old Style', Palatino, Georgia, serif;
+  --font-serif: 'Baskerville Text', Baskerville, 'Libre Baskerville', serif;
   --shadow-2xs: 0 0 #0000;
   --shadow-xs: 0 0 #0000;
   --shadow-sm: 0 0 #0000;
