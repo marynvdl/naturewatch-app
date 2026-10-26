@@ -13,8 +13,8 @@ This document describes the working system and agreed direction. Commands and br
 | How a dataset becomes published objects, including transformations, costs, and scripts | [docs/pipelines.md](https://github.com/marynvdl/naturewatch-analysis/blob/main/docs/pipelines.md) in marynvdl/naturewatch-analysis |
 | The hand-edited layer catalog | [cookbook/recipes/](https://github.com/marynvdl/naturewatch-analysis/tree/main/cookbook/recipes) in marynvdl/naturewatch-analysis |
 | How to run a step, and what that run cost | The step README in marynvdl/naturewatch-analysis |
-| Work parcels | `.cursor/parcels/` in this repo |
-| A single task | `.cursor/tasks/` in the repo that does the work |
+| Work parcels | `docs/parcels/` in this repo |
+| A single task | `docs/tasks/` in the repo that does the work |
 
 *Updated 23 October 2026. Reader docs live in `docs/user/`. The first-release roadmap is archived. Pipeline procedure, cost, and scripts stay in naturewatch-analysis. `nature-watch-bucket` was made private on 22 October 2026.*
 
