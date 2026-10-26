@@ -8,6 +8,7 @@ import turfAlong from '@turf/along';
 import turfCentroid from '@turf/centroid';
 import turfBearing from '@turf/bearing';
 import turfDestination from '@turf/destination';
+import { Eraser, Pentagon, Ruler, Trash2 } from '@lucide/vue';
 import useBasemapStore from '@/store/BasemapStore';
 import { useMeasureStore } from '@/store/MeasureStore';
 
@@ -28,30 +29,58 @@ const props = defineProps({
 });
 
 const map = ref(props.mapInstance);
+const mode = ref('simple_select');
+let draw: MapboxDraw | null = null;
+
+/** Keep the length and area buttons in step with the draw tool. */
+function syncMode() {
+  mode.value = draw?.getMode() ?? 'simple_select';
+}
+
+/** Start a length or area measurement, or stop it if that tool is already on. */
+function toggleMode(next: 'draw_line_string' | 'draw_polygon') {
+  if (!draw) return;
+  if (draw.getMode() === next) {
+    draw.changeMode('simple_select');
+  } else if (next === 'draw_line_string') {
+    draw.changeMode('draw_line_string');
+  } else {
+    draw.changeMode('draw_polygon');
+  }
+  syncMode();
+}
+
+/** Remove the selected measurement. */
+function deleteSelected() {
+  draw?.trash();
+}
+
+/** Remove every measurement. */
+function deleteAll() {
+  measureStore.triggerDeleteAll();
+}
 
 // Keep track of stored labels
 const storedLabels = ref<
-  Array<{ id: string; description: string; coordinates: number[] | undefined }>
+  { id: string; description: string; coordinates: number[] | undefined }[]
 >([]);
 
 onMounted(() => {
-  const draw = new MapboxDraw({
+  draw = new MapboxDraw({
     displayControlsDefault: false,
-    controls: {
-      line_string: true,
-      polygon: true,
-      trash: true,
-    },
   });
 
   map.value?.addControl(draw, 'bottom-right');
+  map.value?.on('draw.actionable', syncMode);
+  map.value?.on('draw.create', syncMode);
+  map.value?.on('draw.delete', syncMode);
 
   watch(
     () => measureStore.shouldDeleteAll,
     newValue => {
       if (newValue) {
         // Function to delete all drawn objects
-        draw.deleteAll();
+        draw?.deleteAll();
 
         // Remove all measurement labels
         storedLabels.value.forEach(label => {
@@ -75,7 +104,7 @@ map.value?.on('draw.create', measure);
 map.value?.on('draw.update', measure);
 map.value?.on('draw.delete', removeMeasurementLabel);
 
-// Function to format area
+/** Format a measured area in square metres, hectares, or square kilometres. */
 function formatArea(areaM2: number): string {
   if (areaM2 >= 1_000_000) {
     // Convert to km² and format
@@ -93,7 +122,7 @@ function formatArea(areaM2: number): string {
   }
 }
 
-// Function to format distance
+/** Format a measured length in metres or kilometres. */
 function formatDistance(distanceM: number): string {
   if (distanceM >= 1000) {
     // Convert to km and format
@@ -108,7 +137,7 @@ function formatDistance(distanceM: number): string {
   }
 }
 
-// Function to measure area or distance
+/** Label a finished line or polygon with its length or area. */
 function measure(event: any) {
   const geometry = event.features[0].geometry;
   let label = '';
@@ -146,7 +175,7 @@ function measure(event: any) {
     position = turfCentroid(geometry);
   }
 
-  // Helper function to convert degrees to radians
+  /** Convert degrees to radians. */
   function toRadians(degrees: number): number {
     return degrees * (Math.PI / 180);
   }
@@ -187,7 +216,7 @@ function measure(event: any) {
   });
 }
 
-// Function to remove measurement labels
+/** Remove the label for a deleted measurement. */
 function removeMeasurementLabel(event: any) {
   const id = `measure-label-${event.features[0].id}`;
   if (map.value?.getSource(id)) {
@@ -217,6 +246,9 @@ const unwatch = watch(map, (newValue, oldValue) => {
 });
 
 onBeforeUnmount(() => {
+  map.value?.off('draw.actionable', syncMode);
+  map.value?.off('draw.create', syncMode);
+  map.value?.off('draw.delete', syncMode);
   unwatch();
 });
 
@@ -254,7 +286,71 @@ map.value?.on('style.load', () => {
 });
 </script>
 
-<!-- <template>
-</template> -->
+<template>
+  <Teleport to=".mapboxgl-ctrl-bottom-right">
+    <div class="measure-panel map-panel nw">
+      <h2 class="panel-heading">Measure</h2>
+      <div class="measure-tools">
+        <button
+          type="button"
+          class="measure-tool map-control map-icon"
+          :class="{ 'is-on': mode === 'draw_line_string' }"
+          title="Measure length"
+          aria-label="Measure length"
+          :aria-pressed="mode === 'draw_line_string'"
+          @click="toggleMode('draw_line_string')"
+        >
+          <Ruler aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="measure-tool map-control map-icon"
+          :class="{ 'is-on': mode === 'draw_polygon' }"
+          title="Measure area"
+          aria-label="Measure area"
+          :aria-pressed="mode === 'draw_polygon'"
+          @click="toggleMode('draw_polygon')"
+        >
+          <Pentagon aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="measure-tool map-control map-icon"
+          title="Delete selected measurement"
+          aria-label="Delete selected measurement"
+          @click="deleteSelected"
+        >
+          <Trash2 aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="measure-tool map-control map-icon"
+          title="Delete all measurements"
+          aria-label="Delete all measurements"
+          @click="deleteAll"
+        >
+          <Eraser aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  </Teleport>
+</template>
 
-<style scoped></style>
+<style scoped>
+.measure-panel {
+  order: 0;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: max-content;
+  margin: 0;
+}
+
+.measure-tools {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+</style>

@@ -240,6 +240,7 @@ describe('layer catalog', () => {
 
     const paint = classRasterPaint(layer?.tiles.colorClasses ?? []);
     expect(paint['raster-color-mix']).toEqual([255, 0, 0, 0]);
+    expect(paint['raster-fade-duration']).toBe(0);
     expect(paint['raster-color-range']).toEqual([0, 1]);
     expect(paint['raster-color']).toEqual([
       'step',

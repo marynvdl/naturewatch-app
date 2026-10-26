@@ -9,18 +9,15 @@ import {
   type Ref,
   type WritableComputedRef,
 } from 'vue';
-import DrawerComponent from '@/components/DrawerComponent.vue';
 import logo from '@/assets/logo.svg';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from 'vuetify';
 
 // Stores
 import { useGlobal, useConfig } from '@/store';
-import useDrawerStore from '@/store/DrawerStore';
 import useBasemapStore from '@/store/BasemapStore';
 
 /** Using stores */
-const drawerStore = useDrawerStore();
 const globalStore = useGlobal();
 const configStore = useConfig();
 const basemapStore = useBasemapStore();
@@ -59,11 +56,6 @@ function setTheme() {
     theme.global.name.value = isDark ? 'dark' : 'light';
   }
 }
-
-/** Drawer */
-const drawerVisible = computed(() => drawerStore.visible);
-const drawerWidth = computed(() => drawerStore.width);
-const toggleDrawerVisibility = drawerStore.toggleDrawerVisibility;
 
 /** loading overlay visibility */
 const loading: WritableComputedRef<boolean> = computed({
@@ -113,22 +105,9 @@ onMounted(() => {
 
 <template>
   <v-app>
-    <v-navigation-drawer v-model="drawerVisible" :width="drawerWidth">
-      <drawer-component />
-    </v-navigation-drawer>
-
     <v-main class="pa-0">
-      <v-btn
-        class="drawer-button"
-        :style="
-          drawerVisible ? `left: ${parseInt(drawerWidth) - 15}px` : 'left: 15px'
-        "
-        :icon="drawerVisible ? 'mdi-menu-open' : 'mdi-menu'"
-        elevation="2"
-        @click="toggleDrawerVisibility"
-      />
-      <router-view v-slot="{ Component, route }">
-        <component :is="Component" :key="route.path" />
+      <router-view v-slot="{ Component, route: activeRoute }">
+        <component :is="Component" :key="activeRoute.path" />
       </router-view>
     </v-main>
     <v-overlay v-model="loading" app class="justify-center align-center">
@@ -188,23 +167,53 @@ html {
   bottom: 0;
 }
 
-/* Override Mapbox CSS that causes issues with layout */
-.mapboxgl-ctrl-bottom-left,
-.mapboxgl-ctrl-bottom-right,
-.mapboxgl-ctrl-top-left,
-.mapboxgl-ctrl-top-right {
-  position: inherit;
+.mapboxgl-ctrl-bottom-right {
+  position: absolute;
+  right: 12px;
+  bottom: 20px;
+  left: auto;
+  top: auto;
+  z-index: 5;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0;
+  width: auto;
 }
 
-.drawer-button {
-  position: absolute;
-  top: 80px;
-  z-index: 1005;
-  transition: left 0.2s ease-in-out;
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl {
+  margin: 0;
+  float: none;
 }
-// Removes overlay when navigation-drawer is open
-.v-navigation-drawer__scrim {
-  width: 0;
-  height: 0;
+
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f8f9f9;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group:has(.mapboxgl-ctrl-zoom-in) {
+  order: 3;
+  display: flex;
+  flex-direction: column;
+}
+
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group:has(.mapboxgl-ctrl-geolocate),
+.mapboxgl-ctrl-bottom-right > .mapboxgl-ctrl-geolocate {
+  order: 1;
+}
+
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group:has(.mapbox-gl-draw_line) {
+  order: 2;
+  display: flex;
+  flex-direction: row;
+}
+
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group:not(:has(button)) {
+  display: none;
 }
 </style>
