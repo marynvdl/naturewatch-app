@@ -100,11 +100,11 @@
 :root {
   /* Panels stay near-square. Buttons set their own pill radius. */
   --radius: 0.25rem;
-  --background: #ffffff;
+  --background: #f8f9f9;
   --foreground: #3a3935;
-  --card: #ffffff;
+  --card: #f8f9f9;
   --card-foreground: #3a3935;
-  --popover: #ffffff;
+  --popover: #f8f9f9;
   --popover-foreground: #3a3935;
   --primary: #3a3935;
   --primary-foreground: #ffffff;
@@ -124,6 +124,14 @@
   --border: oklch(92% 0.004 286.32 / 80%);
   --input: oklch(92% 0.004 286.32 / 80%);
   --ring: #3a3935;
+  /* Map panels are flat 16px cards. Quiet controls match the Places buttons. */
+  --map-panel-radius: 16px;
+  --map-panel-padding: 22px;
+  --map-control-radius: 10px;
+  --map-control-text: #24312c;
+  --map-section: #7a8680;
+  /* Grey mixed into an active layer. 47% of the layer colour is two shades quieter. */
+  --map-layer-mute: #8f9898;
 }
 
 @layer base {
@@ -133,9 +141,92 @@
     font-family: var(--font-sans);
   }
 
+  /* Titles on the Layers, Places, and Measure panels. */
+  .panel-heading {
+    margin: 0;
+    font-family: var(--nw-font-serif);
+    font-size: 25px;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: 0;
+    color: var(--foreground);
+  }
+
   .nw *,
   .nw *::before,
   .nw *::after {
     box-sizing: border-box;
+  }
+}
+
+/*
+ * Unlayered so these beat the button reset. A layered rule loses to it.
+ */
+.map-panel {
+  padding: var(--map-panel-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--map-panel-radius);
+  background: var(--background);
+  box-shadow: none;
+  text-align: left;
+}
+
+.map-section {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--map-section);
+}
+
+.map-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--map-control-radius);
+  background: var(--background);
+  color: var(--map-control-text);
+  font-size: 14px;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.map-control:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+.map-control.is-on {
+  background: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--primary-foreground);
+}
+
+.map-control.layer-button.is-on {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--layer) 47%, var(--map-layer-mute));
+  color: var(--primary-foreground);
+}
+
+.map-control.map-icon {
+  display: grid;
+  width: 36px;
+  padding: 0;
+  place-items: center;
+}
+
+.map-control.map-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+@layer utilities {
+  .nw.layer-popover {
+    width: 200px !important;
+    border-radius: 12px !important;
   }
 }

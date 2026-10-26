@@ -11,13 +11,16 @@ export interface ClassRasterPaint {
   'raster-color': ExpressionSpecification;
   'raster-color-mix': [number, number, number, number];
   'raster-color-range': [number, number];
+  'raster-fade-duration': 0;
 }
 
 /**
  * Paint that colours class-value tiles.
  * The PNG stores the class as an 8-bit gray value, so gray 1 is 1/255 in the texture.
- * Multiplying the red channel by 255 turns that back into the class number.
- * A class that is not listed stays transparent. Class 0 is the step's base colour.
+ * Mapbox scales raster-color-mix down to fit the colour ramp, so a mix of 255
+ * on red puts the class number back. A class that is not listed stays transparent.
+ * Class 0 is the step's base colour. Fading between tile zooms blends those class
+ * values and can paint a class that only exists in the other zoom, so the fade is off.
  * @param classes - Class values to colour.
  * @returns Mapbox raster paint for those classes.
  */
@@ -38,5 +41,6 @@ export function classRasterPaint(classes: ClassColor[]): ClassRasterPaint {
     'raster-color-mix': [255, 0, 0, 0],
     'raster-color-range': [0, top],
     'raster-color': expression,
+    'raster-fade-duration': 0,
   };
 }

@@ -6,9 +6,9 @@ The timeline starts at 2016. The last year on the slider is the latest year of a
 
 ## Layer groups
 
-The drawer has two groups, **Threats** and **Interest**. All, Built, Treeloss, Fire, Bare, Mines, Crops, Cropland, Rivers and Dams are under Threats. Tree height is under Interest.
+The layer buttons sit in a panel on the right of the map, under the heading Layers, in two groups, **Threats** and **Interest**. Built, Treeloss, Fire, Crops, Cropland and Dams are under Threats. Tree height is under Interest. Coming soon layers are not shown.
 
-Each layer still has its own visibility button and opacity control. Coming soon layers stay disabled. The basemap switch and label control stay on the map. They are not part of either group.
+Each layer has its own visibility button. An active layer has a settings button on the right of that button. The settings card opens to the left of the Layers panel, for the opacity and the years that layer covers. An info button inside that panel shows the description. The basemap switch and the Labels control stay on the map, at the bottom left. Labels sits just above the basemap thumbnail. They are not part of either group.
 
 ## When the year and the layer disagree
 
@@ -38,9 +38,13 @@ All, bare ground, mines, and rivers are marked “Coming soon”. They are not p
 
 Each layer’s About text is the `info` field in `frontend/naturewatch/src/catalog/layers.json`. “Coming soon” on a card replaces the year list. A custom subtitle does the same, which is why dams show “Same points every year” instead of nine separate years. Tree height has no custom subtitle, so the card shows 2020. The legend, source and limits are in that card.
 
+## Measure
+
+Length and area sit in a Measure panel at the bottom right, to the left of the map controls. Line measures distance. Area measures a polygon. Delete removes the selected measurement. Delete all clears every measurement.
+
 ## Places
 
-**Places** in the drawer draws the pilot protected areas on the map, using the stored boundary. There is no download. Click a shape for the name, the stored cropland square kilometres and percent, the WDPCA release month, attribution, and a Protected Planet link.
+The search and the place-type buttons sit together on a panel at the top left. **Protected areas** draws the pilot protected areas on the map, using the stored boundary. Click it again to remove them. There is no download. Click a shape for the name, the stored cropland square kilometres and percent, the WDPCA release month, attribution, and a Protected Planet link. The attribution line sits at the bottom right of the map.
 
 `/places` is still the name list. A name opens `/places/:id` with the same figures.
 

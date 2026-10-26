@@ -1,385 +1,300 @@
 <script setup lang="ts">
 import { catalog } from '@/catalog';
-import type DrawerMenuItem from '@/interfaces/DrawerMenuItemInterface';
 import useMapLayerStore from '@/store/MapLayerStore';
-import usePlacesStore from '@/store/PlacesStore';
 import useTimelineStore from '@/store/TimelineStore';
-import { ref, computed, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import logo from '@/assets/logo_nw.png';
+import { computed, onMounted, ref } from 'vue';
+import { Info, Settings } from '@lucide/vue';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Slider } from '@/components/ui/slider';
 
-// Using stores
 const mapLayerStore = useMapLayerStore();
-const placesStore = usePlacesStore();
 const timelineStore = useTimelineStore();
-const route = useRoute();
-const router = useRouter();
 
-// Accessing values from the stores
-// Map layers and their visibility
 const mapLayers = computed(() => mapLayerStore.MapLayers);
 const layerGroups = computed(() =>
-  catalog.groups.map(group => ({
-    id: group.id,
-    title: group.title,
-    layers: mapLayers.value.filter(layer => layer.group === group.id),
-  }))
+  catalog.groups
+    .map(group => ({
+      id: group.id,
+      title: group.title,
+      layers: mapLayers.value.filter(
+        layer => layer.group === group.id && layer.active
+      ),
+    }))
+    .filter(group => group.layers.length > 0)
 );
+
 const toggleLayerVisibility = mapLayerStore.toggleLayerVisibility;
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
-// Timeline visibility
 const toggleTimelineVisibility = timelineStore.toggleTimelineVisibility;
 
-/** Drawer menu items */
-const homeItem: DrawerMenuItem = {
-  title: 'Home',
-  icon: 'mdi-home',
-  isNav: true,
-  to: { name: 'Home' },
-};
+const infoByTitle = new Map(
+  catalog.layers.map(layer => [layer.title, layer.info])
+);
+const infoTitle = ref<string | null>(null);
+const layerPanel = ref<HTMLElement | null>(null);
+const settingsSideOffset = ref(8);
 
-/** Methods */
-/** Handle button click to toggle layer */
+/** Keep the settings card to the left of the layers panel, clear of the buttons. */
+function placeSettingsBesidePanel() {
+  const panel = layerPanel.value;
+  if (!panel) return;
+  const padRight = parseFloat(getComputedStyle(panel).paddingRight) || 0;
+  settingsSideOffset.value = Math.round(panel.offsetWidth - padRight - 20 + 8);
+}
+
+onMounted(placeSettingsBesidePanel);
+
+/** Show or hide the description inside the open settings panel. */
+function toggleInfo(title: string) {
+  infoTitle.value = infoTitle.value === title ? null : title;
+}
+
+/** Close the description when its settings panel closes. */
+function onSettings(title: string, open: boolean) {
+  if (open) placeSettingsBesidePanel();
+  if (!open && infoTitle.value === title) infoTitle.value = null;
+}
+
+/** Turn a layer on or off, and show the timeline only while one is on. */
 function handleButtonClick(title: string) {
   toggleLayerVisibility(title);
-  if (visibleMapLayers.value.length === 0) {
-    toggleTimelineVisibility(false);
-  } else if (visibleMapLayers.value.length > 0) {
-    toggleTimelineVisibility(true);
-  }
-}
-
-/** Show the protected-area boundaries on the map. */
-function showPlaces() {
-  placesStore.toggle();
-  if (placesStore.visible && route.name !== 'Home') {
-    void router.push({ name: 'Home' });
-  }
-}
-
-/** Opacity slider */
-
-// New reactive property for tracking which slider is visible
-const sliderVisible = ref(false);
-const sliderStyles = ref({});
-const currentOpacity = ref(100);
-const currentLayerTitle = ref('');
-const sliderRef = ref<HTMLElement | null>(null);
-const iconRefs = ref<Record<string, HTMLElement | undefined>>({});
-
-/**
- * Generate ref name for each icon
- * @param {string} title - Layer title.
- */
-// eslint-disable-next-line no-unused-vars
-function iconRefName(title: string) {
-  return `icon-${title}`;
+  toggleTimelineVisibility(visibleMapLayers.value.length > 0);
 }
 
 /**
- * Handle click event outside of opacity slider.
- * @param {event} event - The mouse click event.
+ * Years the catalog lists for a layer.
+ * A continuous run is written as a span.
  */
-function handleClickOutside(event: MouseEvent) {
-  const buffer = 0; // Buffer size in pixels
-
-  if (sliderRef.value) {
-    const { top, right, bottom, left } =
-      sliderRef.value.getBoundingClientRect();
-
-    // Check if the click is within the buffer zone around the slider
-    const isClickInsideBuffer =
-      event.clientX >= left - buffer &&
-      event.clientX <= right + buffer + 70 &&
-      event.clientY >= top - buffer &&
-      event.clientY <= bottom + buffer;
-
-    if (!isClickInsideBuffer) {
-      const isClickInsideIcon = Object.values(iconRefs.value).some(
-        iconEl =>
-          iconEl &&
-          (iconEl === event.target || iconEl.contains(event.target as Node))
-      );
-
-      if (!isClickInsideIcon) {
-        sliderVisible.value = false;
-      }
-    }
-  }
+function yearsCovered(years: number[]): string {
+  if (years.length === 0) return 'None published';
+  const sorted = [...years].sort((a, b) => a - b);
+  if (sorted.length === 1) return String(sorted[0]);
+  const contiguous = sorted.every(
+    (year, index) => index === 0 || year === sorted[index - 1] + 1
+  );
+  if (contiguous) return `${sorted[0]}–${sorted[sorted.length - 1]}`;
+  return sorted.join(', ');
 }
 
-watch(sliderVisible, newVal => {
-  if (newVal) {
-    window.addEventListener('click', handleClickOutside, true);
-  } else {
-    window.removeEventListener('click', handleClickOutside, true);
-  }
-});
-
-/**
- * Updates the opacity of a layer.
- * @param {string} title - The title of the layer.
- * @param {number} opacity - The new opacity value.
- */
-function updateOpacity(title: string, opacity: number) {
-  mapLayerStore.updateLayerOpacity(title, opacity);
+/** Keep the map opacity in step with the settings slider. */
+function onOpacity(title: string, value: unknown) {
+  if (!Array.isArray(value)) return;
+  const next = value[0];
+  if (typeof next !== 'number') return;
+  mapLayerStore.updateLayerOpacity(title, next);
 }
-
-/**
- * Opens the slider next to the clicked icon and sets its position.
- * @param {MouseEvent} event - The mouse event.
- * @param {title} title - The title of the layer.
- */
-function openSlider(event: MouseEvent, title: string) {
-  iconRefs.value[title] = event.currentTarget as HTMLElement;
-
-  if (currentLayerTitle.value === title && sliderVisible.value) {
-    sliderVisible.value = false;
-    return;
-  }
-
-  const iconRect = (event.target as HTMLElement).getBoundingClientRect();
-  sliderStyles.value = {
-    position: 'absolute',
-    top: `${iconRect.top - 8}px`,
-    left: `${iconRect.right + 10}px`, // 10px to the right of the icon
-    zIndex: 1000, // Ensure it's above other elements
-  };
-  currentOpacity.value = mapLayerStore.getLayerOpacity(title);
-  currentLayerTitle.value = title;
-  sliderVisible.value = true;
-}
-
-watch(currentOpacity, newOpacity => {
-  if (sliderVisible.value) {
-    updateOpacity(currentLayerTitle.value, newOpacity);
-  }
-});
 </script>
 
 <template>
-  <v-container
-    class="pt-2 pb-5 position-relative d-flex justify-center align-center"
-  >
-    <v-btn
-      class="elevation-0 bg-transparent overflow-hidden rounded-circle"
-      nav
-      :disabled="!homeItem.to"
-      :to="homeItem.to"
-      size="60"
-    >
-      <v-img class="position-absolute" width="100%" cover :src="logo" />
-    </v-btn>
-  </v-container>
-  <div class="text-center pb-2">
-    <v-btn
-      variant="text"
-      class="text-none"
-      :color="placesStore.visible ? 'primary' : undefined"
-      @click="showPlaces"
-    >
-      Places
-    </v-btn>
-    <p v-if="placesStore.status === 'loading'" class="text-caption">
-      Loading places.
-    </p>
-    <p v-else-if="placesStore.status === 'error'" class="text-caption">
-      The places could not be drawn.
-    </p>
-    <p v-else-if="placesStore.status === 'unconfigured'" class="text-caption">
-      The place store is not configured.
-    </p>
-  </div>
-  <v-container class="pt-1 pb-0">
-    <v-row align="center" justify="center">
-      <template v-for="group in layerGroups" :key="group.id">
-        <v-col
-          cols="12"
-          class="group-heading text-caption text-medium-emphasis font-weight-bold text-uppercase px-2 pt-4 pb-1"
-        >
-          {{ group.title }}
-        </v-col>
-        <template v-for="item in group.layers" :key="item.title">
-          <!-- Big buttons -->
-          <v-col
-            v-if="item.button_type === 'big'"
-            class="px-1 pt-5 pb-3"
-            cols="12"
-          >
-            <v-row no-gutters align="center">
-              <v-col cols="auto" class="pr-1">
-                <v-tooltip
-                  :disabled="!item.tooltip"
-                  content-class="year-tooltip"
-                  location="top"
-                  :offset="0"
-                  :open-on-focus="false"
-                  :text="item.tooltip"
+  <div class="layer-column nw">
+    <div ref="layerPanel" class="layer-panel map-panel">
+      <h2 class="panel-heading">Layers</h2>
+      <div class="layer-list">
+        <template v-for="group in layerGroups" :key="group.id">
+          <h3 class="group-label map-section">{{ group.title }}</h3>
+          <template v-for="item in group.layers" :key="item.title">
+            <button
+              type="button"
+              class="layer-button map-control"
+              :class="{ 'is-on': item.visible }"
+              :style="{ '--layer': item.button_color }"
+              :aria-pressed="item.visible"
+              @click="handleButtonClick(item.title)"
+            >
+              <v-icon
+                :icon="item.icon"
+                size="18"
+                :color="item.visible ? 'white' : '#24312c'"
+              />
+              <span>{{ item.title }}</span>
+            </button>
+            <div class="settings-slot">
+              <Popover
+                v-if="item.visible"
+                @update:open="open => onSettings(item.title, open)"
+              >
+                <PopoverTrigger as-child>
+                  <button
+                    type="button"
+                    class="layer-settings"
+                    :aria-label="`Settings for ${item.title}`"
+                  >
+                    <Settings />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="left"
+                  align="start"
+                  :avoid-collisions="false"
+                  :side-offset="settingsSideOffset"
+                  class="layer-popover nw:z-[1200] nw:max-h-[70vh] nw:gap-3 nw:overflow-y-auto nw:shadow-none"
                 >
-                  <template #activator="{ props: tooltipProps }">
-                    <v-btn
-                      v-bind="tooltipProps"
-                      class="small-button"
-                      size="small"
-                      :disabled="!item.active"
-                      :variant="item.visible ? undefined : 'tonal'"
-                      :prepend-icon="item.icon"
-                      rounded="lg"
-                      :color="item.visible ? item.button_color : 'default'"
-                      elevation="0"
-                      width="90px"
-                      @click="handleButtonClick(item.title)"
+                  <div
+                    class="nw:flex nw:items-center nw:justify-between nw:gap-2"
+                  >
+                    <p class="nw:text-sm nw:font-medium">{{ item.title }}</p>
+                    <button
+                      v-if="
+                        infoByTitle.get(item.title)?.content ||
+                        infoByTitle.get(item.title)?.subtitle
+                      "
+                      type="button"
+                      class="layer-info-button"
+                      :aria-expanded="infoTitle === item.title"
+                      :aria-label="`About ${item.title}`"
+                      @click="toggleInfo(item.title)"
                     >
-                      <span class="big-button-text pa-0 ma-0">
-                        {{ item.title }}
-                      </span>
-                    </v-btn>
-                  </template>
-                </v-tooltip>
-              </v-col>
-              <v-col cols="auto" class="pa-0 ma-0">
-                <v-icon
-                  v-if="item.visible"
-                  ref="iconRefs[iconRefName(item.title)]"
-                  size="x-small"
-                  :color="
-                    currentLayerTitle === item.title && sliderVisible
-                      ? 'grey-darken-4'
-                      : 'grey-lighten-2'
-                  "
-                  @click="(event: MouseEvent) => openSlider(event, item.title)"
-                >
-                  mdi-circle-opacity
-                </v-icon>
-              </v-col>
-            </v-row>
-          </v-col>
-          <!-- Small buttons -->
-          <v-col
-            v-else-if="item.button_type === 'small'"
-            class="pa-1"
-            cols="12"
-          >
-            <v-row no-gutters align="center">
-              <v-col cols="auto" class="pr-1">
-                <v-tooltip
-                  :disabled="!item.tooltip"
-                  content-class="year-tooltip"
-                  location="top"
-                  :offset="0"
-                  :open-on-focus="false"
-                  :text="item.tooltip"
-                >
-                  <template #activator="{ props: tooltipProps }">
-                    <v-btn
-                      v-bind="tooltipProps"
-                      class="small-button"
-                      size="small"
-                      :disabled="!item.active"
-                      :variant="item.visible ? undefined : 'tonal'"
-                      :prepend-icon="item.icon"
-                      rounded="lg"
-                      :color="item.visible ? item.button_color : 'default'"
-                      elevation="0"
-                      width="90px"
-                      @click="handleButtonClick(item.title)"
+                      <Info />
+                    </button>
+                  </div>
+                  <div class="nw:flex nw:flex-col nw:gap-2">
+                    <div class="nw:flex nw:items-center nw:justify-between">
+                      <p class="nw:text-xs nw:text-muted-foreground">Opacity</p>
+                      <p class="nw:text-xs nw:text-muted-foreground">
+                        {{ item.opacity }}%
+                      </p>
+                    </div>
+                    <Slider
+                      :model-value="[item.opacity]"
+                      :min="0"
+                      :max="100"
+                      :step="5"
+                      :aria-label="`${item.title} opacity`"
+                      @update:model-value="
+                        value => onOpacity(item.title, value)
+                      "
+                    />
+                  </div>
+                  <div class="nw:flex nw:flex-col nw:gap-1">
+                    <p class="nw:text-xs nw:text-muted-foreground">Years</p>
+                    <p class="nw:text-sm">
+                      {{ yearsCovered(item.years_available) }}
+                    </p>
+                  </div>
+                  <div
+                    v-if="infoTitle === item.title"
+                    class="nw:flex nw:flex-col nw:gap-1"
+                  >
+                    <p
+                      v-if="infoByTitle.get(item.title)?.subtitle"
+                      class="nw:text-sm nw:text-muted-foreground"
                     >
-                      <span
-                        class="button-text pa-0 ma-0"
-                        :class="{
-                          'button-text-compact': item.title.length > 8,
-                        }"
-                      >
-                        {{ item.title }}
-                      </span>
-                    </v-btn>
-                  </template>
-                </v-tooltip>
-              </v-col>
-              <v-col cols="auto" class="pa-0 ma-0">
-                <v-icon
-                  v-if="item.visible"
-                  ref="iconRefs[iconRefName(item.title)]"
-                  size="x-small"
-                  :color="
-                    currentLayerTitle === item.title && sliderVisible
-                      ? 'grey-darken-4'
-                      : 'grey-lighten-2'
-                  "
-                  @click="(event: MouseEvent) => openSlider(event, item.title)"
-                >
-                  mdi-circle-opacity
-                </v-icon>
-              </v-col>
-            </v-row>
-          </v-col>
+                      {{ infoByTitle.get(item.title)?.subtitle }}
+                    </p>
+                    <!-- Catalog copy. The info field is authored HTML, same as the About dialog. -->
+                    <!-- eslint-disable vue/no-v-html -->
+                    <div
+                      v-if="infoByTitle.get(item.title)?.content"
+                      class="layer-info nw:text-xs nw:leading-relaxed nw:text-muted-foreground"
+                      v-html="infoByTitle.get(item.title)?.content"
+                    />
+                    <!-- eslint-enable vue/no-v-html -->
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </template>
         </template>
-      </template>
-    </v-row>
-  </v-container>
-  <div
-    v-if="sliderVisible"
-    ref="sliderRef"
-    :style="sliderStyles"
-    class="slider-container"
-  >
-    <v-slider
-      v-model="currentOpacity"
-      min="0"
-      max="100"
-      step="5"
-      track-size="3"
-      :thumb-size="13"
-      thumb-label="always"
-    />
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.position-relative {
-  position: relative;
+.layer-column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
-.position-absolute {
-  position: absolute;
+
+.layer-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: max-content;
 }
-.button-text {
-  text-transform: capitalize;
-  font-size: 11px;
-  margin-left: 8px;
-  white-space: nowrap;
+
+.layer-list {
+  display: grid;
+  grid-template-columns: max-content 20px;
+  column-gap: 6px;
+  row-gap: 8px;
+  align-items: center;
 }
-.button-text-compact {
-  font-size: 9px;
-  letter-spacing: 0;
-  margin-left: 4px;
+
+.group-label {
+  grid-column: 1 / -1;
+  margin: 8px 0 2px;
 }
-.big-button-text {
-  text-transform: capitalize;
-  font-size: 13px;
-  margin-left: 1px;
-}
-.group-heading {
-  letter-spacing: 0.06em;
-  text-align: left;
-}
-.small-button {
+
+.layer-button {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  gap: 8px;
+  width: max-content;
+  min-width: 100%;
+  text-align: left;
 }
-.slider-container {
-  position: absolute;
-  z-index: 1005;
-  width: 110px;
-}
-</style>
 
-<style>
-.year-tooltip.v-overlay__content {
-  font-size: 9px;
-  line-height: 1.15;
-  min-height: 0;
-  min-width: 0;
-  padding: 0 4px;
+.settings-slot {
+  width: 20px;
+  height: 20px;
+}
+
+.layer-settings {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #f8f9f9;
+  color: #3a3935;
+  box-shadow: none;
+}
+
+.layer-settings :deep(svg) {
+  width: 12px;
+  height: 12px;
+}
+
+.layer-info-button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #f8f9f9;
+  color: #3a3935;
+}
+
+.layer-info-button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.layer-info-button[aria-expanded='true'] {
+  background: var(--on);
+}
+
+.layer-info :deep(a) {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.layer-info :deep(p) {
+  margin: 0.5rem 0 0;
+}
+
+.layer-info :deep(ul) {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
 }
 </style>

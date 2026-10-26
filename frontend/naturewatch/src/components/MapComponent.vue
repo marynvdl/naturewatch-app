@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue';
 import * as mapboxgl from 'mapbox-gl';
+import { ChevronsLeft, ChevronsRight } from '@lucide/vue';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
+import DrawerComponent from '@/components/DrawerComponent.vue';
 import MeasureComponent from './MeasureComponent.vue';
+import PlacesBarComponent from '@/components/PlacesBarComponent.vue';
 import TimelineComponent from '@/components/TimelineComponent.vue';
+import mark from '@/assets/logo_nw.png';
 import useBasemapStore from '@/store/BasemapStore';
 import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
-import useDrawerStore from '@/store/DrawerStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
 import { resolveLayerYear } from '@/catalog';
 import { classRasterPaint } from '@/catalog/rasterColor';
@@ -16,6 +19,7 @@ import {
   type PlaceFeatureProperties,
 } from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
+import useDrawerStore from '@/store/DrawerStore';
 import SideButtonsComponent from '@/components/SideButtonsComponent.vue';
 import CoordinatesComponent from '@/components/CoordinatesComponent.vue';
 
@@ -23,8 +27,10 @@ import CoordinatesComponent from '@/components/CoordinatesComponent.vue';
 const basemapStore = useBasemapStore();
 const mapLayerStore = useMapLayerStore();
 const timelineStore = useTimelineStore();
-const drawerStore = useDrawerStore();
 const placesStore = usePlacesStore();
+const drawerStore = useDrawerStore();
+const drawerVisible = computed(() => drawerStore.visible);
+const toggleDrawerVisibility = drawerStore.toggleDrawerVisibility;
 
 /** Props */
 defineProps<{
@@ -47,10 +53,6 @@ const layerColorKey = computed(() => {
 // Timeline visibility from store
 const timelineVisibility = computed(() => timelineStore.visible);
 const activeYear = computed(() => timelineStore.activeYear);
-
-// Drawer visibility and width
-const drawerVisible = computed(() => drawerStore.visible);
-const drawerWidth = computed(() => drawerStore.width);
 
 // Label visibility
 const areLabelsVisible = computed(() => basemapStore.labelsVisible);
@@ -288,7 +290,7 @@ onMounted(() => {
   map.value = mapInstance;
 
   // Add the custom controls during map initialization
-  mapInstance.addControl(nav, 'top-right');
+  mapInstance.addControl(nav, 'bottom-right');
 
   mapInstance.addControl(
     new mapboxgl.GeolocateControl({
@@ -299,7 +301,8 @@ onMounted(() => {
       trackUserLocation: true,
       // Draw an arrow next to the location dot to indicate which direction the device is heading.
       showUserHeading: true,
-    })
+    }),
+    'bottom-right'
   );
 
   // Add event listener for style.load
@@ -560,6 +563,22 @@ function addSourceAndLayer(
     <v-responsive class="d-flex align-center text-center fill-height">
       <div class="map-container">
         <div id="mapDiv" />
+        <div class="map-logo">
+          <img :src="mark" alt="Nature Watch" />
+        </div>
+        <PlacesBarComponent />
+        <div class="layer-stack">
+          <button
+            type="button"
+            class="layer-toggle"
+            :aria-label="drawerVisible ? 'Close layers' : 'Open layers'"
+            @click="toggleDrawerVisibility"
+          >
+            <ChevronsRight v-if="drawerVisible" />
+            <ChevronsLeft v-else />
+          </button>
+          <DrawerComponent v-show="drawerVisible" />
+        </div>
         <p
           v-if="placesStore.visible && placesStore.notice"
           class="place-notice"
@@ -568,14 +587,7 @@ function addSourceAndLayer(
         </p>
         <SideButtonsComponent />
         <!-- Toggle basemap labels -->
-        <div
-          class="basemap-button"
-          :style="
-            drawerVisible
-              ? `left: ${parseInt(drawerWidth) + 10}px`
-              : 'left: 10px'
-          "
-        >
+        <div class="basemap-button">
           <v-btn
             id="labelsButton"
             size="x-small"
@@ -594,13 +606,7 @@ function addSourceAndLayer(
         </div>
       </div>
       <!-- Timeline Component -->
-      <TimelineComponent
-        v-show="timelineVisibility"
-        class="timeline"
-        :style="
-          drawerVisible ? `left: ${parseInt(drawerWidth) + 40}px` : 'left: 95px'
-        "
-      />
+      <TimelineComponent v-show="timelineVisibility" class="timeline" />
       <!-- Measure Component -->
       <MeasureComponent v-if="map" :map-instance="map" />
     </v-responsive>
@@ -631,30 +637,30 @@ function addSourceAndLayer(
 
 .place-notice {
   position: absolute;
-  left: 16px;
-  bottom: 12px;
-  z-index: 10;
-  max-width: 420px;
+  right: 4px;
+  bottom: 0;
+  z-index: 4;
+  max-width: calc(100vw - 24px);
   margin: 0;
-  padding: 6px 8px;
-  font-size: 12px;
-  line-height: 1.4;
-  text-align: left;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 0 4px;
+  font-size: 9px;
+  line-height: 14px;
+  white-space: nowrap;
+  text-align: right;
+  color: #3a3935;
+  background: rgba(248, 249, 249, 0.72);
+  pointer-events: none;
 }
 
 .basemap-button {
   position: absolute;
-  bottom: 50px;
-  left: 0px;
+  bottom: 16px;
+  left: 12px;
   z-index: 10;
-  transition: left 0.15s ease-in-out;
-}
-.darkmode-button {
-  position: absolute;
-  top: 240px;
-  right: 10px;
-  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 .labels-visible {
   background-color: rgb(var(--v-theme-surface-variant));
@@ -662,10 +668,56 @@ function addSourceAndLayer(
 }
 .timeline {
   position: absolute;
-  top: 50px;
-  width: 260px;
-  z-index: 10;
-  transition: left 0.2s ease-in-out;
+  left: 50%;
+  bottom: 18px;
+  top: auto;
+  width: auto;
+  z-index: 12;
+  transform: translateX(-50%);
+}
+
+.map-logo {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 12;
+  width: 52px;
+  height: 52px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.map-logo img {
+  width: 52px;
+  height: 52px;
+}
+
+.layer-stack {
+  position: absolute;
+  top: 72px;
+  right: 12px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.layer-toggle {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #f8f9f9;
+  color: #3a3935;
+  box-shadow: none;
+}
+
+.layer-toggle svg {
+  width: 16px;
+  height: 16px;
 }
 .map-parent {
   padding: 0;

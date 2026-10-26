@@ -12,9 +12,7 @@ const currentBasemap = computed(() => basemapStore.currentBasemap);
 const toggleBasemap = basemapStore.toggleBasemap;
 
 /** Emits */
-const emit = defineEmits<{
-  (e: 'basemap-changed', value: string): void;
-}>();
+const emit = defineEmits<(e: 'basemap-changed', value: string) => void>();
 
 /** Methods */
 function handleButtonClick() {
@@ -29,21 +27,30 @@ const buttonImageSrc = computed(() =>
 </script>
 
 <template>
-  <div>
-    <v-btn style="width: 0; height: 0" @click="handleButtonClick">
-      <v-img
-        class="basemap-btn"
-        aspect-ratio="16/9"
-        cover
-        :src="buttonImageSrc"
-      />
-    </v-btn>
-  </div>
+  <v-btn
+    class="basemap-thumb"
+    variant="flat"
+    aria-label="Change basemap"
+    @click="handleButtonClick"
+  >
+    <v-img class="basemap-btn" cover :src="buttonImageSrc" alt="" />
+  </v-btn>
 </template>
 
 <style scoped>
+.basemap-thumb.v-btn {
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  padding: 0 !important;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 .basemap-btn {
-  width: 50px;
+  width: 56px;
+  height: 56px;
   transition: transform 0.2s ease-in-out;
 }
 
