@@ -1,13 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue';
+import {
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  computed,
+  watch,
+} from 'vue';
 import * as mapboxgl from 'mapbox-gl';
-import { ChevronsLeft, ChevronsRight } from '@lucide/vue';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
 import DrawerComponent from '@/components/DrawerComponent.vue';
 import MeasureComponent from './MeasureComponent.vue';
 import PlacesBarComponent from '@/components/PlacesBarComponent.vue';
+import BlobButton from '@/components/ui/blob-button/BlobButton.vue';
 import TimelineComponent from '@/components/TimelineComponent.vue';
 import mark from '@/assets/logo_nw.png';
+import blobPlaces from '@/assets/blob-places.png';
+import blobLayers from '@/assets/blob-layers.png';
+import blobMeasure from '@/assets/blob-measure.png';
 import useBasemapStore from '@/store/BasemapStore';
 import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
@@ -31,6 +41,34 @@ const placesStore = usePlacesStore();
 const drawerStore = useDrawerStore();
 const drawerVisible = computed(() => drawerStore.visible);
 const toggleDrawerVisibility = drawerStore.toggleDrawerVisibility;
+const placesOpen = ref(false);
+const measureOpen = ref(false);
+
+/** On a narrow screen, one open panel would cover the other blob buttons. */
+function closeOthers(current: 'places' | 'layers' | 'measure') {
+  if (!window.matchMedia('(max-width: 720px)').matches) return;
+  if (current !== 'places') placesOpen.value = false;
+  if (current !== 'layers' && drawerVisible.value) toggleDrawerVisibility();
+  if (current !== 'measure') measureOpen.value = false;
+}
+
+/** Open or close Places, and on a narrow screen close the other panels. */
+function togglePlaces() {
+  placesOpen.value = !placesOpen.value;
+  if (placesOpen.value) closeOthers('places');
+}
+
+/** Open or close Layers, and on a narrow screen close the other panels. */
+function toggleLayers() {
+  toggleDrawerVisibility();
+  if (drawerVisible.value) closeOthers('layers');
+}
+
+/** Open or close Measure, and on a narrow screen close the other panels. */
+function toggleMeasure() {
+  measureOpen.value = !measureOpen.value;
+  if (measureOpen.value) closeOthers('measure');
+}
 
 /** Props */
 defineProps<{
@@ -66,15 +104,21 @@ const clickedPositionX = ref(0);
 const clickedPositionY = ref(0);
 const coordinatesComponentRef = ref();
 
+const monochromeConfig = {
+  basemap: { theme: 'monochrome', lightPreset: 'day' },
+};
+
 const mapOptions: mapboxgl.MapboxOptions = {
   accessToken:
     'pk.eyJ1IjoibmF0dXJlLXdhdGNoIiwiYSI6ImNsZWU4MHN6MjBlZmwzcG12cTdnNGJwcGEifQ.gK_j2FlTCHa0bV0cUT_3IA',
   container: 'mapDiv',
   style: currentBasemap.value.url,
+  config:
+    currentBasemap.value.title === 'Monochrome' ? monochromeConfig : undefined,
   center: [20.23928, 7.35074],
   zoom: 5,
   attributionControl: false,
-  projection: 'mercator' as unknown as mapboxgl.Projection,
+  projection: 'globe' as unknown as mapboxgl.Projection,
 };
 
 // Watch for changes in the visible property of map layers
@@ -216,29 +260,30 @@ function syncPlaceOverlay(mapInstance: mapboxgl.Map) {
     return;
   }
   const before = firstSymbolId(mapInstance);
+  const onStandard = !!mapInstance.getStyle()?.imports?.length;
   if (!mapInstance.getSource(PLACE_SOURCE)) {
     mapInstance.addSource(PLACE_SOURCE, {
       type: 'geojson',
       data: placesStore.features,
     });
-    mapInstance.addLayer(
-      {
-        id: PLACE_FILL,
-        type: 'fill',
-        source: PLACE_SOURCE,
-        paint: { 'fill-color': '#1f4b3a', 'fill-opacity': 0.18 },
-      },
-      before
-    );
-    mapInstance.addLayer(
-      {
-        id: PLACE_LINE,
-        type: 'line',
-        source: PLACE_SOURCE,
-        paint: { 'line-color': '#1f4b3a', 'line-width': 1.5 },
-      },
-      before
-    );
+    const fill: mapboxgl.FillLayer = {
+      id: PLACE_FILL,
+      type: 'fill',
+      source: PLACE_SOURCE,
+      paint: { 'fill-color': '#1f4b3a', 'fill-opacity': 0.18 },
+    };
+    const line: mapboxgl.LineLayer = {
+      id: PLACE_LINE,
+      type: 'line',
+      source: PLACE_SOURCE,
+      paint: { 'line-color': '#1f4b3a', 'line-width': 1.5 },
+    };
+    if (onStandard) {
+      fill.slot = 'top';
+      line.slot = 'top';
+    }
+    mapInstance.addLayer(fill, onStandard ? undefined : before);
+    mapInstance.addLayer(line, onStandard ? undefined : before);
     if (!placesListening) {
       mapInstance.on('click', PLACE_FILL, onPlaceClick);
       mapInstance.on('mouseenter', PLACE_FILL, () => {
@@ -326,9 +371,55 @@ onMounted(() => {
   mapInstance.on('contextmenu', e => {
     displayCoordinates(e.lngLat, e.originalEvent);
   });
+
+  timelineStore.bindTileWait(() => waitForVisibleTiles(mapInstance));
+});
+
+onBeforeUnmount(() => {
+  timelineStore.bindTileWait(() => Promise.resolve());
 });
 
 /** Methods */
+/**
+ * Resolve once the tiles in the current view have loaded.
+ * An idle event before the new year has been drawn is ignored.
+ * @param {mapboxgl.Map} mapInstance - The map showing the selected year.
+ */
+async function waitForVisibleTiles(mapInstance: mapboxgl.Map): Promise<void> {
+  await nextTick();
+  let sawLoad = false;
+  const onLoading = () => {
+    sawLoad = true;
+  };
+  mapInstance.on('dataloading', onLoading);
+  await new Promise(resolve => window.setTimeout(resolve, 50));
+  mapInstance.off('dataloading', onLoading);
+  const ready = () => mapInstance.areTilesLoaded() && !mapInstance.isMoving();
+  if (!sawLoad && ready()) return;
+  await new Promise<void>(resolve => {
+    let settled = false;
+    let poll = 0;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      mapInstance.off('idle', onIdle);
+      window.clearTimeout(giveUp);
+      window.clearTimeout(poll);
+      resolve();
+    };
+    const onIdle = () => {
+      if (ready()) finish();
+    };
+    const look = () => {
+      if (ready()) finish();
+      else poll = window.setTimeout(look, 100);
+    };
+    mapInstance.on('idle', onIdle);
+    const giveUp = window.setTimeout(finish, 8000);
+    poll = window.setTimeout(look, 100);
+  });
+}
+
 /**
  * Display the coordinates where the user right-clicked.
  * @param {mapboxgl.LngLat} lngLat - The longitude and latitude of the clicked location.
@@ -351,6 +442,13 @@ function handleLabelsChanged(map: mapboxgl.Map | null) {
 function setLabels(map: mapboxgl.Map | null) {
   if (map) {
     const style = map.getStyle();
+    if (style?.imports?.some(item => item.id === 'basemap')) {
+      const visible = areLabelsVisible.value;
+      map.setConfigProperty('basemap', 'showPlaceLabels', visible);
+      map.setConfigProperty('basemap', 'showPointOfInterestLabels', visible);
+      map.setConfigProperty('basemap', 'showRoadLabels', visible);
+      map.setConfigProperty('basemap', 'showTransitLabels', visible);
+    }
     if (style && style.layers) {
       style.layers.forEach(function (layer) {
         if (
@@ -375,7 +473,16 @@ function setLabels(map: mapboxgl.Map | null) {
 /** Handle basemap change */
 function handleBasemapChanged(newStyleUrl: string) {
   if (map.value) {
-    map.value.setStyle(newStyleUrl);
+    map.value.setStyle(
+      newStyleUrl,
+      currentBasemap.value.title === 'Monochrome'
+        ? {
+            config: monochromeConfig,
+            localFontFamily: undefined,
+            localIdeographFontFamily: undefined,
+          }
+        : undefined
+    );
     const layer = currentBasemap.value.layer;
     if (layer) {
       if (map.value) {
@@ -493,51 +600,49 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
     }
 
     const layerId = layer.title + activeYear.value;
+    const onStandard = !!style?.imports?.length;
     if (layer.type === 'raster') {
-      map.addLayer(
-        {
-          id: layerId,
-          type: 'raster',
-          source: layerId,
-          paint: {
-            'raster-opacity': currentOpacity, // Set the opacity here
-            ...(layer.resampling && { 'raster-resampling': layer.resampling }),
-            ...(layer.color_classes?.length
-              ? classRasterPaint(layer.color_classes)
-              : {}),
-          },
+      const spec: mapboxgl.RasterLayer = {
+        id: layerId,
+        type: 'raster',
+        source: layerId,
+        paint: {
+          'raster-opacity': currentOpacity, // Set the opacity here
+          ...(layer.resampling && { 'raster-resampling': layer.resampling }),
+          ...(layer.color_classes?.length
+            ? classRasterPaint(layer.color_classes)
+            : {}),
         },
-        firstLineId
-      );
+      };
+      if (onStandard) spec.slot = 'middle';
+      map.addLayer(spec, onStandard ? undefined : firstLineId);
     } else if (layer.type === 'circle') {
-      map.addLayer(
-        {
-          id: layerId,
-          type: layer.type,
-          source: layerId,
-          'source-layer': layer.sourceLayer,
-          paint: {
-            'circle-radius': layer.circle_radius,
-            'circle-color': layer[layerColorKey.value],
-            'circle-opacity': currentOpacity, // Set the opacity here
-          },
+      const spec: mapboxgl.CircleLayer = {
+        id: layerId,
+        type: layer.type,
+        source: layerId,
+        'source-layer': layer.sourceLayer,
+        paint: {
+          'circle-radius': layer.circle_radius,
+          'circle-color': layer[layerColorKey.value],
+          'circle-opacity': currentOpacity, // Set the opacity here
         },
-        firstLabelId
-      );
+      };
+      if (onStandard) spec.slot = 'middle';
+      map.addLayer(spec, onStandard ? undefined : firstLabelId);
     } else if (layer.type === 'line') {
       // If there are additional paint properties for lines, include them here
-      map.addLayer(
-        {
-          id: layerId,
-          type: layer.type,
-          source: layerId,
-          'source-layer': layer.sourceLayer,
-          paint: {
-            // 'line-opacity': currentOpacity, // Uncomment and set if line opacity is used
-          },
+      const spec: mapboxgl.LineLayer = {
+        id: layerId,
+        type: layer.type,
+        source: layerId,
+        'source-layer': layer.sourceLayer,
+        paint: {
+          // 'line-opacity': currentOpacity, // Uncomment and set if line opacity is used
         },
-        firstLineId
-      );
+      };
+      if (onStandard) spec.slot = 'middle';
+      map.addLayer(spec, onStandard ? undefined : firstLineId);
     }
   }
 }
@@ -566,19 +671,39 @@ function addSourceAndLayer(
         <div class="map-logo">
           <img :src="mark" alt="Nature Watch" />
         </div>
-        <PlacesBarComponent />
-        <div class="layer-stack">
-          <button
-            type="button"
-            class="layer-toggle"
-            :aria-label="drawerVisible ? 'Close layers' : 'Open layers'"
-            @click="toggleDrawerVisibility"
-          >
-            <ChevronsRight v-if="drawerVisible" />
-            <ChevronsLeft v-else />
-          </button>
-          <DrawerComponent v-show="drawerVisible" />
-        </div>
+        <BlobButton
+          class="blob-places"
+          label="Places"
+          edge="left"
+          panel-id="places-panel"
+          :image="blobPlaces"
+          :expanded="placesOpen"
+          @toggle="togglePlaces"
+        >
+          <PlacesBarComponent />
+        </BlobButton>
+        <BlobButton
+          class="blob-layers"
+          label="Landscape"
+          edge="right"
+          panel-id="layers-panel"
+          :image="blobLayers"
+          :expanded="drawerVisible"
+          @toggle="toggleLayers"
+        >
+          <DrawerComponent />
+        </BlobButton>
+        <BlobButton
+          class="blob-measure"
+          label="Measure"
+          edge="bottom"
+          panel-id="measure-panel"
+          :image="blobMeasure"
+          :expanded="measureOpen"
+          @toggle="toggleMeasure"
+        >
+          <MeasureComponent v-if="map" :map-instance="map" />
+        </BlobButton>
         <p
           v-if="placesStore.visible && placesStore.notice"
           class="place-notice"
@@ -590,10 +715,11 @@ function addSourceAndLayer(
         <div class="basemap-button">
           <v-btn
             id="labelsButton"
+            class="map-control"
             size="x-small"
             width="50"
-            variant="tonal"
-            :class="{ 'labels-visible': areLabelsVisible }"
+            variant="text"
+            :class="{ 'is-on': areLabelsVisible }"
             @click="handleLabelsChanged(map as any)"
           >
             Labels
@@ -607,8 +733,6 @@ function addSourceAndLayer(
       </div>
       <!-- Timeline Component -->
       <TimelineComponent v-show="timelineVisibility" class="timeline" />
-      <!-- Measure Component -->
-      <MeasureComponent v-if="map" :map-instance="map" />
     </v-responsive>
   </v-container>
   <!-- Coordinates Component -->
@@ -662,9 +786,20 @@ function addSourceAndLayer(
   align-items: flex-start;
   gap: 4px;
 }
-.labels-visible {
-  background-color: rgb(var(--v-theme-surface-variant));
-  color: rgb(var(--v-theme-on-surface-variant));
+#labelsButton.v-btn {
+  background: #f8f9f9;
+  color: #24312c;
+  border: 1px solid var(--border);
+  box-shadow: none;
+  font-size: 10px;
+  letter-spacing: 0;
+  padding: 0;
+}
+
+#labelsButton.v-btn.is-on {
+  background: #3a3935;
+  border-color: #3a3935;
+  color: #fff;
 }
 .timeline {
   position: absolute;
@@ -673,7 +808,7 @@ function addSourceAndLayer(
   top: auto;
   width: auto;
   z-index: 12;
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% - 72px));
 }
 
 .map-logo {
@@ -692,40 +827,42 @@ function addSourceAndLayer(
   height: 52px;
 }
 
-.layer-stack {
-  position: absolute;
-  top: 72px;
+.blob-places {
+  top: 12px;
+  left: 12px;
+  z-index: 14;
+  --panel-inset-top: 12px;
+  --panel-inset-left: 12px;
+}
+
+.blob-layers {
+  /* Centre lines up with the open half, so the slide is horizontal. */
+  top: 132px;
   right: 12px;
-  z-index: 12;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  z-index: 14;
+  /* The card used to sit under the chevron, which started at 72px. */
+  --panel-inset-top: 116px;
+  --panel-inset-right: 12px;
 }
 
-.layer-toggle {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: #f8f9f9;
-  color: #3a3935;
-  box-shadow: none;
+.blob-measure {
+  right: 96px;
+  bottom: 18px;
+  z-index: 15;
 }
 
-.layer-toggle svg {
-  width: 16px;
-  height: 16px;
-}
 .map-parent {
   padding: 0;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .basemap-button {
     bottom: 100px;
+  }
+
+  .blob-measure {
+    right: 12px;
+    bottom: 168px;
   }
 }
 </style>

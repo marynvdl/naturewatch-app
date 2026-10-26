@@ -287,53 +287,51 @@ map.value?.on('style.load', () => {
 </script>
 
 <template>
-  <Teleport to=".mapboxgl-ctrl-bottom-right">
-    <div class="measure-panel map-panel nw">
-      <h2 class="panel-heading">Measure</h2>
-      <div class="measure-tools">
-        <button
-          type="button"
-          class="measure-tool map-control map-icon"
-          :class="{ 'is-on': mode === 'draw_line_string' }"
-          title="Measure length"
-          aria-label="Measure length"
-          :aria-pressed="mode === 'draw_line_string'"
-          @click="toggleMode('draw_line_string')"
-        >
-          <Ruler aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          class="measure-tool map-control map-icon"
-          :class="{ 'is-on': mode === 'draw_polygon' }"
-          title="Measure area"
-          aria-label="Measure area"
-          :aria-pressed="mode === 'draw_polygon'"
-          @click="toggleMode('draw_polygon')"
-        >
-          <Pentagon aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          class="measure-tool map-control map-icon"
-          title="Delete selected measurement"
-          aria-label="Delete selected measurement"
-          @click="deleteSelected"
-        >
-          <Trash2 aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          class="measure-tool map-control map-icon"
-          title="Delete all measurements"
-          aria-label="Delete all measurements"
-          @click="deleteAll"
-        >
-          <Eraser aria-hidden="true" />
-        </button>
-      </div>
+  <div class="measure-panel map-panel nw">
+    <h2 class="panel-heading">Measure</h2>
+    <div class="measure-tools">
+      <button
+        type="button"
+        class="measure-tool map-control map-icon"
+        :class="{ 'is-on': mode === 'draw_line_string' }"
+        title="Measure length"
+        aria-label="Measure length"
+        :aria-pressed="mode === 'draw_line_string'"
+        @click="toggleMode('draw_line_string')"
+      >
+        <Ruler aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        class="measure-tool map-control map-icon"
+        :class="{ 'is-on': mode === 'draw_polygon' }"
+        title="Measure area"
+        aria-label="Measure area"
+        :aria-pressed="mode === 'draw_polygon'"
+        @click="toggleMode('draw_polygon')"
+      >
+        <Pentagon aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        class="measure-tool map-control map-icon"
+        title="Delete selected measurement"
+        aria-label="Delete selected measurement"
+        @click="deleteSelected"
+      >
+        <Trash2 aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        class="measure-tool map-control map-icon"
+        title="Delete all measurements"
+        aria-label="Delete all measurements"
+        @click="deleteAll"
+      >
+        <Eraser aria-hidden="true" />
+      </button>
     </div>
-  </Teleport>
+  </div>
 </template>
 
 <style scoped>
@@ -341,11 +339,15 @@ map.value?.on('style.load', () => {
   order: 0;
   pointer-events: auto;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: center;
   gap: 12px;
   width: max-content;
   margin: 0;
+}
+
+.measure-panel .panel-heading {
+  white-space: nowrap;
 }
 
 .measure-tools {

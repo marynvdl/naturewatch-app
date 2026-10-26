@@ -2,13 +2,17 @@
 
 What the published map does today. What each layer shows, and where it stops, is in [Data notes](data.md). How to run the project is in the [README](../../README.md).
 
-The timeline starts at 2016. The last year on the slider is the latest year of any published layer.
+The timeline starts at 2016. The last year on the slider is the latest year of any published layer. Each year has a mark on the slider. Play sits beside the year. It steps through the years until the last one, then pauses. It waits until the tiles in view have loaded before the next year.
+
+The map opens as a globe, on Mapbox Standard, with the monochrome theme. The basemap switch changes it to satellite. Zoom, the compass, and Find my location stack at the bottom right. More info sits under Find my location.
+
+Places, Landscape, and Measure each open from a round button. Places is at the top left. Landscape is on the right, level with its open panel, so opening it slides sideways. Measure is at the bottom right, beside the map controls. The panels start closed. The part of the circle that stays in view closes that panel.
 
 ## Layer groups
 
-The layer buttons sit in a panel on the right of the map, under the heading Layers, in two groups, **Threats** and **Interest**. Built, Treeloss, Fire, Crops, Cropland and Dams are under Threats. Tree height is under Interest. Coming soon layers are not shown.
+The layer buttons sit in a panel on the right of the map, under the heading Landscape, in two groups, **Pressures** and **Environment**. Built, Treeloss, Fire, Crops, Cropland and Dams are under Pressures. Tree height is under Environment. Coming soon layers are not shown.
 
-Each layer has its own visibility button. An active layer has a settings button on the right of that button. The settings card opens to the left of the Layers panel, for the opacity and the years that layer covers. An info button inside that panel shows the description. The basemap switch and the Labels control stay on the map, at the bottom left. Labels sits just above the basemap thumbnail. They are not part of either group.
+Each layer has its own visibility button. An active layer has a settings button on the right of that button. The settings card opens to the left of the Landscape panel, for the opacity and the years that layer covers. An info button inside that panel shows the description. The basemap switch and the Labels control stay on the map, at the bottom left. Labels sits just above the basemap thumbnail and uses the same off-white button as the other map controls. It turns charcoal while labels are on. They are not part of either group.
 
 ## When the year and the layer disagree
 

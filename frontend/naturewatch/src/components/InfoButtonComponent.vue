@@ -9,6 +9,7 @@ const cardData = buildInfoCards(catalog);
   <v-dialog width="1500">
     <template #activator="{ props }">
       <v-btn
+        class="info-trigger"
         size="x-small"
         icon
         variant="flat"
@@ -74,6 +75,18 @@ const cardData = buildInfoCards(catalog);
 </template>
 
 <style scoped>
+.info-trigger.v-btn {
+  width: 31px;
+  height: 31px;
+  min-width: 31px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f8f9f9;
+  color: #24312c;
+  box-shadow: none;
+}
+
 .card-image {
   max-width: 350px;
 }

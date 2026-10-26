@@ -5,8 +5,8 @@
     "minYear": 2016
   },
   "groups": [
-    { "id": "threats", "title": "Threats" },
-    { "id": "interest", "title": "Interest" }
+    { "id": "threats", "title": "Pressures" },
+    { "id": "interest", "title": "Environment" }
   ],
   "layers": [
     {

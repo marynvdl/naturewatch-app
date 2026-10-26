@@ -3,21 +3,17 @@ import InfoButtonComponent from './InfoButtonComponent.vue';
 </script>
 
 <template>
-  <!-- Separate container for the InfoButtonComponent positioned at the bottom left -->
-  <v-container flat color="transparent" class="info-button-container m-0" dense>
-    <v-row class="d-flex flex-column">
-      <v-col class="pa-1" cols="12">
-        <InfoButtonComponent />
-      </v-col>
-    </v-row>
-  </v-container>
+  <div class="info-button-container">
+    <InfoButtonComponent />
+  </div>
 </template>
 
 <style scoped>
 .info-button-container {
   position: absolute;
+  right: 12px;
   bottom: 16px;
-  left: 128px;
+  left: auto;
   z-index: 10;
   width: auto;
   box-shadow: none;

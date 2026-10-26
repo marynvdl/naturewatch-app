@@ -92,7 +92,7 @@ function onOpacity(title: string, value: unknown) {
 <template>
   <div class="layer-column nw">
     <div ref="layerPanel" class="layer-panel map-panel">
-      <h2 class="panel-heading">Layers</h2>
+      <h2 class="panel-heading">Landscape</h2>
       <div class="layer-list">
         <template v-for="group in layerGroups" :key="group.id">
           <h3 class="group-label map-section">{{ group.title }}</h3>
