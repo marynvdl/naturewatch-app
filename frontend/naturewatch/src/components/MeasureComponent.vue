@@ -40,7 +40,13 @@ function syncMode() {
 /** Start a length or area measurement, or stop it if that tool is already on. */
 function toggleMode(next: 'draw_line_string' | 'draw_polygon') {
   if (!draw) return;
-  draw.changeMode(draw.getMode() === next ? 'simple_select' : next);
+  if (draw.getMode() === next) {
+    draw.changeMode('simple_select');
+  } else if (next === 'draw_line_string') {
+    draw.changeMode('draw_line_string');
+  } else {
+    draw.changeMode('draw_polygon');
+  }
   syncMode();
 }
 
