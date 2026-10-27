@@ -1,8 +1,8 @@
 # Task 003 — Map controls
 
-Archived. This task is not active. The active task 003 is [Blob buttons](../../tasks/task-003-blob-buttons.md).
+Archived. This task is not active. The blob-button task is [Blob buttons](task-003-blob-buttons.md).
 
-Parcel: [Sooty Earth interface](../../parcels/ui-revamp.md)
+Parcel: [Sooty Earth interface](../parcels/ui-revamp.md)
 
 Repository: naturewatch-app. Start only after task 002 has merged.
 

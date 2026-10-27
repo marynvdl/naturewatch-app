@@ -27,9 +27,9 @@ Do one task at a time. Start a task only after the one above it has merged. Each
 
 ### naturewatch-app
 
-- [x] [task-001-visual-system.md](../archive/tasks/task-001-visual-system.md)
+- [x] [task-001-visual-system.md](../tasks/task-001-visual-system.md)
   - *Goal:* Add the visual system and basic controls beside the current ones. No screen changes.
-- [x] [task-002-app-frame.md](../archive/tasks/task-002-app-frame.md)
+- [x] [task-002-app-frame.md](../tasks/task-002-app-frame.md)
   - *Goal:* Leave the map full-bleed. No top bar.
 - [x] [task-003-blob-buttons.md](../tasks/task-003-blob-buttons.md)
   - *Goal:* Open Places, Layers, and Measure with three organic blob buttons.
