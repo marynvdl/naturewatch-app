@@ -132,6 +132,12 @@
   --map-section: #7a8680;
   /* Grey mixed into an active layer. 47% of the layer colour is two shades quieter. */
   --map-layer-mute: #8f9898;
+  /* Blob buttons. These are the tuning parameters. */
+  --blob-size: 112px;
+  --blob-color: #f8f9f9;
+  --blob-hover: 2px;
+  --blob-breathe: 0.006;
+  --blob-duration: 280ms;
 }
 
 @layer base {
@@ -141,7 +147,7 @@
     font-family: var(--font-sans);
   }
 
-  /* Titles on the Layers, Places, and Measure panels. */
+  /* Titles on the Landscape, Places, and Measure panels. */
   .panel-heading {
     margin: 0;
     font-family: var(--nw-font-serif);

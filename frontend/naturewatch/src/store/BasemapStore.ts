@@ -20,9 +20,9 @@ const SatelliteBasemap: Basemap = {
   layer: SatelliteLayer,
 };
 
-const StreetsBasemap: Basemap = {
-  title: 'Streets',
-  url: 'mapbox://styles/mapbox/streets-v12',
+const MonochromeBasemap: Basemap = {
+  title: 'Monochrome',
+  url: 'mapbox://styles/mapbox/standard',
   layer: undefined,
 };
 
@@ -32,16 +32,16 @@ const useBasemapStore = defineStore('basemap', () => {
   const configStore = useConfig();
 
   // State
-  const currentBasemap = ref(StreetsBasemap);
+  const currentBasemap = ref(MonochromeBasemap);
   const labelsVisible = ref(true);
 
   // Actions
-  /** Toggle basemap style between Satellite and Streets*/
+  /** Toggle basemap style between Satellite and Standard monochrome. */
   function toggleBasemap() {
     configStore.toggleSatelliteTheme();
     currentBasemap.value =
       currentBasemap.value.title === 'Satellite'
-        ? StreetsBasemap
+        ? MonochromeBasemap
         : SatelliteBasemap;
   }
 

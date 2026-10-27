@@ -8,6 +8,7 @@ const useTimelineStore = defineStore('timeline', () => {
   const visible: Ref<boolean> = ref(false);
   const activeYear: Ref<number> = ref(timelineRange.max);
   const lastActiveYear: Ref<number> = ref(timelineRange.min);
+  let tileWait: () => Promise<void> = () => Promise.resolve();
 
   // Getters
 
@@ -47,6 +48,19 @@ const useTimelineStore = defineStore('timeline', () => {
     lastActiveYear.value = year;
   }
 
+  /**
+   * Let the map report when the tiles in view have finished loading.
+   * @param {() => Promise<void>} wait - Resolves once those tiles are ready.
+   */
+  function bindTileWait(wait: () => Promise<void>): void {
+    tileWait = wait;
+  }
+
+  /** Wait until the tiles for the current view have loaded. */
+  function waitForTiles(): Promise<void> {
+    return tileWait();
+  }
+
   return {
     visible,
     activeYear,
@@ -55,6 +69,8 @@ const useTimelineStore = defineStore('timeline', () => {
     setActiveYear,
     previewActiveYear,
     setPreviousYear,
+    bindTileWait,
+    waitForTiles,
   };
 });
 

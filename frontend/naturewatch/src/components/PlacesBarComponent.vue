@@ -56,10 +56,7 @@ function toggleProtectedAreas() {
 
 <style scoped>
 .places-bar {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 12;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;

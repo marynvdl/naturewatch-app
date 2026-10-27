@@ -154,10 +154,10 @@ describe('layer catalog', () => {
     expect(validate(broken)).toBe(false);
   });
 
-  it('puts existing layers under Threats and tree height under Interest', () => {
+  it('puts existing layers under Pressures and tree height under Environment', () => {
     expect(catalog.groups.map(group => group.title)).toEqual([
-      'Threats',
-      'Interest',
+      'Pressures',
+      'Environment',
     ]);
     const threats = catalog.layers
       .filter(layer => layer.group === 'threats')

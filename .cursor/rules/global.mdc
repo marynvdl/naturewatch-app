@@ -15,14 +15,14 @@ Write each fact once.
 
 - `docs/blueprint.md`: database tables, bucket object paths, and how the app reads layers.
 - `docs/user/`: what a person using the web app needs. `using-the-map.md` is the controls. `data.md` is what each layer shows and where it stops.
-- `.cursor/parcels/` in this repo: the active work. `docs/archive/sooty-earth-roadmap.md` is the 20 October 2026 plan. Steps 1–6 were carried out. Do not add tasks to it.
+- `docs/parcels/` in this repo: the active work. `docs/archive/sooty-earth-roadmap.md` is the 20 October 2026 plan. Steps 1–6 were carried out. Do not add tasks to it.
 - `docs/pipelines.md` in naturewatch-analysis: how a dataset becomes published objects, including transformations, cloud costs, and scripts. Do not copy that procedure into this repo.
 - `cookbook/recipes/` in naturewatch-analysis: the hand-edited layer catalog. The map reads `frontend/naturewatch/src/catalog/layers.json`. The app does not read STAC.
 - The step README in naturewatch-analysis: how to run that step, and what the run cost.
 
 ## Parcels and tasks
 
-Parcels live in `.cursor/parcels/` in this repo. A parcel lists tasks. Each task points at one `.cursor/tasks/<file>.md`.
+Parcels live in `docs/parcels/` in this repo. A parcel lists tasks. Each task points at one `docs/tasks/<file>.md` in the repo that does the work.
 
 - A task marked for naturewatch-app is done in this repo.
 - A task marked for naturewatch-analysis is done in that repo, from its own checkout.

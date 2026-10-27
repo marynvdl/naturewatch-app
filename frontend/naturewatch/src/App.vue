@@ -170,12 +170,12 @@ html {
 .mapboxgl-ctrl-bottom-right {
   position: absolute;
   right: 12px;
-  bottom: 20px;
+  bottom: 56px;
   left: auto;
   top: auto;
   z-index: 5;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: flex-end;
   justify-content: flex-end;
   gap: 8px;
@@ -197,14 +197,14 @@ html {
 }
 
 .mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group:has(.mapboxgl-ctrl-zoom-in) {
-  order: 3;
+  order: 1;
   display: flex;
   flex-direction: column;
 }
 
 .mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group:has(.mapboxgl-ctrl-geolocate),
 .mapboxgl-ctrl-bottom-right > .mapboxgl-ctrl-geolocate {
-  order: 1;
+  order: 2;
 }
 
 .mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group:has(.mapbox-gl-draw_line) {
