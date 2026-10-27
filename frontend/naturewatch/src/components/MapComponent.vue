@@ -846,6 +846,9 @@ function addSourceAndLayer(
 }
 
 .blob-measure {
+  /* Two thirds of the 112px circle. */
+  --blob-size: 74.667px;
+  --blob-label: 13.333px;
   right: 96px;
   bottom: 18px;
   z-index: 15;

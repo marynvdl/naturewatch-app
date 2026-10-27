@@ -92,18 +92,10 @@ function inset(name: string, fallback: number): number {
 /** Transition length in milliseconds. */
 function duration(): number {
   const node = anchor.value;
-  if (!node) return 560;
+  if (!node) return 280;
   return cssNumber(
     getComputedStyle(node).getPropertyValue('--blob-duration'),
-    560
-  );
-}
-
-/** Prefer the live media query. The change event can lag. */
-function motionReduced(): boolean {
-  return (
-    reduced.value ||
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    280
   );
 }
 
@@ -124,9 +116,9 @@ function placePanel() {
       .querySelector('.mapboxgl-ctrl-bottom-right')
       ?.getBoundingClientRect();
     const rightEdge = controls ? controls.left - 8 : map.right - 86;
-    // The open circle stays on the closed circle, so the panel does not lift it.
-    const tuck = origin.height / 2 - 10;
-    panelTop.value = `${tuck}px`;
+    const cardHeight =
+      panel.value?.getBoundingClientRect().height ?? origin.height;
+    panelTop.value = `${(origin.height - cardHeight) / 2}px`;
     panelLeft.value = 'auto';
     panelRight.value = `${origin.right - rightEdge}px`;
     panelBottom.value = 'auto';
@@ -216,7 +208,6 @@ function onToggle() {
 
 /** Mark the circle as hovered. The open half only scales. */
 function onEnter() {
-  if (motionReduced()) return;
   hovering.value = true;
 }
 
@@ -292,22 +283,24 @@ onBeforeUnmount(() => {
       },
     ]"
   >
-    <div class="blob-visual" :style="visualStyle">
-      <div class="blob-face">
-        <img :src="image" alt="" />
+    <div class="blob-visual">
+      <div class="blob-slide" :style="visualStyle">
+        <div class="blob-face">
+          <img :src="image" alt="" />
+        </div>
+        <button
+          type="button"
+          class="blob-hit"
+          :aria-expanded="expanded"
+          :aria-controls="panelId"
+          :aria-label="expanded ? `Close ${label}` : `Open ${label}`"
+          @click="onToggle"
+          @pointerenter="onEnter"
+          @pointerleave="onLeave"
+        >
+          <span class="blob-label">{{ label }}</span>
+        </button>
       </div>
-      <button
-        type="button"
-        class="blob-hit"
-        :aria-expanded="expanded"
-        :aria-controls="panelId"
-        :aria-label="expanded ? `Close ${label}` : `Open ${label}`"
-        @click="onToggle"
-        @pointerenter="onEnter"
-        @pointerleave="onLeave"
-      >
-        <span class="blob-label">{{ label }}</span>
-      </button>
     </div>
     <div
       :id="panelId"
@@ -341,8 +334,15 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 1;
   pointer-events: none;
+}
+
+.blob-slide {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   transform-origin: center;
-  transition: transform 720ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition: transform var(--blob-duration, 280ms)
+    cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .blob-face {
@@ -353,7 +353,7 @@ onBeforeUnmount(() => {
   pointer-events: none;
   transform-origin: center;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
-  transition: transform 640ms ease;
+  transition: transform 180ms ease;
 }
 
 .blob-face img {
@@ -392,27 +392,19 @@ onBeforeUnmount(() => {
   margin-left: -100%;
 }
 
-.is-spread.is-bottom .blob-face {
-  height: 50%;
-  border-radius: 999px 999px 0 0;
-  transform-origin: center bottom;
-}
-
-.is-spread.is-bottom .blob-face img {
-  width: 100%;
-  height: 200%;
-}
-
 .is-idle .blob-face {
   animation: blob-breathe 8s ease-in-out infinite;
 }
 
+.blob-slide:hover .blob-face,
 .is-hover:not(.is-spread) .blob-face {
-  transform: scale(1.008);
+  animation: none;
+  transform: scale(1.045);
 }
 
+.is-spread .blob-slide:hover .blob-face,
 .is-spread.is-hover .blob-face {
-  transform: scale(1.015);
+  transform: scale(1.03);
 }
 
 .blob-hit {
@@ -445,11 +437,6 @@ onBeforeUnmount(() => {
   width: calc(var(--blob-size) / 2 + 4px);
 }
 
-.is-spread.is-bottom .blob-hit {
-  bottom: auto;
-  height: calc(var(--blob-size) / 2 + 4px);
-}
-
 .blob-hit:focus-visible {
   outline: 2px solid var(--foreground);
   outline-offset: 3px;
@@ -457,7 +444,7 @@ onBeforeUnmount(() => {
 
 .blob-label {
   font-family: var(--nw-font-serif), Baskerville, serif;
-  font-size: 20px;
+  font-size: var(--blob-label, 20px);
   font-weight: 400;
   line-height: 1;
   text-align: center;
@@ -472,7 +459,7 @@ onBeforeUnmount(() => {
 .blob-panel {
   position: absolute;
   z-index: 4;
-  transform: translate3d(0, 0, 0);
+  isolation: isolate;
   pointer-events: none;
 }
 
@@ -480,9 +467,6 @@ onBeforeUnmount(() => {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition:
-    opacity 720ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    visibility 0s linear 720ms;
 }
 
 .blob-panel.is-shown {
@@ -493,9 +477,6 @@ onBeforeUnmount(() => {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  transition:
-    opacity 720ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    visibility 0s linear 0s;
 }
 
 .is-right :deep(.layer-panel) {

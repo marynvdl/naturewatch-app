@@ -137,7 +137,7 @@
   --blob-color: #f8f9f9;
   --blob-hover: 2px;
   --blob-breathe: 0.006;
-  --blob-duration: 720ms;
+  --blob-duration: 280ms;
 }
 
 @layer base {

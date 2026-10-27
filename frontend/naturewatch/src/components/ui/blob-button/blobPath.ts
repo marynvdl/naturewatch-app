@@ -9,7 +9,8 @@ export interface Box {
 
 /**
  * Where the open circle's centre sits, relative to the closed circle's centre.
- * The centre rests just inside the panel, so the card covers the cut.
+ * Places and Landscape rest just inside the panel, so the card covers the cut.
+ * Measure stays whole. A third of it sits under the panel.
  */
 export function nubShift(
   edge: BlobEdge,
@@ -25,13 +26,15 @@ export function nubShift(
     cx = panel.left + panel.width + reveal;
   } else if (edge === 'right') {
     cx = panel.left - reveal;
+  } else {
+    cx = panel.left - size / 6;
   }
   if (edge === 'left' || edge === 'right') {
     const preferred = panel.top + corner + size / 2;
     const lowest = panel.top + panel.height - corner - size / 2;
     cy = lowest < preferred ? panel.top + panel.height / 2 : preferred;
   } else {
-    cy = panel.top - reveal;
+    cy = panel.top + panel.height / 2;
   }
   return {
     x: cx - (anchor.left + anchor.width / 2),

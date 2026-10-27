@@ -19,14 +19,14 @@ describe('blob circle', () => {
     expect(leftCentre).toBeLessThan(leftEdge);
     expect(leftCentre).toBeGreaterThan(leftEdge - 24);
 
-    const bottom = nubShift(
-      'bottom',
-      { left: 500, top: 700, width: 112, height: 112 },
-      { left: 480, top: 640, width: 220, height: 120 },
-      112
-    );
-    const bottomCentre = 700 + 56 + bottom.y;
-    expect(bottomCentre).toBeGreaterThan(640);
-    expect(bottomCentre).toBeLessThan(664);
+    const bottomAnchor = { left: 500, top: 700, width: 112, height: 112 };
+    const bottomPanel = { left: 480, top: 640, width: 220, height: 120 };
+    const bottom = nubShift('bottom', bottomAnchor, bottomPanel, 112);
+    const bottomCentreY = bottomAnchor.top + 56 + bottom.y;
+    expect(bottomCentreY).toBe(bottomPanel.top + bottomPanel.height / 2);
+    const bottomCentreX = bottomAnchor.left + 56 + bottom.x;
+    expect(bottomCentreX).toBeLessThan(bottomPanel.left);
+    const covered = bottomCentreX + 56 - bottomPanel.left;
+    expect(covered).toBeCloseTo(112 / 3);
   });
 });

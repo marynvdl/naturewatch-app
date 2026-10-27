@@ -6,7 +6,7 @@ The timeline starts at 2016. The last year on the slider is the latest year of a
 
 The map opens as a globe, on Mapbox Standard, with the monochrome theme. The basemap switch changes it to satellite. Zoom, the compass, and Find my location stack at the bottom right. More info sits under Find my location.
 
-Places, Landscape, and Measure each open from a round button. Places is at the top left. Landscape is on the right, level with its open panel, so opening it slides sideways. Measure is at the bottom right, beside the map controls. The panels start closed. The part of the circle that stays in view closes that panel.
+Places, Landscape, and Measure each open from a round button. Places is at the top left. Landscape is on the right, level with its open panel, so opening it slides sideways. Measure is at the bottom right, beside the map controls, and its circle is smaller. Opening it slides the circle under the left side of the panel. The panels start closed. The part of the circle that stays in view closes that panel.
 
 ## Layer groups
 
