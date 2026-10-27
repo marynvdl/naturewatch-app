@@ -30,8 +30,8 @@ watch(() => route.params.id, load);
 </script>
 
 <template>
-  <v-container class="place pa-6">
-    <p class="mb-4">
+  <div class="place">
+    <p class="back">
       <router-link :to="{ name: 'Places' }">Places</router-link>
     </p>
 
@@ -43,7 +43,7 @@ watch(() => route.params.id, load);
     <p v-else-if="status === 'error'">The place could not be loaded.</p>
 
     <template v-else-if="place">
-      <h1 class="text-h5 mb-4">{{ place.name }}</h1>
+      <h1>{{ place.name }}</h1>
       <p v-if="place.croplandKm2 !== null && place.percent !== null">
         Cropland: {{ formatKm2(place.croplandKm2) }} km² ({{
           formatPercent(place.percent)
@@ -62,5 +62,24 @@ watch(() => route.params.id, load);
         </a>
       </p>
     </template>
-  </v-container>
+  </div>
 </template>
+
+<style scoped>
+.place {
+  max-width: 720px;
+  padding: 24px;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.back {
+  margin-bottom: 16px;
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+</style>

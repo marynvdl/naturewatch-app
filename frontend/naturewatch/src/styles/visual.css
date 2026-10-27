@@ -1,7 +1,7 @@
 /*
- * Light visual system for the controls added beside Vuetify.
- * Preflight is omitted so this file does not restyle the current screens.
- * Roboto still comes from the existing font loader.
+ * Light visual system. Preflight stays off so Mapbox and the map
+ * panels keep their own layout. Roboto is the sans family from
+ * task 001, loaded from index.html.
  */
 
 @layer theme, base, components, utilities;
@@ -141,6 +141,24 @@
 }
 
 @layer base {
+  html {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+
+  body {
+    margin: 0;
+  }
+
+  code,
+  kbd,
+  pre,
+  samp,
+  var {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
   .nw {
     box-sizing: border-box;
     color: var(--foreground);

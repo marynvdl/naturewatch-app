@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { loadPilotPlaces, type PlaceSummary } from '@/places/api';
 import { placesMatching } from '@/places/display';
+import { Input } from '@/components/ui/input';
 
 const status = ref<'loading' | 'ok' | 'unconfigured' | 'error'>('loading');
 const places = ref<PlaceSummary[]>([]);
@@ -17,9 +18,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <v-container class="places pa-6">
-    <h1 class="text-h5 mb-2">Places</h1>
-    <p class="mb-4">
+  <div class="places">
+    <h1>Places</h1>
+    <p class="intro">
       Terrestrial protected areas in South Africa of at least 10 km².
       <router-link :to="{ name: 'Home' }">Back to the map</router-link>
     </p>
@@ -30,22 +31,66 @@ onMounted(async () => {
     </p>
     <p v-else-if="status === 'error'">The places could not be loaded.</p>
     <template v-else>
-      <v-text-field
-        v-model="query"
-        label="Find a place"
-        hide-details
-        density="comfortable"
-        class="mb-4"
-      />
+      <label class="find">
+        Find a place
+        <Input v-model="query" />
+      </label>
       <p v-if="shown.length === 0">No places match.</p>
-      <v-list v-else density="compact">
-        <v-list-item
-          v-for="place in shown"
-          :key="place.id"
-          :to="{ name: 'Place', params: { id: place.id } }"
-          :title="place.name"
-        />
-      </v-list>
+      <ul v-else class="place-list">
+        <li v-for="place in shown" :key="place.id">
+          <router-link :to="{ name: 'Place', params: { id: place.id } }">
+            {{ place.name }}
+          </router-link>
+        </li>
+      </ul>
     </template>
-  </v-container>
+  </div>
 </template>
+
+<style scoped>
+.places {
+  max-width: 720px;
+  padding: 24px;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.intro {
+  margin-bottom: 16px;
+}
+
+.find {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.place-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-list li {
+  border-top: 1px solid var(--border);
+}
+
+.place-list a {
+  display: block;
+  padding: 8px 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.place-list a:hover {
+  text-decoration: underline;
+}
+</style>

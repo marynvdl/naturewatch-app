@@ -1,8 +1,8 @@
 # Task 004 — Place filters
 
-Parcel: [Sooty Earth interface](../parcels/ui-revamp.md)
+Not part of the [Sooty Earth interface](../parcels/ui-revamp.md) parcel. The places list, these filters, and the split view wait for a later parcel. Do not start this task from that parcel.
 
-Repository: naturewatch-app. Start only after task 003 has merged.
+Repository: naturewatch-app. Start only after that later parcel takes it up.
 
 ## Goal
 

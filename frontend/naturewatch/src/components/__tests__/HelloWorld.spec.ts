@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createPinia } from 'pinia';
-import vuetify from '@/plugins/vuetify';
-
 import MapComponent from '../MapComponent.vue';
 
 vi.mock('mapbox-gl', () => {
@@ -33,6 +31,18 @@ vi.mock('mapbox-gl', () => {
 
 describe('Map', () => {
   it('mounts the round controls', () => {
+    class ResizeObserver {
+      observe() {
+        return undefined;
+      }
+      unobserve() {
+        return undefined;
+      }
+      disconnect() {
+        return undefined;
+      }
+    }
+    window.ResizeObserver = ResizeObserver;
     window.matchMedia = (query: string) =>
       ({
         matches: false,
@@ -46,7 +56,7 @@ describe('Map', () => {
       }) as MediaQueryList;
 
     const wrapper = mount(MapComponent, {
-      global: { plugins: [vuetify, createPinia()] },
+      global: { plugins: [createPinia()] },
       props: { msg: 'Hello Vitest' },
     });
 

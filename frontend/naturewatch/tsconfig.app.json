@@ -12,8 +12,7 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["vuetify"]
+    "lib": ["ESNext", "DOM", "DOM.Iterable"]
   },
   "include": ["src/**/*", "src/**/*.vue"]
 }
