@@ -1,23 +1,57 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import vuetify, { components } from '@/plugins/vuetify';
+import { createPinia } from 'pinia';
+import vuetify from '@/plugins/vuetify';
 
-import HelloWorld from '../MapComponent.vue';
+import MapComponent from '../MapComponent.vue';
 
-describe('HelloWorld', () => {
-  const wrapper = mount(HelloWorld, {
-    global: { plugins: [vuetify] },
-    props: { msg: 'Hello Vitest' },
-  });
+vi.mock('mapbox-gl', () => {
+  class Map {
+    on() {
+      return this;
+    }
+    off() {
+      return this;
+    }
+    addControl() {
+      return this;
+    }
+    areTilesLoaded() {
+      return true;
+    }
+    isMoving() {
+      return false;
+    }
+    loaded() {
+      return true;
+    }
+  }
+  class NavigationControl {}
+  class GeolocateControl {}
+  return { Map, NavigationControl, GeolocateControl };
+});
 
-  it('mount component', async () => {
-    expect(HelloWorld).toBeTruthy();
+describe('Map', () => {
+  it('mounts the round controls', () => {
+    window.matchMedia = (query: string) =>
+      ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as MediaQueryList;
 
-    const img = wrapper.findComponent(components.VImg);
-    expect(img).toBeTruthy();
-  });
+    const wrapper = mount(MapComponent, {
+      global: { plugins: [vuetify, createPinia()] },
+      props: { msg: 'Hello Vitest' },
+    });
 
-  it('renders properly', () => {
-    expect(wrapper.text()).toContain('Hello Vitest');
+    expect(wrapper.text()).toContain('Places');
+    expect(wrapper.text()).toContain('Landscape');
+    expect(wrapper.text()).toContain('Measure');
   });
 });
