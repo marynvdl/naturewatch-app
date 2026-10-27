@@ -29,7 +29,7 @@ Do one task at a time. Start a task only after the one above it has merged. Each
   - *Goal:* Add the visual system and basic controls beside the current ones. No screen changes.
 - [ ] [task-002-app-frame.md](../tasks/task-002-app-frame.md)
   - *Goal:* Leave the map full-bleed. No top bar.
-- [ ] [task-003-blob-buttons.md](../tasks/task-003-blob-buttons.md)
+- [x] [task-003-blob-buttons.md](../tasks/task-003-blob-buttons.md)
   - *Goal:* Open Places, Layers, and Measure with three organic blob buttons.
 - [ ] [task-004-place-filters.md](../tasks/task-004-place-filters.md)
   - *Goal:* Filter places by name, type, and size without reloading boundaries.
