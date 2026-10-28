@@ -497,7 +497,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 720px) {
   .is-left :deep(.places-bar) {
-    max-width: calc(100vw - var(--blob-size) - 120px);
+    max-width: min(360px, calc(100vw - 72px));
   }
 
   .is-left :deep(.places-types) {

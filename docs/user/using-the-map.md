@@ -48,8 +48,10 @@ Length and area sit in a Measure panel at the bottom right, to the left of the m
 
 ## Places
 
-The search and the place-type buttons sit together on a panel at the top left. **Protected areas** draws the pilot protected areas on the map, using the stored boundary. Click it again to remove them. There is no download. Click a shape for the name, the stored cropland square kilometres and percent, the WDPCA release month, attribution, and a Protected Planet link. The attribution line sits at the bottom right of the map.
+The search and the place-type buttons sit together on a panel at the top left. The list sits under those buttons. **Protected areas** starts selected and lists the stored places. Search matches the place name. An empty search shows every place of the selected type. **Ecoregions** and **Countries** can be selected. Each says that none are stored.
+
+Click **Protected areas** while it is already selected to draw the pilot protected areas on the map, using the stored boundary. Click it again to remove them. Changing the search or the place type does not download the boundaries again. There is no download. Click a shape for the name, the stored cropland square kilometres and percent, the WDPCA release month, attribution, and a Protected Planet link. The attribution line sits at the bottom right of the map.
 
 `/places` is still the name list. A name opens `/places/:id` with the same figures.
 
-If the Supabase URL or anon key is missing from the build, the page says the place store is not configured.
+If the Supabase URL or anon key is missing from the build, the page and the Places panel say the place store is not configured.
