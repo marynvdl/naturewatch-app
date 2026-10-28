@@ -24,11 +24,8 @@ import useTimelineStore from '@/store/TimelineStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
 import { resolveLayerYear } from '@/catalog';
 import { classRasterPaint } from '@/catalog/rasterColor';
-import {
-  placePopupElement,
-  type PlaceFeatureProperties,
-} from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
+import { usePlaceBoundaries } from '@/places/usePlaceBoundaries';
 import useDrawerStore from '@/store/DrawerStore';
 import SideButtonsComponent from '@/components/SideButtonsComponent.vue';
 import CoordinatesComponent from '@/components/CoordinatesComponent.vue';
@@ -80,6 +77,12 @@ defineProps<{
 const currentBasemap = computed(() => basemapStore.currentBasemap);
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
+
+usePlaceBoundaries(map, () => {
+  if (placesOpen.value) return;
+  placesOpen.value = true;
+  closeOthers('places');
+});
 
 // Determine layer color to use
 const layerColorKey = computed(() => {
@@ -224,108 +227,6 @@ function updateLayerOpacityOnMap(
   }
 }
 
-const PLACE_SOURCE = 'pilot-places';
-const PLACE_FILL = 'pilot-places-fill';
-const PLACE_LINE = 'pilot-places-line';
-let placesPopup: mapboxgl.Popup | null = null;
-let placesListening = false;
-
-/**
- * First symbol layer, so place boundaries sit under the labels.
- * @param mapInstance - The map.
- * @returns The layer id, when the style has a symbol.
- */
-function firstSymbolId(mapInstance: mapboxgl.Map): string | undefined {
-  return mapInstance.getStyle()?.layers?.find(layer => layer.type === 'symbol')
-    ?.id;
-}
-
-/** Remove the place boundaries and any open popup. */
-function removePlaceOverlay(mapInstance: mapboxgl.Map) {
-  placesPopup?.remove();
-  placesPopup = null;
-  if (mapInstance.getLayer(PLACE_LINE)) mapInstance.removeLayer(PLACE_LINE);
-  if (mapInstance.getLayer(PLACE_FILL)) mapInstance.removeLayer(PLACE_FILL);
-  if (mapInstance.getSource(PLACE_SOURCE))
-    mapInstance.removeSource(PLACE_SOURCE);
-}
-
-/**
- * Draw or clear the protected-area boundaries.
- * @param mapInstance - The map.
- */
-function syncPlaceOverlay(mapInstance: mapboxgl.Map) {
-  if (!placesStore.visible || !placesStore.features) {
-    removePlaceOverlay(mapInstance);
-    return;
-  }
-  const before = firstSymbolId(mapInstance);
-  const onStandard = !!mapInstance.getStyle()?.imports?.length;
-  if (!mapInstance.getSource(PLACE_SOURCE)) {
-    mapInstance.addSource(PLACE_SOURCE, {
-      type: 'geojson',
-      data: placesStore.features,
-    });
-    const fill: mapboxgl.FillLayer = {
-      id: PLACE_FILL,
-      type: 'fill',
-      source: PLACE_SOURCE,
-      paint: { 'fill-color': '#1f4b3a', 'fill-opacity': 0.18 },
-    };
-    const line: mapboxgl.LineLayer = {
-      id: PLACE_LINE,
-      type: 'line',
-      source: PLACE_SOURCE,
-      paint: { 'line-color': '#1f4b3a', 'line-width': 1.5 },
-    };
-    if (onStandard) {
-      fill.slot = 'top';
-      line.slot = 'top';
-    }
-    mapInstance.addLayer(fill, onStandard ? undefined : before);
-    mapInstance.addLayer(line, onStandard ? undefined : before);
-    if (!placesListening) {
-      mapInstance.on('click', PLACE_FILL, onPlaceClick);
-      mapInstance.on('mouseenter', PLACE_FILL, () => {
-        mapInstance.getCanvas().style.cursor = 'pointer';
-      });
-      mapInstance.on('mouseleave', PLACE_FILL, () => {
-        mapInstance.getCanvas().style.cursor = '';
-      });
-      placesListening = true;
-    }
-  } else {
-    const source = mapInstance.getSource(
-      PLACE_SOURCE
-    ) as mapboxgl.GeoJSONSource;
-    source.setData(placesStore.features);
-  }
-}
-
-/**
- * Open the name and cropland figure for the clicked boundary.
- * @param event - The map click.
- */
-function onPlaceClick(event: mapboxgl.MapMouseEvent) {
-  const feature = event.features?.[0];
-  const properties = feature?.properties as PlaceFeatureProperties | undefined;
-  if (!properties || !map.value) return;
-  placesPopup?.remove();
-  placesPopup = new mapboxgl.Popup({ closeButton: true, maxWidth: '280px' })
-    .setLngLat(event.lngLat)
-    .setDOMContent(placePopupElement(properties))
-    .addTo(map.value as unknown as mapboxgl.Map);
-}
-
-watch(
-  () => [placesStore.visible, placesStore.features] as const,
-  () => {
-    if (map.value?.isStyleLoaded()) {
-      syncPlaceOverlay(map.value as unknown as mapboxgl.Map);
-    }
-  }
-);
-
 onMounted(() => {
   // Create the controls
   const nav = new mapboxgl.NavigationControl();
@@ -363,7 +264,6 @@ onMounted(() => {
     visibleMapLayers.value.forEach((layer, index) => {
       addSourceAndLayer(layer, activeYear.value, mapInstance);
     });
-    syncPlaceOverlay(mapInstance);
     setLabels(mapInstance);
   });
 
