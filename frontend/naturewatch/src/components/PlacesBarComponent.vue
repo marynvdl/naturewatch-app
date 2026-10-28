@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { Search } from '@lucide/vue';
+import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
 import { loadPilotPlaces, type PlaceSummary } from '@/places/api';
 import { placesMatching } from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
+
+const props = withDefaults(
+  defineProps<{
+    open?: boolean;
+    zoomToPlace?: () => void;
+  }>(),
+  { open: true, zoomToPlace: () => undefined }
+);
 
 const placesStore = usePlacesStore();
 
@@ -24,11 +33,32 @@ const places = ref<PlaceSummary[]>([]);
 const query = ref('');
 const resultsList = ref<HTMLElement | null>(null);
 
-const shown = computed(() => placesMatching(places.value, query.value));
+const needle = computed(() => query.value.trim());
+const searchingAll = computed(
+  () => placeType.value === null && needle.value.length > 0
+);
+const shown = computed(() => {
+  if (!searchingAll.value) return placesMatching(places.value, query.value);
+  const prefix = needle.value.toLocaleLowerCase();
+  return places.value.filter(place =>
+    place.name.toLocaleLowerCase().startsWith(prefix)
+  );
+});
 const emptyMessage = computed(() =>
   places.value.length === 0 ? nothingStored : 'No places match.'
 );
 const showProtected = computed(() => placeType.value === 'protected_area');
+const showNames = computed(() => showProtected.value || searchingAll.value);
+const selectedName = computed(() => {
+  const id = placesStore.selectedId;
+  if (!id) return '';
+  return (
+    places.value.find(place => place.id === id)?.name ??
+    placesStore.features?.features.find(item => item.properties.id === id)
+      ?.properties.name ??
+    ''
+  );
+});
 
 /** Draw the protected areas when they are hidden. */
 function showBoundaries() {
@@ -39,6 +69,11 @@ function showBoundaries() {
 function hideBoundaries() {
   if (placesStore.visible) placesStore.toggle();
 }
+
+watch(needle, value => {
+  if (placeType.value || !value) return;
+  void ensureList();
+});
 
 /** Load the stored names once. Later type clicks reuse them. */
 async function ensureList() {
@@ -127,11 +162,8 @@ watch(
           {{ type.label }}
         </button>
       </div>
-      <template v-if="placeType">
-        <p
-          v-if="showProtected && listStatus === 'loading'"
-          class="places-status"
-        >
+      <template v-if="placeType || searchingAll">
+        <p v-if="showNames && listStatus === 'loading'" class="places-status">
           Loading places.
         </p>
         <p
@@ -142,7 +174,7 @@ watch(
         </p>
         <p
           v-if="
-            showProtected &&
+            showNames &&
             (placesStore.status === 'unconfigured' ||
               listStatus === 'unconfigured')
           "
@@ -150,10 +182,10 @@ watch(
         >
           The place store is not configured.
         </p>
-        <p v-if="showProtected && listStatus === 'error'" class="places-status">
+        <p v-if="showNames && listStatus === 'error'" class="places-status">
           The places could not be loaded.
         </p>
-        <div v-if="!showProtected" class="places-list">
+        <div v-if="placeType && !showProtected" class="places-list">
           <p class="places-status">{{ nothingStored }}</p>
         </div>
         <div
@@ -188,7 +220,13 @@ watch(
         </div>
       </template>
     </div>
-    <div v-if="placesStore.selectedId" class="places-detail map-panel nw" />
+    <PlaceProfileComponent
+      v-if="open && placesStore.selectedId"
+      class="places-detail map-panel nw"
+      :name="selectedName"
+      @close="placesStore.clearSelection()"
+      @zoom="props.zoomToPlace()"
+    />
   </div>
 </template>
 
@@ -197,7 +235,8 @@ watch(
   display: flex;
   align-items: stretch;
   gap: 0;
-  max-height: calc(100dvh - 24px);
+  height: 100vh;
+  max-height: 100vh;
 }
 
 .places-frame.has-detail .places-results {
@@ -213,13 +252,11 @@ watch(
   align-items: stretch;
   gap: 12px;
   width: max-content;
-  max-width: calc(100vw - 24px);
-}
-
-.places-results.has-results {
-  max-height: calc(100dvh - 24px);
+  height: 100%;
+  max-width: 100vw;
   min-height: 0;
   overflow: hidden;
+  border-radius: 0;
 }
 
 .places-title,
@@ -235,6 +272,10 @@ watch(
 .places-status {
   width: 0;
   min-width: 100%;
+}
+
+.places-title {
+  padding-right: 40px;
 }
 
 .places-search {
@@ -332,9 +373,9 @@ watch(
 
 .places-detail {
   width: 240px;
+  height: 100%;
   flex: none;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
+  border-radius: 0;
 }
 
 @media (max-width: 720px) {
@@ -345,14 +386,18 @@ watch(
   .places-frame.has-detail .places-results {
     border-right-width: 1px;
     border-bottom-width: 0;
-    border-radius: var(--map-panel-radius) var(--map-panel-radius) 0 0;
+  }
+
+  .places-results,
+  .places-detail {
+    height: auto;
+    flex: 1 1 0;
+    min-height: 0;
   }
 
   .places-detail {
     width: 100%;
-    min-height: 120px;
     border-top-width: 0;
-    border-radius: 0 0 var(--map-panel-radius) var(--map-panel-radius);
   }
 }
 </style>

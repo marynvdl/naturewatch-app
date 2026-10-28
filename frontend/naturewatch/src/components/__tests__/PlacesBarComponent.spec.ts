@@ -113,9 +113,31 @@ describe('Places panel', () => {
     expect(loadPlaceMap).toHaveBeenCalledTimes(1);
 
     await typeButton(wrapper, 'Protected areas').trigger('click');
-    expect(wrapper.text()).not.toContain('No places match.');
+    expect(wrapper.text()).toContain('No places match.');
     expect(wrapper.text()).not.toContain('Kruger National Park');
+    expect(typeButton(wrapper, 'Protected areas').classes()).not.toContain(
+      'is-on'
+    );
     expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists places that start with the search when no type is selected', async () => {
+    vi.mocked(loadPilotPlaces).mockResolvedValue({ status: 'ok', places });
+
+    const wrapper = mountPlaces();
+    await wrapper.get('input[aria-label="Search places"]').setValue('kru');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Kruger National Park');
+    expect(wrapper.text()).not.toContain('Addo Elephant National Park');
+    expect(typeButton(wrapper, 'Protected areas').classes()).not.toContain(
+      'is-on'
+    );
+    expect(loadPlaceMap).not.toHaveBeenCalled();
+
+    await wrapper.get('input[aria-label="Search places"]').setValue('park');
+    expect(wrapper.text()).toContain('No places match.');
+    expect(wrapper.text()).not.toContain('Kruger National Park');
   });
 
   it('opens the detail column for a place chosen on the map', async () => {
@@ -141,6 +163,47 @@ describe('Places panel', () => {
     expect(wrapper.find('.places-detail').exists()).toBe(false);
     expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
     expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the profile without changing the search or the place type', async () => {
+    vi.mocked(loadPilotPlaces).mockResolvedValue({ status: 'ok', places });
+    vi.mocked(loadPlaceMap).mockResolvedValue(drawn);
+    const zoomToPlace = vi.fn();
+
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+      props: { zoomToPlace },
+    });
+    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await flushPromises();
+    await wrapper.get('input[aria-label="Search places"]').setValue('kruger');
+    await wrapper.get('button.place-result').trigger('click');
+
+    expect(wrapper.get('.place-profile').text()).toContain(
+      'Kruger National Park'
+    );
+    await wrapper.get('.place-profile button.map-control').trigger('click');
+    expect(zoomToPlace).toHaveBeenCalledTimes(1);
+
+    await wrapper.get('button[aria-label="Close place"]').trigger('click');
+    expect(wrapper.find('.place-profile').exists()).toBe(false);
+    expect(
+      wrapper.get('input[aria-label="Search places"]').element
+    ).toHaveProperty('value', 'kruger');
+    expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
+    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the profile out of the list when the list is closed', async () => {
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+      props: { open: false },
+    });
+    usePlacesStore(pinia).selectPlace(places[1].id, 'map');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('.place-profile').exists()).toBe(false);
   });
 
   it('scrolls a place chosen on the map to the top of the list', async () => {
