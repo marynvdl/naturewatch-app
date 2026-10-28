@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nubShift } from '../blobPath';
+import { cornerShift, nubShift } from '../blobPath';
 
 describe('blob circle', () => {
   const anchor = { left: 600, top: 12, width: 112, height: 112 };
@@ -28,5 +28,16 @@ describe('blob circle', () => {
     expect(bottomCentreX).toBeLessThan(bottomPanel.left);
     const covered = bottomCentreX + 56 - bottomPanel.left;
     expect(covered).toBeCloseTo(112 / 3);
+  });
+
+  it('shrinks the circle into the panel’s top-right corner', () => {
+    const origin = { left: 12, top: 12, width: 112, height: 112 };
+    const card = { left: 12, top: 12, width: 368, height: 220 };
+    const shift = cornerShift(origin, card, 36, 20);
+    const centreX = origin.left + origin.width / 2 + shift.x;
+    const centreY = origin.top + origin.height / 2 + shift.y;
+    expect(shift.scale).toBeCloseTo(36 / 112);
+    expect(centreX).toBe(card.left + card.width - 20 - 18);
+    expect(centreY).toBe(card.top + 20 + 18);
   });
 });

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { X } from '@lucide/vue';
+
 defineProps<{
   name: string;
 }>();
@@ -11,12 +13,15 @@ defineEmits<{
 
 <template>
   <section class="place-profile" aria-label="Place">
-    <div class="place-profile-head">
-      <h2 class="panel-heading">{{ name }}</h2>
-      <button type="button" aria-label="Close place" @click="$emit('close')">
-        Close
-      </button>
-    </div>
+    <button
+      type="button"
+      class="place-close"
+      aria-label="Close place"
+      @click="$emit('close')"
+    >
+      <X :size="16" :stroke-width="2.25" aria-hidden="true" />
+    </button>
+    <h2 class="panel-heading">{{ name }}</h2>
     <button type="button" class="map-control" @click="$emit('zoom')">
       Zoom to place
     </button>
@@ -25,34 +30,46 @@ defineEmits<{
 
 <style scoped>
 .place-profile {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 16px;
 }
 
-.place-profile-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .panel-heading {
   min-width: 0;
+  padding-right: 40px;
   overflow-wrap: anywhere;
 }
 
-button[aria-label='Close place'] {
-  flex: none;
+.place-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   margin: 0;
   padding: 0;
   border: 0;
+  border-radius: 50%;
   background: transparent;
-  color: #5f7168;
-  font: inherit;
-  font-size: 13px;
+  color: var(--map-control-text, #24312c);
   cursor: pointer;
+  transition: transform 180ms ease;
+}
+
+.place-close:hover {
+  transform: scale(1.045);
+}
+
+.place-close:focus-visible {
+  outline: 2px solid var(--foreground, #24312c);
+  outline-offset: 2px;
 }
 
 .map-control {

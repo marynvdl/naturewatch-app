@@ -41,6 +41,7 @@ const drawerVisible = computed(() => drawerStore.visible);
 const toggleDrawerVisibility = drawerStore.toggleDrawerVisibility;
 const placesOpen = ref(false);
 const measureOpen = ref(false);
+const parkedWidth = ref(0);
 
 /** On a narrow screen, one open panel would cover the other blob buttons. */
 function closeOthers(current: 'places' | 'layers' | 'measure') {
@@ -50,8 +51,14 @@ function closeOthers(current: 'places' | 'layers' | 'measure') {
   if (current !== 'measure') measureOpen.value = false;
 }
 
-/** Open or close Places, and on a narrow screen close the other panels. */
+/** Remember the open profile's width, then open or close Places. */
 function togglePlaces() {
+  if (placesOpen.value && placesStore.selectedId) {
+    const detail = document.querySelector('.blob-places .places-detail');
+    parkedWidth.value = detail?.getBoundingClientRect().width || 240;
+  } else {
+    parkedWidth.value = 0;
+  }
   placesOpen.value = !placesOpen.value;
   if (placesOpen.value) closeOthers('places');
 }
@@ -87,6 +94,74 @@ const soloPlaceName = computed(() => {
       ?.properties.name ?? ''
   );
 });
+const soloPlaceStyle = computed(() => {
+  if (!parkedWidth.value) return undefined;
+  return { width: `${parkedWidth.value}px` };
+});
+const placesParkedWidth = computed(() =>
+  !placesOpen.value && placesStore.selectedId ? parkedWidth.value || 240 : 0
+);
+
+watch(
+  () => placesStore.selectedId,
+  id => {
+    if (id) return;
+    parkedWidth.value = 0;
+  }
+);
+
+const controlsLeft = ref(12);
+let controlsObserver: ResizeObserver | null = null;
+
+/** The open places column the map controls should clear. */
+function controlsPanel(): HTMLElement | null {
+  if (placesOpen.value) {
+    const frame = document.querySelector('.blob-places .places-frame');
+    if (frame instanceof HTMLElement) return frame;
+  }
+  if (!placesOpen.value && placesStore.selectedId) {
+    const solo = document.querySelector('.place-profile-solo');
+    if (solo instanceof HTMLElement) return solo;
+  }
+  return null;
+}
+
+/** Sit Labels and the basemap switch to the right of an open places panel. */
+function placeControls() {
+  const mapBox = document
+    .querySelector('.map-container')
+    ?.getBoundingClientRect();
+  const panel = controlsPanel();
+  if (!mapBox || !panel) {
+    controlsLeft.value = 12;
+    return;
+  }
+  const box = panel.getBoundingClientRect();
+  if (box.width === 0) {
+    controlsLeft.value = 12;
+    return;
+  }
+  controlsLeft.value = Math.round(box.right - mapBox.left + 12);
+}
+
+/** Follow the places panel as it opens, closes, or grows. */
+function watchControls() {
+  controlsObserver?.disconnect();
+  controlsObserver = null;
+  placeControls();
+  const panel = controlsPanel();
+  if (!panel || typeof ResizeObserver === 'undefined') return;
+  controlsObserver = new ResizeObserver(() => placeControls());
+  controlsObserver.observe(panel);
+}
+
+watch(
+  () => [placesOpen.value, placesStore.selectedId] as const,
+  async () => {
+    await nextTick();
+    watchControls();
+  }
+);
 
 // Determine layer color to use
 const layerColorKey = computed(() => {
@@ -280,6 +355,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  controlsObserver?.disconnect();
   timelineStore.bindTileWait(() => Promise.resolve());
 });
 
@@ -582,6 +658,8 @@ function addSourceAndLayer(
           panel-id="places-panel"
           :image="blobPlaces"
           :expanded="placesOpen"
+          corner
+          :parked-width="placesParkedWidth"
           @toggle="togglePlaces"
         >
           <PlacesBarComponent
@@ -614,6 +692,7 @@ function addSourceAndLayer(
         <PlaceProfileComponent
           v-if="!placesOpen && placesStore.selectedId"
           class="place-profile-solo map-panel nw"
+          :style="soloPlaceStyle"
           :name="soloPlaceName"
           @close="placesStore.clearSelection()"
           @zoom="zoomToSelectedPlace"
@@ -626,7 +705,7 @@ function addSourceAndLayer(
         </p>
         <SideButtonsComponent />
         <!-- Toggle basemap labels -->
-        <div class="basemap-button">
+        <div class="basemap-button" :style="{ left: `${controlsLeft}px` }">
           <v-btn
             id="labelsButton"
             class="map-control"
@@ -743,18 +822,21 @@ function addSourceAndLayer(
 
 .place-profile-solo {
   position: absolute;
-  top: calc(12px + var(--blob-size) + 12px);
-  left: 12px;
+  top: 0;
+  left: 0;
   z-index: 13;
-  width: min(280px, calc(100vw - 24px));
+  width: 240px;
+  height: 100vh;
+  box-sizing: border-box;
+  border-radius: 0;
 }
 
 .blob-places {
   top: 12px;
   left: 12px;
   z-index: 14;
-  --panel-inset-top: 12px;
-  --panel-inset-left: 12px;
+  --panel-inset-top: 0px;
+  --panel-inset-left: 0px;
 }
 
 .blob-layers {

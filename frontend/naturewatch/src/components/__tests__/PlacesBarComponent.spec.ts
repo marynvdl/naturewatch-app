@@ -113,9 +113,31 @@ describe('Places panel', () => {
     expect(loadPlaceMap).toHaveBeenCalledTimes(1);
 
     await typeButton(wrapper, 'Protected areas').trigger('click');
-    expect(wrapper.text()).not.toContain('No places match.');
+    expect(wrapper.text()).toContain('No places match.');
     expect(wrapper.text()).not.toContain('Kruger National Park');
+    expect(typeButton(wrapper, 'Protected areas').classes()).not.toContain(
+      'is-on'
+    );
     expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists places that start with the search when no type is selected', async () => {
+    vi.mocked(loadPilotPlaces).mockResolvedValue({ status: 'ok', places });
+
+    const wrapper = mountPlaces();
+    await wrapper.get('input[aria-label="Search places"]').setValue('kru');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Kruger National Park');
+    expect(wrapper.text()).not.toContain('Addo Elephant National Park');
+    expect(typeButton(wrapper, 'Protected areas').classes()).not.toContain(
+      'is-on'
+    );
+    expect(loadPlaceMap).not.toHaveBeenCalled();
+
+    await wrapper.get('input[aria-label="Search places"]').setValue('park');
+    expect(wrapper.text()).toContain('No places match.');
+    expect(wrapper.text()).not.toContain('Kruger National Park');
   });
 
   it('opens the detail column for a place chosen on the map', async () => {
