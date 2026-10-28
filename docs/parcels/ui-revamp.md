@@ -1,5 +1,7 @@
 # Parcel: Sooty Earth interface
 
+Task 003 has merged. Do not start the unchecked tasks below. [Budding Places](budding-places.md) replaces the list, the split view, and the popup. Boundary loading stays as it is until Places Tiles.
+
 ## Goal
 
 Give the app one plain, light visual system and three ways to look at places: the map, a list, and the two side by side. Clicking a place opens a small popup. The current map tools keep the jobs they have today.
@@ -14,14 +16,14 @@ The map stays the dominant surface. Controls are small, flat, and quiet. The spl
 
 ## Left for later
 
-- Vector tiles for place boundaries. The map currently downloads every park outline before it can draw. The next parcel builds a PMTiles archive, after a cost check. Tasks here must not download the outlines again when a filter changes.
+- Vector tiles for place boundaries. The map currently downloads every park outline before it can draw. Places Tiles builds a PMTiles archive, after a cost check. Tasks here must not download the outlines again when a filter changes.
 - Place types other than protected area, ecosystem condition, charts, and photos.
 - A full place page. The simple page at `/places/:id` stays as it is. The popup does not open it.
 - A production release. Merge into `develop` only. Do not open a pull request from `develop` into `main`.
 
 ## Tasks
 
-Do one task at a time. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop`.
+These tasks are the record of this parcel. Do not start task 004, task 005, task 006, or task 007.
 
 ### naturewatch-app
 
