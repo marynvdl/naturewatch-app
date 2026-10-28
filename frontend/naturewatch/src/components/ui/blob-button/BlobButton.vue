@@ -7,7 +7,11 @@ import {
   ref,
   watch,
 } from 'vue';
-import { nubShift, type BlobEdge } from './blobPath';
+import { X } from '@lucide/vue';
+import { cornerShift, nubShift, type BlobEdge } from './blobPath';
+
+const CLOSE_SIZE = 36;
+const CLOSE_INSET = 20;
 
 /**
  * Round open and close control.
@@ -20,6 +24,10 @@ const props = defineProps<{
   expanded: boolean;
   panelId: string;
   image: string;
+  /** Shrink onto the panel's top-right corner instead of sliding behind it. */
+  corner?: boolean;
+  /** Left edge, in pixels from the map, when closed beside a profile. */
+  parkedWidth?: number;
 }>();
 
 const emit = defineEmits<{
@@ -36,6 +44,9 @@ const awake = ref(true);
 const blobSize = ref(112);
 const shiftX = ref(0);
 const shiftY = ref(0);
+const scale = ref(1);
+const showMark = ref(false);
+const labelSize = ref<number | null>(null);
 const panelTop = ref('auto');
 const panelRight = ref('auto');
 const panelBottom = ref('auto');
@@ -43,6 +54,7 @@ const panelLeft = ref('auto');
 
 let revealTimer = 0;
 let reduceQuery: MediaQueryList | null = null;
+let panelObserver: ResizeObserver | null = null;
 let targetX = 0;
 let targetY = 0;
 
@@ -56,8 +68,18 @@ const idle = computed(
 );
 
 const visualStyle = computed(() => ({
-  transform: `translate3d(${shiftX.value}px, ${shiftY.value}px, 0)`,
+  transform: `translate3d(${shiftX.value}px, ${shiftY.value}px, 0) scale(${scale.value})`,
 }));
+
+const anchorStyle = computed(() => {
+  if (!props.corner || props.expanded || !props.parkedWidth) return undefined;
+  return { left: `${props.parkedWidth}px` };
+});
+
+const labelStyle = computed(() => {
+  if (labelSize.value == null) return undefined;
+  return { fontSize: `${labelSize.value}px` };
+});
 
 const panelStyle = computed(() => ({
   top: panelTop.value,
@@ -141,21 +163,65 @@ function placePanel() {
   panelBottom.value = 'auto';
 }
 
-/** Move the circle onto the panel edge and remember that spot. */
+/** Stop watching the panel size. */
+function stopTracking() {
+  panelObserver?.disconnect();
+  panelObserver = null;
+}
+
+/** Slide or shrink the circle again when the panel grows or shrinks. */
+function trackPanel() {
+  stopTracking();
+  const card = panel.value;
+  if (!card || typeof ResizeObserver === 'undefined') return;
+  panelObserver = new ResizeObserver(() => {
+    if (!props.expanded) return;
+    measureNub();
+    shiftX.value = targetX;
+    shiftY.value = targetY;
+  });
+  panelObserver.observe(card);
+}
+
+/** The list column when this circle should stay on that column's corner. */
+function cornerBox(card: HTMLElement): DOMRect {
+  const list = card.querySelector('.places-bar');
+  if (list instanceof HTMLElement) {
+    const box = list.getBoundingClientRect();
+    if (box.width > 0 && box.height > 0) return box;
+  }
+  return card.getBoundingClientRect();
+}
+
+/** Move the circle onto the panel and remember that spot. */
 function measureNub() {
   const node = anchor.value;
   const card = panel.value;
   if (!node || !card) return;
   const origin = node.getBoundingClientRect();
+  const anchorBox = {
+    left: origin.left,
+    top: origin.top,
+    width: origin.width,
+    height: origin.height,
+  };
+  if (props.corner) {
+    const box = cornerBox(card);
+    const shift = cornerShift(
+      anchorBox,
+      { left: box.left, top: box.top, width: box.width, height: box.height },
+      CLOSE_SIZE,
+      CLOSE_INSET
+    );
+    targetX = shift.x;
+    targetY = shift.y;
+    scale.value = shift.scale;
+    return;
+  }
   const cardBox = card.getBoundingClientRect();
   const shift = nubShift(
     props.edge,
-    {
-      left: origin.left,
-      top: origin.top,
-      width: origin.width,
-      height: origin.height,
-    },
+    anchorBox,
     {
       left: cardBox.left,
       top: cardBox.top,
@@ -166,38 +232,103 @@ function measureNub() {
   );
   targetX = shift.x;
   targetY = shift.y;
+  scale.value = 1;
 }
 
-/** Show the panel first, so the circle slides underneath it. */
+/** Show the panel on the map, and move the circle from where it was. */
 async function beginOpen() {
   clearReveal();
   hovering.value = false;
   animating.value = true;
+  showMark.value = !!props.corner;
   readTokens();
-  placePanel();
+  const mapBox = anchor.value
+    ?.closest('.map-container')
+    ?.getBoundingClientRect();
+  const fromLeft =
+    props.corner && anchor.value && mapBox
+      ? anchor.value.getBoundingClientRect().left - mapBox.left
+      : null;
   await nextTick();
-  if (!props.expanded) return;
-  measureNub();
+  if (!props.expanded || !anchor.value) return;
+  placePanel();
+  const slide = anchor.value.querySelector('.blob-slide');
+  const mapNow = anchor.value
+    .closest('.map-container')
+    ?.getBoundingClientRect();
+  const current =
+    mapNow != null
+      ? anchor.value.getBoundingClientRect().left - mapNow.left
+      : null;
+  const delta = fromLeft != null && current != null ? fromLeft - current : 0;
   showPanel.value = true;
-  shiftX.value = targetX;
-  shiftY.value = targetY;
+  trackPanel();
   revealTimer = window.setTimeout(() => {
     animating.value = false;
   }, duration());
+  if (slide instanceof HTMLElement && Math.abs(delta) > 1) {
+    slide.style.transition = 'none';
+    shiftX.value += delta;
+    nextTick(() => {
+      requestAnimationFrame(() => {
+        slide.style.transition = '';
+        requestAnimationFrame(() => {
+          measureNub();
+          shiftX.value = targetX;
+          shiftY.value = targetY;
+        });
+      });
+    });
+    return;
+  }
+  measureNub();
+  shiftX.value = targetX;
+  shiftY.value = targetY;
 }
 
-/** Hide the panel, then return the circle to its corner. */
+/** Hide the panel, then return the circle to its resting place. */
 function beginClose() {
   clearReveal();
+  stopTracking();
   showPanel.value = false;
   hovering.value = false;
   animating.value = true;
-  shiftX.value = 0;
-  shiftY.value = 0;
+  showMark.value = false;
+  const parked = props.corner ? (props.parkedWidth ?? 0) : 0;
+  const slide = anchor.value?.querySelector('.blob-slide');
+  if (slide instanceof HTMLElement && props.corner && scale.value < 1) {
+    slide.style.transition = 'none';
+    if (parked > 0 && anchor.value) {
+      const mapBox = anchor.value
+        .closest('.map-container')
+        ?.getBoundingClientRect();
+      const current =
+        anchor.value.getBoundingClientRect().left - (mapBox?.left ?? 0);
+      shiftX.value -= parked - current;
+    }
+    labelSize.value = 11 / scale.value;
+    nextTick(() => {
+      requestAnimationFrame(() => {
+        slide.style.transition = '';
+        requestAnimationFrame(() => {
+          shiftX.value = 0;
+          shiftY.value = 0;
+          scale.value = 1;
+          labelSize.value = 20;
+        });
+      });
+    });
+  } else {
+    shiftX.value = 0;
+    shiftY.value = 0;
+    scale.value = 1;
+    labelSize.value = null;
+  }
   targetX = 0;
   targetY = 0;
   revealTimer = window.setTimeout(() => {
     animating.value = false;
+    labelSize.value = null;
   }, duration());
 }
 
@@ -258,11 +389,15 @@ onMounted(() => {
   else {
     shiftX.value = 0;
     shiftY.value = 0;
+    scale.value = 1;
+    showMark.value = false;
+    labelSize.value = null;
   }
 });
 
 onBeforeUnmount(() => {
   clearReveal();
+  stopTracking();
   reduceQuery?.removeEventListener('change', onReduceChange);
   document.removeEventListener('visibilitychange', onVisibility);
   window.removeEventListener('resize', onResize);
@@ -273,6 +408,7 @@ onBeforeUnmount(() => {
   <div
     ref="anchor"
     class="blob-anchor"
+    :style="anchorStyle"
     :class="[
       `is-${edge}`,
       {
@@ -280,6 +416,7 @@ onBeforeUnmount(() => {
         'is-hover': hovering,
         'is-expanded': expanded,
         'is-spread': showPanel,
+        'is-corner': corner,
       },
     ]"
   >
@@ -298,7 +435,14 @@ onBeforeUnmount(() => {
           @pointerenter="onEnter"
           @pointerleave="onLeave"
         >
-          <span class="blob-label">{{ label }}</span>
+          <X
+            v-if="showMark"
+            class="blob-close"
+            :size="50"
+            :stroke-width="2.5"
+            aria-hidden="true"
+          />
+          <span v-else class="blob-label" :style="labelStyle">{{ label }}</span>
         </button>
       </div>
     </div>
@@ -448,12 +592,48 @@ onBeforeUnmount(() => {
   font-weight: 400;
   line-height: 1;
   text-align: center;
+  white-space: nowrap;
   color: #f8f9f9;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  transition: font-size var(--blob-duration, 280ms)
+    cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .is-spread .blob-label {
   display: none;
+}
+
+.is-corner.is-spread .blob-visual {
+  z-index: 6;
+}
+
+.is-corner.is-spread.is-left .blob-face,
+.is-corner.is-spread.is-right .blob-face {
+  right: 0;
+  left: 0;
+  width: 100%;
+  border-radius: 50%;
+  transform-origin: center;
+}
+
+.is-corner.is-spread .blob-face img {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+}
+
+.is-corner.is-spread.is-left .blob-hit,
+.is-corner.is-spread.is-right .blob-hit {
+  right: 0;
+  left: 0;
+  width: 100%;
+}
+
+.blob-close {
+  width: calc(16px * var(--blob-size) / 36);
+  height: calc(16px * var(--blob-size) / 36);
+  color: #f8f9f9;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 }
 
 .blob-panel {
@@ -497,7 +677,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 720px) {
   .is-left :deep(.places-bar) {
-    max-width: calc(100vw - var(--blob-size) - 120px);
+    max-width: min(360px, calc(100vw - 72px));
   }
 
   .is-left :deep(.places-types) {

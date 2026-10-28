@@ -41,3 +41,29 @@ export function nubShift(
     y: cy - (anchor.top + anchor.height / 2),
   };
 }
+
+/**
+ * Move a shrunk circle onto the top-right corner of an open panel.
+ * The shift is in the circle's own coordinates, before the scale.
+ * @param anchor - The closed circle.
+ * @param panel - The open panel.
+ * @param closeSize - The shrunk circle's diameter.
+ * @param inset - Gap between the circle and the panel corner.
+ * @returns Translation and scale from the closed circle.
+ */
+export function cornerShift(
+  anchor: Box,
+  panel: Box,
+  closeSize: number,
+  inset: number
+): { x: number; y: number; scale: number } {
+  const currentX = anchor.left + anchor.width / 2;
+  const currentY = anchor.top + anchor.height / 2;
+  const targetX = panel.left + panel.width - inset - closeSize / 2;
+  const targetY = panel.top + inset + closeSize / 2;
+  return {
+    x: targetX - currentX,
+    y: targetY - currentY,
+    scale: anchor.width > 0 ? closeSize / anchor.width : 1,
+  };
+}

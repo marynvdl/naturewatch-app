@@ -23,6 +23,9 @@ vi.mock('mapbox-gl', () => {
     loaded() {
       return true;
     }
+    isStyleLoaded() {
+      return false;
+    }
   }
   class NavigationControl {}
   class GeolocateControl {}

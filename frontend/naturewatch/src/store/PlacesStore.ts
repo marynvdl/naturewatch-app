@@ -14,6 +14,29 @@ const usePlacesStore = defineStore('places', () => {
   );
   const features = ref<PlaceFeatureCollection | null>(null);
   const notice = ref('');
+  const selectedId = ref<string | null>(null);
+  const selectedFrom = ref<'list' | 'map' | null>(null);
+
+  /**
+   * Select a place, or clear it when that place is already selected.
+   * @param id - The stored place id.
+   * @param source - Where the click happened. The list is the default.
+   */
+  function selectPlace(id: string, source: 'list' | 'map' = 'list') {
+    if (selectedId.value === id) {
+      selectedId.value = null;
+      selectedFrom.value = null;
+      return;
+    }
+    selectedId.value = id;
+    selectedFrom.value = source;
+  }
+
+  /** Close the place column. */
+  function clearSelection() {
+    selectedId.value = null;
+    selectedFrom.value = null;
+  }
 
   /**
    * Load the map shapes once.
@@ -40,7 +63,18 @@ const usePlacesStore = defineStore('places', () => {
     if (visible.value) void load();
   }
 
-  return { visible, status, features, notice, load, toggle };
+  return {
+    visible,
+    status,
+    features,
+    notice,
+    selectedId,
+    selectedFrom,
+    load,
+    toggle,
+    selectPlace,
+    clearSelection,
+  };
 });
 
 export default usePlacesStore;

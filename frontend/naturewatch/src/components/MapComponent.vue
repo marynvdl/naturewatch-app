@@ -11,6 +11,7 @@ import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
 import DrawerComponent from '@/components/DrawerComponent.vue';
 import MeasureComponent from './MeasureComponent.vue';
+import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
 import PlacesBarComponent from '@/components/PlacesBarComponent.vue';
 import BlobButton from '@/components/ui/blob-button/BlobButton.vue';
 import TimelineComponent from '@/components/TimelineComponent.vue';
@@ -24,11 +25,8 @@ import useTimelineStore from '@/store/TimelineStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
 import { resolveLayerYear } from '@/catalog';
 import { classRasterPaint } from '@/catalog/rasterColor';
-import {
-  placePopupElement,
-  type PlaceFeatureProperties,
-} from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
+import { usePlaceBoundaries } from '@/places/usePlaceBoundaries';
 import useDrawerStore from '@/store/DrawerStore';
 import SideButtonsComponent from '@/components/SideButtonsComponent.vue';
 import CoordinatesComponent from '@/components/CoordinatesComponent.vue';
@@ -43,6 +41,7 @@ const drawerVisible = computed(() => drawerStore.visible);
 const toggleDrawerVisibility = drawerStore.toggleDrawerVisibility;
 const placesOpen = ref(false);
 const measureOpen = ref(false);
+const parkedWidth = ref(0);
 
 /** On a narrow screen, one open panel would cover the other blob buttons. */
 function closeOthers(current: 'places' | 'layers' | 'measure') {
@@ -52,8 +51,14 @@ function closeOthers(current: 'places' | 'layers' | 'measure') {
   if (current !== 'measure') measureOpen.value = false;
 }
 
-/** Open or close Places, and on a narrow screen close the other panels. */
+/** Remember the open profile's width, then open or close Places. */
 function togglePlaces() {
+  if (placesOpen.value && placesStore.selectedId) {
+    const detail = document.querySelector('.blob-places .places-detail');
+    parkedWidth.value = detail?.getBoundingClientRect().width || 240;
+  } else {
+    parkedWidth.value = 0;
+  }
   placesOpen.value = !placesOpen.value;
   if (placesOpen.value) closeOthers('places');
 }
@@ -80,6 +85,83 @@ defineProps<{
 const currentBasemap = computed(() => basemapStore.currentBasemap);
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
+const { zoomToSelectedPlace } = usePlaceBoundaries(() => map.value);
+const soloPlaceName = computed(() => {
+  const id = placesStore.selectedId;
+  if (!id || placesOpen.value) return '';
+  return (
+    placesStore.features?.features.find(item => item.properties.id === id)
+      ?.properties.name ?? ''
+  );
+});
+const soloPlaceStyle = computed(() => {
+  if (!parkedWidth.value) return undefined;
+  return { width: `${parkedWidth.value}px` };
+});
+const placesParkedWidth = computed(() =>
+  !placesOpen.value && placesStore.selectedId ? parkedWidth.value || 240 : 0
+);
+
+watch(
+  () => placesStore.selectedId,
+  id => {
+    if (id) return;
+    parkedWidth.value = 0;
+  }
+);
+
+const controlsLeft = ref(12);
+let controlsObserver: ResizeObserver | null = null;
+
+/** The open places column the map controls should clear. */
+function controlsPanel(): HTMLElement | null {
+  if (placesOpen.value) {
+    const frame = document.querySelector('.blob-places .places-frame');
+    if (frame instanceof HTMLElement) return frame;
+  }
+  if (!placesOpen.value && placesStore.selectedId) {
+    const solo = document.querySelector('.place-profile-solo');
+    if (solo instanceof HTMLElement) return solo;
+  }
+  return null;
+}
+
+/** Sit Labels and the basemap switch to the right of an open places panel. */
+function placeControls() {
+  const mapBox = document
+    .querySelector('.map-container')
+    ?.getBoundingClientRect();
+  const panel = controlsPanel();
+  if (!mapBox || !panel) {
+    controlsLeft.value = 12;
+    return;
+  }
+  const box = panel.getBoundingClientRect();
+  if (box.width === 0) {
+    controlsLeft.value = 12;
+    return;
+  }
+  controlsLeft.value = Math.round(box.right - mapBox.left + 12);
+}
+
+/** Follow the places panel as it opens, closes, or grows. */
+function watchControls() {
+  controlsObserver?.disconnect();
+  controlsObserver = null;
+  placeControls();
+  const panel = controlsPanel();
+  if (!panel || typeof ResizeObserver === 'undefined') return;
+  controlsObserver = new ResizeObserver(() => placeControls());
+  controlsObserver.observe(panel);
+}
+
+watch(
+  () => [placesOpen.value, placesStore.selectedId] as const,
+  async () => {
+    await nextTick();
+    watchControls();
+  }
+);
 
 // Determine layer color to use
 const layerColorKey = computed(() => {
@@ -224,108 +306,6 @@ function updateLayerOpacityOnMap(
   }
 }
 
-const PLACE_SOURCE = 'pilot-places';
-const PLACE_FILL = 'pilot-places-fill';
-const PLACE_LINE = 'pilot-places-line';
-let placesPopup: mapboxgl.Popup | null = null;
-let placesListening = false;
-
-/**
- * First symbol layer, so place boundaries sit under the labels.
- * @param mapInstance - The map.
- * @returns The layer id, when the style has a symbol.
- */
-function firstSymbolId(mapInstance: mapboxgl.Map): string | undefined {
-  return mapInstance.getStyle()?.layers?.find(layer => layer.type === 'symbol')
-    ?.id;
-}
-
-/** Remove the place boundaries and any open popup. */
-function removePlaceOverlay(mapInstance: mapboxgl.Map) {
-  placesPopup?.remove();
-  placesPopup = null;
-  if (mapInstance.getLayer(PLACE_LINE)) mapInstance.removeLayer(PLACE_LINE);
-  if (mapInstance.getLayer(PLACE_FILL)) mapInstance.removeLayer(PLACE_FILL);
-  if (mapInstance.getSource(PLACE_SOURCE))
-    mapInstance.removeSource(PLACE_SOURCE);
-}
-
-/**
- * Draw or clear the protected-area boundaries.
- * @param mapInstance - The map.
- */
-function syncPlaceOverlay(mapInstance: mapboxgl.Map) {
-  if (!placesStore.visible || !placesStore.features) {
-    removePlaceOverlay(mapInstance);
-    return;
-  }
-  const before = firstSymbolId(mapInstance);
-  const onStandard = !!mapInstance.getStyle()?.imports?.length;
-  if (!mapInstance.getSource(PLACE_SOURCE)) {
-    mapInstance.addSource(PLACE_SOURCE, {
-      type: 'geojson',
-      data: placesStore.features,
-    });
-    const fill: mapboxgl.FillLayer = {
-      id: PLACE_FILL,
-      type: 'fill',
-      source: PLACE_SOURCE,
-      paint: { 'fill-color': '#1f4b3a', 'fill-opacity': 0.18 },
-    };
-    const line: mapboxgl.LineLayer = {
-      id: PLACE_LINE,
-      type: 'line',
-      source: PLACE_SOURCE,
-      paint: { 'line-color': '#1f4b3a', 'line-width': 1.5 },
-    };
-    if (onStandard) {
-      fill.slot = 'top';
-      line.slot = 'top';
-    }
-    mapInstance.addLayer(fill, onStandard ? undefined : before);
-    mapInstance.addLayer(line, onStandard ? undefined : before);
-    if (!placesListening) {
-      mapInstance.on('click', PLACE_FILL, onPlaceClick);
-      mapInstance.on('mouseenter', PLACE_FILL, () => {
-        mapInstance.getCanvas().style.cursor = 'pointer';
-      });
-      mapInstance.on('mouseleave', PLACE_FILL, () => {
-        mapInstance.getCanvas().style.cursor = '';
-      });
-      placesListening = true;
-    }
-  } else {
-    const source = mapInstance.getSource(
-      PLACE_SOURCE
-    ) as mapboxgl.GeoJSONSource;
-    source.setData(placesStore.features);
-  }
-}
-
-/**
- * Open the name and cropland figure for the clicked boundary.
- * @param event - The map click.
- */
-function onPlaceClick(event: mapboxgl.MapMouseEvent) {
-  const feature = event.features?.[0];
-  const properties = feature?.properties as PlaceFeatureProperties | undefined;
-  if (!properties || !map.value) return;
-  placesPopup?.remove();
-  placesPopup = new mapboxgl.Popup({ closeButton: true, maxWidth: '280px' })
-    .setLngLat(event.lngLat)
-    .setDOMContent(placePopupElement(properties))
-    .addTo(map.value as unknown as mapboxgl.Map);
-}
-
-watch(
-  () => [placesStore.visible, placesStore.features] as const,
-  () => {
-    if (map.value?.isStyleLoaded()) {
-      syncPlaceOverlay(map.value as unknown as mapboxgl.Map);
-    }
-  }
-);
-
 onMounted(() => {
   // Create the controls
   const nav = new mapboxgl.NavigationControl();
@@ -363,7 +343,6 @@ onMounted(() => {
     visibleMapLayers.value.forEach((layer, index) => {
       addSourceAndLayer(layer, activeYear.value, mapInstance);
     });
-    syncPlaceOverlay(mapInstance);
     setLabels(mapInstance);
   });
 
@@ -376,6 +355,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  controlsObserver?.disconnect();
   timelineStore.bindTileWait(() => Promise.resolve());
 });
 
@@ -678,9 +658,14 @@ function addSourceAndLayer(
           panel-id="places-panel"
           :image="blobPlaces"
           :expanded="placesOpen"
+          corner
+          :parked-width="placesParkedWidth"
           @toggle="togglePlaces"
         >
-          <PlacesBarComponent />
+          <PlacesBarComponent
+            :open="placesOpen"
+            :zoom-to-place="zoomToSelectedPlace"
+          />
         </BlobButton>
         <BlobButton
           class="blob-layers"
@@ -704,6 +689,14 @@ function addSourceAndLayer(
         >
           <MeasureComponent v-if="map" :map-instance="map" />
         </BlobButton>
+        <PlaceProfileComponent
+          v-if="!placesOpen && placesStore.selectedId"
+          class="place-profile-solo map-panel nw"
+          :style="soloPlaceStyle"
+          :name="soloPlaceName"
+          @close="placesStore.clearSelection()"
+          @zoom="zoomToSelectedPlace"
+        />
         <p
           v-if="placesStore.visible && placesStore.notice"
           class="place-notice"
@@ -712,7 +705,7 @@ function addSourceAndLayer(
         </p>
         <SideButtonsComponent />
         <!-- Toggle basemap labels -->
-        <div class="basemap-button">
+        <div class="basemap-button" :style="{ left: `${controlsLeft}px` }">
           <button
             id="labelsButton"
             type="button"
@@ -836,12 +829,23 @@ function addSourceAndLayer(
   height: 52px;
 }
 
+.place-profile-solo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 13;
+  width: 240px;
+  height: 100vh;
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
 .blob-places {
   top: 12px;
   left: 12px;
   z-index: 14;
-  --panel-inset-top: 12px;
-  --panel-inset-left: 12px;
+  --panel-inset-top: 0px;
+  --panel-inset-left: 0px;
 }
 
 .blob-layers {
