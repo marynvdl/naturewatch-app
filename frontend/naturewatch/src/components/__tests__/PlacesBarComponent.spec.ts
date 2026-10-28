@@ -143,6 +143,47 @@ describe('Places panel', () => {
     expect(loadPlaceMap).toHaveBeenCalledTimes(1);
   });
 
+  it('closes the profile without changing the search or the place type', async () => {
+    vi.mocked(loadPilotPlaces).mockResolvedValue({ status: 'ok', places });
+    vi.mocked(loadPlaceMap).mockResolvedValue(drawn);
+    const zoomToPlace = vi.fn();
+
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+      props: { zoomToPlace },
+    });
+    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await flushPromises();
+    await wrapper.get('input[aria-label="Search places"]').setValue('kruger');
+    await wrapper.get('button.place-result').trigger('click');
+
+    expect(wrapper.get('.place-profile').text()).toContain(
+      'Kruger National Park'
+    );
+    await wrapper.get('.place-profile button.map-control').trigger('click');
+    expect(zoomToPlace).toHaveBeenCalledTimes(1);
+
+    await wrapper.get('button[aria-label="Close place"]').trigger('click');
+    expect(wrapper.find('.place-profile').exists()).toBe(false);
+    expect(
+      wrapper.get('input[aria-label="Search places"]').element
+    ).toHaveProperty('value', 'kruger');
+    expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
+    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the profile out of the list when the list is closed', async () => {
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+      props: { open: false },
+    });
+    usePlacesStore(pinia).selectPlace(places[1].id, 'map');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('.place-profile').exists()).toBe(false);
+  });
+
   it('scrolls a place chosen on the map to the top of the list', async () => {
     vi.mocked(loadPilotPlaces).mockResolvedValue({ status: 'ok', places });
     vi.mocked(loadPlaceMap).mockResolvedValue(drawn);

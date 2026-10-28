@@ -11,6 +11,7 @@ import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
 import DrawerComponent from '@/components/DrawerComponent.vue';
 import MeasureComponent from './MeasureComponent.vue';
+import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
 import PlacesBarComponent from '@/components/PlacesBarComponent.vue';
 import BlobButton from '@/components/ui/blob-button/BlobButton.vue';
 import TimelineComponent from '@/components/TimelineComponent.vue';
@@ -77,15 +78,15 @@ defineProps<{
 const currentBasemap = computed(() => basemapStore.currentBasemap);
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
-
-usePlaceBoundaries(
-  () => map.value,
-  () => {
-    if (placesOpen.value) return;
-    placesOpen.value = true;
-    closeOthers('places');
-  }
-);
+const { zoomToSelectedPlace } = usePlaceBoundaries(() => map.value);
+const soloPlaceName = computed(() => {
+  const id = placesStore.selectedId;
+  if (!id || placesOpen.value) return '';
+  return (
+    placesStore.features?.features.find(item => item.properties.id === id)
+      ?.properties.name ?? ''
+  );
+});
 
 // Determine layer color to use
 const layerColorKey = computed(() => {
@@ -583,7 +584,10 @@ function addSourceAndLayer(
           :expanded="placesOpen"
           @toggle="togglePlaces"
         >
-          <PlacesBarComponent />
+          <PlacesBarComponent
+            :open="placesOpen"
+            :zoom-to-place="zoomToSelectedPlace"
+          />
         </BlobButton>
         <BlobButton
           class="blob-layers"
@@ -607,6 +611,13 @@ function addSourceAndLayer(
         >
           <MeasureComponent v-if="map" :map-instance="map" />
         </BlobButton>
+        <PlaceProfileComponent
+          v-if="!placesOpen && placesStore.selectedId"
+          class="place-profile-solo map-panel nw"
+          :name="soloPlaceName"
+          @close="placesStore.clearSelection()"
+          @zoom="zoomToSelectedPlace"
+        />
         <p
           v-if="placesStore.visible && placesStore.notice"
           class="place-notice"
@@ -728,6 +739,14 @@ function addSourceAndLayer(
 .map-logo img {
   width: 52px;
   height: 52px;
+}
+
+.place-profile-solo {
+  position: absolute;
+  top: calc(12px + var(--blob-size) + 12px);
+  left: 12px;
+  z-index: 13;
+  width: min(280px, calc(100vw - 24px));
 }
 
 .blob-places {

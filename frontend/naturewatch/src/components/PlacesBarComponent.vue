@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { Search } from '@lucide/vue';
+import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
 import { loadPilotPlaces, type PlaceSummary } from '@/places/api';
 import { placesMatching } from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
+
+const props = withDefaults(
+  defineProps<{
+    open?: boolean;
+    zoomToPlace?: () => void;
+  }>(),
+  { open: true, zoomToPlace: () => undefined }
+);
 
 const placesStore = usePlacesStore();
 
@@ -29,6 +38,16 @@ const emptyMessage = computed(() =>
   places.value.length === 0 ? nothingStored : 'No places match.'
 );
 const showProtected = computed(() => placeType.value === 'protected_area');
+const selectedName = computed(() => {
+  const id = placesStore.selectedId;
+  if (!id) return '';
+  return (
+    places.value.find(place => place.id === id)?.name ??
+    placesStore.features?.features.find(item => item.properties.id === id)
+      ?.properties.name ??
+    ''
+  );
+});
 
 /** Draw the protected areas when they are hidden. */
 function showBoundaries() {
@@ -188,7 +207,13 @@ watch(
         </div>
       </template>
     </div>
-    <div v-if="placesStore.selectedId" class="places-detail map-panel nw" />
+    <PlaceProfileComponent
+      v-if="open && placesStore.selectedId"
+      class="places-detail map-panel nw"
+      :name="selectedName"
+      @close="placesStore.clearSelection()"
+      @zoom="props.zoomToPlace()"
+    />
   </div>
 </template>
 

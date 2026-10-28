@@ -1,4 +1,4 @@
-import { watch } from 'vue';
+import { nextTick, watch } from 'vue';
 import type * as mapboxgl from 'mapbox-gl';
 import usePlacesStore from '@/store/PlacesStore';
 import {
@@ -23,13 +23,13 @@ interface PlaceMap {
 
 /**
  * Draw the protected-area boundaries, highlight a selection, and frame it.
+ * A boundary click does not open the places list.
  * @param getMap - The Mapbox map, once MapComponent has created it.
- * @param onSelected - Called when a boundary click selects a place.
+ * @returns A control that fits the map to the selected place.
  */
-export function usePlaceBoundaries(
-  getMap: () => PlaceMap | null,
-  onSelected: () => void
-) {
+export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
+  zoomToSelectedPlace: () => void;
+} {
   const placesStore = usePlacesStore();
   let listening = false;
 
@@ -51,9 +51,40 @@ export function usePlaceBoundaries(
   }
 
   /**
-   * Highlight the selected boundary, and move the map when it is outside the view.
+   * Leave room for a visible places panel on the left.
+   * @param mapInstance - The map.
+   * @returns Padding for fitBounds.
    */
-  function frameSelectedPlace(mapInstance: mapboxgl.Map) {
+  function panelPadding(mapInstance: mapboxgl.Map): {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  } {
+    const canvasLeft = mapInstance.getCanvas().getBoundingClientRect().left;
+    let cover = 0;
+    document.querySelectorAll('.places-frame, .place-profile').forEach(node => {
+      if (!(node instanceof HTMLElement)) return;
+      if (getComputedStyle(node).visibility === 'hidden') return;
+      const box = node.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) return;
+      cover = Math.max(cover, box.right - canvasLeft);
+    });
+    return {
+      top: 72,
+      right: 72,
+      bottom: 72,
+      left: Math.max(72, Math.round(cover) + 24),
+    };
+  }
+
+  /**
+   * Highlight the selected boundary.
+   * Move the map when the place is outside the view, or whenever zoom is requested.
+   * @param mapInstance - The map.
+   * @param force - Fit even when the place is already in view.
+   */
+  function frameSelectedPlace(mapInstance: mapboxgl.Map, force = false) {
     if (mapInstance.getLayer(PLACE_SELECT_FILL)) {
       const filter = selectionFilter();
       mapInstance.setFilter(PLACE_SELECT_FILL, filter);
@@ -75,14 +106,21 @@ export function usePlaceBoundaries(
       view.getEast(),
       view.getNorth(),
     ];
-    if (boundsInsideFrame(frame, place)) return;
+    if (!force && boundsInsideFrame(frame, place)) return;
     mapInstance.fitBounds(
       [
         [place[0], place[1]],
         [place[2], place[3]],
       ],
-      { padding: 72, maxZoom: 10, duration: 800 }
+      { padding: panelPadding(mapInstance), maxZoom: 10, duration: 800 }
     );
+  }
+
+  /** Fit the map to the selected place, even when it is already in view. */
+  function zoomToSelectedPlace() {
+    const mapInstance = readMap();
+    if (!mapInstance) return;
+    frameSelectedPlace(mapInstance, true);
   }
 
   /** Remove the place boundaries. */
@@ -104,9 +142,7 @@ export function usePlaceBoundaries(
     const id = event.features?.[0]?.properties?.id;
     if (id === undefined || id === null || id === '') return;
     const placeId = String(id);
-    const selecting = placesStore.selectedId !== placeId;
     placesStore.selectPlace(placeId, 'map');
-    if (selecting) onSelected();
   }
 
   /** Draw or clear the protected-area boundaries. */
@@ -204,11 +240,13 @@ export function usePlaceBoundaries(
 
   watch(
     () => placesStore.selectedId,
-    () => {
+    async () => {
+      await nextTick();
       const mapInstance = readMap();
-      if (!mapInstance?.isStyleLoaded()) return;
-      if (!mapInstance.getLayer(PLACE_SELECT_LINE)) return;
+      if (!mapInstance) return;
       frameSelectedPlace(mapInstance);
     }
   );
+
+  return { zoomToSelectedPlace };
 }
