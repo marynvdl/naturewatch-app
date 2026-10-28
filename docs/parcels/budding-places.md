@@ -29,7 +29,7 @@ Do one task at a time. Start a task only after the one above it has merged. Each
 
 ### naturewatch-app
 
-- [ ] [task-008-places-frame.md](../tasks/task-008-places-frame.md)
+- [x] [task-008-places-frame.md](../archive/tasks/task-008-places-frame.md)
   - *Goal:* Add the results column, below the three place-type controls, and search. Protected Areas lists the stored places. The other two types say that none are stored. The detail column is empty until a place is chosen. Filtering the list does not download boundaries again.
 - [ ] [task-009-place-selection.md](../tasks/task-009-place-selection.md)
   - *Goal:* Choosing a result and clicking a boundary select the same place and open its profile beside the list. Move the map to the place only when it is outside the current view. Keep a zoom-to-place control. Closing the profile leaves the map, the search, and the place type as they are. When a place is clicked in the map while the list view wasn't opened, keep the list view closed, and just show the profile to the left.

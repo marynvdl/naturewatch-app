@@ -4,6 +4,8 @@ import {
   formatPercent,
   formatReleaseMonth,
   placesMatching,
+  geometryBounds,
+  boundsInsideFrame,
   placePopupElement,
   protectedPlanetUrl,
   buildPlaceFeatures,
@@ -22,6 +24,26 @@ describe('place figures', () => {
     expect(protectedPlanetUrl('873')).toBe(
       'https://www.protectedplanet.net/873'
     );
+  });
+
+  it('keeps a place that is already in view and reports one that is not', () => {
+    const bounds = geometryBounds({
+      type: 'MultiPolygon',
+      coordinates: [
+        [
+          [
+            [30, -25],
+            [32, -25],
+            [32, -23],
+            [30, -23],
+            [30, -25],
+          ],
+        ],
+      ],
+    });
+    expect(bounds).toEqual([30, -25, 32, -23]);
+    expect(boundsInsideFrame([20, -30, 40, -20], bounds!)).toBe(true);
+    expect(boundsInsideFrame([31, -24.5, 33, -22], bounds!)).toBe(false);
   });
 
   it('filters places by name', () => {

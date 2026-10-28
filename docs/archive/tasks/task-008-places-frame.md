@@ -1,6 +1,8 @@
 # Task 008 — Places frame
 
-Parcel: [Budding Places](../parcels/budding-places.md)
+Archived. This task is not active.
+
+Parcel: [Budding Places](../../parcels/budding-places.md)
 
 Repository: naturewatch-app. Start from `develop`. Do not start the unchecked tasks in the Sooty Earth interface parcel.
 

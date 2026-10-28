@@ -66,6 +66,55 @@ export function placesMatching<T extends { name: string }>(
   );
 }
 
+/** West, south, east, north. */
+export type LngLatBounds = [number, number, number, number];
+
+/**
+ * The extent of a stored boundary.
+ * @param geometry - A polygon or multipolygon.
+ * @returns West, south, east, north, or null when the shape has no positions.
+ */
+export function geometryBounds(
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
+): LngLatBounds | null {
+  let west = Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let north = -Infinity;
+  const polygons =
+    geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+  polygons.forEach(polygon => {
+    polygon.forEach(ring => {
+      ring.forEach(([lng, lat]) => {
+        if (lng < west) west = lng;
+        if (lng > east) east = lng;
+        if (lat < south) south = lat;
+        if (lat > north) north = lat;
+      });
+    });
+  });
+  if (!Number.isFinite(west)) return null;
+  return [west, south, east, north];
+}
+
+/**
+ * Whether a place sits entirely inside the current map view.
+ * @param frame - The map view, west, south, east, north.
+ * @param place - The place extent.
+ * @returns True when the place does not cross the view.
+ */
+export function boundsInsideFrame(
+  frame: LngLatBounds,
+  place: LngLatBounds
+): boolean {
+  return (
+    place[0] >= frame[0] &&
+    place[2] <= frame[2] &&
+    place[1] >= frame[1] &&
+    place[3] <= frame[3]
+  );
+}
+
 /** One stored boundary from `pilot_place_map`. */
 export interface PlaceBoundary {
   id: string;

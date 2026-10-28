@@ -43,6 +43,7 @@ const panelLeft = ref('auto');
 
 let revealTimer = 0;
 let reduceQuery: MediaQueryList | null = null;
+let panelObserver: ResizeObserver | null = null;
 let targetX = 0;
 let targetY = 0;
 
@@ -141,6 +142,26 @@ function placePanel() {
   panelBottom.value = 'auto';
 }
 
+/** Stop watching the panel size. */
+function stopTracking() {
+  panelObserver?.disconnect();
+  panelObserver = null;
+}
+
+/** Slide the circle again when the panel grows or shrinks. */
+function trackPanel() {
+  stopTracking();
+  const card = panel.value;
+  if (!card || typeof ResizeObserver === 'undefined') return;
+  panelObserver = new ResizeObserver(() => {
+    if (!props.expanded) return;
+    measureNub();
+    shiftX.value = targetX;
+    shiftY.value = targetY;
+  });
+  panelObserver.observe(card);
+}
+
 /** Move the circle onto the panel edge and remember that spot. */
 function measureNub() {
   const node = anchor.value;
@@ -181,6 +202,7 @@ async function beginOpen() {
   showPanel.value = true;
   shiftX.value = targetX;
   shiftY.value = targetY;
+  trackPanel();
   revealTimer = window.setTimeout(() => {
     animating.value = false;
   }, duration());
@@ -189,6 +211,7 @@ async function beginOpen() {
 /** Hide the panel, then return the circle to its corner. */
 function beginClose() {
   clearReveal();
+  stopTracking();
   showPanel.value = false;
   hovering.value = false;
   animating.value = true;
@@ -263,6 +286,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearReveal();
+  stopTracking();
   reduceQuery?.removeEventListener('change', onReduceChange);
   document.removeEventListener('visibilitychange', onVisibility);
   window.removeEventListener('resize', onResize);
@@ -497,7 +521,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 720px) {
   .is-left :deep(.places-bar) {
-    max-width: calc(100vw - var(--blob-size) - 120px);
+    max-width: min(360px, calc(100vw - 72px));
   }
 
   .is-left :deep(.places-types) {
