@@ -223,6 +223,16 @@ begin
     raise exception 'row level security is not enabled on sources, facts, or fact_methods';
   end if;
 
+  if not exists (
+    select 1
+    from pg_class
+    where oid = 'public.pilot_place_map'::regclass
+      and relkind = 'r'
+      and relrowsecurity
+  ) then
+    raise exception 'pilot_place_map is not a table with row level security';
+  end if;
+
   if exists (
     select 1
     from public.pilot_place_map as mapped
@@ -230,6 +240,49 @@ begin
     where not extensions.st_equals(mapped.geom, places.geom)
   ) then
     raise exception 'pilot_place_map does not return the stored boundary';
+  end if;
+
+  if exists (
+    select 1
+    from public.pilot_place_map
+    where name = 'Small Park'
+  ) then
+    raise exception 'the place below 10 km2 was copied to pilot_place_map';
+  end if;
+
+  update public.places
+  set name = 'Pilot Park Renamed'
+  where source_id = 'fixture-pilot';
+  if (
+    select name
+    from public.pilot_place_map
+    where name = 'Pilot Park Renamed'
+  ) is null then
+    raise exception 'pilot_place_map did not follow the place name';
+  end if;
+  update public.places
+  set name = 'Pilot Park'
+  where source_id = 'fixture-pilot';
+
+  update public.sources
+  set name = 'WDPCA check'
+  where name = 'WDPCA'
+    and release_month = date '2026-10-01';
+  if (
+    select source_name
+    from public.pilot_place_map
+    where source_name = 'WDPCA check'
+  ) is null then
+    raise exception 'pilot_place_map did not follow the source name';
+  end if;
+  update public.sources
+  set name = 'WDPCA'
+  where name = 'WDPCA check'
+    and release_month = date '2026-10-01';
+
+  if has_function_privilege('anon', 'public.sync_pilot_place_map()', 'execute')
+    or has_function_privilege('authenticated', 'public.sync_pilot_place_map()', 'execute') then
+    raise exception 'anon or authenticated can execute sync_pilot_place_map';
   end if;
 
   if has_column_privilege('anon', 'public.places', 'geom', 'SELECT')
@@ -248,10 +301,12 @@ begin
   if has_table_privilege('anon', 'public.sources', 'INSERT')
     or has_table_privilege('anon', 'public.facts', 'INSERT')
     or has_table_privilege('anon', 'public.fact_methods', 'INSERT')
+    or has_table_privilege('anon', 'public.pilot_place_map', 'INSERT')
     or has_table_privilege('authenticated', 'public.sources', 'INSERT')
     or has_table_privilege('authenticated', 'public.facts', 'INSERT')
-    or has_table_privilege('authenticated', 'public.fact_methods', 'INSERT') then
-    raise exception 'anon or authenticated can insert sources, facts, or fact_methods';
+    or has_table_privilege('authenticated', 'public.fact_methods', 'INSERT')
+    or has_table_privilege('authenticated', 'public.pilot_place_map', 'INSERT') then
+    raise exception 'anon or authenticated can insert sources, facts, fact_methods, or pilot_place_map';
   end if;
 
   insert into public.facts (
