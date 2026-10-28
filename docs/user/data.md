@@ -6,11 +6,11 @@ Years and tile addresses below are what the map catalogue publishes.
 
 ## Fire
 
-**Source.** NASA FIRMS, Earth Engine collection `FIRMS`, band `T21`.
+**Source.** NASA FIRMS.
 
 **Unit.** Count of 14-day windows with a detection, drawn as squares about 1 km across. Display tiles are zooms 0–9. Closer zoom still shows those 1 km squares.
 
-**Coverage.** 25 blocks across Africa, Madagascar, and part of the western Indian Ocean. Some blocks are mostly sea. This is not a global layer.
+**Coverage.** Africa, Madagascar, and part of the western Indian Ocean. Some of that area is mostly sea. This is not a global layer.
 
 **Calendar.** Windows start on 1 January and repeat every 14 days through 31 December, which is 27 windows. The last window includes about 13 days of the next January. A square can therefore reach 27, and 27 is shown in the same dark red as the top of the legend.
 
@@ -18,7 +18,7 @@ Years and tile addresses below are what the map catalogue publishes.
 
 **Limitation.** Repeated detections are not the same as a measured burned area, and they do not identify a cause.
 
-Years 2016–2024 were produced by an earlier method than the current export. FIRMS is sometimes reprocessed, so a later export of an old year can differ.
+Years 2016–2024 were produced by an earlier method than the current export. FIRMS is sometimes reprocessed, so a later export of an old year can differ. The count, the grid, and the tile build are in [docs/pipelines.md](https://github.com/marynvdl/naturewatch-analysis/blob/main/docs/pipelines.md) in marynvdl/naturewatch-analysis.
 
 ## Tree loss
 

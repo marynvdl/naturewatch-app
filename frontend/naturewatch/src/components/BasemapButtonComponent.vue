@@ -27,30 +27,33 @@ const buttonImageSrc = computed(() =>
 </script>
 
 <template>
-  <v-btn
+  <button
+    type="button"
     class="basemap-thumb"
-    variant="flat"
     aria-label="Change basemap"
     @click="handleButtonClick"
   >
-    <v-img class="basemap-btn" cover :src="buttonImageSrc" alt="" />
-  </v-btn>
+    <img class="basemap-btn" :src="buttonImageSrc" alt="" />
+  </button>
 </template>
 
 <style scoped>
-.basemap-thumb.v-btn {
-  width: 56px !important;
-  height: 56px !important;
-  min-width: 56px !important;
-  padding: 0 !important;
+.basemap-thumb {
+  width: 56px;
+  height: 56px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
+  background: #f8f9f9;
+  cursor: pointer;
 }
 
 .basemap-btn {
+  display: block;
   width: 56px;
   height: 56px;
+  object-fit: cover;
   transition: transform 0.2s ease-in-out;
 }
 

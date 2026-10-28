@@ -644,8 +644,8 @@ function addSourceAndLayer(
 </script>
 
 <template>
-  <v-container fluid class="map-parent">
-    <v-responsive class="d-flex align-center text-center fill-height">
+  <div class="map-parent">
+    <div class="map-frame">
       <div class="map-container">
         <div id="mapDiv" />
         <div class="map-logo">
@@ -706,17 +706,15 @@ function addSourceAndLayer(
         <SideButtonsComponent />
         <!-- Toggle basemap labels -->
         <div class="basemap-button" :style="{ left: `${controlsLeft}px` }">
-          <v-btn
+          <button
             id="labelsButton"
+            type="button"
             class="map-control"
-            size="x-small"
-            width="50"
-            variant="text"
             :class="{ 'is-on': areLabelsVisible }"
             @click="handleLabelsChanged(map as any)"
           >
             Labels
-          </v-btn>
+          </button>
           <!-- Toggle Basemap type -->
           <BasemapButtonComponent
             id="basmapButton"
@@ -726,8 +724,8 @@ function addSourceAndLayer(
       </div>
       <!-- Timeline Component -->
       <TimelineComponent v-show="timelineVisibility" class="timeline" />
-    </v-responsive>
-  </v-container>
+    </div>
+  </div>
   <!-- Coordinates Component -->
   <CoordinatesComponent
     ref="coordinatesComponentRef"
@@ -741,6 +739,16 @@ function addSourceAndLayer(
 .logo:hover {
   will-change: filter;
   filter: drop-shadow(0 0 1em #2196f3aa);
+}
+
+.map-parent,
+.map-frame {
+  height: 100%;
+}
+
+.map-frame {
+  position: relative;
+  text-align: center;
 }
 
 .map-container {
@@ -779,7 +787,8 @@ function addSourceAndLayer(
   align-items: flex-start;
   gap: 4px;
 }
-#labelsButton.v-btn {
+#labelsButton {
+  width: 50px;
   background: #f8f9f9;
   color: #24312c;
   border: 1px solid var(--border);
@@ -789,7 +798,7 @@ function addSourceAndLayer(
   padding: 0;
 }
 
-#labelsButton.v-btn.is-on {
+#labelsButton.is-on {
   background: #3a3935;
   border-color: #3a3935;
   color: #fff;

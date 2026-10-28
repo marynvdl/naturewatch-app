@@ -14,8 +14,6 @@ import { usePosthog } from './plugins/posthog';
 // Pinia Store
 import { useGlobal } from '@/store';
 
-// import { goTo } from 'vuetify/lib/services/goto/index.mjs';
-
 // Components
 import HomeView from '@/views/HomeView.vue';
 

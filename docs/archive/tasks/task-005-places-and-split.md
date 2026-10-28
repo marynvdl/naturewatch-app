@@ -1,8 +1,8 @@
 # Task 005 — Places and split
 
-Parcel: [Sooty Earth interface](../parcels/ui-revamp.md)
+Not part of the [Sooty Earth interface](../parcels/ui-revamp.md) parcel. The places list and the map-and-list split wait for a later parcel. Do not start this task from that parcel.
 
-Repository: naturewatch-app. Start only after task 004 has merged.
+Repository: naturewatch-app. Start only after that later parcel takes it up, and after task 004.
 
 ## Goal
 

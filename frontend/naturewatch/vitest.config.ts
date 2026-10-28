@@ -2,7 +2,6 @@ import { fileURLToPath, URL } from 'node:url';
 
 import { configDefaults, defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
-import vuetify from 'vite-plugin-vuetify';
 
 /**
  * Vitest Configure
@@ -31,12 +30,6 @@ export default defineConfig({
     } as any,
     // Vue3
     vue(),
-    // Vuetify Loader
-    // https://github.com/vuetifyjs/vuetify-loader
-    vuetify({
-      autoImport: true,
-      styles: { configFile: './src/styles/variables.scss' },
-    }),
   ],
   test: {
     // https://vitest.dev/guide/#configuring-vitest
@@ -45,8 +38,5 @@ export default defineConfig({
     globals: true,
     globalSetup: [fileURLToPath(new URL('./vitest/setup.ts', import.meta.url))],
     root: fileURLToPath(new URL('./', import.meta.url)),
-    deps: {
-      inline: ['vuetify'],
-    },
   },
 });

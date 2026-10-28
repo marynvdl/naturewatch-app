@@ -1,8 +1,8 @@
 # Task 006 — Place popup
 
-Parcel: [Sooty Earth interface](../parcels/ui-revamp.md)
+Not part of the [Sooty Earth interface](../parcels/ui-revamp.md) parcel. The popup restyle waits for a later parcel. The popup that opens today stays as it is. Do not start this task from that parcel.
 
-Repository: naturewatch-app. Start only after task 005 has merged.
+Repository: naturewatch-app. Start only after that later parcel takes it up, and after task 005.
 
 ## Goal
 
@@ -22,7 +22,7 @@ Restyle the popup that opens when a place is clicked. Show the facts already sto
 - Do not add an image slot, a chart, or a click-through to a detail page.
 - Do not redesign `/places/:id`. Leave `PlaceView.vue` as it is.
 - Do not change attribution text or the Protected Planet address format.
-- Do not start task 007.
+- Do not treat this as part of the Sooty Earth interface parcel. Task 007 removes Vuetify without this restyle.
 
 ## Done when
 

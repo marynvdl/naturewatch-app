@@ -4,6 +4,7 @@ import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
 import { computed, onMounted, ref } from 'vue';
 import { Info, Settings } from '@lucide/vue';
+import LayerIcon from '@/components/LayerIcon.vue';
 import {
   Popover,
   PopoverContent,
@@ -105,11 +106,7 @@ function onOpacity(title: string, value: unknown) {
               :aria-pressed="item.visible"
               @click="handleButtonClick(item.title)"
             >
-              <v-icon
-                :icon="item.icon"
-                size="18"
-                :color="item.visible ? 'white' : '#24312c'"
-              />
+              <LayerIcon :name="item.icon" :size="16" />
               <span>{{ item.title }}</span>
             </button>
             <div class="settings-slot">

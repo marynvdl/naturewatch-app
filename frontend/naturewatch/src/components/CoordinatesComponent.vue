@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, defineExpose } from 'vue';
+import { ref, computed } from 'vue';
+import { Copy } from '@lucide/vue';
 
 const props = defineProps({
   lngLat: {
@@ -44,37 +45,52 @@ function copyCoordinates() {
   navigator.clipboard.writeText(coordinates.value);
 }
 
-// Expose methods
 defineExpose({
   openPopup,
 });
 </script>
 
 <template>
-  <v-menu
-    v-model="show"
-    absolute
-    class="pa-0"
+  <div
+    v-if="show && coordinates"
+    class="coordinate-pop"
     :style="{ top: y + 'px', left: x + 'px' }"
   >
-    <v-card>
-      <v-card-text class="px-2 py-1 coordinate-text">
-        {{ coordinates }}
-        <v-btn
-          class="px-2"
-          variant="plain"
-          size="x-small"
-          density="compact"
-          icon="mdi-content-copy"
-          @click="copyCoordinates"
-        />
-      </v-card-text>
-    </v-card>
-  </v-menu>
+    <span class="coordinate-text">{{ coordinates }}</span>
+    <button type="button" aria-label="Copy coordinates" @click="copyCoordinates">
+      <Copy :size="14" />
+    </button>
+  </div>
 </template>
 
 <style scoped>
+.coordinate-pop {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f8f9f9;
+  color: #3a3935;
+}
+
 .coordinate-text {
   font-size: 0.75rem;
+}
+
+.coordinate-pop button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }
 </style>

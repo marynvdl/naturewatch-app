@@ -9,8 +9,8 @@ const jsonLd = JSON.stringify(
     '@context': 'http://schema.org',
     '@type': 'WebSite',
     name: 'Project NatureWatch',
-    url: 'https://github.com/logue/vite-vuetify-ts-starter',
-    description: 'A geospatial web application using Vue3, Vuetify and Mapbox',
+    url: 'https://github.com/marynvdl/naturewatch-app',
+    description: 'A geospatial web application using Vue 3, Tailwind, and Mapbox',
   },
   null,
   2
@@ -18,9 +18,9 @@ const jsonLd = JSON.stringify(
 </script>
 
 <template>
-  <v-container class="pa-0" fluid>
+  <div class="map-page">
     <map-box msg="Hello World" />
-  </v-container>
+  </div>
   <teleport to="head">
     <meta
       name="keyword"
@@ -28,7 +28,7 @@ const jsonLd = JSON.stringify(
     />
     <meta
       name="description"
-      content="A geospatial web application using Vue3, Vuetify and Mapbox"
+      content="A geospatial web application using Vue 3, Tailwind, and Mapbox"
     />
     <component :is="'script'" type="application/ld+json">
       {{ jsonLd }}
@@ -36,4 +36,9 @@ const jsonLd = JSON.stringify(
   </teleport>
 </template>
 
-<style scoped></style>
+<style scoped>
+.map-page {
+  margin: 0;
+  padding: 0;
+}
+</style>

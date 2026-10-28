@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createMemoryHistory, createRouter } from 'vue-router';
-import vuetify from '@/plugins/vuetify';
 import PlaceView from '@/views/PlaceView.vue';
 import { loadPilotPlace } from '@/places/api';
 
@@ -37,7 +36,7 @@ describe('Place view', () => {
     await router.push(`/places/${placeId}`);
 
     const wrapper = mount(PlaceView, {
-      global: { plugins: [vuetify, router] },
+      global: { plugins: [router] },
     });
     await flushPromises();
 

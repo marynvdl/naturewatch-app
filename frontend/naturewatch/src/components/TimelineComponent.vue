@@ -1,14 +1,23 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { Hourglass, Pause, Play, Timer } from '@lucide/vue';
 import useTimelineStore from '@/store/TimelineStore';
 import { timelineRange } from '@/catalog';
+import { Slider } from '@/components/ui/slider';
 
 const timelineStore = useTimelineStore();
 const row = ref<HTMLElement | null>(null);
 
 const selectedYear = ref(timelineStore.activeYear);
-const jumpYearIcon = ref('mdi-timer-sand-complete');
+const jumpYearIcon = ref<'rest' | 'moved'>('rest');
 const playing = ref(false);
+const years = computed(() => {
+  const marks: number[] = [];
+  for (let year = timelineRange.min; year <= timelineRange.max; year += 1) {
+    marks.push(year);
+  }
+  return marks;
+});
 let playGeneration = 0;
 
 const yearKeys = new Set([
@@ -31,7 +40,7 @@ let pendingPrevious: number | null = null;
 /** Keep the year from before a slider drag or click. Capture runs first. */
 function beginGesture(event: PointerEvent) {
   const target = event.target;
-  if (!(target instanceof Element) || !target.closest('.v-slider')) return;
+  if (!(target instanceof Element) || !target.closest('.timeline-slider')) return;
   stopPlay();
   if (pendingPrevious === null) pendingPrevious = selectedYear.value;
 }
@@ -74,10 +83,14 @@ function jumpToPreviousYear() {
   timelineStore.setPreviousYear(current);
   timelineStore.previewActiveYear(previous);
   selectedYear.value = previous;
-  jumpYearIcon.value =
-    jumpYearIcon.value === 'mdi-timer-sand-complete'
-      ? 'mdi-timer-sand'
-      : 'mdi-timer-sand-complete';
+  jumpYearIcon.value = jumpYearIcon.value === 'rest' ? 'moved' : 'rest';
+}
+
+/** Keep the slider thumb on the selected year. */
+function onSlider(value: number[] | undefined) {
+  const year = value?.[0];
+  if (typeof year !== 'number') return;
+  selectedYear.value = year;
 }
 
 watch(selectedYear, year => {
@@ -178,35 +191,47 @@ onBeforeUnmount(() => {
 <template>
   <div ref="row" class="timelineRow">
     <span class="year-readout">{{ selectedYear }}</span>
-    <v-btn
-      size="x-small"
-      variant="text"
-      :icon="playing ? 'mdi-pause' : 'mdi-play'"
+    <button
+      type="button"
+      class="timeline-icon"
       :aria-label="playing ? 'Pause the years' : 'Play the years'"
       :aria-pressed="playing"
       @click="togglePlay"
-    />
+    >
+      <Pause v-if="playing" :size="16" />
+      <Play v-else :size="16" />
+    </button>
     <div class="timeline-container">
-      <v-slider
-        v-model="selectedYear"
-        class="timeline"
-        density="compact"
-        hide-details
-        show-ticks="always"
-        tick-size="2"
+      <div class="timeline-ticks" aria-hidden="true">
+        <span
+          v-for="year in years"
+          :key="year"
+          class="tick"
+          :style="{
+            left: `${((year - timelineRange.min) / (timelineRange.max - timelineRange.min)) * 100}%`,
+          }"
+        />
+      </div>
+      <Slider
+        class="timeline-slider"
+        :model-value="[selectedYear]"
         :min="timelineRange.min"
         :max="timelineRange.max"
         :step="1"
-        @end="endGesture"
+        aria-label="Year"
+        @update:model-value="onSlider"
+        @value-commit="endGesture"
       />
     </div>
-    <v-btn
-      size="x-small"
-      variant="text"
-      :icon="jumpYearIcon"
+    <button
+      type="button"
+      class="timeline-icon"
       aria-label="Jump between this year and the previous year"
       @click="jumpToPreviousYear"
-    />
+    >
+      <Hourglass v-if="jumpYearIcon === 'rest'" :size="16" />
+      <Timer v-else :size="16" />
+    </button>
   </div>
 </template>
 
@@ -230,36 +255,45 @@ onBeforeUnmount(() => {
   color: #3a3935;
 }
 
+.timeline-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #3a3935;
+  cursor: pointer;
+}
+
+.timeline-icon:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
 .timeline-container {
+  position: relative;
   width: 300px;
 }
 
-/* The fill's height is inherit, and that declaration wins over a plain height. */
-.timeline :deep(.v-slider.v-input--horizontal .v-slider-track__background),
-.timeline :deep(.v-slider.v-input--horizontal .v-slider-track__fill) {
-  height: 3px !important;
-  align-self: center;
+.timeline-ticks {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  height: 0;
+  pointer-events: none;
 }
 
-.timeline :deep(.v-slider.v-input--horizontal .v-slider-track__tick) {
+.tick {
+  position: absolute;
   width: 6px;
   height: 6px;
   border: 1.5px solid #3a3935;
   border-radius: 50%;
-  background-color: #fff;
-  opacity: 1;
-  transform: translate(-3px, -3px);
-}
-
-.timeline :deep(.v-slider.v-input--horizontal .v-slider-track__tick--first) {
-  margin-inline-start: 0;
-}
-
-.timeline :deep(.v-slider.v-input--horizontal .v-slider-track__tick--last) {
-  margin-inline-start: 100%;
-}
-
-.timeline :deep(.v-slider-thumb) {
-  --v-slider-thumb-size: 10px !important;
+  background: #fff;
+  transform: translate(-50%, -50%);
 }
 </style>

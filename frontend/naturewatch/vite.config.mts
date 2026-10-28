@@ -6,23 +6,14 @@ import { visualizer } from 'rollup-plugin-visualizer';
 import { checker } from 'vite-plugin-checker';
 import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
-import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify';
 
 export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
   const config: UserConfig = {
     base: './',
     define: { 'process.env': {} },
     plugins: [
-      vue({
-        template: {
-          transformAssetUrls,
-        },
-      }),
+      vue(),
       tailwindcss(),
-      vuetify({
-        autoImport: true,
-        styles: { configFile: 'src/styles/settings.scss' },
-      }),
       checker({
         typescript: true,
         vueTsc: true,
@@ -51,13 +42,6 @@ export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
         output: {
           manualChunks: {
             vue: ['vue', 'vue-router', 'pinia', 'pinia-plugin-persistedstate'],
-            vuetify: [
-              'vuetify',
-              'vuetify/components',
-              'vuetify/directives',
-              'webfontloader',
-            ],
-            materialdesignicons: ['@mdi/font/css/materialdesignicons.css'],
           },
           plugins: [
             mode === 'analyze'

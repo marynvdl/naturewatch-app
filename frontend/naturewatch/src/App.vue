@@ -9,53 +9,18 @@ import {
   type Ref,
   type WritableComputedRef,
 } from 'vue';
+import { X } from '@lucide/vue';
 import logo from '@/assets/logo.svg';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useTheme } from 'vuetify';
 
 // Stores
-import { useGlobal, useConfig } from '@/store';
-import useBasemapStore from '@/store/BasemapStore';
+import { useGlobal } from '@/store';
 
 /** Using stores */
 const globalStore = useGlobal();
-const configStore = useConfig();
-const basemapStore = useBasemapStore();
 
 /** Title */
 const title = import.meta.env.VITE_APP_TITLE || 'Nature Watch';
-
-/** Theme */
-const theme = useTheme();
-const currentBasemap = computed(() => basemapStore.currentBasemap);
-
-watch(
-  () => configStore.themeDark,
-  newVal => {
-    setTheme();
-  },
-  { immediate: true }
-);
-
-watch(
-  () => basemapStore.currentBasemap.title,
-  newVal => {
-    setTheme();
-  },
-  { immediate: true }
-);
-
-/** Methods */
-function setTheme() {
-  const isSatellite = currentBasemap.value.title === 'Satellite';
-  const isDark = configStore.themeDark;
-
-  if (isSatellite) {
-    theme.global.name.value = isDark ? 'satelliteDark' : 'satelliteLight';
-  } else {
-    theme.global.name.value = isDark ? 'dark' : 'light';
-  }
-}
 
 /** loading overlay visibility */
 const loading: WritableComputedRef<boolean> = computed({
@@ -95,7 +60,6 @@ watch(loading, async () => nextTick());
 onMounted(() => {
   document.title = title;
   loading.value = false;
-  setTheme();
   const preloader = document.getElementById('preloader');
   if (preloader) {
     preloader.style.display = 'none';
@@ -104,40 +68,30 @@ onMounted(() => {
 </script>
 
 <template>
-  <v-app>
-    <v-main class="pa-0">
-      <router-view v-slot="{ Component, route: activeRoute }">
-        <component :is="Component" :key="activeRoute.path" />
-      </router-view>
-    </v-main>
-    <v-overlay v-model="loading" app class="justify-center align-center">
-      <v-progress-circular indeterminate size="64" />
-    </v-overlay>
-
-    <v-snackbar v-model="snackbar" @update:model-value="onSnackbarChanged">
-      {{ snackbarText }}
-      <template #actions>
-        <v-btn icon @click="onSnackbarChanged">
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </template>
-    </v-snackbar>
-  </v-app>
+  <div class="app-frame">
+    <router-view v-slot="{ Component, route: activeRoute }">
+      <component :is="Component" :key="activeRoute.path" />
+    </router-view>
+    <div v-if="loading" class="loading-overlay" role="status" aria-label="Loading">
+      <span class="spinner" />
+    </div>
+    <div v-if="snackbar" class="snackbar" role="status">
+      <p>{{ snackbarText }}</p>
+      <button type="button" aria-label="Close" @click="onSnackbarChanged">
+        <X :size="16" />
+      </button>
+    </div>
+  </div>
   <teleport to="head">
     <link rel="icon" :href="logo" type="image/svg+xml" />
   </teleport>
 </template>
 
-<style lang="scss">
-@use 'vuetify/settings';
-
+<style>
 html {
-  // Fix always scrollbar shown.
   overflow-y: auto;
-  // Modern scrollbar style
   scrollbar-width: thin;
-  scrollbar-color: map-get(settings.$grey, 'lighten-2')
-    map-get(settings.$grey, 'base');
+  scrollbar-color: #e0e0e0 #9e9e9e;
 }
 
 ::-webkit-scrollbar {
@@ -147,24 +101,78 @@ html {
 
 ::-webkit-scrollbar-track {
   box-shadow: inset 0 0 0.5rem rgba(0, 0, 0, 0.1);
-  background-color: map-get(settings.$grey, 'lighten-2');
+  background-color: #e0e0e0;
 }
 
 ::-webkit-scrollbar-thumb {
   border-radius: 0.5rem;
-  background-color: map-get(settings.$grey, 'base');
+  background-color: #9e9e9e;
   box-shadow: inset 0 0 0.5rem rgba(0, 0, 0, 0.1);
 }
 
-// Fixed a bug that the theme color is interrupted when scrolling
-.v-application {
+.app-frame {
+  min-height: 100vh;
   overflow-y: auto;
 }
 
-// Fix app-bar's progress-bar
-.v-app-bar .v-progress-linear {
-  position: absolute;
-  bottom: 0;
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 249, 249, 0.72);
+}
+
+.spinner {
+  width: 64px;
+  height: 64px;
+  border: 4px solid var(--border);
+  border-top-color: var(--foreground);
+  border-radius: 50%;
+  animation: app-spin 0.8s linear infinite;
+}
+
+@keyframes app-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.snackbar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px 12px 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--foreground);
+  color: var(--primary-foreground);
+  transform: translateX(-50%);
+}
+
+.snackbar p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.snackbar button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }
 
 .mapboxgl-ctrl-bottom-right {
