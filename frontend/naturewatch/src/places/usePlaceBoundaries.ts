@@ -1,4 +1,4 @@
-import { type Ref, watch } from 'vue';
+import { watch } from 'vue';
 import type * as mapboxgl from 'mapbox-gl';
 import usePlacesStore from '@/store/PlacesStore';
 import {
@@ -14,16 +14,29 @@ const PLACE_SELECT_FILL = 'pilot-places-select-fill';
 const PLACE_SELECT_LINE = 'pilot-places-select-line';
 
 /**
+ * The map methods this overlay uses.
+ * The full Mapbox map type is too large to pass through a ref.
+ */
+interface PlaceMap {
+  isStyleLoaded(): boolean;
+}
+
+/**
  * Draw the protected-area boundaries, highlight a selection, and frame it.
- * @param map - The Mapbox map, once MapComponent has created it.
+ * @param getMap - The Mapbox map, once MapComponent has created it.
  * @param onSelected - Called when a boundary click selects a place.
  */
 export function usePlaceBoundaries(
-  map: Ref<mapboxgl.Map | null>,
+  getMap: () => PlaceMap | null,
   onSelected: () => void
 ) {
   const placesStore = usePlacesStore();
   let listening = false;
+
+  /** Read the map as the Mapbox instance this overlay draws on. */
+  function readMap(): mapboxgl.Map | null {
+    return getMap() as mapboxgl.Map | null;
+  }
 
   /** First symbol layer, so place boundaries sit under the labels. */
   function firstSymbolId(mapInstance: mapboxgl.Map): string | undefined {
@@ -55,6 +68,7 @@ export function usePlaceBoundaries(
     const place = geometryBounds(feature.geometry);
     if (!place) return;
     const view = mapInstance.getBounds();
+    if (!view) return;
     const frame: LngLatBounds = [
       view.getWest(),
       view.getSouth(),
@@ -170,11 +184,12 @@ export function usePlaceBoundaries(
   }
 
   watch(
-    map,
+    getMap,
     mapInstance => {
       if (!mapInstance) return;
-      mapInstance.on('style.load', () => syncPlaceOverlay(mapInstance));
-      drawWhenReady(mapInstance);
+      const instance = mapInstance as mapboxgl.Map;
+      instance.on('style.load', () => syncPlaceOverlay(instance));
+      drawWhenReady(instance);
     },
     { flush: 'sync' }
   );
@@ -182,7 +197,7 @@ export function usePlaceBoundaries(
   watch(
     () => [placesStore.visible, placesStore.features] as const,
     () => {
-      const mapInstance = map.value;
+      const mapInstance = readMap();
       if (mapInstance) drawWhenReady(mapInstance);
     }
   );
@@ -190,7 +205,7 @@ export function usePlaceBoundaries(
   watch(
     () => placesStore.selectedId,
     () => {
-      const mapInstance = map.value;
+      const mapInstance = readMap();
       if (!mapInstance?.isStyleLoaded()) return;
       if (!mapInstance.getLayer(PLACE_SELECT_LINE)) return;
       frameSelectedPlace(mapInstance);

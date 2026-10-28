@@ -78,11 +78,14 @@ const currentBasemap = computed(() => basemapStore.currentBasemap);
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
 
-usePlaceBoundaries(map, () => {
-  if (placesOpen.value) return;
-  placesOpen.value = true;
-  closeOthers('places');
-});
+usePlaceBoundaries(
+  () => map.value,
+  () => {
+    if (placesOpen.value) return;
+    placesOpen.value = true;
+    closeOthers('places');
+  }
+);
 
 // Determine layer color to use
 const layerColorKey = computed(() => {
