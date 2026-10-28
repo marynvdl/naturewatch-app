@@ -212,6 +212,19 @@ begin
 
   if exists (
     select 1
+    from pg_class
+    where oid in (
+      'public.sources'::regclass,
+      'public.facts'::regclass,
+      'public.fact_methods'::regclass
+    )
+      and not relrowsecurity
+  ) then
+    raise exception 'row level security is not enabled on sources, facts, or fact_methods';
+  end if;
+
+  if exists (
+    select 1
     from public.pilot_place_map as mapped
     join public.places on places.id = mapped.id
     where not extensions.st_equals(mapped.geom, places.geom)
@@ -231,6 +244,14 @@ begin
   if has_table_privilege('anon', 'public.places', 'INSERT')
     or has_table_privilege('authenticated', 'public.places', 'INSERT') then
     raise exception 'anon or authenticated can insert places';
+  end if;
+  if has_table_privilege('anon', 'public.sources', 'INSERT')
+    or has_table_privilege('anon', 'public.facts', 'INSERT')
+    or has_table_privilege('anon', 'public.fact_methods', 'INSERT')
+    or has_table_privilege('authenticated', 'public.sources', 'INSERT')
+    or has_table_privilege('authenticated', 'public.facts', 'INSERT')
+    or has_table_privilege('authenticated', 'public.fact_methods', 'INSERT') then
+    raise exception 'anon or authenticated can insert sources, facts, or fact_methods';
   end if;
 
   insert into public.facts (
@@ -317,6 +338,24 @@ begin
     ) <> 'area-weighted-spheroid-v1' then
       raise exception '% could not read fact_methods', role_name;
     end if;
+
+    begin
+      insert into public.facts (
+        place_id, sprout_id, method_id, area_km2, percent, valid_coverage
+      )
+      values (
+        '00000000-0000-0000-0000-000000000000',
+        'cropland-2024-v1',
+        'area-weighted-spheroid-v1',
+        1,
+        1,
+        1
+      );
+      raise exception '% inserted a fact', role_name;
+    exception
+      when insufficient_privilege then
+        null;
+    end;
   end loop;
 end $$;
 
