@@ -16,7 +16,7 @@ This document describes the working system and agreed direction. Commands and br
 | Work parcels | `docs/parcels/` in this repo |
 | A single task | `docs/tasks/` in the repo that does the work |
 
-*Updated 23 October 2026. Reader docs live in `docs/user/`. The first-release roadmap is archived. Pipeline procedure, cost, and scripts stay in naturewatch-analysis. `nature-watch-bucket` was made private on 22 October 2026.*
+*Updated 28 October 2026. Reader docs live in `docs/user/`. The first-release roadmap is archived. Pipeline procedure, cost, and scripts stay in naturewatch-analysis. `nature-watch-bucket` was made private on 22 October 2026.*
 
 ## 1. How the system fits together
 
@@ -77,7 +77,7 @@ The cropland seed objects are at `gs://nature-watch-bucket/seeds/cropland/glad/2
 
 Cropland facts for the 941 pilot places are stored for sprout `cropland-2024-v1`, method `area-weighted-spheroid-v1`.
 
-The catalog layer `cropland` publishes that 2024 product for South Africa. Its tiles are class values at `gs://nature-watch-tiles/cropland/2024/v1/{z}/{x}/{y}.png`, zooms 0–12. The client colours class 1 and leaves class 0 clear. The tile bucket allows the develop app and local dev (`http://localhost:5173` and `http://127.0.0.1:5173`) to read those pixels. Closer than zoom 12 enlarges the zoom 12 tiles. `/places` lists the pilot protected areas. `/places/:id` shows the name, the stored cropland square kilometres and percent, the WDPCA release month, attribution, and a Protected Planet link. **Places** on the map draws the stored boundary from `pilot_place_map`. The `places.geom` column itself stays ungranted. A click shows the name, cropland figure, release month, attribution, and Protected Planet link. The app does not offer a polygon download. The page and the overlay need `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` at build time. The develop deploy reads those from GitHub secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+The catalog layer `cropland` publishes that 2024 product for South Africa. Its tiles are class values at `gs://nature-watch-tiles/cropland/2024/v1/{z}/{x}/{y}.png`, zooms 0–12. The client colours class 1 and leaves class 0 clear. The tile bucket allows the develop app and local dev (`http://localhost:5173` and `http://127.0.0.1:5173`) to read those pixels. Closer than zoom 12 enlarges the zoom 12 tiles. `/places` lists the pilot protected areas. `/places/:id` shows the name, the stored cropland square kilometres and percent, the WDPCA release month, attribution, and a Protected Planet link. **Places** on the map draws the stored boundary from the `pilot_place_map` table. The `places.geom` column itself stays ungranted. A click shows the name, cropland figure, release month, attribution, and Protected Planet link. The app does not offer a polygon download. The page and the overlay need `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` at build time. The develop deploy reads those from GitHub secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 
 Accepted for the first Sooty Earth release, and not yet built:
 
