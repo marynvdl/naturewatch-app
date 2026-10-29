@@ -7,7 +7,7 @@ const props = withDefaults(
     name?: string;
     size?: number;
   }>(),
-  { size: 16 }
+  { name: undefined, size: 16 }
 );
 
 const icon = computed(() => layerIcon(props.name));

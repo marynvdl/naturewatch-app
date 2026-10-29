@@ -12,7 +12,7 @@ The place types are Protected Areas, Ecoregions, and Countries. The stored place
 
 The map stays the main surface. On a wide screen the results sit on the left, the open place sits beside the results, and the map fills the rest. The list stays visible while a place is open. On a narrow screen the panels shrink over the map, and the map remains.
 
-The active place type uses the same near-black selected style as the other controls. The place name is a serif title. The area is a prominent tag in square kilometres, at the two decimal places already used for display. Do not show hectares.
+The active place type uses the same near-black selected style as the other controls. The place name is a serif title. The area is a prominent tag in whole square kilometres, or at two decimal places below 100 km². Do not show hectares.
 
 The refined mock-up at [budding-places.html](budding-places.html) is the interaction reference. Its polygons, names, and photographs are examples. Do not copy them into the app. Keep Mapbox. Do not switch the map to the library used in the mock-up.
 
@@ -31,10 +31,10 @@ Do one task at a time. Start a task only after the one above it has merged. Each
 
 - [x] [task-008-places-frame.md](../archive/tasks/task-008-places-frame.md)
   - *Goal:* Add the results column, below the three place-type controls, and search. Protected Areas lists the stored places. The other two types say that none are stored. The detail column is empty until a place is chosen. Filtering the list does not download boundaries again.
-- [ ] [task-009-place-selection.md](../tasks/task-009-place-selection.md)
+- [x] [task-009-place-selection.md](../archive/tasks/task-009-place-selection.md)
   - *Goal:* Choosing a result and clicking a boundary select the same place and open its profile beside the list. Move the map to the place only when it is outside the current view. Keep a zoom-to-place control. Closing the profile leaves the map, the search, and the place type as they are. When a place is clicked in the map while the list view wasn't opened, keep the list view closed, and just show the profile to the left.
-- [ ] [task-010-place-profile.md](../tasks/task-010-place-profile.md)
-  - *Goal:* Overview, Disturbances, and Species. Overview shows the stored name, designation, country, area, and source. Disturbances shows the stored cropland fact, or that it is not stored. Species says that no species records are stored, and does not say the place has none.
+- [x] [task-010-place-profile.md](../archive/tasks/task-010-place-profile.md)
+  - *Goal:* Overview, Landscape, and Species. Overview shows the stored name, designation, country, area, and source. Landscape shows the stored cropland fact, or that it has not been calculated. Species says there is nothing to show yet, and does not say the place has none.
 - [ ] [task-011-place-photographs.md](../tasks/task-011-place-photographs.md)
   - *Goal:* Show one approved photograph, and open the rest in a gallery with the photographer, the source, and the licence. Arrows and Escape move through the gallery and close it. No approved photographs are stored, so the profile shows that.
 

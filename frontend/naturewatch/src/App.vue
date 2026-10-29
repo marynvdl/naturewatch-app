@@ -72,7 +72,12 @@ onMounted(() => {
     <router-view v-slot="{ Component, route: activeRoute }">
       <component :is="Component" :key="activeRoute.path" />
     </router-view>
-    <div v-if="loading" class="loading-overlay" role="status" aria-label="Loading">
+    <div
+      v-if="loading"
+      class="loading-overlay"
+      role="status"
+      aria-label="Loading"
+    >
       <span class="spinner" />
     </div>
     <div v-if="snackbar" class="snackbar" role="status">

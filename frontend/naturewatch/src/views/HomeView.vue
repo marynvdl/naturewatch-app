@@ -10,7 +10,8 @@ const jsonLd = JSON.stringify(
     '@type': 'WebSite',
     name: 'Project NatureWatch',
     url: 'https://github.com/marynvdl/naturewatch-app',
-    description: 'A geospatial web application using Vue 3, Tailwind, and Mapbox',
+    description:
+      'A geospatial web application using Vue 3, Tailwind, and Mapbox',
   },
   null,
   2

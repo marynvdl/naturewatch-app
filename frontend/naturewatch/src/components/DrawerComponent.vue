@@ -216,6 +216,10 @@ function onOpacity(title: string, value: unknown) {
   width: max-content;
 }
 
+.layer-panel .panel-heading {
+  padding-right: 40px;
+}
+
 .layer-list {
   display: grid;
   grid-template-columns: max-content 20px;

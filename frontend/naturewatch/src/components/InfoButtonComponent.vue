@@ -39,7 +39,12 @@ function close() {
           layer or have feedback? Send us an email at top.map4835@fastmail.com
         </p>
       </div>
-      <button type="button" class="info-close" aria-label="Close" @click="close">
+      <button
+        type="button"
+        class="info-close"
+        aria-label="Close"
+        @click="close"
+      >
         <X :size="18" />
       </button>
     </header>

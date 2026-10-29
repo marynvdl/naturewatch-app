@@ -354,5 +354,6 @@ map.value?.on('style.load', () => {
   display: flex;
   flex-direction: row;
   gap: 8px;
+  padding-right: 40px;
 }
 </style>

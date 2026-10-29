@@ -47,6 +47,8 @@ const shiftY = ref(0);
 const scale = ref(1);
 const showMark = ref(false);
 const labelSize = ref<number | null>(null);
+/** The label size at rest, from `--blob-label`. */
+let labelRest = 20;
 const panelTop = ref('auto');
 const panelRight = ref('auto');
 const panelBottom = ref('auto');
@@ -94,6 +96,7 @@ function readTokens() {
   if (!node) return;
   const style = getComputedStyle(node);
   blobSize.value = cssNumber(style.getPropertyValue('--blob-size'), 112);
+  labelRest = cssNumber(style.getPropertyValue('--blob-label'), 20);
 }
 
 /** Parse a px or ms custom property. */
@@ -183,9 +186,9 @@ function trackPanel() {
   panelObserver.observe(card);
 }
 
-/** The list column when this circle should stay on that column's corner. */
+/** The visible panel card whose corner this circle should sit on. */
 function cornerBox(card: HTMLElement): DOMRect {
-  const list = card.querySelector('.places-bar');
+  const list = card.querySelector('.places-bar, .map-panel');
   if (list instanceof HTMLElement) {
     const box = list.getBoundingClientRect();
     if (box.width > 0 && box.height > 0) return box;
@@ -294,6 +297,7 @@ function beginClose() {
   hovering.value = false;
   animating.value = true;
   showMark.value = false;
+  readTokens();
   const parked = props.corner ? (props.parkedWidth ?? 0) : 0;
   const slide = anchor.value?.querySelector('.blob-slide');
   if (slide instanceof HTMLElement && props.corner && scale.value < 1) {
@@ -306,7 +310,10 @@ function beginClose() {
         anchor.value.getBoundingClientRect().left - (mapBox?.left ?? 0);
       shiftX.value -= parked - current;
     }
-    labelSize.value = 11 / scale.value;
+    // The label's font and the circle's scale ease together, and their product
+    // is the size seen. Starting at most s·r·(2 − s) keeps it from passing r.
+    const start = scale.value;
+    labelSize.value = Math.min(11, start * labelRest * (2 - start)) / start;
     nextTick(() => {
       requestAnimationFrame(() => {
         slide.style.transition = '';
@@ -314,7 +321,7 @@ function beginClose() {
           shiftX.value = 0;
           shiftY.value = 0;
           scale.value = 1;
-          labelSize.value = 20;
+          labelSize.value = labelRest;
         });
       });
     });

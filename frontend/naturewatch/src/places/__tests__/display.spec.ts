@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SIZE_STEPS,
+  binCounts,
+  countryName,
+  sizeFraction,
+  filterPlaces,
+  formatAreaTag,
+  sizeAtStep,
+  sortPlaces,
   formatKm2,
   formatPercent,
   formatReleaseMonth,
@@ -17,6 +25,96 @@ describe('place figures', () => {
     expect(formatPercent(0.0598)).toBe('0.1');
     expect(formatKm2(0)).toBe('0.00');
     expect(formatPercent(0)).toBe('0.0');
+    expect(formatKm2(1538.284)).toBe('1,538.28');
+  });
+
+  it('shows whole square kilometres on the area tag from 100 km²', () => {
+    expect(formatAreaTag(19485.4)).toBe('19,485');
+    expect(formatAreaTag(100)).toBe('100');
+    expect(formatAreaTag(99.994)).toBe('99.99');
+    expect(formatAreaTag(15.284)).toBe('15.28');
+  });
+
+  it('sorts by name, size, and cropland percent, with missing figures last', () => {
+    const list = [
+      { name: 'Bontebok', area_km2: 27.86, cropland_percent: 4.2 },
+      { name: 'Addo', area_km2: 1538.28, cropland_percent: null },
+      { name: 'Camdeboo', area_km2: 194.5, cropland_percent: 0.3 },
+    ];
+    const names = (sorted: typeof list) => sorted.map(place => place.name);
+    expect(names(sortPlaces(list, 'name'))).toEqual([
+      'Addo',
+      'Bontebok',
+      'Camdeboo',
+    ]);
+    expect(names(sortPlaces(list, 'size-desc'))).toEqual([
+      'Addo',
+      'Camdeboo',
+      'Bontebok',
+    ]);
+    expect(names(sortPlaces(list, 'size-asc'))).toEqual([
+      'Bontebok',
+      'Camdeboo',
+      'Addo',
+    ]);
+    expect(names(sortPlaces(list, 'cropland-desc'))).toEqual([
+      'Bontebok',
+      'Camdeboo',
+      'Addo',
+    ]);
+    expect(names(sortPlaces(list, 'cropland-asc'))).toEqual([
+      'Camdeboo',
+      'Bontebok',
+      'Addo',
+    ]);
+  });
+
+  it('keeps places inside both ranges, and a missing figure only at the full range', () => {
+    const list = [
+      { name: 'Small', area_km2: 12, cropland_percent: 40 },
+      { name: 'Large', area_km2: 5000, cropland_percent: 1 },
+      { name: 'Unmeasured', area_km2: 300, cropland_percent: null },
+    ];
+    const full = {
+      size: {
+        kept: [12, 5000] as [number, number],
+        full: [12, 5000] as [number, number],
+      },
+      cropland: {
+        kept: [0, 100] as [number, number],
+        full: [0, 100] as [number, number],
+      },
+    };
+    expect(filterPlaces(list, full.size, full.cropland)).toHaveLength(3);
+    const lowCrop = filterPlaces(list, full.size, {
+      kept: [0, 10],
+      full: [0, 100],
+    });
+    expect(lowCrop.map(place => place.name)).toEqual(['Large']);
+    const bigOnes = filterPlaces(
+      list,
+      { kept: [100, 5000], full: [12, 5000] },
+      full.cropland
+    );
+    expect(bigOnes.map(place => place.name)).toEqual(['Large', 'Unmeasured']);
+  });
+
+  it('steps the size slider on a log scale between the stored ends', () => {
+    expect(sizeAtStep(0, [10, 10000])).toBe(10);
+    expect(sizeAtStep(SIZE_STEPS, [10, 10000])).toBe(10000);
+    expect(sizeAtStep(SIZE_STEPS / 3, [10, 10000])).toBeCloseTo(100);
+    expect(sizeFraction(100, [10, 10000])).toBeCloseTo(1 / 3);
+    expect(sizeFraction(5, [10, 10000])).toBe(0);
+  });
+
+  it('counts values into bins and keeps the top end in the last bin', () => {
+    expect(binCounts([0, 0.1, 0.5, 0.99, 1], 4)).toEqual([2, 0, 1, 2]);
+  });
+
+  it('names the country, or keeps the code when no name is known', () => {
+    expect(countryName('ZAF')).toBe('South Africa');
+    expect(countryName('BWA')).toBe('BWA');
+    expect(countryName(null)).toBe('');
   });
 
   it('names the release month and the Protected Planet page', () => {

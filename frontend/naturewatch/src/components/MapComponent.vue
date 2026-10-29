@@ -41,24 +41,18 @@ const drawerVisible = computed(() => drawerStore.visible);
 const toggleDrawerVisibility = drawerStore.toggleDrawerVisibility;
 const placesOpen = ref(false);
 const measureOpen = ref(false);
-const parkedWidth = ref(0);
+const NARROW = '(max-width: 720px)';
 
 /** On a narrow screen, one open panel would cover the other blob buttons. */
 function closeOthers(current: 'places' | 'layers' | 'measure') {
-  if (!window.matchMedia('(max-width: 720px)').matches) return;
+  if (!window.matchMedia(NARROW).matches) return;
   if (current !== 'places') placesOpen.value = false;
   if (current !== 'layers' && drawerVisible.value) toggleDrawerVisibility();
   if (current !== 'measure') measureOpen.value = false;
 }
 
-/** Remember the open profile's width, then open or close Places. */
+/** Open or close Places. An open profile stays where it is. */
 function togglePlaces() {
-  if (placesOpen.value && placesStore.selectedId) {
-    const detail = document.querySelector('.blob-places .places-detail');
-    parkedWidth.value = detail?.getBoundingClientRect().width || 240;
-  } else {
-    parkedWidth.value = 0;
-  }
   placesOpen.value = !placesOpen.value;
   if (placesOpen.value) closeOthers('places');
 }
@@ -86,82 +80,87 @@ const currentBasemap = computed(() => basemapStore.currentBasemap);
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
 const { zoomToSelectedPlace } = usePlaceBoundaries(() => map.value);
-const soloPlaceName = computed(() => {
+const selectedName = computed(() => {
   const id = placesStore.selectedId;
-  if (!id || placesOpen.value) return '';
+  if (!id) return '';
   return (
     placesStore.features?.features.find(item => item.properties.id === id)
       ?.properties.name ?? ''
   );
 });
-const soloPlaceStyle = computed(() => {
-  if (!parkedWidth.value) return undefined;
-  return { width: `${parkedWidth.value}px` };
-});
+
+/** Rendered profile width. The closed Places circle parks beside it. */
+const profileWidth = ref(0);
+let profileObserver: ResizeObserver | null = null;
+
+/** Measure the profile column, which follows `--place-column`. */
+function measureProfile() {
+  const profile = document.querySelector('.map-place');
+  const beside = !window.matchMedia(NARROW).matches;
+  profileWidth.value =
+    beside && profile instanceof HTMLElement
+      ? profile.getBoundingClientRect().width
+      : 0;
+}
+
 const placesParkedWidth = computed(() =>
-  !placesOpen.value && placesStore.selectedId ? parkedWidth.value || 240 : 0
+  !placesOpen.value && placesStore.selectedId ? profileWidth.value : 0
 );
 
-watch(
-  () => placesStore.selectedId,
-  id => {
-    if (id) return;
-    parkedWidth.value = 0;
-  }
-);
+/**
+ * False while the open place columns leave too little map for the timeline.
+ * With no column open the timeline keeps its place, even on a phone.
+ */
+const timelineRoom = ref(true);
 
-const controlsLeft = ref(12);
-let controlsObserver: ResizeObserver | null = null;
-
-/** The open places column the map controls should clear. */
-function controlsPanel(): HTMLElement | null {
-  if (placesOpen.value) {
-    const frame = document.querySelector('.blob-places .places-frame');
-    if (frame instanceof HTMLElement) return frame;
-  }
-  if (!placesOpen.value && placesStore.selectedId) {
-    const solo = document.querySelector('.place-profile-solo');
-    if (solo instanceof HTMLElement) return solo;
-  }
-  return null;
-}
-
-/** Sit Labels and the basemap switch to the right of an open places panel. */
-function placeControls() {
-  const mapBox = document
-    .querySelector('.map-container')
-    ?.getBoundingClientRect();
-  const panel = controlsPanel();
-  if (!mapBox || !panel) {
-    controlsLeft.value = 12;
+/** Compare the drawn timeline with the map beside the place columns. */
+function measureTimelineRoom() {
+  const frame = document.querySelector('.map-frame');
+  const timeline = document.querySelector('.timeline');
+  if (!(frame instanceof HTMLElement) || !(timeline instanceof HTMLElement)) {
     return;
   }
-  const box = panel.getBoundingClientRect();
-  if (box.width === 0) {
-    controlsLeft.value = 12;
+  const box = timeline.getBoundingClientRect();
+  if (!box.width) return;
+  const columns = [
+    placesOpen.value ? document.querySelector('.places-bar') : null,
+    placesStore.selectedId ? document.querySelector('.map-place') : null,
+  ].filter(column => column !== null);
+  if (!columns.length) {
+    timelineRoom.value = true;
     return;
   }
-  controlsLeft.value = Math.round(box.right - mapBox.left + 12);
+  const mapLeft = Math.max(
+    frame.getBoundingClientRect().left,
+    ...columns.map(column => column.getBoundingClientRect().right)
+  );
+  timelineRoom.value =
+    box.left >= mapLeft && box.right <= frame.getBoundingClientRect().right;
 }
 
-/** Follow the places panel as it opens, closes, or grows. */
-function watchControls() {
-  controlsObserver?.disconnect();
-  controlsObserver = null;
-  placeControls();
-  const panel = controlsPanel();
-  if (!panel || typeof ResizeObserver === 'undefined') return;
-  controlsObserver = new ResizeObserver(() => placeControls());
-  controlsObserver.observe(panel);
+/** Follow the profile as it opens, closes, or the window changes. */
+function observeProfile() {
+  profileObserver?.disconnect();
+  profileObserver = null;
+  measureProfile();
+  measureTimelineRoom();
+  if (typeof ResizeObserver === 'undefined') return;
+  profileObserver = new ResizeObserver(() => {
+    measureProfile();
+    measureTimelineRoom();
+  });
+  const watched = document.querySelectorAll(
+    '.map-frame, .map-place, .places-bar, .timeline'
+  );
+  watched.forEach(element => profileObserver?.observe(element));
 }
 
 watch(
-  () => [placesOpen.value, placesStore.selectedId] as const,
-  async () => {
-    await nextTick();
-    watchControls();
-  }
+  () => [placesStore.selectedId, placesOpen.value, timelineStore.visible],
+  observeProfile,
+  { flush: 'post' }
 );
+onMounted(observeProfile);
 
 // Determine layer color to use
 const layerColorKey = computed(() => {
@@ -355,7 +354,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  controlsObserver?.disconnect();
+  profileObserver?.disconnect();
   timelineStore.bindTileWait(() => Promise.resolve());
 });
 
@@ -645,7 +644,13 @@ function addSourceAndLayer(
 
 <template>
   <div class="map-parent">
-    <div class="map-frame">
+    <div
+      class="map-frame"
+      :class="{
+        'has-list': placesOpen,
+        'has-place': !!placesStore.selectedId,
+      }"
+    >
       <div class="map-container">
         <div id="mapDiv" />
         <div class="map-logo">
@@ -662,10 +667,7 @@ function addSourceAndLayer(
           :parked-width="placesParkedWidth"
           @toggle="togglePlaces"
         >
-          <PlacesBarComponent
-            :open="placesOpen"
-            :zoom-to-place="zoomToSelectedPlace"
-          />
+          <PlacesBarComponent />
         </BlobButton>
         <BlobButton
           class="blob-layers"
@@ -674,6 +676,7 @@ function addSourceAndLayer(
           panel-id="layers-panel"
           :image="blobLayers"
           :expanded="drawerVisible"
+          corner
           @toggle="toggleLayers"
         >
           <DrawerComponent />
@@ -685,18 +688,11 @@ function addSourceAndLayer(
           panel-id="measure-panel"
           :image="blobMeasure"
           :expanded="measureOpen"
+          corner
           @toggle="toggleMeasure"
         >
           <MeasureComponent v-if="map" :map-instance="map" />
         </BlobButton>
-        <PlaceProfileComponent
-          v-if="!placesOpen && placesStore.selectedId"
-          class="place-profile-solo map-panel nw"
-          :style="soloPlaceStyle"
-          :name="soloPlaceName"
-          @close="placesStore.clearSelection()"
-          @zoom="zoomToSelectedPlace"
-        />
         <p
           v-if="placesStore.visible && placesStore.notice"
           class="place-notice"
@@ -704,26 +700,41 @@ function addSourceAndLayer(
           {{ placesStore.notice }}
         </p>
         <SideButtonsComponent />
-        <!-- Toggle basemap labels -->
-        <div class="basemap-button" :style="{ left: `${controlsLeft}px` }">
-          <button
-            id="labelsButton"
-            type="button"
-            class="map-control"
-            :class="{ 'is-on': areLabelsVisible }"
-            @click="handleLabelsChanged(map as any)"
-          >
-            Labels
-          </button>
-          <!-- Toggle Basemap type -->
-          <BasemapButtonComponent
-            id="basmapButton"
-            @basemap-changed="handleBasemapChanged"
+        <!-- Places columns and the controls that sit beside them -->
+        <div class="map-overlay">
+          <PlaceProfileComponent
+            v-if="placesStore.selectedId"
+            class="map-place map-panel nw"
+            :place-id="placesStore.selectedId"
+            :name="selectedName"
+            @close="placesStore.clearSelection()"
+            @zoom="zoomToSelectedPlace"
           />
+          <!-- Toggle basemap labels -->
+          <div class="basemap-button">
+            <button
+              id="labelsButton"
+              type="button"
+              class="map-control"
+              :class="{ 'is-on': areLabelsVisible }"
+              @click="handleLabelsChanged(map as any)"
+            >
+              Labels
+            </button>
+            <!-- Toggle Basemap type -->
+            <BasemapButtonComponent
+              id="basmapButton"
+              @basemap-changed="handleBasemapChanged"
+            />
+          </div>
         </div>
       </div>
       <!-- Timeline Component -->
-      <TimelineComponent v-show="timelineVisibility" class="timeline" />
+      <TimelineComponent
+        v-show="timelineVisibility"
+        class="timeline"
+        :class="{ 'is-squeezed': !timelineRoom }"
+      />
     </div>
   </div>
   <!-- Coordinates Component -->
@@ -746,9 +757,52 @@ function addSourceAndLayer(
   height: 100%;
 }
 
+/*
+ * One layout for the places columns. The list and the profile share
+ * --place-column. Everything that must clear them reads --places-offset.
+ */
 .map-frame {
+  --place-column: clamp(300px, 27vw, 380px);
+  --list-track: 0px;
+  --profile-track: 0px;
+  --places-offset: calc(var(--list-track) + var(--profile-track));
+
   position: relative;
   text-align: center;
+}
+
+.map-frame.has-list {
+  --list-track: var(--place-column);
+}
+
+.map-frame.has-place {
+  --profile-track: var(--place-column);
+}
+
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 13;
+  display: grid;
+  grid-template-columns: var(--list-track) var(--profile-track) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  pointer-events: none;
+}
+
+.map-overlay > * {
+  pointer-events: auto;
+}
+
+.map-place {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  min-width: 0;
+  height: 100dvh;
+  border-radius: 0;
+}
+
+.map-frame:not(.has-list) .map-place {
+  grid-column: 1 / 3;
 }
 
 .map-container {
@@ -778,23 +832,25 @@ function addSourceAndLayer(
 }
 
 .basemap-button {
-  position: absolute;
-  bottom: 16px;
-  left: 12px;
-  z-index: 10;
+  grid-column: 3;
+  grid-row: 2;
+  justify-self: start;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
+  margin: 0 0 16px 12px;
 }
 #labelsButton {
+  justify-content: center;
   width: 50px;
   background: #f8f9f9;
   color: #24312c;
   border: 1px solid var(--border);
   box-shadow: none;
   font-size: 10px;
-  letter-spacing: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   padding: 0;
 }
 
@@ -805,12 +861,18 @@ function addSourceAndLayer(
 }
 .timeline {
   position: absolute;
-  left: 50%;
+  left: calc(var(--places-offset) + (100% - var(--places-offset)) / 2);
   bottom: 18px;
   top: auto;
   width: auto;
   z-index: 12;
   transform: translateX(calc(-50% - 72px));
+}
+
+/* Hidden but still laid out, so its width can be measured again. */
+.timeline.is-squeezed {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .map-logo {
@@ -827,17 +889,6 @@ function addSourceAndLayer(
 .map-logo img {
   width: 52px;
   height: 52px;
-}
-
-.place-profile-solo {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 13;
-  width: 240px;
-  height: 100vh;
-  box-sizing: border-box;
-  border-radius: 0;
 }
 
 .blob-places {
@@ -871,14 +922,63 @@ function addSourceAndLayer(
   padding: 0;
 }
 
+/* Two open columns leave too little map for these beside Measure. */
+@media (max-width: 900px) {
+  .has-list.has-place .basemap-button {
+    margin-bottom: 100px;
+  }
+}
+
+/* The list and the profile share one column, stacked, beside a strip of map. */
 @media (max-width: 720px) {
+  .map-frame {
+    --place-column: min(360px, calc(100vw - 72px));
+    --places-offset: max(var(--list-track), var(--profile-track));
+  }
+
+  .map-frame.has-list.has-place {
+    --places-list-height: 50dvh;
+  }
+
+  .map-overlay {
+    grid-template-columns: var(--places-offset) minmax(0, 1fr);
+  }
+
+  .map-place,
+  .map-frame:not(.has-list) .map-place {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+
+  .has-list .map-place {
+    align-self: end;
+    height: 50dvh;
+  }
+
   .basemap-button {
-    bottom: 100px;
+    grid-column: 2;
+    margin-bottom: 100px;
+  }
+
+  /* The strip beside an open column holds the map controls, then Measure, then these. */
+  .has-list .basemap-button,
+  .has-place .basemap-button {
+    margin-bottom: 276px;
   }
 
   .blob-measure {
     right: 12px;
-    bottom: 168px;
+    bottom: 192px;
+  }
+
+  .has-list .blob-layers,
+  .has-place .blob-layers,
+  .has-list .blob-measure,
+  .has-place .blob-measure {
+    --blob-size: 64px;
+    --blob-label: 11px;
+
+    right: 4px;
   }
 }
 </style>

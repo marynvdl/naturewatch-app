@@ -17,6 +17,9 @@ describe('Place view', () => {
       place: {
         id: placeId,
         name: 'Kruger National Park',
+        designation: 'National Park',
+        iso3: 'ZAF',
+        areaKm2: 19485.2,
         siteId: '873',
         releaseMonth: '2026-10-01',
         sourceName: 'WDPCA',

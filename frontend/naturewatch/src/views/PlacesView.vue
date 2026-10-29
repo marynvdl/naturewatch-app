@@ -31,10 +31,10 @@ onMounted(async () => {
     </p>
     <p v-else-if="status === 'error'">The places could not be loaded.</p>
     <template v-else>
-      <label class="find">
-        Find a place
-        <Input v-model="query" />
-      </label>
+      <div class="find">
+        <span id="places-find">Find a place</span>
+        <Input v-model="query" aria-labelledby="places-find" />
+      </div>
       <p v-if="shown.length === 0">No places match.</p>
       <ul v-else class="place-list">
         <li v-for="place in shown" :key="place.id">
