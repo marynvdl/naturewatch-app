@@ -201,7 +201,7 @@ describe('Places panel', () => {
 
     const store = usePlacesStore();
     expect(store.keptIds).toBeNull();
-    store.applyFilter([99, 100], [0, 100]);
+    store.applyFilter([19000, null], [0, 100]);
     await flushPromises();
     expect(names()).toEqual(['Kruger National Park']);
     expect(wrapper.get('.places-count').text()).toBe('1 of 2 places');

@@ -7,6 +7,10 @@ import {
   filterPlaces,
   formatAreaTag,
   sizeAtStep,
+  sizeStep,
+  roundSize,
+  formatSizeInput,
+  parseFigure,
   sortPlaces,
   formatKm2,
   formatPercent,
@@ -105,6 +109,20 @@ describe('place figures', () => {
     expect(sizeAtStep(SIZE_STEPS / 3, [10, 10000])).toBeCloseTo(100);
     expect(sizeFraction(100, [10, 10000])).toBeCloseTo(1 / 3);
     expect(sizeFraction(5, [10, 10000])).toBe(0);
+    expect(sizeStep(100, [10, 10000])).toBe(33);
+  });
+
+  it('rounds, shows, and reads sizes typed into the filter', () => {
+    expect(roundSize(15.284)).toBe(15.28);
+    expect(roundSize(1538.6)).toBe(1539);
+    expect(formatSizeInput(15.2)).toBe('15.20');
+    expect(formatSizeInput(2000.5)).toBe('2,000.5');
+    expect(formatSizeInput(19485)).toBe('19,485');
+    expect(parseFigure(' 2,000.5 km² ')).toBe(2000.5);
+    expect(parseFigure('12%')).toBe(12);
+    expect(parseFigure('')).toBeNull();
+    expect(parseFigure('lots')).toBeNull();
+    expect(parseFigure('-3')).toBeNull();
   });
 
   it('counts values into bins and keeps the top end in the last bin', () => {

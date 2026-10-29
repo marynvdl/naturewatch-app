@@ -97,6 +97,58 @@ describe('Places filter dialog', () => {
     expect(dialog.props('open')).toBe(false);
   });
 
+  it('filters on exactly the size and cropland typed', async () => {
+    const store = usePlacesStore();
+    await mountDialog();
+    const box = (label: string) =>
+      body().get<HTMLInputElement>(`input[aria-label="${label}"]`);
+    const type = async (label: string, text: string) => {
+      await box(label).setValue(text);
+      await flushPromises();
+    };
+
+    expect(box('Minimum size, km²').element.value).toBe('1,538.28');
+    await type('Minimum size, km²', '2,000.5 km²');
+    expect(box('Minimum size, km²').element.value).toBe('2,000.5');
+    expect(button('Show 1 place').exists()).toBe(true);
+
+    await type('Maximum size, km²', '100');
+    expect(box('Maximum size, km²').element.value).toBe('2,000.5');
+    await type('Maximum size, km²', 'lots');
+    expect(box('Maximum size, km²').element.value).toBe('2,000.5');
+    await type('Maximum size, km²', '50000');
+    expect(box('Maximum size, km²').element.value).toBe('19,485.2');
+
+    await type('Minimum cropland, percent', '0.5');
+    await type('Maximum cropland, percent', '1 %');
+    expect(box('Maximum cropland, percent').element.value).toBe('1.0');
+    expect(button('Show 0 places').exists()).toBe(true);
+    await type('Minimum size, km²', '0');
+    expect(button('Show 1 place').exists()).toBe(true);
+
+    await button('Show 1 place').trigger('click');
+    expect(store.sizeKept).toEqual([null, null]);
+    expect(store.croplandKept).toEqual([0.5, 1]);
+    expect(store.filtering).toBe(true);
+  });
+
+  it('keeps a typed size when the other thumb moves', async () => {
+    const store = usePlacesStore();
+    await mountDialog();
+    await body()
+      .get('input[aria-label="Minimum size, km²"]')
+      .setValue('1600.25');
+    await flushPromises();
+
+    const sizeMax = body().findAll('[role="slider"]')[1];
+    await sizeMax.trigger('focus');
+    await sizeMax.trigger('keydown', { key: 'ArrowLeft' });
+    await flushPromises();
+    await button('Show 0 places').trigger('click');
+    expect(store.sizeKept[0]).toBe(1600.25);
+    expect(store.sizeKept[1]).toBeLessThan(19485.2);
+  });
+
   it('discards the draft when closed, and clears it from Clear all', async () => {
     const store = usePlacesStore();
     store.applyFilter([0, 100], [50, 100]);

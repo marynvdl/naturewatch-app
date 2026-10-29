@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { X } from '@lucide/vue';
 import {
   DialogClose,
@@ -16,12 +16,16 @@ import {
   SIZE_STEPS,
   binCounts,
   filterPlaces,
-  formatAreaTag,
   formatPercent,
+  formatSizeInput,
+  parseFigure,
+  roundSize,
   sizeAtStep,
   sizeFraction,
+  sizeStep,
   type FigureRange,
   type PlaceFigures,
+  type SizeBounds,
 } from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
 
@@ -37,19 +41,99 @@ const open = defineModel<boolean>('open', { required: true });
 const placesStore = usePlacesStore();
 const BINS = 40;
 
-const sizeSteps = ref<number[]>([0, SIZE_STEPS]);
-const croplandKept = ref<number[]>([...CROPLAND_FULL]);
+const sizeBounds = ref<SizeBounds>([null, null]);
+const croplandKept = ref<FigureRange>([...CROPLAND_FULL]);
 
 watch(open, isOpen => {
   if (!isOpen) return;
-  sizeSteps.value = [...placesStore.sizeSteps];
+  sizeBounds.value = [...placesStore.sizeKept];
   croplandKept.value = [...placesStore.croplandKept];
 });
 
 const sizeKept = computed<FigureRange>(() => [
-  sizeAtStep(sizeSteps.value[0], props.sizeFull),
-  sizeAtStep(sizeSteps.value[1], props.sizeFull),
+  sizeBounds.value[0] ?? props.sizeFull[0],
+  sizeBounds.value[1] ?? props.sizeFull[1],
 ]);
+
+const sizeSteps = computed(() => [
+  sizeBounds.value[0] === null
+    ? 0
+    : sizeStep(sizeKept.value[0], props.sizeFull),
+  sizeBounds.value[1] === null
+    ? SIZE_STEPS
+    : sizeStep(sizeKept.value[1], props.sizeFull),
+]);
+
+const croplandSteps = computed(() => croplandKept.value.map(Math.round));
+
+/**
+ * Follow the size slider. A thumb that did not move keeps its typed size.
+ * @param steps - Both thumbs, 0 to SIZE_STEPS.
+ */
+function slideSize(steps: number[] | undefined) {
+  if (!steps) return;
+  sizeBounds.value = [0, 1].map(end => {
+    if (steps[end] === sizeSteps.value[end]) return sizeBounds.value[end];
+    if (steps[end] === (end ? SIZE_STEPS : 0)) return null;
+    return roundSize(sizeAtStep(steps[end], props.sizeFull));
+  }) as SizeBounds;
+}
+
+/**
+ * Follow the cropland slider. A thumb that did not move keeps its typed percent.
+ * @param steps - Both thumbs, in whole percent.
+ */
+function slideCropland(steps: number[] | undefined) {
+  if (!steps) return;
+  croplandKept.value = [0, 1].map(end =>
+    steps[end] === croplandSteps.value[end]
+      ? croplandKept.value[end]
+      : steps[end]
+  ) as FigureRange;
+}
+
+/**
+ * Take a typed size. Text that is not a number puts the last size back.
+ * A size at or past the stored end leaves that end open.
+ * @param end - 0 for the minimum, 1 for the maximum.
+ * @param event - The change or Enter on the box.
+ */
+async function typeSize(end: 0 | 1, event: Event) {
+  const input = event.target as HTMLInputElement;
+  const typed = parseFigure(input.value);
+  if (typed !== null) {
+    const value = Math.round(typed * 100) / 100;
+    const bounds: SizeBounds = [...sizeBounds.value];
+    if (end === 0) {
+      bounds[0] =
+        value <= props.sizeFull[0] ? null : Math.min(value, sizeKept.value[1]);
+    } else {
+      bounds[1] =
+        value >= props.sizeFull[1] ? null : Math.max(value, sizeKept.value[0]);
+    }
+    sizeBounds.value = bounds;
+  }
+  await nextTick();
+  input.value = formatSizeInput(sizeKept.value[end]);
+}
+
+/**
+ * Take a typed cropland percent, kept between 0 and 100.
+ * @param end - 0 for the minimum, 1 for the maximum.
+ * @param event - The change or Enter on the box.
+ */
+async function typeCropland(end: 0 | 1, event: Event) {
+  const input = event.target as HTMLInputElement;
+  const typed = parseFigure(input.value);
+  if (typed !== null) {
+    const value = Math.min(CROPLAND_FULL[1], Math.round(typed * 10) / 10);
+    const kept: FigureRange = [...croplandKept.value];
+    kept[end] = end === 0 ? Math.min(value, kept[1]) : Math.max(value, kept[0]);
+    croplandKept.value = kept;
+  }
+  await nextTick();
+  input.value = formatPercent(croplandKept.value[end]);
+}
 
 const keptCount = computed(
   () =>
@@ -94,7 +178,10 @@ const sizeBars = computed(() =>
         ? [sizeFraction(place.area_km2, props.sizeFull)]
         : []
     ),
-    [sizeSteps.value[0] / SIZE_STEPS, sizeSteps.value[1] / SIZE_STEPS]
+    [
+      sizeFraction(sizeKept.value[0], props.sizeFull),
+      sizeFraction(sizeKept.value[1], props.sizeFull),
+    ]
   )
 );
 
@@ -109,16 +196,13 @@ const croplandBars = computed(() =>
 
 /** Return the draft to every place. The panel stays open. */
 function clearAll() {
-  sizeSteps.value = [0, SIZE_STEPS];
+  sizeBounds.value = [null, null];
   croplandKept.value = [...CROPLAND_FULL];
 }
 
 /** Apply the draft to the list and the map, and close. */
 function apply() {
-  placesStore.applyFilter(
-    [sizeSteps.value[0], sizeSteps.value[1]],
-    [croplandKept.value[0], croplandKept.value[1]]
-  );
+  placesStore.applyFilter(sizeBounds.value, croplandKept.value);
   open.value = false;
 }
 </script>
@@ -155,27 +239,40 @@ function apply() {
               />
             </div>
             <Slider
-              v-model="sizeSteps"
+              :model-value="sizeSteps"
               class="filter-slider"
               :min="0"
               :max="SIZE_STEPS"
               :step="1"
               :min-steps-between-thumbs="1"
               aria-labelledby="filter-size-title"
+              @update:model-value="slideSize"
             />
             <div class="filter-ends">
-              <p class="filter-end">
-                <span class="filter-end-label">Minimum</span>
-                <span class="filter-end-value">
-                  {{ formatAreaTag(sizeKept[0]) }} km²
+              <div
+                v-for="end in [0, 1] as const"
+                :key="end"
+                class="filter-end"
+                :class="{ 'is-max': end === 1 }"
+              >
+                <span class="filter-end-label">
+                  {{ end ? 'Maximum' : 'Minimum' }}
                 </span>
-              </p>
-              <p class="filter-end is-max">
-                <span class="filter-end-label">Maximum</span>
-                <span class="filter-end-value">
-                  {{ formatAreaTag(sizeKept[1]) }} km²
-                </span>
-              </p>
+                <label class="filter-end-value" :for="`filter-size-${end}`">
+                  <input
+                    :id="`filter-size-${end}`"
+                    class="filter-end-input"
+                    type="text"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    :aria-label="`${end ? 'Maximum' : 'Minimum'} size, km²`"
+                    :value="formatSizeInput(sizeKept[end])"
+                    @change="typeSize(end, $event)"
+                    @keydown.enter.prevent="typeSize(end, $event)"
+                  />
+                  <span class="filter-end-unit">km²</span>
+                </label>
+              </div>
             </div>
           </section>
           <section
@@ -194,27 +291,40 @@ function apply() {
               />
             </div>
             <Slider
-              v-model="croplandKept"
+              :model-value="croplandSteps"
               class="filter-slider"
               :min="CROPLAND_FULL[0]"
               :max="CROPLAND_FULL[1]"
               :step="1"
               :min-steps-between-thumbs="1"
               aria-labelledby="filter-cropland-title"
+              @update:model-value="slideCropland"
             />
             <div class="filter-ends">
-              <p class="filter-end">
-                <span class="filter-end-label">Minimum</span>
-                <span class="filter-end-value">
-                  {{ formatPercent(croplandKept[0]) }}%
+              <div
+                v-for="end in [0, 1] as const"
+                :key="end"
+                class="filter-end"
+                :class="{ 'is-max': end === 1 }"
+              >
+                <span class="filter-end-label">
+                  {{ end ? 'Maximum' : 'Minimum' }}
                 </span>
-              </p>
-              <p class="filter-end is-max">
-                <span class="filter-end-label">Maximum</span>
-                <span class="filter-end-value">
-                  {{ formatPercent(croplandKept[1]) }}%
-                </span>
-              </p>
+                <label class="filter-end-value" :for="`filter-cropland-${end}`">
+                  <input
+                    :id="`filter-cropland-${end}`"
+                    class="filter-end-input"
+                    type="text"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    :aria-label="`${end ? 'Maximum' : 'Minimum'} cropland, percent`"
+                    :value="formatPercent(croplandKept[end])"
+                    @change="typeCropland(end, $event)"
+                    @keydown.enter.prevent="typeCropland(end, $event)"
+                  />
+                  <span class="filter-end-unit">%</span>
+                </label>
+              </div>
             </div>
           </section>
         </div>
@@ -371,13 +481,41 @@ function apply() {
 }
 
 .filter-end-value {
-  min-width: 96px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
   padding: 10px 14px;
   border: 1px solid var(--border);
   border-radius: 999px;
   font-size: 14px;
+  cursor: text;
+}
+
+.filter-end-value:focus-within {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+.filter-end-input {
+  width: 9ch;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
   font-variant-numeric: tabular-nums;
-  text-align: center;
+  text-align: right;
+}
+
+.filter-end-input:focus {
+  outline: none;
+}
+
+.filter-end-unit {
+  color: var(--muted-foreground);
 }
 
 .filter-foot {
