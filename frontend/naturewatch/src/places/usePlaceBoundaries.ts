@@ -68,6 +68,24 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   }
 
   /**
+   * How far the visible places panels reach over the map from its left edge.
+   * @param mapInstance - The map.
+   * @returns Pixels from the left of the map canvas.
+   */
+  function panelCover(mapInstance: mapboxgl.Map): number {
+    const canvasLeft = mapInstance.getCanvas().getBoundingClientRect().left;
+    let cover = 0;
+    document.querySelectorAll('.places-frame, .place-profile').forEach(node => {
+      if (!(node instanceof HTMLElement)) return;
+      if (getComputedStyle(node).visibility === 'hidden') return;
+      const box = node.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) return;
+      cover = Math.max(cover, box.right - canvasLeft);
+    });
+    return Math.max(0, Math.round(cover));
+  }
+
+  /**
    * Leave room for a visible places panel on the left.
    * @param mapInstance - The map.
    * @returns Padding for fitBounds.
@@ -78,21 +96,77 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     bottom: number;
     left: number;
   } {
-    const canvasLeft = mapInstance.getCanvas().getBoundingClientRect().left;
-    let cover = 0;
-    document.querySelectorAll('.places-frame, .place-profile').forEach(node => {
-      if (!(node instanceof HTMLElement)) return;
-      if (getComputedStyle(node).visibility === 'hidden') return;
-      const box = node.getBoundingClientRect();
-      if (box.width === 0 || box.height === 0) return;
-      cover = Math.max(cover, box.right - canvasLeft);
-    });
     return {
       top: 72,
       right: 72,
       bottom: 72,
-      left: Math.max(72, Math.round(cover) + 24),
+      left: Math.max(72, panelCover(mapInstance) + 24),
     };
+  }
+
+  /** Highlight the selected boundary. */
+  function highlightSelection(mapInstance: mapboxgl.Map) {
+    if (!mapInstance.getLayer(PLACE_SELECT_FILL)) return;
+    const filter = selectionFilter();
+    mapInstance.setFilter(PLACE_SELECT_FILL, filter);
+    mapInstance.setFilter(PLACE_SELECT_LINE, filter);
+  }
+
+  /** Extent of the selected place, or null when it has no stored shape. */
+  function selectedBounds(): LngLatBounds | null {
+    const id = placesStore.selectedId;
+    if (!id || !placesStore.features) return null;
+    const feature = placesStore.features.features.find(
+      item => item.properties.id === id
+    );
+    return feature ? geometryBounds(feature.geometry) : null;
+  }
+
+  /**
+   * Wait until the place columns stop changing width, for at most a second.
+   * @param mapInstance - The map.
+   */
+  async function panelsSettled(mapInstance: mapboxgl.Map) {
+    let last = -1;
+    let steady = 0;
+    for (let frame = 0; frame < 60 && steady < 3; frame += 1) {
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const cover = panelCover(mapInstance);
+      steady = cover === last ? steady + 1 : 0;
+      last = cover;
+    }
+  }
+
+  /**
+   * Pan a place chosen on the map into the middle of the map beside the
+   * panels, when the panels now hide part of it. The zoom stays.
+   * @param mapInstance - The map.
+   */
+  async function centreCoveredPlace(mapInstance: mapboxgl.Map) {
+    const id = placesStore.selectedId;
+    await panelsSettled(mapInstance);
+    if (placesStore.selectedId !== id) return;
+    const place = selectedBounds();
+    if (!place) return;
+    const canvas = mapInstance.getCanvas().getBoundingClientRect();
+    const cover = Math.min(panelCover(mapInstance), canvas.width);
+    if (canvas.width - cover < 80) return;
+    const northWest = mapInstance.project([place[0], place[3]]);
+    const southEast = mapInstance.project([place[2], place[1]]);
+    const shown: LngLatBounds = [cover, 0, canvas.width, canvas.height];
+    const drawn: LngLatBounds = [
+      northWest.x,
+      northWest.y,
+      southEast.x,
+      southEast.y,
+    ];
+    if (boundsInsideFrame(shown, drawn)) return;
+    mapInstance.easeTo({
+      center: [(place[0] + place[2]) / 2, (place[1] + place[3]) / 2],
+      padding: { left: cover, top: 0, right: 0, bottom: 0 },
+      retainPadding: false,
+      duration: 800,
+    });
   }
 
   /**
@@ -102,18 +176,8 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * @param force - Fit even when the place is already in view.
    */
   function frameSelectedPlace(mapInstance: mapboxgl.Map, force = false) {
-    if (mapInstance.getLayer(PLACE_SELECT_FILL)) {
-      const filter = selectionFilter();
-      mapInstance.setFilter(PLACE_SELECT_FILL, filter);
-      mapInstance.setFilter(PLACE_SELECT_LINE, filter);
-    }
-    const id = placesStore.selectedId;
-    if (!id || !placesStore.features) return;
-    const feature = placesStore.features.features.find(
-      item => item.properties.id === id
-    );
-    if (!feature) return;
-    const place = geometryBounds(feature.geometry);
+    highlightSelection(mapInstance);
+    const place = selectedBounds();
     if (!place) return;
     const view = mapInstance.getBounds();
     if (!view) return;
@@ -270,6 +334,11 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       await nextTick();
       const mapInstance = readMap();
       if (!mapInstance) return;
+      if (placesStore.selectedFrom === 'map') {
+        highlightSelection(mapInstance);
+        await centreCoveredPlace(mapInstance);
+        return;
+      }
       frameSelectedPlace(mapInstance);
     }
   );

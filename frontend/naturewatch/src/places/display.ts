@@ -210,6 +210,53 @@ export function sizeFraction(km2: number, full: FigureRange): number {
   return Math.min(1, Math.max(0, fraction));
 }
 
+/** Kept sizes in km². Null leaves that end open. */
+export type SizeBounds = [number | null, number | null];
+
+/**
+ * The nearest size slider step to a size.
+ * @param km2 - Square kilometres.
+ * @param full - Smallest and largest stored size.
+ * @returns 0 to SIZE_STEPS.
+ */
+export function sizeStep(km2: number, full: FigureRange): number {
+  return Math.round(sizeFraction(km2, full) * SIZE_STEPS);
+}
+
+/**
+ * A size at the precision the filter shows it: whole square kilometres, or
+ * two decimal places below 100 km².
+ * @param km2 - Square kilometres.
+ * @returns The rounded size.
+ */
+export function roundSize(km2: number): number {
+  return km2 < 100 ? Math.round(km2 * 100) / 100 : Math.round(km2);
+}
+
+/**
+ * A size in a filter box. A typed size keeps up to two decimal places.
+ * @param km2 - Square kilometres.
+ * @returns Text such as 1,538 or 15.28.
+ */
+export function formatSizeInput(km2: number): string {
+  return km2.toLocaleString('en-GB', {
+    minimumFractionDigits: km2 < 100 ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * A figure typed into a filter box.
+ * @param text - What was typed. Commas, spaces, km², and % are ignored.
+ * @returns The number, or null when the text is not a number of zero or more.
+ */
+export function parseFigure(text: string): number | null {
+  const cleaned = text.replace(/km²|km2|%|,|\s/gi, '');
+  if (!cleaned) return null;
+  const value = Number(cleaned);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
 /**
  * Count values into equal bins along a slider.
  * @param fractions - Each value's place along the slider, 0 to 1.

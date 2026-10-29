@@ -20,7 +20,6 @@ import {
   filterPlaces,
   formatAreaTag,
   placesMatching,
-  sizeAtStep,
   sortPlaces,
   type FigureRange,
   type PlaceSort,
@@ -94,14 +93,11 @@ const sizeFull = computed<FigureRange>(() => {
  * @returns The places kept, in the same order.
  */
 function keptBy<T extends PlaceSummary>(pool: T[]): T[] {
-  const steps = placesStore.sizeSteps;
+  const [low, high] = placesStore.sizeKept;
   return filterPlaces(
     pool,
     {
-      kept: [
-        sizeAtStep(steps[0], sizeFull.value),
-        sizeAtStep(steps[1], sizeFull.value),
-      ],
+      kept: [low ?? sizeFull.value[0], high ?? sizeFull.value[1]],
       full: sizeFull.value,
     },
     { kept: placesStore.croplandKept, full: CROPLAND_FULL }
@@ -109,7 +105,7 @@ function keptBy<T extends PlaceSummary>(pool: T[]): T[] {
 }
 
 watch(
-  () => [places.value, placesStore.sizeSteps, placesStore.croplandKept],
+  () => [places.value, placesStore.sizeKept, placesStore.croplandKept],
   () => {
     if (places.value.length === 0) return;
     placesStore.keptIds = placesStore.filtering
