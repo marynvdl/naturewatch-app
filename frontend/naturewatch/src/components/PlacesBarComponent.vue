@@ -584,6 +584,7 @@ watch(
   max-width: 100vw;
   min-height: 0;
   overflow: hidden;
+  overscroll-behavior: contain;
   border-radius: 0;
 }
 
@@ -672,12 +673,14 @@ watch(
   margin-left: calc(-1 * var(--map-panel-padding));
   padding-left: var(--map-panel-padding);
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* The half-height column is too short to keep the header and a scrolling list. */
 @media (max-width: 720px) {
   .places-results {
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   /* The close circle sits on the heading, so the heading stays put. */
