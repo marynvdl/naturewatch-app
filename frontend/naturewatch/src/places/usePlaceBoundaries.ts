@@ -32,6 +32,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
 } {
   const placesStore = usePlacesStore();
   let listening = false;
+  let boundsListening = false;
 
   /** Read the map as the Mapbox instance this overlay draws on. */
   function readMap(): mapboxgl.Map | null {
@@ -110,6 +111,18 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     const filter = selectionFilter();
     mapInstance.setFilter(PLACE_SELECT_FILL, filter);
     mapInstance.setFilter(PLACE_SELECT_LINE, filter);
+  }
+
+  /** Publish the current map view for the list extent option. */
+  function publishViewBounds(mapInstance: mapboxgl.Map) {
+    const view = mapInstance.getBounds();
+    if (!view) return;
+    placesStore.viewBounds = [
+      view.getWest(),
+      view.getSouth(),
+      view.getEast(),
+      view.getNorth(),
+    ];
   }
 
   /** Extent of the selected place, or null when it has no stored shape. */
@@ -307,6 +320,11 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       if (!mapInstance) return;
       const instance = mapInstance as mapboxgl.Map;
       instance.on('style.load', () => syncPlaceOverlay(instance));
+      if (!boundsListening) {
+        instance.on('moveend', () => publishViewBounds(instance));
+        boundsListening = true;
+      }
+      publishViewBounds(instance);
       drawWhenReady(instance);
     },
     { flush: 'sync' }

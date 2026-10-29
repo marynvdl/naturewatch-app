@@ -6,6 +6,7 @@ import {
   PROTECTED_AREA_ATTRIBUTION,
   formatReleaseMonth,
   type FigureRange,
+  type LngLatBounds,
   type PlaceFeatureCollection,
   type SizeBounds,
 } from '@/places/display';
@@ -25,6 +26,8 @@ const usePlacesStore = defineStore('places', () => {
   const croplandKept = ref<FigureRange>([...CROPLAND_FULL]);
   /** Ids the applied filter keeps on the map, or null while it keeps every place. */
   const keptIds = ref<string[] | null>(null);
+  /** Current map view, west, south, east, north. */
+  const viewBounds = ref<LngLatBounds | null>(null);
   const filtering = computed(
     () =>
       sizeKept.value[0] !== null ||
@@ -104,6 +107,7 @@ const usePlacesStore = defineStore('places', () => {
     sizeKept,
     croplandKept,
     keptIds,
+    viewBounds,
     filtering,
     applyFilter,
     clearFilter,

@@ -414,5 +414,110 @@ begin
   end loop;
 end $$;
 
+do $$
+declare
+  window_count int;
+  window_total bigint;
+  extent_count int;
+  stats_count bigint;
+  kept uuid[];
+  window_row record;
+begin
+  perform set_config('role', 'anon', true);
+
+  select count(*), min(total_count)
+    into window_count, window_total
+  from public.pilot_place_window(
+    '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
+  );
+  if window_count <> 1 or window_total <> 1 then
+    raise exception 'pilot_place_window returned % of %, expected 1 of 1',
+      window_count, window_total;
+  end if;
+
+  select * into window_row
+  from public.pilot_place_window(
+    '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
+  );
+  if to_jsonb(window_row) ? 'geom' then
+    raise exception 'pilot_place_window returned geom';
+  end if;
+  if window_row.cropland_percent is null then
+    raise exception 'pilot_place_window did not join the cropland fact';
+  end if;
+
+  select count(*) into extent_count
+  from public.pilot_places_in_extent(26, -27, 28, -25);
+  if extent_count <> 1 then
+    raise exception 'extent that covers the park returned %', extent_count;
+  end if;
+  select count(*) into extent_count
+  from public.pilot_places_in_extent(0, -10, 1, -9);
+  if extent_count <> 0 then
+    raise exception 'extent that misses the park returned %', extent_count;
+  end if;
+
+  if public.pilot_place_window_count(
+    'Pilot', false, null, null, 0, 100, null, null, null, null
+  ) <> 1 then
+    raise exception 'name search did not match Pilot Park';
+  end if;
+  if public.pilot_place_window_count(
+    'zzz', false, null, null, 0, 100, null, null, null, null
+  ) <> 0 then
+    raise exception 'missing name search was not empty';
+  end if;
+
+  select place_count into stats_count from public.pilot_place_filter_stats();
+  if stats_count <> 1 then
+    raise exception 'filter stats counted % places, expected 1', stats_count;
+  end if;
+
+  kept := public.pilot_place_kept_ids(null, null, 0, 100);
+  if array_length(kept, 1) <> 1 then
+    raise exception 'kept ids returned %', kept;
+  end if;
+
+  perform set_config('role', 'postgres', true);
+
+  insert into public.places (
+    source_release_id, source_id, site_id, name, place_type, designation,
+    iucn_category, iso3, realm, geom
+  )
+  select
+    sources.id,
+    'fixture-cap-' || extra.n,
+    'fixture-cap-site-' || extra.n,
+    'Cap Park ' || extra.n,
+    'protected_area',
+    'National Park',
+    'II',
+    'ZAF',
+    'Terrestrial',
+    extensions.ST_GeomFromText(
+      'MULTIPOLYGON((('
+      || (27 + extra.n)::text || ' -24, '
+      || (27.2 + extra.n)::text || ' -24, '
+      || (27.2 + extra.n)::text || ' -23.8, '
+      || (27 + extra.n)::text || ' -23.8, '
+      || (27 + extra.n)::text || ' -24)))',
+      4326
+    )::extensions.geometry(MultiPolygon, 4326)
+  from public.sources
+  cross join generate_series(1, 51) as extra(n)
+  where sources.name = 'WDPCA' and sources.release_month = date '2026-10-01';
+
+  perform set_config('role', 'anon', true);
+  select count(*), min(total_count)
+    into window_count, window_total
+  from public.pilot_place_window(
+    '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
+  );
+  if window_count <> 50 or window_total <> 52 then
+    raise exception 'capped window returned % of %, expected 50 of 52',
+      window_count, window_total;
+  end if;
+end $$;
+
 \echo records fixture ok
 rollback;

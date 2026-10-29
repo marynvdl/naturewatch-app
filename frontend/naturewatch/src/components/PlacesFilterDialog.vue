@@ -11,11 +11,10 @@ import {
   DialogTitle,
 } from 'reka-ui';
 import { Slider } from '@/components/ui/slider';
+import { loadPilotPlaceWindowCount } from '@/places/api';
 import {
   CROPLAND_FULL,
   SIZE_STEPS,
-  binCounts,
-  filterPlaces,
   formatPercent,
   formatSizeInput,
   parseFigure,
@@ -24,16 +23,26 @@ import {
   sizeFraction,
   sizeStep,
   type FigureRange,
-  type PlaceFigures,
+  type LngLatBounds,
   type SizeBounds,
 } from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
 
 const props = defineProps<{
-  /** Places the filter counts, after any search. */
-  places: PlaceFigures[];
   /** Smallest and largest stored size. */
   sizeFull: FigureRange;
+  /** Stored size histogram, 40 bins on a log scale. */
+  sizeBins: number[];
+  /** Stored cropland histogram, 40 bins from 0 to 100. */
+  croplandBins: number[];
+  /** Text typed in the list. */
+  search: string;
+  /** True when the list matches a name prefix. */
+  searchPrefix: boolean;
+  /** Map view while In view is on. */
+  extent: LngLatBounds | null;
+  /** Matching places for the applied filter. */
+  matchedTotal: number;
 }>();
 
 const open = defineModel<boolean>('open', { required: true });
@@ -43,11 +52,14 @@ const BINS = 40;
 
 const sizeBounds = ref<SizeBounds>([null, null]);
 const croplandKept = ref<FigureRange>([...CROPLAND_FULL]);
+const keptCount = ref(props.matchedTotal);
+let countRequest = 0;
 
 watch(open, isOpen => {
   if (!isOpen) return;
   sizeBounds.value = [...placesStore.sizeKept];
   croplandKept.value = [...placesStore.croplandKept];
+  keptCount.value = props.matchedTotal;
 });
 
 const sizeKept = computed<FigureRange>(() => [
@@ -135,18 +147,6 @@ async function typeCropland(end: 0 | 1, event: Event) {
   input.value = formatPercent(croplandKept.value[end]);
 }
 
-const keptCount = computed(
-  () =>
-    filterPlaces(
-      props.places,
-      { kept: sizeKept.value, full: props.sizeFull },
-      {
-        kept: [croplandKept.value[0], croplandKept.value[1]],
-        full: CROPLAND_FULL,
-      }
-    ).length
-);
-
 const showText = computed(
   () => `Show ${keptCount.value} ${keptCount.value === 1 ? 'place' : 'places'}`
 );
@@ -155,15 +155,15 @@ const showText = computed(
  * Bars for one chart, each marked when it sits inside the kept range.
  * Heights follow the square root of the count. Most places have almost no
  * cropland, and a linear scale would leave one bar and a row of slivers.
- * @param fractions - Each place's position along the slider, 0 to 1.
+ * @param counts - Stored counts, one per bin.
  * @param kept - The kept range, 0 to 1.
  * @returns Height in percent of the tallest bar, and whether it is kept.
  */
-function bars(fractions: number[], kept: FigureRange) {
-  const counts = binCounts(fractions, BINS);
+function bars(counts: number[], kept: FigureRange) {
   const tallest = Math.sqrt(Math.max(1, ...counts));
   return counts.map((count, index) => {
-    const middle = (index + 0.5) / BINS;
+    const bins = Math.max(BINS, counts.length);
+    const middle = (index + 0.5) / bins;
     return {
       height: count ? Math.max(10, (Math.sqrt(count) / tallest) * 100) : 0,
       kept: middle >= kept[0] && middle <= kept[1],
@@ -172,26 +172,45 @@ function bars(fractions: number[], kept: FigureRange) {
 }
 
 const sizeBars = computed(() =>
-  bars(
-    props.places.flatMap(place =>
-      place.area_km2 != null
-        ? [sizeFraction(place.area_km2, props.sizeFull)]
-        : []
-    ),
-    [
-      sizeFraction(sizeKept.value[0], props.sizeFull),
-      sizeFraction(sizeKept.value[1], props.sizeFull),
-    ]
-  )
+  bars(props.sizeBins, [
+    sizeFraction(sizeKept.value[0], props.sizeFull),
+    sizeFraction(sizeKept.value[1], props.sizeFull),
+  ])
 );
 
 const croplandBars = computed(() =>
-  bars(
-    props.places.flatMap(place =>
-      place.cropland_percent != null ? [place.cropland_percent / 100] : []
-    ),
-    [croplandKept.value[0] / 100, croplandKept.value[1] / 100]
-  )
+  bars(props.croplandBins, [
+    croplandKept.value[0] / 100,
+    croplandKept.value[1] / 100,
+  ])
+);
+
+watch(
+  () =>
+    [
+      open.value,
+      sizeKept.value[0],
+      sizeKept.value[1],
+      croplandKept.value[0],
+      croplandKept.value[1],
+      props.search,
+      props.extent,
+    ] as const,
+  async ([isOpen]) => {
+    if (!isOpen) return;
+    const request = ++countRequest;
+    const result = await loadPilotPlaceWindowCount({
+      search: props.search,
+      searchPrefix: props.searchPrefix,
+      sizeMin: sizeBounds.value[0],
+      sizeMax: sizeBounds.value[1],
+      cropMin: croplandKept.value[0],
+      cropMax: croplandKept.value[1],
+      extent: props.extent,
+    });
+    if (request !== countRequest) return;
+    if (result.status === 'ok') keptCount.value = result.total;
+  }
 );
 
 /** Return the draft to every place. The panel stays open. */

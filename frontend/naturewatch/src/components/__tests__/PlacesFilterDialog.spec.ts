@@ -7,7 +7,17 @@ import {
 } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import PlacesFilterDialog from '@/components/PlacesFilterDialog.vue';
+import { loadPilotPlaceWindowCount } from '@/places/api';
+import {
+  CROPLAND_FULL,
+  filterPlaces,
+  type FigureRange,
+} from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
+
+vi.mock('@/places/api', () => ({
+  loadPilotPlaceWindowCount: vi.fn(),
+}));
 
 vi.stubGlobal(
   'ResizeObserver',
@@ -26,6 +36,8 @@ const places = [
   },
   { name: 'Kruger National Park', area_km2: 19485.2, cropland_percent: 0.06 },
 ];
+const sizeFull: FigureRange = [1538.284, 19485.2];
+const emptyBins = new Array(40).fill(0);
 
 /** The dialog is drawn in a portal on the page body. */
 const body = () => new DOMWrapper(document.body);
@@ -40,8 +52,13 @@ async function mountDialog() {
   const mounted = mount(PlacesFilterDialog, {
     props: {
       open: false,
-      places,
-      sizeFull: [1538.284, 19485.2] as [number, number],
+      sizeFull,
+      sizeBins: emptyBins,
+      croplandBins: emptyBins,
+      search: '',
+      searchPrefix: false,
+      extent: null,
+      matchedTotal: 2,
       'onUpdate:open': (open: boolean) => mounted.setProps({ open }),
     },
     attachTo: document.body,
@@ -68,6 +85,20 @@ function button(text: string) {
 describe('Places filter dialog', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    vi.mocked(loadPilotPlaceWindowCount).mockImplementation(async query => ({
+      status: 'ok',
+      total: filterPlaces(
+        places,
+        {
+          kept: [query.sizeMin ?? sizeFull[0], query.sizeMax ?? sizeFull[1]],
+          full: sizeFull,
+        },
+        {
+          kept: [query.cropMin, query.cropMax],
+          full: CROPLAND_FULL,
+        }
+      ).length,
+    }));
   });
 
   afterEach(() => {
@@ -110,6 +141,7 @@ describe('Places filter dialog', () => {
     expect(box('Minimum size, km²').element.value).toBe('1,538.28');
     await type('Minimum size, km²', '2,000.5 km²');
     expect(box('Minimum size, km²').element.value).toBe('2,000.5');
+    await flushPromises();
     expect(button('Show 1 place').exists()).toBe(true);
 
     await type('Maximum size, km²', '100');
@@ -156,6 +188,7 @@ describe('Places filter dialog', () => {
 
     expect(button('Show 0 places').exists()).toBe(true);
     await button('Clear all').trigger('click');
+    await flushPromises();
     expect(button('Show 2 places').exists()).toBe(true);
     expect(store.croplandKept).toEqual([50, 100]);
 

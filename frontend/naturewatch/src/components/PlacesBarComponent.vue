@@ -4,6 +4,7 @@ import {
   ArrowDownUp,
   Check,
   Image,
+  Scan,
   Search,
   SlidersHorizontal,
 } from '@lucide/vue';
@@ -13,14 +14,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { loadPilotPlaces, type PlaceSummary } from '@/places/api';
 import {
-  CROPLAND_FULL,
+  loadPilotPlaceFilterStats,
+  loadPilotPlaceKeptIds,
+  loadPilotPlaceWindow,
+  type PlaceSummary,
+  type PlaceWindowQuery,
+} from '@/places/api';
+import {
   countryName,
-  filterPlaces,
   formatAreaTag,
-  placesMatching,
-  sortPlaces,
   type FigureRange,
   type PlaceSort,
 } from '@/places/display';
@@ -42,8 +45,18 @@ const listStatus = ref<'idle' | 'loading' | 'ok' | 'unconfigured' | 'error'>(
 );
 const nothingStored = 'Well, this is awkward. We have nothing to show.';
 const places = ref<PlaceSummary[]>([]);
+const matchTotal = ref(0);
+const storedCount = ref(0);
+const statsReady = ref(false);
+const sizeFull = ref<FigureRange>([1, 1]);
+const sizeBins = ref<number[]>([]);
+const croplandBins = ref<number[]>([]);
 const query = ref('');
+const listInView = ref(false);
 const resultsList = ref<HTMLElement | null>(null);
+let listRequest = 0;
+let listWait: ReturnType<typeof setTimeout> | null = null;
+const listWaitMs = import.meta.env.MODE === 'test' ? 0 : 200;
 
 const needle = computed(() => query.value.trim());
 const searchingAll = computed(
@@ -56,7 +69,7 @@ const sortOptions: { id: PlaceSort; label: string }[] = [
   { id: 'cropland-desc', label: 'Cropland %, highest first' },
   { id: 'cropland-asc', label: 'Cropland %, lowest first' },
 ];
-const sort = ref<PlaceSort>('name');
+const sort = ref<PlaceSort>('size-desc');
 const sortOpen = ref(false);
 const filterOpen = ref(false);
 const filterButton = ref<HTMLButtonElement | null>(null);
@@ -79,79 +92,51 @@ function chooseSort(id: PlaceSort) {
   sortOpen.value = false;
 }
 
-const sizeFull = computed<FigureRange>(() => {
-  const areas = places.value.flatMap(place =>
-    place.area_km2 != null ? [place.area_km2] : []
-  );
-  if (areas.length === 0) return [1, 1];
-  return [Math.min(...areas), Math.max(...areas)];
-});
-
-/**
- * Places the applied filter keeps.
- * @param pool - Places to filter.
- * @returns The places kept, in the same order.
- */
-function keptBy<T extends PlaceSummary>(pool: T[]): T[] {
-  const [low, high] = placesStore.sizeKept;
-  return filterPlaces(
-    pool,
-    {
-      kept: [low ?? sizeFull.value[0], high ?? sizeFull.value[1]],
-      full: sizeFull.value,
-    },
-    { kept: placesStore.croplandKept, full: CROPLAND_FULL }
-  );
+/** Limit the list to the current map view, or show the worldwide window. */
+function toggleListInView() {
+  listInView.value = !listInView.value;
 }
 
-watch(
-  () => [places.value, placesStore.sizeKept, placesStore.croplandKept],
-  () => {
-    if (places.value.length === 0) return;
-    placesStore.keptIds = placesStore.filtering
-      ? keptBy(places.value).map(place => place.id)
-      : null;
-  },
-  { immediate: true }
-);
-
-const searched = computed(() => placesMatching(places.value, query.value));
-
-/** Each place's number in the filtered and sorted list, before any search. */
-const ranks = computed(
-  () =>
-    new Map(
-      sortPlaces(keptBy(places.value), sort.value).map((place, index) => [
-        place.id,
-        index + 1,
-      ])
-    )
-);
-
-const shown = computed(() => {
-  if (searchingAll.value) {
-    const prefix = needle.value.toLocaleLowerCase();
-    return places.value.filter(place =>
-      place.name.toLocaleLowerCase().startsWith(prefix)
-    );
-  }
-  return sortPlaces(keptBy(searched.value), sort.value);
-});
+const shown = computed(() => places.value);
 const emptyMessage = computed(() =>
-  places.value.length === 0 ? nothingStored : 'No places match.'
+  storedCount.value === 0 && !placesStore.filtering && !needle.value
+    ? nothingStored
+    : 'No places match.'
 );
 const showProtected = computed(() => placeType.value === 'protected_area');
 const showTools = computed(
   () =>
-    showProtected.value && listStatus.value === 'ok' && places.value.length > 0
+    showProtected.value &&
+    listStatus.value === 'ok' &&
+    (storedCount.value > 0 || matchTotal.value > 0 || placesStore.filtering)
 );
 const countText = computed(() => {
-  const total = places.value.length;
+  const total = matchTotal.value;
   const count = shown.value.length;
   const noun = total === 1 ? 'place' : 'places';
   return count === total ? `${total} ${noun}` : `${count} of ${total} ${noun}`;
 });
 const showNames = computed(() => showProtected.value || searchingAll.value);
+const listExtent = computed(() =>
+  listInView.value ? placesStore.viewBounds : null
+);
+
+/**
+ * The list query for the current search, sort, filters, and extent.
+ * @returns Arguments for the bounded place query.
+ */
+function listQuery(): PlaceWindowQuery {
+  return {
+    search: needle.value,
+    searchPrefix: searchingAll.value,
+    sort: sort.value,
+    sizeMin: placesStore.sizeKept[0],
+    sizeMax: placesStore.sizeKept[1],
+    cropMin: placesStore.croplandKept[0],
+    cropMax: placesStore.croplandKept[1],
+    extent: listExtent.value,
+  };
+}
 
 /** Draw the protected areas when they are hidden. */
 function showBoundaries() {
@@ -163,23 +148,103 @@ function hideBoundaries() {
   if (placesStore.visible) placesStore.toggle();
 }
 
-watch(needle, value => {
-  if (placeType.value || !value) return;
-  void ensureList();
-});
-
-/** Load the stored names once. Later type clicks reuse them. */
-async function ensureList() {
-  if (listStatus.value !== 'idle') return;
-  listStatus.value = 'loading';
-  const result = await loadPilotPlaces();
-  listStatus.value = result.status === 'ok' ? 'ok' : result.status;
-  if (result.status === 'ok') places.value = result.places;
+/** Load the stored size range and chart counts once. */
+async function ensureStats() {
+  if (statsReady.value) return;
+  const result = await loadPilotPlaceFilterStats();
+  if (result.status !== 'ok') return;
+  statsReady.value = true;
+  storedCount.value = result.stats.placeCount;
+  sizeFull.value = result.stats.sizeFull;
+  sizeBins.value = result.stats.sizeBins;
+  croplandBins.value = result.stats.croplandBins;
 }
+
+/** Load the names that match the current list query. */
+async function refreshList() {
+  if (!showProtected.value && !searchingAll.value) return;
+  const request = ++listRequest;
+  const first = listStatus.value === 'idle';
+  if (first) listStatus.value = 'loading';
+  if (showProtected.value) await ensureStats();
+  const result = await loadPilotPlaceWindow(listQuery());
+  if (request !== listRequest) return;
+  listStatus.value = result.status === 'ok' ? 'ok' : result.status;
+  if (result.status === 'ok') {
+    places.value = result.places;
+    matchTotal.value = result.total;
+  }
+}
+
+/** Wait for typing or a map move before querying again. */
+function scheduleList() {
+  if (listWaitMs === 0) {
+    void refreshList();
+    return;
+  }
+  if (listWait) clearTimeout(listWait);
+  listWait = setTimeout(() => {
+    listWait = null;
+    void refreshList();
+  }, listWaitMs);
+}
+
+watch(
+  () =>
+    [
+      placeType.value,
+      needle.value,
+      searchingAll.value,
+      sort.value,
+      placesStore.sizeKept[0],
+      placesStore.sizeKept[1],
+      placesStore.croplandKept[0],
+      placesStore.croplandKept[1],
+      listInView.value,
+      listExtent.value,
+    ] as const,
+  (next, previous) => {
+    if (!showProtected.value && !searchingAll.value) return;
+    const moved =
+      previous != null && next[8] === previous[8] && next[9] !== previous[9];
+    const typed =
+      previous != null &&
+      next[1] !== previous[1] &&
+      next[0] === previous[0] &&
+      next[3] === previous[3] &&
+      next[8] === previous[8];
+    if (moved || typed) scheduleList();
+    else void refreshList();
+  }
+);
+
+watch(
+  () =>
+    [
+      placesStore.filtering,
+      placesStore.sizeKept[0],
+      placesStore.sizeKept[1],
+      placesStore.croplandKept[0],
+      placesStore.croplandKept[1],
+    ] as const,
+  async () => {
+    if (!placesStore.filtering) {
+      placesStore.keptIds = null;
+      return;
+    }
+    const result = await loadPilotPlaceKeptIds(
+      placesStore.sizeKept[0],
+      placesStore.sizeKept[1],
+      placesStore.croplandKept
+    );
+    if (result.status === 'ok') placesStore.keptIds = result.ids;
+  }
+);
 
 /** Return to the panel with no list and no drawn boundaries. */
 function clearPlaces() {
   placeType.value = null;
+  listInView.value = false;
   placesStore.clearSelection();
   hideBoundaries();
 }
@@ -197,22 +262,19 @@ function selectPlaceType(type: PlaceTypeId) {
   placesStore.clearSelection();
   if (type === 'protected_area') {
     showBoundaries();
-    void ensureList();
     return;
   }
   hideBoundaries();
 }
 
 /**
- * Put a place chosen on the map at the top of the visible list.
- * An active search or filter is cleared so the name is in the list.
+ * Scroll a place chosen on the map to the top of the list when it is in the
+ * window. The profile opens either way.
  */
 watch(
   () => [placesStore.selectedId, placesStore.selectedFrom] as const,
   async ([id, source]) => {
     if (!id || source !== 'map') return;
-    query.value = '';
-    if (!shown.value.some(place => place.id === id)) placesStore.clearFilter();
     await nextTick();
     const list = resultsList.value;
     const row = list?.querySelector<HTMLElement>(
@@ -286,57 +348,75 @@ watch(
           The places could not be loaded.
         </p>
         <div v-if="showTools" class="places-tools">
-          <Popover v-model:open="sortOpen">
-            <PopoverTrigger as-child>
-              <button
-                type="button"
-                class="places-tool map-control"
-                :aria-label="`Sort places, ${sortLabel}`"
-              >
-                <ArrowDownUp :size="16" aria-hidden="true" />
-                Sort
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="start"
-              class="places-sort-menu nw:z-[1200] nw:w-60 nw:gap-0 nw:p-1 nw:shadow-none"
-            >
-              <div role="radiogroup" aria-label="Sort places">
+          <div class="places-tool-buttons">
+            <Popover v-model:open="sortOpen">
+              <PopoverTrigger as-child>
                 <button
-                  v-for="option in sortOptions"
-                  :key="option.id"
                   type="button"
-                  role="radio"
-                  class="places-sort-option"
-                  :aria-checked="sort === option.id"
-                  @click="chooseSort(option.id)"
+                  class="places-tool map-control"
+                  :aria-label="`Sort places, ${sortLabel}`"
                 >
-                  {{ option.label }}
-                  <Check
-                    v-if="sort === option.id"
-                    :size="16"
-                    aria-hidden="true"
-                  />
+                  <ArrowDownUp :size="16" aria-hidden="true" />
+                  Sort
                 </button>
-              </div>
-            </PopoverContent>
-          </Popover>
-          <button
-            ref="filterButton"
-            type="button"
-            class="places-tool places-filter-toggle map-control"
-            :class="{ 'is-on': placesStore.filtering }"
-            aria-haspopup="dialog"
-            @click="filterOpen = true"
-          >
-            <SlidersHorizontal :size="16" aria-hidden="true" />
-            Filter
-          </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                class="places-sort-menu nw:z-[1200] nw:w-60 nw:gap-0 nw:p-1 nw:shadow-none"
+              >
+                <div role="radiogroup" aria-label="Sort places">
+                  <button
+                    v-for="option in sortOptions"
+                    :key="option.id"
+                    type="button"
+                    role="radio"
+                    class="places-sort-option"
+                    :aria-checked="sort === option.id"
+                    @click="chooseSort(option.id)"
+                  >
+                    {{ option.label }}
+                    <Check
+                      v-if="sort === option.id"
+                      :size="16"
+                      aria-hidden="true"
+                    />
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <button
+              ref="filterButton"
+              type="button"
+              class="places-tool places-filter-toggle map-control"
+              :class="{ 'is-on': placesStore.filtering }"
+              aria-haspopup="dialog"
+              @click="filterOpen = true"
+            >
+              <SlidersHorizontal :size="16" aria-hidden="true" />
+              Filter
+            </button>
+            <button
+              type="button"
+              class="places-tool places-extent-toggle map-control"
+              :class="{ 'is-on': listInView }"
+              :aria-pressed="listInView"
+              aria-label="Limit list to the map view"
+              @click="toggleListInView"
+            >
+              <Scan :size="16" aria-hidden="true" />
+              In view
+            </button>
+          </div>
           <p class="places-count">{{ countText }}</p>
           <PlacesFilterDialog
             v-model:open="filterOpen"
-            :places="searched"
             :size-full="sizeFull"
+            :size-bins="sizeBins"
+            :cropland-bins="croplandBins"
+            :search="needle"
+            :search-prefix="searchingAll"
+            :extent="listExtent"
+            :matched-total="matchTotal"
           />
         </div>
         <div v-if="placeType && !showProtected" class="places-list">
@@ -355,12 +435,12 @@ watch(
           </p>
           <ul v-else aria-label="Place results">
             <li
-              v-for="place in shown"
+              v-for="(place, index) in shown"
               :key="place.id"
               :data-place-id="place.id"
             >
               <span class="place-number" aria-hidden="true">
-                {{ ranks.get(place.id) }}
+                {{ index + 1 }}
               </span>
               <button
                 type="button"
@@ -535,8 +615,18 @@ watch(
 .places-tools {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.places-tool-buttons {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .places-tool {
