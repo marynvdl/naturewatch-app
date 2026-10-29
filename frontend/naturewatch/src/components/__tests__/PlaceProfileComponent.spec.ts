@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
 import { loadPilotPlace, type PlaceDetail } from '@/places/api';
+import { PHOTOS_NONE } from '@/places/photos';
 
 vi.mock('@/places/api', () => ({
   loadPilotPlace: vi.fn(),
@@ -111,6 +112,15 @@ describe('Place profile', () => {
     const panel = wrapper.get('[role="tabpanel"]').text();
     expect(panel).toBe('Oops, we have nothing to show you yet.');
     expect(panel.toLowerCase()).not.toMatch(/no species|none/);
+  });
+
+  it('shows the empty photograph state, and keeps the placeholder', async () => {
+    const wrapper = await mountProfile(kruger);
+
+    expect(wrapper.get('.place-photo-empty').text()).toBe(PHOTOS_NONE);
+    expect(wrapper.find('.place-photo-icon').exists()).toBe(true);
+    expect(wrapper.find('img').exists()).toBe(false);
+    expect(wrapper.find('button.place-photo').exists()).toBe(false);
   });
 
   it('asks to zoom and to close', async () => {
