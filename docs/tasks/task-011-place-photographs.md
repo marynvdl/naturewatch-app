@@ -10,20 +10,21 @@ Show one approved photograph, and open the rest in a gallery with the photograph
 
 ## Do this
 
-- Add the photograph area to the profile. One approved photograph is the main image. Opening it shows the whole set large, with the photographer, the source, and the licence on each image.
+- One approved photograph is the main image. Opening it shows the whole set large, with the photographer, the source, and the licence on each image.
 - Previous and next move through the set. The arrow keys do the same. Escape closes the gallery and returns focus to the control that opened it.
-- No approved photographs are stored. The profile says so, in the empty state. Do not use the example images in `docs/parcels/budding-places.html`.
+- No approved photographs are stored. The profile says so, in the empty state. Keep the placeholder image for now.
 - Build the gallery so a later parcel can pass approved records into it without a second design. Do not add a photograph table in this task.
 
 ## Do not
 
-- Do not invent photographs or copy the mock-up images into the app.
+- Do not invent photographs.
 - Do not add upload, approval, or sign-in. Molding Places owns those.
-- Do not change the Overview, Disturbances, or Species text.
+- Do not change the Overview, Landscape, or Species text.
 - Do not download boundaries again.
 
 ## Done when
 
+- I approved the design visually.
 - Every stored place shows that no approved photograph is stored.
 - Tests cover the empty state, and the gallery controls for a set of records passed in directly: next, previous, arrow keys, and Escape.
 - The catalog tests still pass.
