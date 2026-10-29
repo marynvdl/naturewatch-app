@@ -4,9 +4,8 @@ import { createPinia } from 'pinia';
 import PlacesBarComponent from '@/components/PlacesBarComponent.vue';
 import {
   loadPilotPlaceFilterStats,
-  loadPilotPlaceKeptIds,
   loadPilotPlaceWindow,
-  loadPlaceMap,
+  loadPlaceRelease,
 } from '@/places/api';
 import {
   CROPLAND_FULL,
@@ -42,8 +41,7 @@ vi.mock('@/places/api', () => ({
   loadPilotPlaceWindow: vi.fn(),
   loadPilotPlaceWindowCount: vi.fn(),
   loadPilotPlaceFilterStats: vi.fn(),
-  loadPilotPlaceKeptIds: vi.fn(),
-  loadPlaceMap: vi.fn(),
+  loadPlaceRelease: vi.fn(),
 }));
 
 const places = [
@@ -77,8 +75,7 @@ const missingPlace = {
 
 const drawn = {
   status: 'ok' as const,
-  features: { type: 'FeatureCollection' as const, features: [] },
-  releaseMonth: '',
+  releaseMonth: '2026-10-01',
 };
 
 const stats = {
@@ -148,20 +145,7 @@ describe('Places panel', () => {
       list = sortPlaces(list, query.sort);
       return { status: 'ok', places: list, total: list.length };
     });
-    vi.mocked(loadPilotPlaceKeptIds).mockImplementation(
-      async (sizeMin, sizeMax, cropland) => ({
-        status: 'ok',
-        ids: filterPlaces(
-          places,
-          {
-            kept: [sizeMin ?? sizeFull[0], sizeMax ?? sizeFull[1]],
-            full: sizeFull,
-          },
-          { kept: cropland, full: CROPLAND_FULL }
-        ).map(place => place.id),
-      })
-    );
-    vi.mocked(loadPlaceMap).mockResolvedValue(drawn);
+    vi.mocked(loadPlaceRelease).mockResolvedValue(drawn);
   });
 
   it('shows results and boundaries only after a place type is selected', async () => {
@@ -171,14 +155,14 @@ describe('Places panel', () => {
     expect(wrapper.text()).not.toContain('Addo Elephant National Park');
     const areas = typeButton(wrapper, 'Protected areas');
     expect(areas.attributes('aria-pressed')).toBe('false');
-    expect(loadPlaceMap).not.toHaveBeenCalled();
+    expect(loadPlaceRelease).not.toHaveBeenCalled();
 
     await typeButton(wrapper, 'Protected areas').trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('Addo Elephant National Park');
     expect(wrapper.text()).toContain('Kruger National Park');
     expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
       expect.objectContaining({ sort: 'size-desc' as PlaceSort, extent: null })
     );
@@ -203,7 +187,7 @@ describe('Places panel', () => {
     await wrapper.get('input[aria-label="Search places"]').setValue('zzz');
     await flushPromises();
     expect(wrapper.text()).toContain('No places match.');
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
 
     await typeButton(wrapper, 'Ecoregions').trigger('click');
     expect(wrapper.text()).toContain(
@@ -225,7 +209,7 @@ describe('Places panel', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('No places match.');
     expect(loadPilotPlaceWindow).toHaveBeenCalled();
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
 
     await typeButton(wrapper, 'Protected areas').trigger('click');
     expect(wrapper.text()).toContain('No places match.');
@@ -233,7 +217,7 @@ describe('Places panel', () => {
     expect(typeButton(wrapper, 'Protected areas').classes()).not.toContain(
       'is-on'
     );
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
   it('caps the list at 50, largest first, with the matching total', async () => {
@@ -273,7 +257,7 @@ describe('Places panel', () => {
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
       expect.objectContaining({ sort: 'size-desc' as PlaceSort })
     );
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
   it('loads the next 50 when the end of the list is reached', async () => {
@@ -323,7 +307,7 @@ describe('Places panel', () => {
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
       expect.objectContaining({ offset: 50 })
     );
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
   it('sorts and filters the protected areas', async () => {
@@ -382,16 +366,19 @@ describe('Places panel', () => {
     await flushPromises();
 
     const store = usePlacesStore();
-    expect(store.keptIds).toBeNull();
+    expect(store.tileFilter).toBeNull();
     store.applyFilter([19000, null], [0, 100]);
     await flushPromises();
     expect(names()).toEqual(['Kruger National Park']);
     expect(wrapper.get('.places-count').text()).toBe('1 place');
-    expect(store.keptIds).toEqual([places[1].id]);
+    expect(store.tileFilter).toEqual([
+      'all',
+      ['>=', ['to-number', ['get', 'area_km2'], -1], 19000],
+    ]);
     expect(wrapper.get('button.places-filter-toggle').classes()).toContain(
       'is-on'
     );
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
 
@@ -422,7 +409,7 @@ describe('Places panel', () => {
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
       expect.objectContaining({ extent: [20, -30, 40, -20] })
     );
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
 
     store.viewBounds = [21, -29, 39, -21];
     await flushPromises();
@@ -440,7 +427,7 @@ describe('Places panel', () => {
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
       expect.objectContaining({ extent: null })
     );
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
   it('lists places that start with the search when no type is selected', async () => {
@@ -453,7 +440,7 @@ describe('Places panel', () => {
     expect(typeButton(wrapper, 'Protected areas').classes()).not.toContain(
       'is-on'
     );
-    expect(loadPlaceMap).not.toHaveBeenCalled();
+    expect(loadPlaceRelease).not.toHaveBeenCalled();
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
       expect.objectContaining({ search: 'kru', searchPrefix: true })
     );
@@ -484,7 +471,7 @@ describe('Places panel', () => {
 
     expect(wrapper.find('.places-frame').classes()).not.toContain('has-detail');
     expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
   it('opens a map-chosen place that is not in the window', async () => {
@@ -508,7 +495,7 @@ describe('Places panel', () => {
     expect(wrapper.text()).toContain('Kruger National Park');
     expect(wrapper.text()).not.toContain('A small reserve');
     expect(wrapper.get('.places-count').text()).toBe('1 of 941 places');
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
     expect(loadPilotPlaceWindow).toHaveBeenCalledTimes(1);
   });
 
@@ -531,7 +518,7 @@ describe('Places panel', () => {
       wrapper.get('input[aria-label="Search places"]').element
     ).toHaveProperty('value', 'kruger');
     expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
   it('scrolls a place chosen on the map to the top of the list', async () => {
@@ -579,7 +566,7 @@ describe('Places panel', () => {
     vi.mocked(loadPilotPlaceFilterStats).mockResolvedValue({
       status: 'unconfigured',
     });
-    vi.mocked(loadPlaceMap).mockResolvedValue({ status: 'unconfigured' });
+    vi.mocked(loadPlaceRelease).mockResolvedValue({ status: 'unconfigured' });
 
     const wrapper = mountPlaces();
     await flushPromises();
@@ -592,7 +579,7 @@ describe('Places panel', () => {
     expect(wrapper.text()).not.toContain(
       'Well, this is awkward. We have nothing to show.'
     );
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
   it('says the places could not be loaded', async () => {
@@ -603,6 +590,6 @@ describe('Places panel', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('The places could not be loaded.');
-    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+    expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 });

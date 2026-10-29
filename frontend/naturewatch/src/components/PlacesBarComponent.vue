@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/popover';
 import {
   loadPilotPlaceFilterStats,
-  loadPilotPlaceKeptIds,
   loadPilotPlaceWindow,
   type PlaceSummary,
   type PlaceWindowQuery,
@@ -284,29 +283,6 @@ watch(
       next[8] === previous[8];
     if (moved || typed) scheduleList();
     else void refreshList();
-  }
-);
-
-watch(
-  () =>
-    [
-      placesStore.filtering,
-      placesStore.sizeKept[0],
-      placesStore.sizeKept[1],
-      placesStore.croplandKept[0],
-      placesStore.croplandKept[1],
-    ] as const,
-  async () => {
-    if (!placesStore.filtering) {
-      placesStore.keptIds = null;
-      return;
-    }
-    const result = await loadPilotPlaceKeptIds(
-      placesStore.sizeKept[0],
-      placesStore.sizeKept[1],
-      placesStore.croplandKept
-    );
-    if (result.status === 'ok') placesStore.keptIds = result.ids;
   }
 );
 

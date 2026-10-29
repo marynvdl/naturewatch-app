@@ -1,22 +1,26 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { loadPlaceMap } from '@/places/api';
+import { loadPlaceRelease } from '@/places/api';
 import {
   CROPLAND_FULL,
   PROTECTED_AREA_ATTRIBUTION,
   formatReleaseMonth,
+  placeTileFilter,
   type FigureRange,
   type LngLatBounds,
-  type PlaceFeatureCollection,
   type SizeBounds,
 } from '@/places/display';
 
 const usePlacesStore = defineStore('places', () => {
   const visible = ref(false);
+  /**
+   * Boundaries draw from the tile archive whatever this says.
+   * `unconfigured` means Supabase is not set, so names and profiles cannot load.
+   * `error` means the tiles could not be read.
+   */
   const status = ref<'idle' | 'loading' | 'ready' | 'unconfigured' | 'error'>(
     'idle'
   );
-  const features = ref<PlaceFeatureCollection | null>(null);
   const notice = ref('');
   const selectedId = ref<string | null>(null);
   const selectedFrom = ref<'list' | 'map' | null>(null);
@@ -24,8 +28,6 @@ const usePlacesStore = defineStore('places', () => {
   const sizeKept = ref<SizeBounds>([null, null]);
   /** Applied cropland filter, in percent. */
   const croplandKept = ref<FigureRange>([...CROPLAND_FULL]);
-  /** Ids the applied filter keeps on the map, or null while it keeps every place. */
-  const keptIds = ref<string[] | null>(null);
   /** Current map view, west, south, east, north. */
   const viewBounds = ref<LngLatBounds | null>(null);
   const filtering = computed(
@@ -34,6 +36,10 @@ const usePlacesStore = defineStore('places', () => {
       sizeKept.value[1] !== null ||
       croplandKept.value[0] > CROPLAND_FULL[0] ||
       croplandKept.value[1] < CROPLAND_FULL[1]
+  );
+  /** Tile filter for the applied size and cropland ranges. */
+  const tileFilter = computed(() =>
+    placeTileFilter(sizeKept.value, croplandKept.value)
   );
 
   /**
@@ -73,22 +79,23 @@ const usePlacesStore = defineStore('places', () => {
   }
 
   /**
-   * Load the map shapes once.
-   * Later toggles reuse the collection already in memory.
+   * Read the release month for the notice once.
+   * The boundaries themselves come from the tile archive.
    */
   async function load(): Promise<void> {
-    if (features.value || status.value === 'loading') return;
+    if (status.value !== 'idle') return;
     status.value = 'loading';
-    const result = await loadPlaceMap();
-    if (result.status !== 'ok') {
-      status.value = result.status;
+    const result = await loadPlaceRelease();
+    if (result.status === 'unconfigured') {
+      status.value = 'unconfigured';
+      notice.value = PROTECTED_AREA_ATTRIBUTION;
       return;
     }
-    features.value = result.features;
-    notice.value = result.releaseMonth
-      ? `Protected areas: WDPCA, ${formatReleaseMonth(result.releaseMonth)}. ${PROTECTED_AREA_ATTRIBUTION}`
+    const month = result.status === 'ok' ? result.releaseMonth : null;
+    notice.value = month
+      ? `Protected areas: WDPCA, ${formatReleaseMonth(month)}. ${PROTECTED_AREA_ATTRIBUTION}`
       : PROTECTED_AREA_ATTRIBUTION;
-    status.value = 'ready';
+    if (status.value === 'loading') status.value = 'ready';
   }
 
   /** Show or hide the boundaries on the map. */
@@ -100,15 +107,14 @@ const usePlacesStore = defineStore('places', () => {
   return {
     visible,
     status,
-    features,
     notice,
     selectedId,
     selectedFrom,
     sizeKept,
     croplandKept,
-    keptIds,
     viewBounds,
     filtering,
+    tileFilter,
     applyFilter,
     clearFilter,
     load,

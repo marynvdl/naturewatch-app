@@ -2,17 +2,23 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   CROPLAND_METHOD_ID,
   CROPLAND_SPROUT_ID,
-  buildPlaceFeatures,
   type FigureRange,
   type LngLatBounds,
-  type PlaceBoundary,
-  type PlaceFactRow,
-  type PlaceFeatureCollection,
   type PlaceSort,
 } from '@/places/display';
 
 /** Cards the places list shows at once. */
 export const PLACE_LIST_LIMIT = 50;
+
+/**
+ * Published protected-area boundaries. Each feature carries `id` (`places.id`),
+ * `area_km2`, and `cropland_percent` when a fact exists.
+ */
+export const PLACE_TILES_URL =
+  'https://storage.googleapis.com/nature-watch-tiles/places/protected-areas/v1/places.pmtiles';
+
+/** Vector layer inside the places archive. */
+export const PLACE_TILE_LAYER = 'places';
 
 /** A card on the places list. */
 export interface PlaceSummary {
@@ -85,12 +91,6 @@ export type PlaceFilterStatsResult =
   | { status: 'unconfigured' }
   | { status: 'error' };
 
-/** Result of loading the ids the map filter keeps. */
-export type PlaceKeptIdsResult =
-  | { status: 'ok'; ids: string[] }
-  | { status: 'unconfigured' }
-  | { status: 'error' };
-
 type WindowRow = PlaceSummary & { total_count: number | string };
 
 /** Result of opening one place. */
@@ -100,9 +100,16 @@ export type PlaceLoadResult =
   | { status: 'unconfigured' }
   | { status: 'error' };
 
-/** Result of loading the shapes drawn on the map. */
-export type PlaceMapResult =
-  | { status: 'ok'; features: PlaceFeatureCollection; releaseMonth: string }
+/** Result of looking up the extent of one place. */
+export type PlaceBoundsResult =
+  | { status: 'ok'; bounds: LngLatBounds }
+  | { status: 'missing' }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/** Result of reading the WDPCA release month for the map notice. */
+export type PlaceReleaseResult =
+  | { status: 'ok'; releaseMonth: string | null }
   | { status: 'unconfigured' }
   | { status: 'error' };
 
@@ -261,30 +268,6 @@ export async function loadPilotPlaceFilterStats(): Promise<PlaceFilterStatsResul
 }
 
 /**
- * Ids the size and cropland filter keeps on the map.
- * @param sizeMin - Lowest kept size, or null when that end is open.
- * @param sizeMax - Highest kept size, or null when that end is open.
- * @param cropland - Kept cropland percent.
- * @returns The ids, or why they could not be loaded.
- */
-export async function loadPilotPlaceKeptIds(
-  sizeMin: number | null,
-  sizeMax: number | null,
-  cropland: FigureRange
-): Promise<PlaceKeptIdsResult> {
-  const supabase = placesClient();
-  if (!supabase) return { status: 'unconfigured' };
-  const { data, error } = await supabase.rpc('pilot_place_kept_ids', {
-    p_size_min: sizeMin,
-    p_size_max: sizeMax,
-    p_crop_min: cropland[0],
-    p_crop_max: cropland[1],
-  });
-  if (error || !data) return { status: 'error' };
-  return { status: 'ok', ids: data as string[] };
-}
-
-/**
  * One pilot place and its cropland fact for the 2024 sprout.
  * @param id - `places.id`.
  * @returns The place, or why it could not be opened.
@@ -331,30 +314,44 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
 }
 
 /**
- * Stored pilot boundaries and their cropland figures, for drawing on the map.
- * The app does not offer a file download.
- * @returns The feature collection, or why it could not be loaded.
+ * West, south, east, north of one place, so the map can move to it.
+ * The boundary itself comes from the tiles. The shape is never downloaded.
+ * @param id - `places.id`.
+ * @returns The extent, or why it could not be found.
  */
-export async function loadPlaceMap(): Promise<PlaceMapResult> {
+export async function loadPlaceBounds(id: string): Promise<PlaceBoundsResult> {
+  if (!PLACE_ID.test(id)) return { status: 'missing' };
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('place_bounds', { p_id: id });
+  if (error || !data) return { status: 'error' };
+  const row = (
+    data as {
+      west: number;
+      south: number;
+      east: number;
+      north: number;
+    }[]
+  )[0];
+  if (!row) return { status: 'missing' };
+  return {
+    status: 'ok',
+    bounds: [row.west, row.south, row.east, row.north],
+  };
+}
 
-  const { data: boundaries, error } = await supabase
-    .from('pilot_place_map')
-    .select('id, name, site_id, source_name, release_month, geom');
-  if (error || !boundaries) return { status: 'error' };
-
-  const { data: facts, error: factError } = await supabase
-    .from('facts')
-    .select('place_id, area_km2, percent')
-    .eq('sprout_id', CROPLAND_SPROUT_ID)
-    .eq('method_id', CROPLAND_METHOD_ID);
-  if (factError || !facts) return { status: 'error' };
-
-  const features = buildPlaceFeatures(
-    boundaries as PlaceBoundary[],
-    facts as PlaceFactRow[]
-  );
-  const releaseMonth = boundaries[0]?.release_month ?? '';
-  return { status: 'ok', features, releaseMonth };
+/**
+ * WDPCA release month of the stored protected areas, for the map notice.
+ * @returns The month, or why it could not be read.
+ */
+export async function loadPlaceRelease(): Promise<PlaceReleaseResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase
+    .from('pilot_places')
+    .select('release_month')
+    .limit(1)
+    .maybeSingle();
+  if (error) return { status: 'error' };
+  return { status: 'ok', releaseMonth: data?.release_month ?? null };
 }
