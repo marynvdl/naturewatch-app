@@ -8,6 +8,7 @@ import {
   loadPlaceRelease,
 } from '@/places/api';
 import { usePlaceBoundaries } from '@/places/usePlaceBoundaries';
+import useBasemapStore from '@/store/BasemapStore';
 import usePlacesStore from '@/store/PlacesStore';
 
 vi.mock('@/places/api', async importOriginal => ({
@@ -15,6 +16,19 @@ vi.mock('@/places/api', async importOriginal => ({
   loadPlaceBounds: vi.fn(),
   loadPlaceRelease: vi.fn(),
 }));
+
+vi.stubGlobal(
+  'matchMedia',
+  (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+    }) as unknown as MediaQueryList
+);
 
 type Handler = (event: unknown) => void;
 
@@ -26,6 +40,7 @@ class FakeMap {
   fitBounds = vi.fn();
   easeTo = vi.fn();
   setFilter = vi.fn();
+  setPaintProperty = vi.fn();
   isStyleLoaded() {
     return true;
   }
@@ -173,6 +188,35 @@ describe('place boundaries from tiles', () => {
     store.selectPlace(outsideWindow);
     await flushPromises();
     expect(map.fitBounds).not.toHaveBeenCalled();
+  });
+
+  it('marks a selection with a thicker outline and no extra fill', async () => {
+    const { map } = await drawPlaces();
+
+    expect(map.getLayer('places-select-fill')).toBeUndefined();
+    expect(map.getLayer('places-select-line')).toMatchObject({
+      paint: { 'line-width': 3 },
+    });
+  });
+
+  it('draws places off-white on the satellite basemap', async () => {
+    const { map } = await drawPlaces();
+    expect(map.getLayer('places-fill')).toMatchObject({
+      paint: { 'fill-color': '#1f4b3a' },
+    });
+
+    useBasemapStore().toggleBasemap();
+    await flushPromises();
+    expect(map.setPaintProperty).toHaveBeenCalledWith(
+      'places-fill',
+      'fill-color',
+      '#f4f1e8'
+    );
+    expect(map.setPaintProperty).toHaveBeenCalledWith(
+      'places-line',
+      'line-color',
+      '#f4f1e8'
+    );
   });
 
   it('reports a failed tile read', async () => {

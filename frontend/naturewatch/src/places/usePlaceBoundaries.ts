@@ -1,5 +1,6 @@
 import { nextTick, watch } from 'vue';
 import type * as mapboxgl from 'mapbox-gl';
+import useBasemapStore from '@/store/BasemapStore';
 import usePlacesStore from '@/store/PlacesStore';
 import { PLACE_TILES_URL, PLACE_TILE_LAYER, loadPlaceBounds } from './api';
 import { boundsInsideFrame, type LngLatBounds } from './display';
@@ -7,42 +8,63 @@ import { boundsInsideFrame, type LngLatBounds } from './display';
 const PLACE_SOURCE = 'places-tiles';
 const PLACE_FILL = 'places-fill';
 const PLACE_LINE = 'places-line';
-const PLACE_SELECT_FILL = 'places-select-fill';
 const PLACE_SELECT_LINE = 'places-select-line';
+
+const PLACE_FILL_OPACITY = [
+  'interpolate',
+  ['linear'],
+  ['zoom'],
+  4,
+  0.6,
+  7,
+  0.2,
+  9,
+  0.06,
+] as mapboxgl.ExpressionSpecification;
+
+/** Green on the monochrome basemap, off-white on satellite imagery. */
+const PLACE_COLOUR = {
+  monochrome: { place: '#1f4b3a', selected: '#143528' },
+  satellite: { place: '#f4f1e8', selected: '#fbfaf5' },
+};
 
 /**
  * Solid patches at a country or world view, so small places stay readable.
  * Closer in, the fill is faint enough that overlapping places show as darker
- * areas, and the outline carries the boundary.
+ * areas, and the outline carries the boundary. A selected place keeps the
+ * same fill and gains a thicker outline.
+ * @param satellite - Whether the satellite basemap is shown.
+ * @returns Paint for each place layer.
  */
-const PLACE_PAINT = {
-  fill: {
-    'fill-color': '#1f4b3a',
-    'fill-opacity': [
-      'interpolate',
-      ['linear'],
-      ['zoom'],
-      4,
-      0.6,
-      7,
-      0.2,
-      9,
-      0.06,
-    ],
-  },
-  line: {
-    'line-color': '#1f4b3a',
-    'line-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0, 7, 0.9],
-    'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 8, 1.3, 12, 2],
-  },
-  selectedFill: { 'fill-color': '#143528', 'fill-opacity': 0.35 },
-  selectedLine: { 'line-color': '#143528', 'line-width': 3 },
-} satisfies {
-  fill: mapboxgl.FillLayer['paint'];
-  line: mapboxgl.LineLayer['paint'];
-  selectedFill: mapboxgl.FillLayer['paint'];
-  selectedLine: mapboxgl.LineLayer['paint'];
-};
+function placePaint(satellite: boolean) {
+  const colour = satellite ? PLACE_COLOUR.satellite : PLACE_COLOUR.monochrome;
+  return {
+    fill: {
+      'fill-color': colour.place,
+      'fill-opacity': PLACE_FILL_OPACITY,
+    },
+    line: {
+      'line-color': colour.place,
+      'line-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0, 7, 0.9],
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        5,
+        0.5,
+        8,
+        1.3,
+        12,
+        2,
+      ],
+    },
+    selectedLine: { 'line-color': colour.selected, 'line-width': 3 },
+  } satisfies {
+    fill: mapboxgl.FillLayer['paint'];
+    line: mapboxgl.LineLayer['paint'];
+    selectedLine: mapboxgl.LineLayer['paint'];
+  };
+}
 
 /**
  * The map methods this overlay uses.
@@ -62,6 +84,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   zoomToSelectedPlace: () => void;
 } {
   const placesStore = usePlacesStore();
+  const basemapStore = useBasemapStore();
   let listening = false;
   let boundsListening = false;
   const knownBounds = new Map<string, LngLatBounds | null>();
@@ -138,10 +161,32 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
 
   /** Highlight the selected boundary. */
   function highlightSelection(mapInstance: mapboxgl.Map) {
-    if (!mapInstance.getLayer(PLACE_SELECT_FILL)) return;
-    const filter = selectionFilter();
-    mapInstance.setFilter(PLACE_SELECT_FILL, filter);
-    mapInstance.setFilter(PLACE_SELECT_LINE, filter);
+    if (!mapInstance.getLayer(PLACE_SELECT_LINE)) return;
+    mapInstance.setFilter(PLACE_SELECT_LINE, selectionFilter());
+  }
+
+  /** Whether the satellite basemap is shown. */
+  function onSatellite(): boolean {
+    return basemapStore.currentBasemap.title === 'Satellite';
+  }
+
+  /**
+   * Colour the drawn places for the current basemap.
+   * @param mapInstance - The map.
+   */
+  function applyBasemapPaint(mapInstance: mapboxgl.Map) {
+    const paint = placePaint(onSatellite());
+    const layers: [string, Record<string, unknown>][] = [
+      [PLACE_FILL, paint.fill],
+      [PLACE_LINE, paint.line],
+      [PLACE_SELECT_LINE, paint.selectedLine],
+    ];
+    layers.forEach(([layer, properties]) => {
+      if (!mapInstance.getLayer(layer)) return;
+      Object.entries(properties).forEach(([name, value]) =>
+        mapInstance.setPaintProperty(layer, name as never, value as never)
+      );
+    });
   }
 
   /** Publish the current map view for the list extent option. */
@@ -257,8 +302,6 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   function removePlaceOverlay(mapInstance: mapboxgl.Map) {
     if (mapInstance.getLayer(PLACE_SELECT_LINE))
       mapInstance.removeLayer(PLACE_SELECT_LINE);
-    if (mapInstance.getLayer(PLACE_SELECT_FILL))
-      mapInstance.removeLayer(PLACE_SELECT_FILL);
     if (mapInstance.getLayer(PLACE_LINE)) mapInstance.removeLayer(PLACE_LINE);
     if (mapInstance.getLayer(PLACE_FILL)) mapInstance.removeLayer(PLACE_FILL);
     if (mapInstance.getSource(PLACE_SOURCE))
@@ -296,27 +339,20 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         type: 'vector',
         url: PLACE_TILES_URL,
       });
+      const paint = placePaint(onSatellite());
       const fill: mapboxgl.FillLayer = {
         id: PLACE_FILL,
         type: 'fill',
         source: PLACE_SOURCE,
         'source-layer': PLACE_TILE_LAYER,
-        paint: PLACE_PAINT.fill,
+        paint: paint.fill,
       };
       const line: mapboxgl.LineLayer = {
         id: PLACE_LINE,
         type: 'line',
         source: PLACE_SOURCE,
         'source-layer': PLACE_TILE_LAYER,
-        paint: PLACE_PAINT.line,
-      };
-      const selectedFill: mapboxgl.FillLayer = {
-        id: PLACE_SELECT_FILL,
-        type: 'fill',
-        source: PLACE_SOURCE,
-        'source-layer': PLACE_TILE_LAYER,
-        filter: selectionFilter(),
-        paint: PLACE_PAINT.selectedFill,
+        paint: paint.line,
       };
       const selectedLine: mapboxgl.LineLayer = {
         id: PLACE_SELECT_LINE,
@@ -324,17 +360,15 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         source: PLACE_SOURCE,
         'source-layer': PLACE_TILE_LAYER,
         filter: selectionFilter(),
-        paint: PLACE_PAINT.selectedLine,
+        paint: paint.selectedLine,
       };
       if (onStandard) {
         fill.slot = 'top';
         line.slot = 'top';
-        selectedFill.slot = 'top';
         selectedLine.slot = 'top';
       }
       mapInstance.addLayer(fill, onStandard ? undefined : before);
       mapInstance.addLayer(line, onStandard ? undefined : before);
-      mapInstance.addLayer(selectedFill, onStandard ? undefined : before);
       mapInstance.addLayer(selectedLine, onStandard ? undefined : before);
       if (!listening) {
         mapInstance.on('click', PLACE_FILL, onPlaceClick);
@@ -379,6 +413,14 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     () => {
       const mapInstance = readMap();
       if (mapInstance) drawWhenReady(mapInstance);
+    }
+  );
+
+  watch(
+    () => basemapStore.currentBasemap.title,
+    () => {
+      const mapInstance = readMap();
+      if (mapInstance?.isStyleLoaded()) applyBasemapPaint(mapInstance);
     }
   );
 
