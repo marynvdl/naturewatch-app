@@ -57,7 +57,11 @@ defineExpose({
     :style="{ top: y + 'px', left: x + 'px' }"
   >
     <span class="coordinate-text">{{ coordinates }}</span>
-    <button type="button" aria-label="Copy coordinates" @click="copyCoordinates">
+    <button
+      type="button"
+      aria-label="Copy coordinates"
+      @click="copyCoordinates"
+    >
       <Copy :size="14" />
     </button>
   </div>

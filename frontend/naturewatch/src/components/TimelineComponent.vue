@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue';
 import { Hourglass, Pause, Play, Timer } from '@lucide/vue';
 import useTimelineStore from '@/store/TimelineStore';
 import { timelineRange } from '@/catalog';
@@ -40,7 +47,8 @@ let pendingPrevious: number | null = null;
 /** Keep the year from before a slider drag or click. Capture runs first. */
 function beginGesture(event: PointerEvent) {
   const target = event.target;
-  if (!(target instanceof Element) || !target.closest('.timeline-slider')) return;
+  if (!(target instanceof Element) || !target.closest('.timeline-slider'))
+    return;
   stopPlay();
   if (pendingPrevious === null) pendingPrevious = selectedYear.value;
 }
@@ -283,8 +291,14 @@ onBeforeUnmount(() => {
   left: 8px;
   right: 8px;
   top: 50%;
+  z-index: 1;
   height: 0;
   pointer-events: none;
+}
+
+/* The dots sit on the track, and the thumb sits on the dots. */
+.timeline-slider :deep([data-slot='slider-thumb']) {
+  z-index: 2;
 }
 
 .tick {

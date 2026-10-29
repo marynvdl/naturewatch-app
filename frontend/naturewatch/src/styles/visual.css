@@ -144,7 +144,7 @@
   html {
     background: var(--background);
     color: var(--foreground);
-    font-family: var(--font-sans);
+    font-family: var(--nw-font-sans);
   }
 
   body {
@@ -162,7 +162,7 @@
   .nw {
     box-sizing: border-box;
     color: var(--foreground);
-    font-family: var(--font-sans);
+    font-family: var(--nw-font-sans);
   }
 
   /* Titles on the Landscape, Places, and Measure panels. */
@@ -186,6 +186,16 @@
 /*
  * Unlayered so these beat the button reset. A layered rule loses to it.
  */
+button:not(:disabled),
+select:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+[role='tab'],
+[role='radio'],
+[role='menuitem'],
+.map-container .mapboxgl-ctrl-group button.mapboxgl-ctrl-compass {
+  cursor: pointer;
+}
+
 .map-panel {
   padding: var(--map-panel-padding);
   border: 1px solid var(--border);

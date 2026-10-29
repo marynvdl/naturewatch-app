@@ -50,6 +50,23 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     return ['==', ['get', 'id'], placesStore.selectedId ?? ''];
   }
 
+  /** Filter that keeps the places the list filter keeps. */
+  function keptFilter(): mapboxgl.FilterSpecification | null {
+    const ids = placesStore.keptIds;
+    return ids ? ['in', ['get', 'id'], ['literal', ids]] : null;
+  }
+
+  /**
+   * Hide the boundaries the list filter leaves out.
+   * @param mapInstance - The map.
+   */
+  function applyKeptFilter(mapInstance: mapboxgl.Map) {
+    const filter = keptFilter();
+    [PLACE_FILL, PLACE_LINE].forEach(layer => {
+      if (mapInstance.getLayer(layer)) mapInstance.setFilter(layer, filter);
+    });
+  }
+
   /**
    * Leave room for a visible places panel on the left.
    * @param mapInstance - The map.
@@ -210,6 +227,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       ) as mapboxgl.GeoJSONSource;
       source.setData(placesStore.features);
     }
+    applyKeptFilter(mapInstance);
     frameSelectedPlace(mapInstance);
   }
 
@@ -235,6 +253,14 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     () => {
       const mapInstance = readMap();
       if (mapInstance) drawWhenReady(mapInstance);
+    }
+  );
+
+  watch(
+    () => placesStore.keptIds,
+    () => {
+      const mapInstance = readMap();
+      if (mapInstance?.isStyleLoaded()) applyKeptFilter(mapInstance);
     }
   );
 

@@ -11,11 +11,47 @@ export const PROTECTED_AREA_ATTRIBUTION =
 /**
  * Cropland square kilometres, to one hectare.
  * @param km2 - Stored area.
- * @returns Two decimal places.
+ * @returns Two decimal places, with thousands separators.
  */
 export function formatKm2(km2: number): string {
-  return km2.toFixed(2);
+  return km2.toLocaleString('en-GB', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
+
+/**
+ * Place area for the profile tag and the list card.
+ * Whole square kilometres, or two decimal places below 100 km².
+ * @param km2 - `pilot_places.area_km2`.
+ * @returns The number, with thousands separators.
+ */
+export function formatAreaTag(km2: number): string {
+  const digits = km2 < 100 ? 2 : 0;
+  return km2.toLocaleString('en-GB', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+const COUNTRY_NAMES: Record<string, string> = { ZAF: 'South Africa' };
+
+/**
+ * English country name for a stored ISO 3166 alpha-3 code.
+ * @param iso3 - `places.iso3`.
+ * @returns The name, or the code when no name is known.
+ */
+export function countryName(iso3: string | null): string {
+  if (!iso3) return '';
+  return COUNTRY_NAMES[iso3] ?? iso3;
+}
+
+/** Landscape tab, when no cropland fact is stored for the place. */
+export const CROPLAND_NOT_CALCULATED =
+  'Cropland has not been calculated for this place.';
+
+/** Species tab. No species records are stored for any place. */
+export const SPECIES_NOTHING_YET = 'Oops, we have nothing to show you yet.';
 
 /**
  * Cropland percent, to one decimal place.
@@ -64,6 +100,129 @@ export function placesMatching<T extends { name: string }>(
   return places.filter(place =>
     place.name.toLocaleLowerCase().includes(needle)
   );
+}
+
+/** How the places list is ordered. */
+export type PlaceSort =
+  | 'name'
+  | 'size-desc'
+  | 'size-asc'
+  | 'cropland-desc'
+  | 'cropland-asc';
+
+/** The list fields that sorting and filtering read. */
+export interface PlaceFigures {
+  name: string;
+  area_km2: number | null;
+  cropland_percent: number | null;
+}
+
+/**
+ * Order places. A place without the sorted figure goes last.
+ * @param places - Places to order.
+ * @param sort - Name, size, or cropland percent, and the direction.
+ * @returns A new array.
+ */
+export function sortPlaces<T extends PlaceFigures>(
+  places: T[],
+  sort: PlaceSort
+): T[] {
+  const byName = (a: T, b: T) => a.name.localeCompare(b.name, 'en');
+  if (sort === 'name') return [...places].sort(byName);
+  const field = sort.startsWith('size') ? 'area_km2' : 'cropland_percent';
+  const sign = sort.endsWith('desc') ? -1 : 1;
+  return [...places].sort((a, b) => {
+    const left = a[field];
+    const right = b[field];
+    if (left === null && right === null) return byName(a, b);
+    if (left === null) return 1;
+    if (right === null) return -1;
+    return (left - right) * sign || byName(a, b);
+  });
+}
+
+/** Lowest and highest value a filter keeps. */
+export type FigureRange = [number, number];
+
+/**
+ * Places whose size and cropland percent fall inside both ranges.
+ * A missing figure passes only while its range is the full range.
+ * @param places - Places to filter.
+ * @param size - Square kilometres.
+ * @param size.kept - Sizes kept.
+ * @param size.full - Smallest and largest stored size.
+ * @param cropland - Cropland percent.
+ * @param cropland.kept - Percents kept.
+ * @param cropland.full - 0 to 100.
+ * @returns The places kept, in the same order.
+ */
+export function filterPlaces<T extends PlaceFigures>(
+  places: T[],
+  size: { kept: FigureRange; full: FigureRange },
+  cropland: { kept: FigureRange; full: FigureRange }
+): T[] {
+  const passes = (
+    value: number | null,
+    range: { kept: FigureRange; full: FigureRange }
+  ) => {
+    const whole =
+      range.kept[0] <= range.full[0] && range.kept[1] >= range.full[1];
+    if (value === null) return whole;
+    return value >= range.kept[0] && value <= range.kept[1];
+  };
+  return places.filter(
+    place =>
+      passes(place.area_km2, size) && passes(place.cropland_percent, cropland)
+  );
+}
+
+/** The whole cropland range, in percent. */
+export const CROPLAND_FULL: FigureRange = [0, 100];
+
+/** Steps on the size slider. The slider is logarithmic. */
+export const SIZE_STEPS = 100;
+
+/**
+ * Square kilometres for a size slider step.
+ * @param step - 0 to SIZE_STEPS.
+ * @param full - Smallest and largest stored size.
+ * @returns The size at that step. The ends are exactly the stored ends.
+ */
+export function sizeAtStep(step: number, full: FigureRange): number {
+  if (step <= 0) return full[0];
+  if (step >= SIZE_STEPS) return full[1];
+  const low = Math.log10(full[0]);
+  const high = Math.log10(full[1]);
+  return 10 ** (low + ((high - low) * step) / SIZE_STEPS);
+}
+
+/**
+ * Where a size sits along the logarithmic size slider.
+ * @param km2 - Square kilometres.
+ * @param full - Smallest and largest stored size.
+ * @returns 0 at the smallest size, 1 at the largest.
+ */
+export function sizeFraction(km2: number, full: FigureRange): number {
+  const low = Math.log10(full[0]);
+  const high = Math.log10(full[1]);
+  if (high <= low) return 0;
+  const fraction = (Math.log10(km2) - low) / (high - low);
+  return Math.min(1, Math.max(0, fraction));
+}
+
+/**
+ * Count values into equal bins along a slider.
+ * @param fractions - Each value's place along the slider, 0 to 1.
+ * @param bins - Number of bins.
+ * @returns The count in each bin. A value of 1 falls in the last bin.
+ */
+export function binCounts(fractions: number[], bins: number): number[] {
+  const counts = new Array<number>(bins).fill(0);
+  fractions.forEach(fraction => {
+    const bin = Math.min(bins - 1, Math.max(0, Math.floor(fraction * bins)));
+    counts[bin] += 1;
+  });
+  return counts;
 }
 
 /** West, south, east, north. */

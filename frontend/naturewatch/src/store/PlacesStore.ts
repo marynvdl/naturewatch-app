@@ -1,9 +1,12 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { loadPlaceMap } from '@/places/api';
 import {
+  CROPLAND_FULL,
   PROTECTED_AREA_ATTRIBUTION,
+  SIZE_STEPS,
   formatReleaseMonth,
+  type FigureRange,
   type PlaceFeatureCollection,
 } from '@/places/display';
 
@@ -16,6 +19,34 @@ const usePlacesStore = defineStore('places', () => {
   const notice = ref('');
   const selectedId = ref<string | null>(null);
   const selectedFrom = ref<'list' | 'map' | null>(null);
+  /** Applied size filter, in steps along the logarithmic slider. */
+  const sizeSteps = ref<FigureRange>([0, SIZE_STEPS]);
+  /** Applied cropland filter, in percent. */
+  const croplandKept = ref<FigureRange>([...CROPLAND_FULL]);
+  /** Ids the applied filter keeps on the map, or null while it keeps every place. */
+  const keptIds = ref<string[] | null>(null);
+  const filtering = computed(
+    () =>
+      sizeSteps.value[0] > 0 ||
+      sizeSteps.value[1] < SIZE_STEPS ||
+      croplandKept.value[0] > CROPLAND_FULL[0] ||
+      croplandKept.value[1] < CROPLAND_FULL[1]
+  );
+
+  /**
+   * Apply a filter to the list and the map.
+   * @param size - Steps along the size slider.
+   * @param cropland - Cropland percent.
+   */
+  function applyFilter(size: FigureRange, cropland: FigureRange) {
+    sizeSteps.value = [...size];
+    croplandKept.value = [...cropland];
+  }
+
+  /** Keep every place again. */
+  function clearFilter() {
+    applyFilter([0, SIZE_STEPS], CROPLAND_FULL);
+  }
 
   /**
    * Select a place, or clear it when that place is already selected.
@@ -70,6 +101,12 @@ const usePlacesStore = defineStore('places', () => {
     notice,
     selectedId,
     selectedFrom,
+    sizeSteps,
+    croplandKept,
+    keptIds,
+    filtering,
+    applyFilter,
+    clearFilter,
     load,
     toggle,
     selectPlace,

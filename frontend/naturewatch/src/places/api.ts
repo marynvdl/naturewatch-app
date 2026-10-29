@@ -8,16 +8,24 @@ import {
   type PlaceFeatureCollection,
 } from '@/places/display';
 
-/** A name on the places list. */
+/** A card on the places list. */
 export interface PlaceSummary {
   id: string;
   name: string;
+  designation: string | null;
+  iso3: string | null;
+  area_km2: number | null;
+  /** Stored cropland percent, or null when no fact is stored. */
+  cropland_percent: number | null;
 }
 
 /** A protected area and its stored cropland figure, when one exists. */
 export interface PlaceDetail {
   id: string;
   name: string;
+  designation: string | null;
+  iso3: string | null;
+  areaKm2: number | null;
   siteId: string | null;
   releaseMonth: string;
   sourceName: string;
@@ -67,7 +75,7 @@ export function placesClient(): SupabaseClient | null {
 }
 
 /**
- * Pilot protected areas, ordered by name.
+ * Pilot protected areas, ordered by name, with their stored cropland percent.
  * @returns The list, or why it could not be loaded.
  */
 export async function loadPilotPlaces(): Promise<PlaceListResult> {
@@ -75,10 +83,25 @@ export async function loadPilotPlaces(): Promise<PlaceListResult> {
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase
     .from('pilot_places')
-    .select('id, name')
+    .select('id, name, designation, iso3, area_km2')
     .order('name');
   if (error || !data) return { status: 'error' };
-  return { status: 'ok', places: data };
+
+  const { data: facts, error: factError } = await supabase
+    .from('facts')
+    .select('place_id, percent')
+    .eq('sprout_id', CROPLAND_SPROUT_ID)
+    .eq('method_id', CROPLAND_METHOD_ID);
+  if (factError || !facts) return { status: 'error' };
+
+  const percent = new Map(facts.map(fact => [fact.place_id, fact.percent]));
+  return {
+    status: 'ok',
+    places: data.map(place => ({
+      ...place,
+      cropland_percent: percent.get(place.id) ?? null,
+    })),
+  };
 }
 
 /**
@@ -93,7 +116,9 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
 
   const { data: place, error } = await supabase
     .from('pilot_places')
-    .select('id, name, site_id, release_month, source_name')
+    .select(
+      'id, name, designation, iso3, area_km2, site_id, release_month, source_name'
+    )
     .eq('id', id)
     .maybeSingle();
   if (error) return { status: 'error' };
@@ -113,6 +138,9 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
     place: {
       id: place.id,
       name: place.name,
+      designation: place.designation,
+      iso3: place.iso3,
+      areaKm2: place.area_km2,
       siteId: place.site_id,
       releaseMonth: place.release_month,
       sourceName: place.source_name,
