@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Image, LocateFixed, X } from '@lucide/vue';
+import { LocateFixed, X } from '@lucide/vue';
+import PlacePhotos from '@/components/PlacePhotos.vue';
 import { loadPilotPlace, type PlaceDetail } from '@/places/api';
 import {
   CROPLAND_NOT_CALCULATED,
@@ -12,12 +13,18 @@ import {
   formatPercent,
   formatReleaseMonth,
 } from '@/places/display';
+import type { PlacePhoto } from '@/places/photos';
 
-const props = defineProps<{
-  placeId: string;
-  /** Shown while the stored record loads. */
-  name?: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    placeId: string;
+    /** Shown while the stored record loads. */
+    name?: string;
+    /** Approved photographs. None are stored yet. */
+    photos?: PlacePhoto[];
+  }>(),
+  { name: undefined, photos: () => [] }
+);
 
 defineEmits<{
   close: [];
@@ -82,9 +89,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
 
 <template>
   <section class="place-profile" aria-label="Place">
-    <div class="place-hero" aria-hidden="true">
-      <Image class="place-hero-icon" :stroke-width="1.25" />
-    </div>
+    <PlacePhotos :photos="photos" :place-name="title" />
     <button
       type="button"
       class="place-close"
@@ -198,20 +203,6 @@ function onTabKey(event: KeyboardEvent, index: number) {
   overflow-y: auto;
   padding: 0;
   scrollbar-width: thin;
-}
-
-.place-hero {
-  display: grid;
-  flex: none;
-  height: 200px;
-  place-items: center;
-  background: linear-gradient(150deg, #eef0ee, #dfe3df);
-  color: #a3aba6;
-}
-
-.place-hero-icon {
-  width: 40px;
-  height: 40px;
 }
 
 .place-close {
@@ -374,10 +365,6 @@ function onTabKey(event: KeyboardEvent, index: number) {
 }
 
 @media (max-width: 720px) {
-  .place-hero {
-    height: 120px;
-  }
-
   .place-body {
     gap: 12px;
     padding: 16px;

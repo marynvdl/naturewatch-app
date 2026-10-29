@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Layers, Search } from '@lucide/vue';
+import PlacePhotos from '@/components/PlacePhotos.vue';
+import type { PlacePhoto } from '@/places/photos';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +30,38 @@ const place = ref('');
 const satellite = ref(true);
 const year = ref([2020]);
 const view = ref('split');
+
+/**
+ * A plain grey frame with its number and shape written on it.
+ * @param number - Position in the sample set.
+ * @param width - Frame width.
+ * @param height - Frame height.
+ * @returns A data address for the frame.
+ */
+function frame(number: number, width: number, height: number) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#dfe3df"/><rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="#a3aba6" stroke-width="2"/><text x="50%" y="50%" fill="#6f7873" font-family="sans-serif" font-size="${Math.round(Math.min(width, height) / 16)}" text-anchor="middle" dominant-baseline="middle">Sample frame ${number}, ${width} × ${height}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+const samplePhotos: PlacePhoto[] = [
+  [1200, 800],
+  [800, 1200],
+  [1600, 900],
+  [1000, 1000],
+].map(([width, height], index) => ({
+  src: frame(index + 1, width, height),
+  alt: `Sample frame ${index + 1}`,
+  title: `Sample record ${index + 1}`,
+  photographer: 'Sample photographer',
+  source:
+    index % 2
+      ? { name: 'Sample source' }
+      : { name: 'Sample source', url: 'https://example.org' },
+  licence: {
+    name: 'CC BY 4.0',
+    url: 'https://creativecommons.org/licenses/by/4.0/',
+  },
+}));
 </script>
 
 <template>
@@ -143,6 +177,28 @@ const view = ref('split');
             </TableRow>
           </TableBody>
         </Table>
+      </section>
+
+      <section
+        class="nw:flex nw:flex-col nw:gap-stack"
+        aria-label="Place photographs"
+      >
+        <p class="nw:text-sm nw:text-muted-foreground">
+          Place photographs. Grey sample records, then the empty state every
+          stored place shows.
+        </p>
+        <div class="nw:flex nw:flex-wrap nw:gap-panel">
+          <div
+            class="nw:w-[380px] nw:max-w-full nw:border nw:border-border nw:bg-white"
+          >
+            <PlacePhotos :photos="samplePhotos" place-name="Sample place" />
+          </div>
+          <div
+            class="nw:w-[380px] nw:max-w-full nw:border nw:border-border nw:bg-white"
+          >
+            <PlacePhotos />
+          </div>
+        </div>
       </section>
     </div>
   </div>
