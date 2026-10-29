@@ -8,7 +8,7 @@ The October 2026 WDPCA row is pinned in the migration: release month `2026-10-01
 
 `site_id` is the Protected Planet id (`https://www.protectedplanet.net/<site_id>`).
 
-The places page reads `pilot_places` and `facts` in the browser with the anon key. The Places list on the map reads `pilot_place_window` (at most 50 matching rows) and `pilot_place_filter_stats` for the filter charts. Extent filtering uses `pilot_places_in_extent`, which accepts a bounding box and returns attributes only. It does not read `places.geom`. The map reads `pilot_place_map`, which returns that stored boundary.
+The places page reads `pilot_places` and `facts` in the browser with the anon key. The Places list on the map reads `pilot_place_window` (50 matching rows at a time, from an offset) and `pilot_place_filter_stats` for the filter charts. Extent filtering uses `pilot_places_in_extent`, which accepts a bounding box and returns attributes only. It does not read `places.geom`. The map reads `pilot_place_map`, which returns that stored boundary.
 
 `places`, `sources`, `facts`, `fact_methods`, and `pilot_place_map` have row-level security on. `anon` and `authenticated` can select rows and cannot insert, update, or delete. `service_role` keeps select, insert, update, and delete on `sources`, `places`, `facts`, and `fact_methods`. On `pilot_place_map` it can select. `places.geom` stays ungranted.
 

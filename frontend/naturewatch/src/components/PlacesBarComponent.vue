@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import {
   ArrowDownUp,
   Check,
@@ -54,8 +54,12 @@ const croplandBins = ref<number[]>([]);
 const query = ref('');
 const listInView = ref(false);
 const resultsList = ref<HTMLElement | null>(null);
+const moreSentinel = ref<HTMLElement | null>(null);
+const loadingMore = ref(false);
+const moreExhausted = ref(false);
 let listRequest = 0;
 let listWait: ReturnType<typeof setTimeout> | null = null;
+let moreObserver: IntersectionObserver | null = null;
 const listWaitMs = import.meta.env.MODE === 'test' ? 0 : 200;
 
 const needle = computed(() => query.value.trim());
@@ -123,9 +127,10 @@ const listExtent = computed(() =>
 
 /**
  * The list query for the current search, sort, filters, and extent.
+ * @param offset - Matching rows to skip when loading the next page.
  * @returns Arguments for the bounded place query.
  */
-function listQuery(): PlaceWindowQuery {
+function listQuery(offset = 0): PlaceWindowQuery {
   return {
     search: needle.value,
     searchPrefix: searchingAll.value,
@@ -135,7 +140,21 @@ function listQuery(): PlaceWindowQuery {
     cropMin: placesStore.croplandKept[0],
     cropMax: placesStore.croplandKept[1],
     extent: listExtent.value,
+    offset,
   };
+}
+
+/**
+ * The element that actually scrolls the cards.
+ * On a narrow screen that is the whole Places column, not the list.
+ * @returns The scroller, or null before the list is drawn.
+ */
+function listScroller(): HTMLElement | null {
+  const list = resultsList.value;
+  if (!list) return null;
+  return getComputedStyle(list).overflowY === 'visible'
+    ? (list.closest<HTMLElement>('.places-results') ?? list)
+    : list;
 }
 
 /** Draw the protected areas when they are hidden. */
@@ -164,16 +183,66 @@ async function ensureStats() {
 async function refreshList() {
   if (!showProtected.value && !searchingAll.value) return;
   const request = ++listRequest;
+  loadingMore.value = false;
+  moreExhausted.value = false;
   const first = listStatus.value === 'idle';
   if (first) listStatus.value = 'loading';
   if (showProtected.value) await ensureStats();
-  const result = await loadPilotPlaceWindow(listQuery());
+  const result = await loadPilotPlaceWindow(listQuery(0));
   if (request !== listRequest) return;
   listStatus.value = result.status === 'ok' ? 'ok' : result.status;
   if (result.status === 'ok') {
     places.value = result.places;
     matchTotal.value = result.total;
+    await nextTick();
+    const scroller = listScroller();
+    if (scroller) scroller.scrollTop = 0;
   }
+}
+
+/** Load the next 50 when the end of the list is in view. */
+async function loadMore() {
+  if (loadingMore.value) return;
+  if (listStatus.value !== 'ok') return;
+  if (places.value.length >= matchTotal.value) return;
+  const request = listRequest;
+  const offset = places.value.length;
+  loadingMore.value = true;
+  const result = await loadPilotPlaceWindow(listQuery(offset));
+  if (request !== listRequest) return;
+  loadingMore.value = false;
+  if (result.status !== 'ok') return;
+  matchTotal.value = result.total;
+  const have = new Set(places.value.map(place => place.id));
+  const extra = result.places.filter(place => !have.has(place.id));
+  if (extra.length === 0) {
+    moreExhausted.value = true;
+    return;
+  }
+  places.value = [...places.value, ...extra];
+}
+
+/** Watch the end of the list so scrolling loads the next page. */
+function watchMore() {
+  moreObserver?.disconnect();
+  moreObserver = null;
+  const sentinel = moreSentinel.value;
+  const root = listScroller();
+  if (
+    typeof IntersectionObserver === 'undefined' ||
+    !sentinel ||
+    !root ||
+    moreExhausted.value ||
+    places.value.length >= matchTotal.value
+  )
+    return;
+  moreObserver = new IntersectionObserver(
+    entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadMore();
+    },
+    { root, rootMargin: '80px' }
+  );
+  moreObserver.observe(sentinel);
 }
 
 /** Wait for typing or a map move before querying again. */
@@ -267,6 +336,18 @@ function selectPlaceType(type: PlaceTypeId) {
   hideBoundaries();
 }
 
+watch(
+  () => [places.value.length, matchTotal.value, listStatus.value] as const,
+  () => {
+    void nextTick(watchMore);
+  }
+);
+
+onBeforeUnmount(() => {
+  moreObserver?.disconnect();
+  moreObserver = null;
+});
+
 /**
  * Scroll a place chosen on the map to the top of the list when it is in the
  * window. The profile opens either way.
@@ -281,10 +362,7 @@ watch(
       `[data-place-id="${CSS.escape(id)}"]`
     );
     if (!list || !row) return;
-    const scroller =
-      getComputedStyle(list).overflowY === 'visible'
-        ? (list.closest<HTMLElement>('.places-results') ?? list)
-        : list;
+    const scroller = listScroller() ?? list;
     const top = Math.max(
       scroller.getBoundingClientRect().top,
       list.getBoundingClientRect().top
@@ -467,6 +545,13 @@ watch(
               </button>
             </li>
           </ul>
+          <div
+            v-if="shown.length > 0 && shown.length < matchTotal"
+            ref="moreSentinel"
+            class="places-more"
+            aria-hidden="true"
+          />
+          <p v-if="loadingMore" class="places-status">Loading more places.</p>
         </div>
       </template>
     </div>
@@ -667,6 +752,10 @@ watch(
   font-size: 12px;
   color: var(--muted-foreground);
   white-space: nowrap;
+}
+
+.places-more {
+  height: 1px;
 }
 
 .places-list ul {

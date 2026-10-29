@@ -118,6 +118,9 @@ describe('Places filter dialog', () => {
     await croplandMin.trigger('focus');
     await croplandMin.trigger('keydown', { key: 'ArrowRight' });
     await flushPromises();
+    expect(loadPilotPlaceWindowCount).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cropMin: 1, cropMax: 100 })
+    );
     expect(button('Show 0 places').exists()).toBe(true);
     expect(store.filtering).toBe(false);
 

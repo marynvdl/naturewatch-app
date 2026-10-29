@@ -25,6 +25,19 @@ vi.stubGlobal(
   }
 );
 
+let ioCallback: IntersectionObserverCallback | null = null;
+vi.stubGlobal(
+  'IntersectionObserver',
+  class {
+    constructor(callback: IntersectionObserverCallback) {
+      ioCallback = callback;
+    }
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+  }
+);
+
 vi.mock('@/places/api', () => ({
   loadPilotPlaceWindow: vi.fn(),
   loadPilotPlaceWindowCount: vi.fn(),
@@ -106,6 +119,7 @@ function typeButton(wrapper: ReturnType<typeof mountPlaces>, label: string) {
 
 describe('Places panel', () => {
   beforeEach(() => {
+    ioCallback = null;
     vi.clearAllMocks();
     vi.mocked(loadPilotPlaceFilterStats).mockResolvedValue(stats);
     vi.mocked(loadPilotPlaceWindow).mockImplementation(async query => {
@@ -258,6 +272,56 @@ describe('Places panel', () => {
     expect(wrapper.get('.place-card-name').text()).toBe('Park 01');
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
       expect.objectContaining({ sort: 'size-desc' as PlaceSort })
+    );
+    expect(loadPlaceMap).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads the next 50 when the end of the list is reached', async () => {
+    const many = Array.from({ length: 60 }, (_, index) => ({
+      id: `${String(index + 1).padStart(8, '0')}-1111-1111-1111-111111111111`,
+      name: `Park ${String(index + 1).padStart(2, '0')}`,
+      designation: 'National Park',
+      iso3: 'ZAF',
+      area_km2: 1000 - index,
+      cropland_percent: 1,
+    }));
+    vi.mocked(loadPilotPlaceFilterStats).mockResolvedValue({
+      status: 'ok',
+      stats: {
+        placeCount: 60,
+        sizeFull: [10, 20000],
+        sizeBins: new Array(40).fill(0),
+        croplandBins: new Array(40).fill(0),
+      },
+    });
+    vi.mocked(loadPilotPlaceWindow).mockImplementation(async query => {
+      const offset = query.offset ?? 0;
+      return {
+        status: 'ok',
+        places: many.slice(offset, offset + 50),
+        total: 60,
+      };
+    });
+
+    const wrapper = mountPlaces();
+    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.findAll('button.place-result')).toHaveLength(50);
+    expect(wrapper.get('.places-count').text()).toBe('50 of 60 places');
+    expect(ioCallback).not.toBeNull();
+
+    ioCallback?.(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver
+    );
+    await flushPromises();
+
+    expect(wrapper.findAll('button.place-result')).toHaveLength(60);
+    expect(wrapper.get('.places-count').text()).toBe('60 places');
+    expect(wrapper.findAll('.place-number').at(-1)?.text()).toBe('60');
+    expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 50 })
     );
     expect(loadPlaceMap).toHaveBeenCalledTimes(1);
   });

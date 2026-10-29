@@ -55,6 +55,8 @@ export interface PlaceWindowQuery {
   cropMin: number;
   cropMax: number;
   extent: LngLatBounds | null;
+  /** Skip this many matching rows. Used to load the next 50. */
+  offset?: number;
 }
 
 /** Result of loading the capped list. */
@@ -127,15 +129,14 @@ export function placesClient(): SupabaseClient | null {
 }
 
 /**
- * Arguments the list window RPC expects.
- * @param query - Search, sort, filters, and optional extent.
- * @returns Named arguments for `pilot_place_window`.
+ * Arguments shared by the list window and the filter count.
+ * @param query - Search, filters, and optional extent.
+ * @returns Named arguments for `pilot_place_matched` filters.
  */
-function windowArgs(query: PlaceWindowQuery) {
+function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
   return {
     p_search: query.search.trim(),
     p_search_prefix: query.searchPrefix,
-    p_sort: query.sort,
     p_size_min: query.sizeMin,
     p_size_max: query.sizeMax,
     p_crop_min: query.cropMin,
@@ -189,8 +190,10 @@ export async function loadPilotPlaceWindow(
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase.rpc('pilot_place_window', {
-    ...windowArgs(query),
+    ...matchedArgs(query),
+    p_sort: query.sort,
     p_limit: PLACE_LIST_LIMIT,
+    ...(query.offset ? { p_offset: query.offset } : {}),
   });
   if (error || !data) return { status: 'error' };
   const rows = data as WindowRow[];
@@ -221,7 +224,7 @@ export async function loadPilotPlaceWindowCount(
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase.rpc(
     'pilot_place_window_count',
-    windowArgs({ ...query, sort: 'size-desc' })
+    matchedArgs(query)
   );
   if (error || data === null) return { status: 'error' };
   return { status: 'ok', total: Number(data) };

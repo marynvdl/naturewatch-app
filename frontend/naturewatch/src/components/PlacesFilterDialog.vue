@@ -194,6 +194,7 @@ watch(
       croplandKept.value[0],
       croplandKept.value[1],
       props.search,
+      props.searchPrefix,
       props.extent,
     ] as const,
   async ([isOpen]) => {

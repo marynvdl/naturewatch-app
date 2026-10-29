@@ -517,6 +517,16 @@ begin
     raise exception 'capped window returned % of %, expected 50 of 52',
       window_count, window_total;
   end if;
+
+  select count(*), min(total_count)
+    into window_count, window_total
+  from public.pilot_place_window(
+    '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50, 50
+  );
+  if window_count <> 2 or window_total <> 52 then
+    raise exception 'offset window returned % of %, expected 2 of 52',
+      window_count, window_total;
+  end if;
 end $$;
 
 \echo records fixture ok
