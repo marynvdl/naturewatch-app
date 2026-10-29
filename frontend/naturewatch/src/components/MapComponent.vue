@@ -80,14 +80,6 @@ const currentBasemap = computed(() => basemapStore.currentBasemap);
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
 const { zoomToSelectedPlace } = usePlaceBoundaries(() => map.value);
-const selectedName = computed(() => {
-  const id = placesStore.selectedId;
-  if (!id) return '';
-  return (
-    placesStore.features?.features.find(item => item.properties.id === id)
-      ?.properties.name ?? ''
-  );
-});
 
 /** Rendered profile width. The closed Places circle parks beside it. */
 const profileWidth = ref(0);
@@ -706,7 +698,6 @@ function addSourceAndLayer(
             v-if="placesStore.selectedId"
             class="map-place map-panel nw"
             :place-id="placesStore.selectedId"
-            :name="selectedName"
             @close="placesStore.clearSelection()"
             @zoom="zoomToSelectedPlace"
           />

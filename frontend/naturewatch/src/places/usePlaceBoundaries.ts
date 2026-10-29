@@ -1,17 +1,48 @@
 import { nextTick, watch } from 'vue';
 import type * as mapboxgl from 'mapbox-gl';
 import usePlacesStore from '@/store/PlacesStore';
-import {
-  boundsInsideFrame,
-  geometryBounds,
-  type LngLatBounds,
-} from './display';
+import { PLACE_TILES_URL, PLACE_TILE_LAYER, loadPlaceBounds } from './api';
+import { boundsInsideFrame, type LngLatBounds } from './display';
 
-const PLACE_SOURCE = 'pilot-places';
-const PLACE_FILL = 'pilot-places-fill';
-const PLACE_LINE = 'pilot-places-line';
-const PLACE_SELECT_FILL = 'pilot-places-select-fill';
-const PLACE_SELECT_LINE = 'pilot-places-select-line';
+const PLACE_SOURCE = 'places-tiles';
+const PLACE_FILL = 'places-fill';
+const PLACE_LINE = 'places-line';
+const PLACE_SELECT_FILL = 'places-select-fill';
+const PLACE_SELECT_LINE = 'places-select-line';
+
+/**
+ * Solid patches at a country or world view, so small places stay readable.
+ * Closer in, the fill is faint enough that overlapping places show as darker
+ * areas, and the outline carries the boundary.
+ */
+const PLACE_PAINT = {
+  fill: {
+    'fill-color': '#1f4b3a',
+    'fill-opacity': [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      4,
+      0.6,
+      7,
+      0.2,
+      9,
+      0.06,
+    ],
+  },
+  line: {
+    'line-color': '#1f4b3a',
+    'line-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0, 7, 0.9],
+    'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 8, 1.3, 12, 2],
+  },
+  selectedFill: { 'fill-color': '#143528', 'fill-opacity': 0.35 },
+  selectedLine: { 'line-color': '#143528', 'line-width': 3 },
+} satisfies {
+  fill: mapboxgl.FillLayer['paint'];
+  line: mapboxgl.LineLayer['paint'];
+  selectedFill: mapboxgl.FillLayer['paint'];
+  selectedLine: mapboxgl.LineLayer['paint'];
+};
 
 /**
  * The map methods this overlay uses.
@@ -33,6 +64,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   const placesStore = usePlacesStore();
   let listening = false;
   let boundsListening = false;
+  const knownBounds = new Map<string, LngLatBounds | null>();
 
   /** Read the map as the Mapbox instance this overlay draws on. */
   function readMap(): mapboxgl.Map | null {
@@ -51,14 +83,13 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     return ['==', ['get', 'id'], placesStore.selectedId ?? ''];
   }
 
-  /** Filter that keeps the places the list filter keeps. */
+  /** Filter that keeps the places the size and cropland filter keeps. */
   function keptFilter(): mapboxgl.FilterSpecification | null {
-    const ids = placesStore.keptIds;
-    return ids ? ['in', ['get', 'id'], ['literal', ids]] : null;
+    return placesStore.tileFilter as mapboxgl.FilterSpecification | null;
   }
 
   /**
-   * Hide the boundaries the list filter leaves out.
+   * Hide the boundaries the size and cropland filter leaves out.
    * @param mapInstance - The map.
    */
   function applyKeptFilter(mapInstance: mapboxgl.Map) {
@@ -126,13 +157,15 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   }
 
   /** Extent of the selected place, or null when it has no stored shape. */
-  function selectedBounds(): LngLatBounds | null {
+  async function selectedBounds(): Promise<LngLatBounds | null> {
     const id = placesStore.selectedId;
-    if (!id || !placesStore.features) return null;
-    const feature = placesStore.features.features.find(
-      item => item.properties.id === id
-    );
-    return feature ? geometryBounds(feature.geometry) : null;
+    if (!id) return null;
+    if (knownBounds.has(id)) return knownBounds.get(id) ?? null;
+    const result = await loadPlaceBounds(id);
+    const bounds = result.status === 'ok' ? result.bounds : null;
+    if (result.status === 'ok' || result.status === 'missing')
+      knownBounds.set(id, bounds);
+    return placesStore.selectedId === id ? bounds : null;
   }
 
   /**
@@ -157,9 +190,11 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    */
   async function centreCoveredPlace(mapInstance: mapboxgl.Map) {
     const id = placesStore.selectedId;
-    await panelsSettled(mapInstance);
+    const [place] = await Promise.all([
+      selectedBounds(),
+      panelsSettled(mapInstance),
+    ]);
     if (placesStore.selectedId !== id) return;
-    const place = selectedBounds();
     if (!place) return;
     const canvas = mapInstance.getCanvas().getBoundingClientRect();
     const cover = Math.min(panelCover(mapInstance), canvas.width);
@@ -188,10 +223,11 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * @param mapInstance - The map.
    * @param force - Fit even when the place is already in view.
    */
-  function frameSelectedPlace(mapInstance: mapboxgl.Map, force = false) {
+  async function frameSelectedPlace(mapInstance: mapboxgl.Map, force = false) {
     highlightSelection(mapInstance);
-    const place = selectedBounds();
-    if (!place) return;
+    const id = placesStore.selectedId;
+    const place = await selectedBounds();
+    if (!place || placesStore.selectedId !== id) return;
     const view = mapInstance.getBounds();
     if (!view) return;
     const frame: LngLatBounds = [
@@ -214,7 +250,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   function zoomToSelectedPlace() {
     const mapInstance = readMap();
     if (!mapInstance) return;
-    frameSelectedPlace(mapInstance, true);
+    void frameSelectedPlace(mapInstance, true);
   }
 
   /** Remove the place boundaries. */
@@ -239,9 +275,17 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     placesStore.selectPlace(placeId, 'map');
   }
 
+  /**
+   * Report a failed tile read as the overlay status.
+   * @param event - A map error.
+   */
+  function onMapError(event: mapboxgl.ErrorEvent & { sourceId?: string }) {
+    if (event.sourceId === PLACE_SOURCE) placesStore.status = 'error';
+  }
+
   /** Draw or clear the protected-area boundaries. */
   function syncPlaceOverlay(mapInstance: mapboxgl.Map) {
-    if (!placesStore.visible || !placesStore.features) {
+    if (!placesStore.visible) {
       removePlaceOverlay(mapInstance);
       return;
     }
@@ -249,34 +293,38 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     const onStandard = !!mapInstance.getStyle()?.imports?.length;
     if (!mapInstance.getSource(PLACE_SOURCE)) {
       mapInstance.addSource(PLACE_SOURCE, {
-        type: 'geojson',
-        data: placesStore.features,
+        type: 'vector',
+        url: PLACE_TILES_URL,
       });
       const fill: mapboxgl.FillLayer = {
         id: PLACE_FILL,
         type: 'fill',
         source: PLACE_SOURCE,
-        paint: { 'fill-color': '#1f4b3a', 'fill-opacity': 0.18 },
+        'source-layer': PLACE_TILE_LAYER,
+        paint: PLACE_PAINT.fill,
       };
       const line: mapboxgl.LineLayer = {
         id: PLACE_LINE,
         type: 'line',
         source: PLACE_SOURCE,
-        paint: { 'line-color': '#1f4b3a', 'line-width': 1.5 },
+        'source-layer': PLACE_TILE_LAYER,
+        paint: PLACE_PAINT.line,
       };
       const selectedFill: mapboxgl.FillLayer = {
         id: PLACE_SELECT_FILL,
         type: 'fill',
         source: PLACE_SOURCE,
+        'source-layer': PLACE_TILE_LAYER,
         filter: selectionFilter(),
-        paint: { 'fill-color': '#1f4b3a', 'fill-opacity': 0.38 },
+        paint: PLACE_PAINT.selectedFill,
       };
       const selectedLine: mapboxgl.LineLayer = {
         id: PLACE_SELECT_LINE,
         type: 'line',
         source: PLACE_SOURCE,
+        'source-layer': PLACE_TILE_LAYER,
         filter: selectionFilter(),
-        paint: { 'line-color': '#143528', 'line-width': 3.5 },
+        paint: PLACE_PAINT.selectedLine,
       };
       if (onStandard) {
         fill.slot = 'top';
@@ -296,16 +344,12 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         mapInstance.on('mouseleave', PLACE_FILL, () => {
           mapInstance.getCanvas().style.cursor = '';
         });
+        mapInstance.on('error', onMapError);
         listening = true;
       }
-    } else {
-      const source = mapInstance.getSource(
-        PLACE_SOURCE
-      ) as mapboxgl.GeoJSONSource;
-      source.setData(placesStore.features);
     }
     applyKeptFilter(mapInstance);
-    frameSelectedPlace(mapInstance);
+    void frameSelectedPlace(mapInstance);
   }
 
   /** Draw once the style can accept layers. */
@@ -331,7 +375,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   );
 
   watch(
-    () => [placesStore.visible, placesStore.features] as const,
+    () => placesStore.visible,
     () => {
       const mapInstance = readMap();
       if (mapInstance) drawWhenReady(mapInstance);
@@ -339,7 +383,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   );
 
   watch(
-    () => placesStore.keptIds,
+    () => placesStore.tileFilter,
     () => {
       const mapInstance = readMap();
       if (mapInstance?.isStyleLoaded()) applyKeptFilter(mapInstance);
@@ -357,7 +401,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         await centreCoveredPlace(mapInstance);
         return;
       }
-      frameSelectedPlace(mapInstance);
+      await frameSelectedPlace(mapInstance);
     }
   );
 

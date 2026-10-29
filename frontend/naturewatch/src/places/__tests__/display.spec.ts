@@ -16,11 +16,10 @@ import {
   formatPercent,
   formatReleaseMonth,
   placesMatching,
-  geometryBounds,
   boundsInsideFrame,
   placePopupElement,
+  placeTileFilter,
   protectedPlanetUrl,
-  buildPlaceFeatures,
 } from '@/places/display';
 
 describe('place figures', () => {
@@ -143,23 +142,24 @@ describe('place figures', () => {
   });
 
   it('keeps a place that is already in view and reports one that is not', () => {
-    const bounds = geometryBounds({
-      type: 'MultiPolygon',
-      coordinates: [
-        [
-          [
-            [30, -25],
-            [32, -25],
-            [32, -23],
-            [30, -23],
-            [30, -25],
-          ],
-        ],
-      ],
-    });
-    expect(bounds).toEqual([30, -25, 32, -23]);
-    expect(boundsInsideFrame([20, -30, 40, -20], bounds!)).toBe(true);
-    expect(boundsInsideFrame([31, -24.5, 33, -22], bounds!)).toBe(false);
+    const bounds: [number, number, number, number] = [30, -25, 32, -23];
+    expect(boundsInsideFrame([20, -30, 40, -20], bounds)).toBe(true);
+    expect(boundsInsideFrame([31, -24.5, 33, -22], bounds)).toBe(false);
+  });
+
+  it('filters tiles on the copied size and cropland fields', () => {
+    expect(placeTileFilter([null, null], [0, 100])).toBeNull();
+    expect(placeTileFilter([100, 5000], [0, 100])).toEqual([
+      'all',
+      ['>=', ['to-number', ['get', 'area_km2'], -1], 100],
+      ['<=', ['to-number', ['get', 'area_km2'], -1], 5000],
+    ]);
+    expect(placeTileFilter([null, null], [0, 10])).toEqual([
+      'all',
+      ['has', 'cropland_percent'],
+      ['>=', ['to-number', ['get', 'cropland_percent'], -1], 0],
+      ['<=', ['to-number', ['get', 'cropland_percent'], -1], 10],
+    ]);
   });
 
   it('filters places by name', () => {
@@ -171,36 +171,16 @@ describe('place figures', () => {
     expect(placesMatching(places, '')).toEqual(places);
   });
 
-  it('joins a stored boundary to the stored cropland figure', () => {
-    const features = buildPlaceFeatures(
-      [
-        {
-          id: '11111111-1111-1111-1111-111111111111',
-          name: 'Kruger National Park',
-          site_id: '873',
-          source_name: 'WDPCA',
-          release_month: '2026-10-01',
-          geom: { type: 'MultiPolygon', coordinates: [] },
-        },
-        {
-          id: '22222222-2222-2222-2222-222222222222',
-          name: 'Missing shape',
-          site_id: null,
-          source_name: 'WDPCA',
-          release_month: '2026-10-01',
-          geom: null,
-        },
-      ],
-      [
-        {
-          place_id: '11111111-1111-1111-1111-111111111111',
-          area_km2: 11.455618,
-          percent: 0.0598,
-        },
-      ]
-    );
-    expect(features.features).toHaveLength(1);
-    const popup = placePopupElement(features.features[0].properties);
+  it('writes the stored cropland figure into a place popup', () => {
+    const popup = placePopupElement({
+      id: '11111111-1111-1111-1111-111111111111',
+      name: 'Kruger National Park',
+      siteId: '873',
+      sourceName: 'WDPCA',
+      releaseMonth: '2026-10-01',
+      croplandKm2: 11.455618,
+      percent: 0.0598,
+    });
     expect(popup.textContent).toContain('Kruger National Park');
     expect(popup.textContent).toContain('11.46 km²');
     expect(popup.textContent).toContain('0.1%');

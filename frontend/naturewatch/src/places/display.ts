@@ -275,32 +275,37 @@ export function binCounts(fractions: number[], bins: number): number[] {
 /** West, south, east, north. */
 export type LngLatBounds = [number, number, number, number];
 
+/** A Mapbox filter expression, kept loose so this file needs no Mapbox types. */
+export type TileFilter = unknown[];
+
 /**
- * The extent of a stored boundary.
- * @param geometry - A polygon or multipolygon.
- * @returns West, south, east, north, or null when the shape has no positions.
+ * Filter on the fields copied onto each place tile: `area_km2` and
+ * `cropland_percent`. Matches the list query: a missing cropland figure passes
+ * only while the cropland range is 0–100%.
+ * @param size - Kept sizes in km². Null leaves that end open.
+ * @param cropland - Kept cropland percent.
+ * @returns The expression, or null when every place is kept.
  */
-export function geometryBounds(
-  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
-): LngLatBounds | null {
-  let west = Infinity;
-  let south = Infinity;
-  let east = -Infinity;
-  let north = -Infinity;
-  const polygons =
-    geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
-  polygons.forEach(polygon => {
-    polygon.forEach(ring => {
-      ring.forEach(([lng, lat]) => {
-        if (lng < west) west = lng;
-        if (lng > east) east = lng;
-        if (lat < south) south = lat;
-        if (lat > north) north = lat;
-      });
-    });
-  });
-  if (!Number.isFinite(west)) return null;
-  return [west, south, east, north];
+export function placeTileFilter(
+  size: SizeBounds,
+  cropland: FigureRange
+): TileFilter | null {
+  const parts: TileFilter[] = [];
+  const area = ['to-number', ['get', 'area_km2'], -1];
+  if (size[0] !== null) parts.push(['>=', area, size[0]]);
+  if (size[1] !== null) parts.push(['<=', area, size[1]]);
+  const cropWhole =
+    cropland[0] <= CROPLAND_FULL[0] && cropland[1] >= CROPLAND_FULL[1];
+  if (!cropWhole) {
+    const percent = ['to-number', ['get', 'cropland_percent'], -1];
+    parts.push(
+      ['has', 'cropland_percent'],
+      ['>=', percent, cropland[0]],
+      ['<=', percent, cropland[1]]
+    );
+  }
+  if (parts.length === 0) return null;
+  return ['all', ...parts];
 }
 
 /**
@@ -321,24 +326,7 @@ export function boundsInsideFrame(
   );
 }
 
-/** One stored boundary from `pilot_place_map`. */
-export interface PlaceBoundary {
-  id: string;
-  name: string;
-  site_id: string | null;
-  source_name: string;
-  release_month: string;
-  geom: GeoJSON.MultiPolygon | null;
-}
-
-/** Stored cropland figure joined onto a boundary for the popup. */
-export interface PlaceFactRow {
-  place_id: string;
-  area_km2: number;
-  percent: number;
-}
-
-/** Properties Mapbox keeps on each drawn place. */
+/** Properties shown in a place popup. */
 export interface PlaceFeatureProperties {
   id: string;
   name: string;
@@ -347,48 +335,6 @@ export interface PlaceFeatureProperties {
   releaseMonth: string;
   croplandKm2: number | null;
   percent: number | null;
-}
-
-/** GeoJSON the map draws. There is no file download of this shape. */
-export type PlaceFeatureCollection = GeoJSON.FeatureCollection<
-  GeoJSON.MultiPolygon,
-  PlaceFeatureProperties
->;
-
-/**
- * Join stored boundaries to the stored cropland figures.
- * A boundary with no geometry is left out.
- * @param boundaries - Rows from `pilot_place_map`.
- * @param facts - Cropland rows for the same places.
- * @returns The feature collection drawn on the map.
- */
-export function buildPlaceFeatures(
-  boundaries: PlaceBoundary[],
-  facts: PlaceFactRow[]
-): PlaceFeatureCollection {
-  const byPlace = new Map(facts.map(fact => [fact.place_id, fact]));
-  return {
-    type: 'FeatureCollection',
-    features: boundaries.flatMap(boundary => {
-      if (!boundary.geom) return [];
-      const fact = byPlace.get(boundary.id);
-      return [
-        {
-          type: 'Feature' as const,
-          geometry: boundary.geom,
-          properties: {
-            id: boundary.id,
-            name: boundary.name,
-            siteId: boundary.site_id,
-            sourceName: boundary.source_name,
-            releaseMonth: boundary.release_month,
-            croplandKm2: fact?.area_km2 ?? null,
-            percent: fact?.percent ?? null,
-          },
-        },
-      ];
-    }),
-  };
 }
 
 /**

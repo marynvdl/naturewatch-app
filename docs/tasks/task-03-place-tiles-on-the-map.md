@@ -10,7 +10,7 @@ Draw boundaries from the published PMTiles archive. Stop calling `loadPlaceMap`.
 
 ## Facts already stored
 
-Task 02 publishes `gs://nature-watch-tiles/places/protected-area/v1/places.pmtiles`. Each feature has `places.id`, `area_km2`, and cropland percent when a fact exists. The list still reads Supabase. `places.geom` stays ungranted. The app does not offer a polygon download.
+Task 02 publishes `gs://nature-watch-tiles/places/protected-areas/v1/places.pmtiles`. Each feature has `places.id`, `area_km2`, and cropland percent when a fact exists. The list still reads Supabase. `places.geom` stays ungranted. The app does not offer a polygon download.
 
 `loadPlaceMap` in `frontend/naturewatch/src/places/api.ts` still downloads every `pilot_place_map` row. This task removes that path from the map.
 
