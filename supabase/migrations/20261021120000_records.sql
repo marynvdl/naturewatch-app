@@ -33,8 +33,8 @@ values (
   'a0c3e5b2-7d14-4f6a-9c88-2b6e1d0a94f3',
   'WDPCA',
   date '2026-10-01',
-  'https://d1gam3xoknrgr2.cloudfront.net/current/WDPA_WDOECM_Oct2026_Public_ZAF.zip',
-  '5e55ad223986b4d9e2afdb1fad5d9ec0591e18e2ebb0e5bf71dfa344f0f93447'
+  'https://pp-import-production.s3.eu-west-1.amazonaws.com/WDPA_WDOECM_Oct2026_Public.zip',
+  'f5f5e50f230923619ad60faf8296e4f39a4d8c1b14bb6ea80e82ea6db6292b1c'
 );
 
 create table public.places (
@@ -151,11 +151,10 @@ from public.places
 join public.sources on sources.id = places.source_release_id
 where places.place_type = 'protected_area'
   and places.realm = 'Terrestrial'
-  and places.iso3 = 'ZAF'
   and places.area_km2 >= 10;
 
 comment on view public.pilot_places is
-  'Terrestrial South African protected areas of at least 10 km2, with the source release month.';
+  'Terrestrial protected areas of at least 10 km2, with the source release month.';
 
 revoke all on table public.pilot_places from public, anon, authenticated;
 grant select on table public.pilot_places to anon, authenticated, service_role;

@@ -1,3 +1,5 @@
+import { COUNTRY_NAMES } from './countryNames';
+
 /** Sprout whose stored cropland figures the place page shows. */
 export const CROPLAND_SPROUT_ID = 'cropland-2024-v1';
 
@@ -34,15 +36,17 @@ export function formatAreaTag(km2: number): string {
   });
 }
 
-const COUNTRY_NAMES: Record<string, string> = { ZAF: 'South Africa' };
+const ISO3_CODE = /^[A-Z]{3}$/;
 
 /**
  * English country name for a stored ISO 3166 alpha-3 code.
+ * A transboundary string, such as `ZAF;BWA`, is returned as stored.
  * @param iso3 - `places.iso3`.
- * @returns The name, or the code when no name is known.
+ * @returns The name, or the stored value when it is not one known code.
  */
 export function countryName(iso3: string | null): string {
   if (!iso3) return '';
+  if (!ISO3_CODE.test(iso3)) return iso3;
   return COUNTRY_NAMES[iso3] ?? iso3;
 }
 

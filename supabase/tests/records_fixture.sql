@@ -1,4 +1,4 @@
--- Two-feature check for the records migration. Rolls back, so places stays empty.
+-- Fixture for the records migrations. Rolls back, so places stays empty.
 -- Run it after supabase db reset and before supabase/import_wdpa.py.
 
 \set ON_ERROR_STOP on
@@ -17,8 +17,8 @@ begin
     from public.sources
     where name = 'WDPCA'
       and release_month = date '2026-10-01'
-      and download_url = 'https://d1gam3xoknrgr2.cloudfront.net/current/WDPA_WDOECM_Oct2026_Public_ZAF.zip'
-      and checksum = '5e55ad223986b4d9e2afdb1fad5d9ec0591e18e2ebb0e5bf71dfa344f0f93447'
+      and download_url = 'https://pp-import-production.s3.eu-west-1.amazonaws.com/WDPA_WDOECM_Oct2026_Public.zip'
+      and checksum = 'f5f5e50f230923619ad60faf8296e4f39a4d8c1b14bb6ea80e82ea6db6292b1c'
   ) then
     raise exception 'WDPCA October 2026 source row does not match the pin';
   end if;
@@ -118,6 +118,35 @@ select
 from public.sources
 where name = 'WDPCA' and release_month = date '2026-10-01';
 
+insert into public.places (
+  source_release_id,
+  source_id,
+  site_id,
+  name,
+  place_type,
+  designation,
+  iucn_category,
+  iso3,
+  realm,
+  geom
+)
+select
+  id,
+  'fixture-abroad',
+  'fixture-abroad-site',
+  'Chobe Fixture',
+  'protected_area',
+  'National Park',
+  'II',
+  'BWA',
+  'Terrestrial',
+  extensions.ST_GeomFromText(
+    'MULTIPOLYGON(((24 -21, 24.2 -21, 24.2 -20.8, 24 -20.8, 24 -21)))',
+    4326
+  )::extensions.geometry(MultiPolygon, 4326)
+from public.sources
+where name = 'WDPCA' and release_month = date '2026-10-01';
+
 do $$
 declare
   pilot_count int;
@@ -130,23 +159,33 @@ declare
   expression text;
 begin
   select count(*) into pilot_count from public.pilot_places;
-  if pilot_count <> 1 then
-    raise exception 'pilot_places returned % rows, expected 1', pilot_count;
+  if pilot_count <> 2 then
+    raise exception 'pilot_places returned % rows, expected 2', pilot_count;
   end if;
-  if (select source_id from public.pilot_places) <> 'fixture-pilot' then
-    raise exception 'pilot_places returned %', (select source_id from public.pilot_places);
+  if not exists (
+    select 1 from public.pilot_places where source_id = 'fixture-pilot' and iso3 = 'ZAF'
+  ) then
+    raise exception 'pilot_places omitted the South Africa place';
+  end if;
+  if not exists (
+    select 1 from public.pilot_places where source_id = 'fixture-abroad' and iso3 = 'BWA'
+  ) then
+    raise exception 'pilot_places omitted the place outside South Africa';
   end if;
 
   select release_month, area_km2
     into release, pilot_area
-  from public.pilot_places;
+  from public.pilot_places
+  where source_id = 'fixture-pilot';
 
   if release <> date '2026-10-01'
     or extract(year from release)::int <> 2026
     or extract(month from release)::int <> 10 then
     raise exception 'release month is not October 2026: %', release;
   end if;
-  if (select source_name from public.pilot_places) <> 'WDPCA' then
+  if exists (
+    select 1 from public.pilot_places where source_name is distinct from 'WDPCA'
+  ) then
     raise exception 'pilot_places is not joined to the WDPCA source';
   end if;
 
@@ -341,6 +380,65 @@ begin
     when foreign_key_violation then
       null;
   end;
+
+  declare
+    kept_id uuid;
+  begin
+    select id into kept_id
+    from public.places
+    where source_id = 'fixture-pilot';
+
+    insert into public.places (
+      source_release_id,
+      source_id,
+      site_id,
+      name,
+      place_type,
+      designation,
+      iucn_category,
+      iso3,
+      realm,
+      geom
+    )
+    select
+      source_release_id,
+      source_id,
+      site_id,
+      name,
+      place_type,
+      designation,
+      iucn_category,
+      iso3,
+      realm,
+      geom
+    from public.places
+    where source_id = 'fixture-pilot'
+    on conflict (source_release_id, source_id) do update
+    set
+      site_id = excluded.site_id,
+      name = excluded.name,
+      place_type = excluded.place_type,
+      designation = excluded.designation,
+      iucn_category = excluded.iucn_category,
+      iso3 = excluded.iso3,
+      realm = excluded.realm,
+      geom = excluded.geom;
+
+    if (
+      select id from public.places where source_id = 'fixture-pilot'
+    ) is distinct from kept_id then
+      raise exception 'upsert changed the South Africa place id';
+    end if;
+    if (
+      select count(*)
+      from public.facts
+      where place_id = kept_id
+        and sprout_id = 'cropland-2024-v1'
+        and method_id = 'area-weighted-spheroid-v1'
+    ) <> 1 then
+      raise exception 'South Africa place lost its cropland fact';
+    end if;
+  end;
 end $$;
 
 do $$
@@ -363,15 +461,20 @@ begin
     select count(*) into readable from (
       select source_id from public.places
     ) as attribute_rows;
-    if readable <> 2 then
-      raise exception '% saw % place rows, expected 2', role_name, readable;
+    if readable <> 3 then
+      raise exception '% saw % place rows, expected 3', role_name, readable;
     end if;
 
     select count(*) into pilot_count
     from public.pilot_places
     where release_month = date '2026-10-01';
-    if pilot_count <> 1 then
-      raise exception '% saw % October 2026 pilot rows, expected 1', role_name, pilot_count;
+    if pilot_count <> 2 then
+      raise exception '% saw % October 2026 pilot rows, expected 2', role_name, pilot_count;
+    end if;
+    if exists (
+      select 1 from public.pilot_place_map where name = 'Chobe Fixture'
+    ) then
+      raise exception '% copied a place outside South Africa onto pilot_place_map', role_name;
     end if;
 
     select count(*) into pilot_count
@@ -430,26 +533,44 @@ begin
   from public.pilot_place_window(
     '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
   );
-  if window_count <> 1 or window_total <> 1 then
-    raise exception 'pilot_place_window returned % of %, expected 1 of 1',
+  if window_count <> 2 or window_total <> 2 then
+    raise exception 'pilot_place_window returned % of %, expected 2 of 2',
       window_count, window_total;
   end if;
 
   select * into window_row
   from public.pilot_place_window(
     '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
-  );
+  ) as listed
+  where listed.name = 'Pilot Park';
   if to_jsonb(window_row) ? 'geom' then
     raise exception 'pilot_place_window returned geom';
   end if;
   if window_row.cropland_percent is null then
-    raise exception 'pilot_place_window did not join the cropland fact';
+    raise exception 'pilot_place_window did not join the South Africa cropland fact';
+  end if;
+
+  select * into window_row
+  from public.pilot_place_window(
+    '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
+  ) as listed
+  where listed.name = 'Chobe Fixture';
+  if window_row.iso3 is distinct from 'BWA' then
+    raise exception 'the list omitted the place outside South Africa';
+  end if;
+  if window_row.cropland_percent is not null then
+    raise exception 'the place outside South Africa has a cropland fact';
   end if;
 
   select count(*) into extent_count
   from public.pilot_places_in_extent(26, -27, 28, -25);
   if extent_count <> 1 then
     raise exception 'extent that covers the park returned %', extent_count;
+  end if;
+  select count(*) into extent_count
+  from public.pilot_places_in_extent(23.5, -21.5, 24.5, -20.5);
+  if extent_count <> 1 then
+    raise exception 'extent that covers the place outside South Africa returned %', extent_count;
   end if;
   select count(*) into extent_count
   from public.pilot_places_in_extent(0, -10, 1, -9);
@@ -469,12 +590,18 @@ begin
   end if;
 
   select place_count into stats_count from public.pilot_place_filter_stats();
-  if stats_count <> 1 then
-    raise exception 'filter stats counted % places, expected 1', stats_count;
+  if stats_count <> 2 then
+    raise exception 'filter stats counted % places, expected 2', stats_count;
+  end if;
+  if (
+    select array_length(size_bins, 1)
+    from public.pilot_place_filter_stats()
+  ) <> 40 then
+    raise exception 'filter stats did not return histogram bins';
   end if;
 
   kept := public.pilot_place_kept_ids(null, null, 0, 100);
-  if array_length(kept, 1) <> 1 then
+  if array_length(kept, 1) <> 2 then
     raise exception 'kept ids returned %', kept;
   end if;
 
@@ -513,8 +640,8 @@ begin
   from public.pilot_place_window(
     '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
   );
-  if window_count <> 50 or window_total <> 52 then
-    raise exception 'capped window returned % of %, expected 50 of 52',
+  if window_count <> 50 or window_total <> 53 then
+    raise exception 'capped window returned % of %, expected 50 of 53',
       window_count, window_total;
   end if;
 
@@ -523,8 +650,8 @@ begin
   from public.pilot_place_window(
     '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50, 50
   );
-  if window_count <> 2 or window_total <> 52 then
-    raise exception 'offset window returned % of %, expected 2 of 52',
+  if window_count <> 3 or window_total <> 53 then
+    raise exception 'offset window returned % of %, expected 3 of 53',
       window_count, window_total;
   end if;
 end $$;

@@ -45,12 +45,6 @@ export interface PlaceDetail {
   percent: number | null;
 }
 
-/** Result of loading the pilot list. */
-export type PlaceListResult =
-  | { status: 'ok'; places: PlaceSummary[] }
-  | { status: 'unconfigured' }
-  | { status: 'error' };
-
 /** Search, sort, filters, and optional map view for the list window. */
 export interface PlaceWindowQuery {
   search: string;
@@ -156,34 +150,22 @@ function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
 }
 
 /**
- * Pilot protected areas, ordered by name, with their stored cropland percent.
- * Used by `/places`. The map list uses `loadPilotPlaceWindow`.
- * @returns The list, or why it could not be loaded.
+ * At most 50 stored places for `/places`, ordered by name.
+ * Search is part of the query. The page receives at most 50 rows.
+ * @param search - Text the name must contain.
+ * @returns The window, or why it could not be loaded.
  */
-export async function loadPilotPlaces(): Promise<PlaceListResult> {
-  const supabase = placesClient();
-  if (!supabase) return { status: 'unconfigured' };
-  const { data, error } = await supabase
-    .from('pilot_places')
-    .select('id, name, designation, iso3, area_km2')
-    .order('name');
-  if (error || !data) return { status: 'error' };
-
-  const { data: facts, error: factError } = await supabase
-    .from('facts')
-    .select('place_id, percent')
-    .eq('sprout_id', CROPLAND_SPROUT_ID)
-    .eq('method_id', CROPLAND_METHOD_ID);
-  if (factError || !facts) return { status: 'error' };
-
-  const percent = new Map(facts.map(fact => [fact.place_id, fact.percent]));
-  return {
-    status: 'ok',
-    places: data.map(place => ({
-      ...place,
-      cropland_percent: percent.get(place.id) ?? null,
-    })),
-  };
+export async function loadPilotPlaces(search = ''): Promise<PlaceWindowResult> {
+  return loadPilotPlaceWindow({
+    search,
+    searchPrefix: false,
+    sort: 'name',
+    sizeMin: null,
+    sizeMax: null,
+    cropMin: 0,
+    cropMax: 100,
+    extent: null,
+  });
 }
 
 /**

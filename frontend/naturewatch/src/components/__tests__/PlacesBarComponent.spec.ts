@@ -220,6 +220,32 @@ describe('Places panel', () => {
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
+  it('shows a place outside South Africa by its English country name', async () => {
+    vi.mocked(loadPilotPlaceWindow).mockResolvedValue({
+      status: 'ok',
+      places: [
+        {
+          id: '44444444-4444-4444-4444-444444444444',
+          name: 'Serengeti National Park',
+          designation: 'National Park',
+          iso3: 'TZA',
+          area_km2: 14763,
+          cropland_percent: null,
+        },
+      ],
+      total: 1,
+    });
+
+    const wrapper = mountPlaces();
+    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await flushPromises();
+
+    const place = wrapper.get('button.place-result');
+    expect(place.text()).toContain('Serengeti National Park');
+    expect(place.text()).toContain('Tanzania');
+    expect(place.text()).not.toContain('TZA');
+  });
+
   it('caps the list at 50, largest first, with the matching total', async () => {
     const many = Array.from({ length: 60 }, (_, index) => ({
       id: `${String(index + 1).padStart(8, '0')}-1111-1111-1111-111111111111`,

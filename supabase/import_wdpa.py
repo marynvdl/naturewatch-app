@@ -19,21 +19,13 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-import psycopg
-from psycopg.rows import dict_row
-
-try:
-    from osgeo import ogr
-except ImportError as exc:
-    raise SystemExit("GDAL Python bindings (osgeo) are required") from exc
-
 PINNED_NAME = "WDPCA"
 PINNED_RELEASE = "2026-10-01"
 PINNED_URL = (
-    "https://d1gam3xoknrgr2.cloudfront.net/current/"
-    "WDPA_WDOECM_Oct2026_Public_ZAF.zip"
+    "https://pp-import-production.s3.eu-west-1.amazonaws.com/"
+    "WDPA_WDOECM_Oct2026_Public.zip"
 )
-PINNED_SHA256 = "5e55ad223986b4d9e2afdb1fad5d9ec0591e18e2ebb0e5bf71dfa344f0f93447"
+PINNED_SHA256 = "f5f5e50f230923619ad60faf8296e4f39a4d8c1b14bb6ea80e82ea6db6292b1c"
 DEFAULT_DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 IUCN_CATEGORIES = {
     "Ia",
@@ -69,6 +61,10 @@ values (
   )::extensions.geometry(MultiPolygon, 4326)
 )
 """
+# 112 km is longer than one degree anywhere on Earth, so a polygon whose
+# planar area is below this cannot reach 10 km².
+TOO_SMALL_DEGREE_AREA = 10.0 / (112.0 * 112.0)
+BATCH_ROWS = 200
 
 
 @dataclass(frozen=True)
@@ -78,13 +74,15 @@ class PlaceFeature:
     name: str
     designation: str | None
     iucn_category: str | None
-    iso3: str
+    iso3: str | None
     realm: str
     wkb: bytes
 
 
 def main() -> None:
-    ogr.UseExceptions()
+    import psycopg
+    from psycopg.rows import dict_row
+
     database_url = os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
         source = fetch_source(conn)
@@ -93,13 +91,15 @@ def main() -> None:
             zip_path = root / "wdpa.zip"
             download(source["download_url"], zip_path, source["checksum"])
             gdb = extract_geodatabase(zip_path, root / "extract")
-            features, gis_area_count = read_features(gdb)
-        stored = replace_places(conn, source["id"], features)
+            terrestrial, gis_area_count, stored = import_geodatabase(
+                conn, source["id"], gdb
+            )
+    print(f"terrestrial polygons: {terrestrial}")
     print(f"GIS_AREA >= 10: {gis_area_count}")
     print(f"stored area_km2 >= 10: {stored}")
 
 
-def fetch_source(conn: psycopg.Connection) -> dict:
+def fetch_source(conn) -> dict:
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -135,7 +135,7 @@ def download(url: str, dest: Path, expected_sha256: str) -> None:
     hasher = hashlib.sha256()
     request = urllib.request.Request(url, headers={"User-Agent": "sooty-earth-records"})
     try:
-        with urllib.request.urlopen(request, timeout=180) as response:
+        with urllib.request.urlopen(request, timeout=300) as response:
             status = getattr(response, "status", 200)
             if status != 200:
                 raise SystemExit(f"download failed for {url}: HTTP {status}")
@@ -183,17 +183,69 @@ def extract_geodatabase(zip_path: Path, dest: Path) -> Path:
     return gdbs[0]
 
 
-def read_features(gdb: Path) -> tuple[list[PlaceFeature], int]:
+def import_geodatabase(conn, source_release_id, gdb: Path) -> tuple[int, int, int]:
+    try:
+        from osgeo import ogr
+    except ImportError as exc:
+        raise SystemExit("GDAL Python bindings (osgeo) are required") from exc
+
+    ogr.UseExceptions()
     dataset = ogr.Open(str(gdb), 0)
     if dataset is None:
         raise SystemExit(f"could not open geodatabase {gdb.name}")
-    layers = polygon_layers(dataset)
-    if not layers:
-        raise SystemExit("download has no polygon layer")
-    features: list[PlaceFeature] = []
+    try:
+        layers = polygon_layers(dataset)
+        if not layers:
+            raise SystemExit("download has no polygon layer")
+        with conn.cursor() as cur:
+            cur.execute("set search_path to public, extensions")
+            cur.execute(
+                """
+                create temp table candidate (
+                  source_id text primary key,
+                  site_id text,
+                  name text,
+                  designation text,
+                  iucn_category text,
+                  iso3 text,
+                  realm text,
+                  geom extensions.geometry(MultiPolygon, 4326) not null,
+                  area_km2 double precision generated always as (
+                    extensions.st_area(geom::extensions.geography, true) / 1e6
+                  ) stored
+                ) on commit drop
+                """
+            )
+            terrestrial, gis_area_count, _accepted = stream_candidates(cur, layers)
+            if terrestrial == 0:
+                raise SystemExit("no terrestrial polygons in the download")
+            reject_invalid(cur)
+            stored = upsert_places(cur, source_release_id)
+        if stored == 0:
+            raise SystemExit("refusing to store zero places")
+        return terrestrial, gis_area_count, stored
+    finally:
+        dataset.Release()
+
+
+def stream_candidates(cur, layers) -> tuple[int, int, int]:
+    from osgeo import ogr
+
     problems: list[str] = []
     seen: set[str] = set()
+    batch: list[tuple] = []
+    terrestrial = 0
     gis_area_count = 0
+    accepted = 0
+
+    def flush() -> None:
+        nonlocal accepted
+        if not batch:
+            return
+        cur.executemany(INSERT_CANDIDATE, batch)
+        accepted += len(batch)
+        batch.clear()
+
     for layer in layers:
         missing = [
             name
@@ -204,12 +256,13 @@ def read_features(gdb: Path) -> tuple[list[PlaceFeature], int]:
             raise SystemExit(f"{layer.GetName()} is missing fields: {', '.join(missing)}")
         for feature in layer:
             realm = text(feature, "REALM")
-            iso3 = text(feature, "ISO3")
-            if realm != "Terrestrial" or iso3 != "ZAF":
+            if realm != "Terrestrial":
                 continue
+            terrestrial += 1
+            iso3 = text(feature, "ISO3")
             source_id = text(feature, "SITE_PID")
             if not source_id:
-                problems.append("missing SITE_PID on a terrestrial South Africa polygon")
+                problems.append("missing SITE_PID on a terrestrial polygon")
                 continue
             if source_id in seen:
                 problems.append(f"duplicate SITE_PID {source_id}")
@@ -240,29 +293,130 @@ def read_features(gdb: Path) -> tuple[list[PlaceFeature], int]:
             gis_area = number(feature, "GIS_AREA")
             if gis_area is not None and gis_area >= 10:
                 gis_area_count += 1
-            features.append(
-                PlaceFeature(
-                    source_id=source_id,
-                    site_id=site_id,
-                    name=name,
-                    designation=text(feature, "DESIG_ENG"),
-                    iucn_category=iucn,
-                    iso3=iso3,
-                    realm=realm,
-                    wkb=geometry.ExportToWkb(ogr.wkbNDR),
+            if too_small_to_store(geometry, gis_area):
+                continue
+            batch.append(
+                (
+                    source_id,
+                    site_id,
+                    name,
+                    text(feature, "DESIG_ENG"),
+                    iucn,
+                    iso3,
+                    realm,
+                    geometry.ExportToWkb(ogr.wkbNDR),
                 )
             )
-    dataset.Release()
+            if len(batch) >= BATCH_ROWS:
+                flush()
+    flush()
     if problems:
         for problem in problems:
             print(problem)
         raise SystemExit(1)
-    if not features:
-        raise SystemExit("no terrestrial South Africa polygons in the download")
-    return features, gis_area_count
+    return terrestrial, gis_area_count, accepted
 
 
-def polygon_layers(dataset: ogr.DataSource) -> list[ogr.Layer]:
+def too_small_to_store(geometry, gis_area: float | None) -> bool:
+    """True when both the source area and the outline are below 10 km².
+
+    GIS_AREA under 1 km² can still hide a large outline, so the outline is
+    checked too. Calculated area_km2 remains the rule for anything inserted.
+    """
+    if gis_area is None or gis_area >= 1:
+        return False
+    try:
+        planar = abs(float(geometry.GetArea()))
+    except (TypeError, ValueError):
+        return False
+    return 0 < planar < TOO_SMALL_DEGREE_AREA
+
+
+def reject_invalid(cur) -> None:
+    cur.execute(
+        """
+        select source_id, extensions.ST_IsValidReason(geom) as reason
+        from candidate
+        where not extensions.ST_IsValid(geom)
+        order by source_id
+        """
+    )
+    invalid = cur.fetchall()
+    if not invalid:
+        return
+    for row in invalid:
+        print(f"invalid geometry {row['source_id']}: {row['reason']}")
+    raise SystemExit(1)
+
+
+def upsert_places(cur, source_release_id) -> int:
+    cur.execute(
+        """
+        insert into public.places (
+          source_release_id,
+          source_id,
+          site_id,
+          name,
+          place_type,
+          designation,
+          iucn_category,
+          iso3,
+          realm,
+          geom
+        )
+        select
+          %s,
+          source_id,
+          site_id,
+          name,
+          'protected_area',
+          designation,
+          iucn_category,
+          iso3,
+          realm,
+          geom
+        from candidate
+        where area_km2 >= 10
+        on conflict (source_release_id, source_id) do update
+        set
+          site_id = excluded.site_id,
+          name = excluded.name,
+          place_type = excluded.place_type,
+          designation = excluded.designation,
+          iucn_category = excluded.iucn_category,
+          iso3 = excluded.iso3,
+          realm = excluded.realm,
+          geom = excluded.geom
+        """,
+        (source_release_id,),
+    )
+    cur.execute(
+        """
+        delete from public.places as place
+        where place.source_release_id = %s
+          and not exists (
+            select 1
+            from candidate
+            where candidate.source_id = place.source_id
+              and candidate.area_km2 >= 10
+          )
+        """,
+        (source_release_id,),
+    )
+    cur.execute(
+        """
+        select count(*) as stored
+        from public.places
+        where source_release_id = %s
+        """,
+        (source_release_id,),
+    )
+    return int(cur.fetchone()["stored"])
+
+
+def polygon_layers(dataset):
+    from osgeo import ogr
+
     layers = []
     for index in range(dataset.GetLayerCount()):
         layer = dataset.GetLayerByIndex(index)
@@ -272,7 +426,7 @@ def polygon_layers(dataset: ogr.DataSource) -> list[ogr.Layer]:
     return layers
 
 
-def text(feature: ogr.Feature, name: str) -> str | None:
+def text(feature, name: str) -> str | None:
     index = feature.GetDefnRef().GetFieldIndex(name)
     if not feature.IsFieldSet(index) or feature.IsFieldNull(index):
         return None
@@ -280,130 +434,16 @@ def text(feature: ogr.Feature, name: str) -> str | None:
     return value or None
 
 
-def number(feature: ogr.Feature, name: str) -> float | None:
+def number(feature, name: str) -> float | None:
     index = feature.GetDefnRef().GetFieldIndex(name)
     if not feature.IsFieldSet(index) or feature.IsFieldNull(index):
         return None
     return float(feature.GetField(index))
 
 
-def replace_places(conn: psycopg.Connection, source_release_id, features: list[PlaceFeature]) -> int:
-    with conn.cursor() as cur:
-        cur.execute("set search_path to public, extensions")
-        cur.execute(
-            """
-            create temp table candidate (
-              source_id text primary key,
-              site_id text,
-              name text,
-              designation text,
-              iucn_category text,
-              iso3 text,
-              realm text,
-              geom extensions.geometry(MultiPolygon, 4326) not null,
-              area_km2 double precision generated always as (
-                extensions.st_area(geom::extensions.geography, true) / 1e6
-              ) stored
-            ) on commit drop
-            """
-        )
-        cur.executemany(
-            INSERT_CANDIDATE,
-            [
-                (
-                    feature.source_id,
-                    feature.site_id,
-                    feature.name,
-                    feature.designation,
-                    feature.iucn_category,
-                    feature.iso3,
-                    feature.realm,
-                    feature.wkb,
-                )
-                for feature in features
-            ],
-        )
-        cur.execute(
-            """
-            select source_id, extensions.ST_IsValidReason(geom) as reason
-            from candidate
-            where not extensions.ST_IsValid(geom)
-            order by source_id
-            """
-        )
-        invalid = cur.fetchall()
-        if invalid:
-            for row in invalid:
-                print(f"invalid geometry {row['source_id']}: {row['reason']}")
-            raise SystemExit(1)
-        cur.execute(
-            """
-            insert into public.places (
-              source_release_id,
-              source_id,
-              site_id,
-              name,
-              place_type,
-              designation,
-              iucn_category,
-              iso3,
-              realm,
-              geom
-            )
-            select
-              %s,
-              source_id,
-              site_id,
-              name,
-              'protected_area',
-              designation,
-              iucn_category,
-              iso3,
-              realm,
-              geom
-            from candidate
-            where area_km2 >= 10
-            on conflict (source_release_id, source_id) do update
-            set
-              site_id = excluded.site_id,
-              name = excluded.name,
-              place_type = excluded.place_type,
-              designation = excluded.designation,
-              iucn_category = excluded.iucn_category,
-              iso3 = excluded.iso3,
-              realm = excluded.realm,
-              geom = excluded.geom
-            """,
-            (source_release_id,),
-        )
-        cur.execute(
-            """
-            delete from public.places as place
-            where place.source_release_id = %s
-              and not exists (
-                select 1
-                from candidate
-                where candidate.source_id = place.source_id
-                  and candidate.area_km2 >= 10
-              )
-            """,
-            (source_release_id,),
-        )
-        cur.execute(
-            """
-            select count(*) as stored
-            from public.places
-            where source_release_id = %s
-            """,
-            (source_release_id,),
-        )
-        stored = int(cur.fetchone()["stored"])
-    if stored == 0:
-        raise SystemExit("refusing to store zero places")
-    return stored
-
-
 if __name__ == "__main__":
+    import psycopg
+
     try:
         main()
     except psycopg.errors.ForeignKeyViolation as exc:

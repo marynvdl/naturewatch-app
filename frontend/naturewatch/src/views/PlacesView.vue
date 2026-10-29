@@ -1,27 +1,36 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { loadPilotPlaces, type PlaceSummary } from '@/places/api';
-import { placesMatching } from '@/places/display';
 import { Input } from '@/components/ui/input';
 
 const status = ref<'loading' | 'ok' | 'unconfigured' | 'error'>('loading');
 const places = ref<PlaceSummary[]>([]);
+const total = ref(0);
 const query = ref('');
 
-const shown = computed(() => placesMatching(places.value, query.value));
+let request = 0;
 
-onMounted(async () => {
-  const result = await loadPilotPlaces();
+/** Load the next name window. A newer keystroke supersedes an older request. */
+async function loadPlaces() {
+  const mine = ++request;
+  const result = await loadPilotPlaces(query.value);
+  if (mine !== request) return;
   status.value = result.status;
-  if (result.status === 'ok') places.value = result.places;
-});
+  if (result.status === 'ok') {
+    places.value = result.places;
+    total.value = result.total;
+  }
+}
+
+onMounted(loadPlaces);
+watch(query, loadPlaces);
 </script>
 
 <template>
   <div class="places">
     <h1>Places</h1>
     <p class="intro">
-      Terrestrial protected areas in South Africa of at least 10 km².
+      Terrestrial protected areas of at least 10 km².
       <router-link :to="{ name: 'Home' }">Back to the map</router-link>
     </p>
 
@@ -35,14 +44,20 @@ onMounted(async () => {
         <span id="places-find">Find a place</span>
         <Input v-model="query" aria-labelledby="places-find" />
       </div>
-      <p v-if="shown.length === 0">No places match.</p>
-      <ul v-else class="place-list">
-        <li v-for="place in shown" :key="place.id">
-          <router-link :to="{ name: 'Place', params: { id: place.id } }">
-            {{ place.name }}
-          </router-link>
-        </li>
-      </ul>
+      <p v-if="places.length === 0">No places match.</p>
+      <template v-else>
+        <p class="count">
+          {{ places.length.toLocaleString('en-GB') }} of
+          {{ total.toLocaleString('en-GB') }} places
+        </p>
+        <ul class="place-list">
+          <li v-for="place in places" :key="place.id">
+            <router-link :to="{ name: 'Place', params: { id: place.id } }">
+              {{ place.name }}
+            </router-link>
+          </li>
+        </ul>
+      </template>
     </template>
   </div>
 </template>
@@ -72,6 +87,11 @@ h1 {
   flex-direction: column;
   gap: 6px;
   margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.count {
+  margin: 0 0 8px;
   font-size: 14px;
 }
 
