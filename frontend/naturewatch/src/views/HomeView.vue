@@ -39,6 +39,7 @@ const jsonLd = JSON.stringify(
 
 <style scoped>
 .map-page {
+  height: 100%;
   margin: 0;
   padding: 0;
 }
