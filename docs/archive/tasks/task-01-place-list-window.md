@@ -1,6 +1,8 @@
 # Task 01 — Place list window
 
-Parcel: [Places Tiles](../parcels/places-tiles.md)
+Archived. This task is not active.
+
+Parcel: [Places Tiles](../../parcels/places-tiles.md)
 
 Repository: naturewatch-app. Start from `develop`.
 

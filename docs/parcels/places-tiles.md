@@ -37,7 +37,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 [Budding Places](../archive/parcels/budding-places.md) is archived. Start the first task from `develop`.
 
-- [ ] [task-01-place-list-window.md](../tasks/task-01-place-list-window.md) — naturewatch-app
+- [x] [task-01-place-list-window.md](../archive/tasks/task-01-place-list-window.md) — naturewatch-app
   - *Goal:* Replace loading every stored place into the list with a bounded query. Default sort is largest first. Cap 50. Keep the other sorts. Add the extent option, off by default. Do not change boundary loading.
 - [ ] [task-02-places-pmtiles.md](https://github.com/marynvdl/naturewatch-analysis/blob/develop/docs/tasks/task-02-places-pmtiles.md) — naturewatch-analysis
   - *Goal:* Build one PMTiles archive from the authoritative places, prove it on the current South Africa rows, and publish it to `nature-watch-tiles`.
