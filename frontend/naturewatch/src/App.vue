@@ -93,8 +93,15 @@ onMounted(() => {
 </template>
 
 <style>
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 html {
-  overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #e0e0e0 #9e9e9e;
 }
@@ -116,8 +123,9 @@ html {
 }
 
 .app-frame {
-  min-height: 100vh;
-  overflow-y: auto;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .loading-overlay {

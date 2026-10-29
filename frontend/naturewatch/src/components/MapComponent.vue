@@ -755,6 +755,7 @@ function addSourceAndLayer(
 .map-parent,
 .map-frame {
   height: 100%;
+  overflow: hidden;
 }
 
 /*
@@ -807,11 +808,11 @@ function addSourceAndLayer(
 
 .map-container {
   position: relative;
-  height: 100vh;
+  height: 100%;
 }
 
 #mapDiv {
-  height: 100vh;
+  height: 100%;
 }
 
 .place-notice {

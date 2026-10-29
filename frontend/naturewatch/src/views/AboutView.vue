@@ -20,8 +20,10 @@ const showSnackbar = (message: string) => {
 
 <style scoped>
 .about {
+  height: 100%;
   max-width: 720px;
   padding: 24px;
+  overflow: auto;
   font-family: var(--font-sans);
 }
 

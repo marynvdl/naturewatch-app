@@ -16,7 +16,7 @@ This document describes the working system and agreed direction. Commands and br
 | Work parcels | `docs/parcels/` in this repo |
 | A single task | `docs/tasks/` in the repo that does the work |
 
-*Updated 28 October 2026. Reader docs live in `docs/user/`. The first-release roadmap is archived. Pipeline procedure, cost, and scripts stay in naturewatch-analysis. `nature-watch-bucket` was made private on 22 October 2026.*
+*Updated 29 October 2026. Reader docs live in `docs/user/`. The first-release roadmap is archived. Pipeline procedure, cost, and scripts stay in naturewatch-analysis. `nature-watch-bucket` was made private on 22 October 2026.*
 
 ## 1. How the system fits together
 
@@ -31,7 +31,7 @@ Fire is the pipeline that runs today: Earth Engine to `nature-watch-bucket`, the
 
 The connection between data and app is defined by **published object paths** and the **layer catalogue** at `frontend/naturewatch/src/catalog/layers.json`.
 
-The `sources`, `places`, and `facts` tables are in Supabase. The places page reads `pilot_places` and `facts` in the browser with the anon key. It does not read `places.geom`. The FastAPI service does not read these tables.
+The `sources`, `places`, and `facts` tables are in Supabase. The places page reads `pilot_places` and `facts` in the browser with the anon key. The Places list on the map reads `pilot_place_window`, 50 rows at a time from an offset, and optional extent through `pilot_places_in_extent`. Filter charts read `pilot_place_filter_stats`. None of those reads return `places.geom`. The FastAPI service does not read these tables.
 
 ## 2. Storage and access
 

@@ -49,8 +49,10 @@ onMounted(async () => {
 
 <style scoped>
 .places {
+  height: 100%;
   max-width: 720px;
   padding: 24px;
+  overflow: auto;
   color: var(--foreground);
   font-family: var(--font-sans);
 }

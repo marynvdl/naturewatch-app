@@ -1,6 +1,8 @@
 # Task 01 — Place list window
 
-Parcel: [Places Tiles](../parcels/places-tiles.md)
+Archived. This task is not active.
+
+Parcel: [Places Tiles](../../parcels/places-tiles.md)
 
 Repository: naturewatch-app. Start from `develop`.
 
@@ -14,6 +16,7 @@ Replace loading every stored place into the list with a bounded query. Default s
 
 ## Do this
 
+- Check with me for visual approval.
 - Query the list from Supabase. Return at most 50 rows for the current search, sort, size filter, cropland filter, and optional map extent.
 - Default order is largest first. Keep name, smallest first, and both cropland-percent orders. A place without the sorted figure goes last.
 - Show the count already used today, for example “50 of N”. N is the number of stored places that match the filters, not the length of the window.
@@ -32,6 +35,7 @@ Replace loading every stored place into the list with a bounded query. Default s
 
 ## Done when
 
+- I approve the interface visually.
 - Protected Areas shows at most 50 places, largest first, with a total count.
 - The other sorts still work. Search and the size and cropland filters still narrow the list.
 - The extent option is off until it is turned on, and then the list follows the map view.

@@ -3,10 +3,16 @@ import {
   CROPLAND_METHOD_ID,
   CROPLAND_SPROUT_ID,
   buildPlaceFeatures,
+  type FigureRange,
+  type LngLatBounds,
   type PlaceBoundary,
   type PlaceFactRow,
   type PlaceFeatureCollection,
+  type PlaceSort,
 } from '@/places/display';
+
+/** Cards the places list shows at once. */
+export const PLACE_LIST_LIMIT = 50;
 
 /** A card on the places list. */
 export interface PlaceSummary {
@@ -38,6 +44,54 @@ export type PlaceListResult =
   | { status: 'ok'; places: PlaceSummary[] }
   | { status: 'unconfigured' }
   | { status: 'error' };
+
+/** Search, sort, filters, and optional map view for the list window. */
+export interface PlaceWindowQuery {
+  search: string;
+  searchPrefix: boolean;
+  sort: PlaceSort;
+  sizeMin: number | null;
+  sizeMax: number | null;
+  cropMin: number;
+  cropMax: number;
+  extent: LngLatBounds | null;
+  /** Skip this many matching rows. Used to load the next 50. */
+  offset?: number;
+}
+
+/** Result of loading the capped list. */
+export type PlaceWindowResult =
+  | { status: 'ok'; places: PlaceSummary[]; total: number }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/** Result of counting matches for the filter dialog. */
+export type PlaceCountResult =
+  | { status: 'ok'; total: number }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/** Stored size range and histogram counts for the filter charts. */
+export interface PlaceFilterStats {
+  placeCount: number;
+  sizeFull: FigureRange;
+  sizeBins: number[];
+  croplandBins: number[];
+}
+
+/** Result of loading the filter charts. */
+export type PlaceFilterStatsResult =
+  | { status: 'ok'; stats: PlaceFilterStats }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/** Result of loading the ids the map filter keeps. */
+export type PlaceKeptIdsResult =
+  | { status: 'ok'; ids: string[] }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+type WindowRow = PlaceSummary & { total_count: number | string };
 
 /** Result of opening one place. */
 export type PlaceLoadResult =
@@ -75,7 +129,28 @@ export function placesClient(): SupabaseClient | null {
 }
 
 /**
+ * Arguments shared by the list window and the filter count.
+ * @param query - Search, filters, and optional extent.
+ * @returns Named arguments for `pilot_place_matched` filters.
+ */
+function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
+  return {
+    p_search: query.search.trim(),
+    p_search_prefix: query.searchPrefix,
+    p_size_min: query.sizeMin,
+    p_size_max: query.sizeMax,
+    p_crop_min: query.cropMin,
+    p_crop_max: query.cropMax,
+    p_west: query.extent?.[0] ?? null,
+    p_south: query.extent?.[1] ?? null,
+    p_east: query.extent?.[2] ?? null,
+    p_north: query.extent?.[3] ?? null,
+  };
+}
+
+/**
  * Pilot protected areas, ordered by name, with their stored cropland percent.
+ * Used by `/places`. The map list uses `loadPilotPlaceWindow`.
  * @returns The list, or why it could not be loaded.
  */
 export async function loadPilotPlaces(): Promise<PlaceListResult> {
@@ -102,6 +177,111 @@ export async function loadPilotPlaces(): Promise<PlaceListResult> {
       cropland_percent: percent.get(place.id) ?? null,
     })),
   };
+}
+
+/**
+ * At most 50 pilot places for the current list query, plus how many match.
+ * @param query - Search, sort, filters, and optional map extent.
+ * @returns The window, or why it could not be loaded.
+ */
+export async function loadPilotPlaceWindow(
+  query: PlaceWindowQuery
+): Promise<PlaceWindowResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('pilot_place_window', {
+    ...matchedArgs(query),
+    p_sort: query.sort,
+    p_limit: PLACE_LIST_LIMIT,
+    ...(query.offset ? { p_offset: query.offset } : {}),
+  });
+  if (error || !data) return { status: 'error' };
+  const rows = data as WindowRow[];
+  const total = Number(rows[0]?.total_count ?? 0);
+  return {
+    status: 'ok',
+    total,
+    places: rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      designation: row.designation,
+      iso3: row.iso3,
+      area_km2: row.area_km2,
+      cropland_percent: row.cropland_percent,
+    })),
+  };
+}
+
+/**
+ * How many stored places match the list query.
+ * @param query - Search, filters, and optional map extent.
+ * @returns The count, or why it could not be loaded.
+ */
+export async function loadPilotPlaceWindowCount(
+  query: Omit<PlaceWindowQuery, 'sort'>
+): Promise<PlaceCountResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc(
+    'pilot_place_window_count',
+    matchedArgs(query)
+  );
+  if (error || data === null) return { status: 'error' };
+  return { status: 'ok', total: Number(data) };
+}
+
+/**
+ * Size range and histogram counts for the filter charts.
+ * @returns The stored distribution, or why it could not be loaded.
+ */
+export async function loadPilotPlaceFilterStats(): Promise<PlaceFilterStatsResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('pilot_place_filter_stats');
+  if (error || !data?.[0]) return { status: 'error' };
+  const row = data[0] as {
+    place_count: number | string;
+    size_min: number | null;
+    size_max: number | null;
+    size_bins: number[];
+    cropland_bins: number[];
+  };
+  const sizeMin = row.size_min;
+  const sizeMax = row.size_max;
+  return {
+    status: 'ok',
+    stats: {
+      placeCount: Number(row.place_count),
+      sizeFull:
+        sizeMin != null && sizeMax != null ? [sizeMin, sizeMax] : [1, 1],
+      sizeBins: row.size_bins ?? [],
+      croplandBins: row.cropland_bins ?? [],
+    },
+  };
+}
+
+/**
+ * Ids the size and cropland filter keeps on the map.
+ * @param sizeMin - Lowest kept size, or null when that end is open.
+ * @param sizeMax - Highest kept size, or null when that end is open.
+ * @param cropland - Kept cropland percent.
+ * @returns The ids, or why they could not be loaded.
+ */
+export async function loadPilotPlaceKeptIds(
+  sizeMin: number | null,
+  sizeMax: number | null,
+  cropland: FigureRange
+): Promise<PlaceKeptIdsResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('pilot_place_kept_ids', {
+    p_size_min: sizeMin,
+    p_size_max: sizeMax,
+    p_crop_min: cropland[0],
+    p_crop_max: cropland[1],
+  });
+  if (error || !data) return { status: 'error' };
+  return { status: 'ok', ids: data as string[] };
 }
 
 /**
