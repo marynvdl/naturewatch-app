@@ -2,7 +2,7 @@
 
 Archived. This task is not active.
 
-Parcel: [Budding Places](../../parcels/budding-places.md)
+Parcel: [Budding Places](../parcels/budding-places.md)
 
 Repository: naturewatch-app. Start from `develop`. Do not start the unchecked tasks in the Sooty Earth interface parcel.
 
@@ -32,7 +32,7 @@ The places panel already has the search field and the three type controls in `Pl
 - Do not add a database migration.
 - Do not change how boundaries are loaded or drawn.
 - Do not build the profile, the gallery, or a popup.
-- Do not copy names or polygons from `docs/parcels/budding-places.html`.
+- Do not copy names or polygons from `docs/archive/parcels/budding-places.html`.
 - Do not start task 009.
 
 ## Done when

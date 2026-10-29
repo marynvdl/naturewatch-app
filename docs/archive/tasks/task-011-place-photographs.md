@@ -1,5 +1,7 @@
 # Task 011 — Place photographs
 
+Archived. This task is not active.
+
 Parcel: [Budding Places](../parcels/budding-places.md)
 
 Repository: naturewatch-app. Start only after task 010 has merged.

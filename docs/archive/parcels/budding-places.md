@@ -19,7 +19,7 @@ The refined mock-up at [budding-places.html](budding-places.html) is the interac
 ## Left for later
 
 - Molding Places: signing in, edit mode, curated text, overlap review, which places are drawn, and approving photographs. This parcel does not write to Supabase.
-- Places Tiles: a larger protected-area set, PMTiles, and a faster way to draw boundaries. This parcel leaves boundary loading as it is.
+- [Places Tiles](../../parcels/places-tiles.md): a larger protected-area set, PMTiles, and a faster way to draw boundaries. This parcel leaves boundary loading as it is.
 - Species records, and disturbance measurements other than the cropland fact already stored.
 - A production release. Merge into `develop` only.
 
@@ -29,13 +29,13 @@ Do one task at a time. Start a task only after the one above it has merged. Each
 
 ### naturewatch-app
 
-- [x] [task-008-places-frame.md](../archive/tasks/task-008-places-frame.md)
+- [x] [task-008-places-frame.md](../tasks/task-008-places-frame.md)
   - *Goal:* Add the results column, below the three place-type controls, and search. Protected Areas lists the stored places. The other two types say that none are stored. The detail column is empty until a place is chosen. Filtering the list does not download boundaries again.
-- [x] [task-009-place-selection.md](../archive/tasks/task-009-place-selection.md)
+- [x] [task-009-place-selection.md](../tasks/task-009-place-selection.md)
   - *Goal:* Choosing a result and clicking a boundary select the same place and open its profile beside the list. Move the map to the place only when it is outside the current view. Keep a zoom-to-place control. Closing the profile leaves the map, the search, and the place type as they are. When a place is clicked in the map while the list view wasn't opened, keep the list view closed, and just show the profile to the left.
-- [x] [task-010-place-profile.md](../archive/tasks/task-010-place-profile.md)
+- [x] [task-010-place-profile.md](../tasks/task-010-place-profile.md)
   - *Goal:* Overview, Landscape, and Species. Overview shows the stored name, designation, country, area, and source. Landscape shows the stored cropland fact, or that it has not been calculated. Species says there is nothing to show yet, and does not say the place has none.
-- [ ] [task-011-place-photographs.md](../tasks/task-011-place-photographs.md)
+- [x] [task-011-place-photographs.md](../tasks/task-011-place-photographs.md)
   - *Goal:* Show one approved photograph, and open the rest in a gallery with the photographer, the source, and the licence. Arrows and Escape move through the gallery and close it. No approved photographs are stored, so the profile shows that.
 
 ## Done when

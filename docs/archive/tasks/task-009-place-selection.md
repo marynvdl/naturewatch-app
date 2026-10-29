@@ -2,7 +2,7 @@
 
 Archived. This task is not active.
 
-Parcel: [Budding Places](../../parcels/budding-places.md)
+Parcel: [Budding Places](../parcels/budding-places.md)
 
 Repository: naturewatch-app. Start only after task 008 has merged.
 
