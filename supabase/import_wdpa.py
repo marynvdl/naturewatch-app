@@ -6,13 +6,15 @@
           No database connection.
   probe   Time a connection to the database and test one small COPY.
           Writes nothing that stays.
-  upload  Copy the filtered file into public.places_load in committed
-          batches. A second start continues from the rows already there.
-  merge   One transaction: check the stage, then insert and update places on
-          (source_release_id, source_id). It never deletes a place.
+  upload  Write the filtered file straight into public.places in committed
+          batches, on (source_release_id, source_id). Rows under 10 km2 are
+          left out. A second start continues from the places already there.
+          It never deletes a place. The geometry is stored once, because the
+          database disk is too small to hold a stage and the places.
+  merge   Read-only check of the result against the file (the name is kept
+          for the existing commands): counts, invalid geometry, facts.
 
-`run` (the default) does build, probe, then upload. Run `merge` afterwards,
-once the stage has been checked.
+`run` (the default) does build, probe, then upload. Run `merge` afterwards.
 
 The download URL and SHA-256 checksum are the sources row from the records
 migration. This script always downloads that URL. It does not read a local
@@ -111,26 +113,35 @@ create temp table if not exists batch (
 ) on commit delete rows
 """
 INSERT_BATCH = """
-insert into public.places_load (
-  source_release_id, source_id, site_id, name, designation,
+with parsed as (
+  select
+    source_id, site_id, name, designation, iucn_category, iso3, realm,
+    extensions.ST_Multi(
+      extensions.ST_Force2D(
+        extensions.ST_GeomFromWKB(decode(wkb_hex, 'hex'), 4326)
+      )
+    )::extensions.geometry(MultiPolygon, 4326) as geom
+  from batch
+)
+insert into public.places (
+  source_release_id, source_id, site_id, name, place_type, designation,
   iucn_category, iso3, realm, geom
 )
 select
-  %s,
-  source_id,
-  site_id,
-  name,
-  designation,
-  iucn_category,
-  iso3,
-  realm,
-  extensions.ST_Multi(
-    extensions.ST_Force2D(
-      extensions.ST_GeomFromWKB(decode(wkb_hex, 'hex'), 4326)
-    )
-  )::extensions.geometry(MultiPolygon, 4326)
-from batch
-on conflict (source_release_id, source_id) do nothing
+  %s, source_id, site_id, name, 'protected_area', designation,
+  iucn_category, iso3, realm, geom
+from parsed
+where extensions.st_area(geom::extensions.geography, true) / 1e6 >= 10
+on conflict (source_release_id, source_id) do update
+set
+  site_id = excluded.site_id,
+  name = excluded.name,
+  place_type = excluded.place_type,
+  designation = excluded.designation,
+  iucn_category = excluded.iucn_category,
+  iso3 = excluded.iso3,
+  realm = excluded.realm,
+  geom = excluded.geom
 """
 
 csv.field_size_limit(2**31 - 1)
@@ -600,10 +611,10 @@ def upload(work: Path) -> None:
     attempts = 0
     while True:
         try:
-            staged = prepare_stage(conn)
-            print(f"already staged: {len(staged)} of {manifest['kept']}", flush=True)
+            staged = prepare_stage(conn, work)
+            print(f"already stored: {len(staged)} of {manifest['kept']}", flush=True)
             total = send_rows(conn, work, staged, manifest["kept"])
-            print(f"staged: {total} of {manifest['kept']}", flush=True)
+            print(f"stored: {total} of {manifest['kept']} (rows under 10 km2 are left out)", flush=True)
             break
         except (psycopg.OperationalError, psycopg.InterfaceError) as exc:
             if isinstance(exc, psycopg.errors.InsufficientResources):
@@ -625,19 +636,65 @@ def upload(work: Path) -> None:
     conn.close()
 
 
-def prepare_stage(conn) -> set[str]:
+def prepare_stage(conn, work: Path) -> set[str]:
     source = fetch_source(conn)
     with conn.cursor() as cur:
         cur.execute("set search_path to public, extensions")
-        ensure_places_load(cur)
-        cur.execute(CREATE_BATCH)
         cur.execute(
-            "select source_id from public.places_load where source_release_id = %s",
+            "select source_id from public.places where source_release_id = %s",
             (source["id"],),
         )
-        staged = {row["source_id"] for row in cur.fetchall()}
+        stored = {row["source_id"] for row in cur.fetchall()}
     conn.commit()
-    return staged
+    in_file = {row[0] for row in read_rows(work)}
+    missing = sorted(stored - in_file)
+    if missing:
+        raise SystemExit(
+            f"refusing to load: {len(missing)} stored places are not in the filtered "
+            f"file: {', '.join(missing[:20])}"
+        )
+    move_leftover_stage(conn, source["id"])
+    with conn.cursor() as cur:
+        cur.execute(CREATE_BATCH)
+        cur.execute(
+            "select source_id from public.places where source_release_id = %s",
+            (source["id"],),
+        )
+        stored = {row["source_id"] for row in cur.fetchall()}
+    conn.commit()
+    return stored
+
+
+def move_leftover_stage(conn, release) -> None:
+    """Move rows left in places_load by an earlier run into places, then drop it."""
+    with conn.cursor() as cur:
+        cur.execute("select to_regclass('public.places_load') is not null as present")
+        present = bool(cur.fetchone()["present"])
+    conn.commit()
+    if not present:
+        return
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            insert into public.places (
+              source_release_id, source_id, site_id, name, place_type, designation,
+              iucn_category, iso3, realm, geom
+            )
+            select source_release_id, source_id, site_id, name, 'protected_area',
+              designation, iucn_category, iso3, realm, geom
+            from public.places_load
+            where source_release_id = %s and area_km2 >= 10
+            on conflict (source_release_id, source_id) do update
+            set site_id = excluded.site_id, name = excluded.name,
+              place_type = excluded.place_type, designation = excluded.designation,
+              iucn_category = excluded.iucn_category, iso3 = excluded.iso3,
+              realm = excluded.realm, geom = excluded.geom
+            """,
+            (release,),
+        )
+        print(f"moved {cur.rowcount} rows from places_load into places", flush=True)
+        cur.execute("drop table public.places_load")
+    conn.commit()
 
 
 def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
@@ -661,7 +718,7 @@ def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
         batch_size = 0
         sent_batches += 1
         if sent_batches % 5 == 0:
-            print(f"staged: {total} of {expected}", flush=True)
+            print(f"sent: {total} of {expected}", flush=True)
 
     for row in read_rows(work):
         if row[0] in staged:
@@ -672,35 +729,6 @@ def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
             flush()
     flush()
     return total
-
-
-def ensure_places_load(cur) -> None:
-    cur.execute(
-        """
-        create table if not exists public.places_load (
-          source_release_id uuid not null,
-          source_id text not null,
-          site_id text not null,
-          name text not null,
-          designation text,
-          iucn_category text,
-          iso3 text,
-          realm text not null,
-          geom extensions.geometry(MultiPolygon, 4326) not null,
-          area_km2 double precision generated always as (
-            extensions.st_area(geom::extensions.geography, true) / 1e6
-          ) stored,
-          primary key (source_release_id, source_id)
-        )
-        """
-    )
-    cur.execute("alter table public.places_load enable row level security")
-    cur.execute(
-        """
-        revoke all on table public.places_load
-        from public, anon, authenticated, service_role
-        """
-    )
 
 
 def fetch_source(conn) -> dict:
@@ -733,157 +761,65 @@ def fetch_source(conn) -> dict:
     return row
 
 
-# --- merge -------------------------------------------------------------------
+# --- check -------------------------------------------------------------------
 
 
 def merge(work: Path) -> None:
-    import psycopg
-
+    """Read-only check of public.places against the filtered file."""
     manifest = read_manifest(work)
     conn = open_connection()
     source = fetch_source(conn)
     release = source["id"]
-    try:
-        with conn.cursor() as cur:
-            cur.execute("set search_path to public, extensions")
-            cur.execute(
-                "select count(*) as n from public.places_load where source_release_id = %s",
-                (release,),
-            )
-            staged = int(cur.fetchone()["n"])
-            if staged != manifest["kept"]:
-                raise SystemExit(
-                    f"refusing to merge: {staged} rows staged, {manifest['kept']} in the filtered file"
-                )
-            reject_invalid(cur)
-            cur.execute(
-                """
-                select count(*) as n from public.places_load
-                where source_release_id = %s and area_km2 < 10
-                """,
-                (release,),
-            )
-            below = int(cur.fetchone()["n"])
-            cur.execute(
-                """
-                select place.source_id
-                from public.places as place
-                where place.source_release_id = %s
-                  and not exists (
-                    select 1 from public.places_load as stage
-                    where stage.source_release_id = place.source_release_id
-                      and stage.source_id = place.source_id
-                      and stage.area_km2 >= 10
-                  )
-                order by place.source_id
-                """,
-                (release,),
-            )
-            missing = [row["source_id"] for row in cur.fetchall()]
-            if missing:
-                raise SystemExit(
-                    f"refusing to merge: {len(missing)} stored places are not in the stage at "
-                    f"10 km2 or more: {', '.join(missing[:20])}"
-                )
-            cur.execute(
-                "create temp table before_ids on commit drop as "
-                "select id from public.places where source_release_id = %s",
-                (release,),
-            )
-            cur.execute("select count(*) as n from public.facts")
-            facts_before = int(cur.fetchone()["n"])
-            print(f"stage ok: {staged} staged, {below} below 10 km2 stay out", flush=True)
-            print("upsert started", flush=True)
-            stored = upsert_places(cur, release)
-            cur.execute(
-                "select count(*) as n from before_ids "
-                "where id not in (select id from public.places)"
-            )
-            lost = int(cur.fetchone()["n"])
-            cur.execute("select count(*) as n from public.facts")
-            facts_after = int(cur.fetchone()["n"])
-            if lost or facts_after != facts_before or stored == 0:
-                conn.rollback()
-                raise SystemExit(
-                    f"merge rolled back: {lost} places lost, facts {facts_before} -> {facts_after}, stored {stored}"
-                )
-        conn.commit()
-        with conn.cursor() as cur:
-            cur.execute("drop table public.places_load")
-        conn.commit()
-    except psycopg.errors.ForeignKeyViolation:
-        conn.rollback()
-        raise SystemExit("refusing to replace places that already have facts") from None
+    expected = {row[0] for row in read_rows(work)}
+    problems: list[str] = []
+    with conn.cursor() as cur:
+        cur.execute("set search_path to public, extensions")
+        cur.execute(
+            "select source_id, area_km2 from public.places where source_release_id = %s",
+            (release,),
+        )
+        stored = {row["source_id"]: row["area_km2"] for row in cur.fetchall()}
+        cur.execute(
+            """
+            select source_id, extensions.ST_IsValidReason(geom) as reason
+            from public.places
+            where source_release_id = %s and not extensions.ST_IsValid(geom)
+            order by source_id
+            """,
+            (release,),
+        )
+        invalid = cur.fetchall()
+        cur.execute("select count(*) as n from public.facts")
+        facts = int(cur.fetchone()["n"])
+        cur.execute("select to_regclass('public.places_load') is not null as present")
+        stage_left = bool(cur.fetchone()["present"])
+    conn.rollback()
+    conn.close()
+    unknown = sorted(set(stored) - expected)
+    absent = sorted(
+        source_id for source_id in expected - set(stored)
+    )
+    under = sorted(source_id for source_id, area in stored.items() if area < 10)
+    if unknown:
+        problems.append(f"{len(unknown)} stored places are not in the file")
+    if under:
+        problems.append(f"{len(under)} stored places are under 10 km2")
+    if invalid:
+        problems.append(f"{len(invalid)} invalid geometries")
+        for row in invalid[:20]:
+            print(f"invalid geometry {row['source_id']}: {row['reason']}")
+    if stage_left:
+        problems.append("places_load still exists")
     print(f"terrestrial polygons: {manifest['terrestrial']}", flush=True)
     print(f"GIS_AREA >= 10: {manifest['gis_area_ge_10']}", flush=True)
-    print(f"stored area_km2 >= 10: {stored}", flush=True)
-    conn.close()
-
-
-def reject_invalid(cur) -> None:
-    cur.execute(
-        """
-        select source_id, extensions.ST_IsValidReason(geom) as reason
-        from public.places_load
-        where not extensions.ST_IsValid(geom)
-        order by source_id
-        """
-    )
-    invalid = cur.fetchall()
-    if not invalid:
-        return
-    for row in invalid:
-        print(f"invalid geometry {row['source_id']}: {row['reason']}")
-    raise SystemExit(1)
-
-
-def upsert_places(cur, source_release_id) -> int:
-    """Insert and update only. A stored place is never deleted."""
-    cur.execute(
-        """
-        insert into public.places (
-          source_release_id,
-          source_id,
-          site_id,
-          name,
-          place_type,
-          designation,
-          iucn_category,
-          iso3,
-          realm,
-          geom
-        )
-        select
-          source_release_id,
-          source_id,
-          site_id,
-          name,
-          'protected_area',
-          designation,
-          iucn_category,
-          iso3,
-          realm,
-          geom
-        from public.places_load
-        where source_release_id = %s and area_km2 >= 10
-        on conflict (source_release_id, source_id) do update
-        set
-          site_id = excluded.site_id,
-          name = excluded.name,
-          place_type = excluded.place_type,
-          designation = excluded.designation,
-          iucn_category = excluded.iucn_category,
-          iso3 = excluded.iso3,
-          realm = excluded.realm,
-          geom = excluded.geom
-        """,
-        (source_release_id,),
-    )
-    cur.execute(
-        "select count(*) as stored from public.places where source_release_id = %s",
-        (source_release_id,),
-    )
-    return int(cur.fetchone()["stored"])
+    print(f"stored areas of 10 km2 or more: {len(stored)}", flush=True)
+    print(f"in the file but not stored (should be under 10 km2): {len(absent)}", flush=True)
+    print(f"facts: {facts}", flush=True)
+    if len(stored) < manifest["gis_area_ge_10"]:
+        problems.append("fewer places stored than polygons with GIS_AREA >= 10")
+    if problems:
+        raise SystemExit("check failed: " + "; ".join(problems))
+    print("check ok", flush=True)
 
 
 # --- download and geodatabase ------------------------------------------------
