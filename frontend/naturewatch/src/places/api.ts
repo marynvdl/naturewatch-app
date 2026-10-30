@@ -132,7 +132,7 @@ export function placesClient(): SupabaseClient | null {
 /**
  * Arguments shared by the list window and the filter count.
  * @param query - Search, filters, and optional extent.
- * @returns Named arguments for `pilot_place_matched` filters.
+ * @returns Named arguments for `protected_area_matched` filters.
  */
 function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
   return {
@@ -178,7 +178,7 @@ export async function loadPilotPlaceWindow(
 ): Promise<PlaceWindowResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
-  const { data, error } = await supabase.rpc('pilot_place_window', {
+  const { data, error } = await supabase.rpc('protected_area_window', {
     ...matchedArgs(query),
     p_sort: query.sort,
     p_limit: PLACE_LIST_LIMIT,
@@ -212,7 +212,7 @@ export async function loadPilotPlaceWindowCount(
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase.rpc(
-    'pilot_place_window_count',
+    'protected_area_window_count',
     matchedArgs(query)
   );
   if (error || data === null) return { status: 'error' };
@@ -226,7 +226,7 @@ export async function loadPilotPlaceWindowCount(
 export async function loadPilotPlaceFilterStats(): Promise<PlaceFilterStatsResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
-  const { data, error } = await supabase.rpc('pilot_place_filter_stats');
+  const { data, error } = await supabase.rpc('protected_area_filter_stats');
   if (error || !data?.[0]) return { status: 'error' };
   const row = data[0] as {
     place_count: number | string;
@@ -250,7 +250,7 @@ export async function loadPilotPlaceFilterStats(): Promise<PlaceFilterStatsResul
 }
 
 /**
- * One pilot place and its cropland fact for the 2024 sprout.
+ * One protected area and its cropland fact for the 2024 sprout.
  * @param id - `places.id`.
  * @returns The place, or why it could not be opened.
  */
@@ -260,7 +260,7 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
   if (!supabase) return { status: 'unconfigured' };
 
   const { data: place, error } = await supabase
-    .from('pilot_places')
+    .from('protected_areas')
     .select(
       'id, name, designation, iso3, area_km2, site_id, release_month, source_name'
     )
@@ -330,7 +330,7 @@ export async function loadPlaceRelease(): Promise<PlaceReleaseResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase
-    .from('pilot_places')
+    .from('protected_areas')
     .select('release_month')
     .limit(1)
     .maybeSingle();
