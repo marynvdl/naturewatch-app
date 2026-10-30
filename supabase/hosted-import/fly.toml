@@ -1,0 +1,20 @@
+# One-off places import. Not the naturewatch or naturewatch-demo web app.
+app = "naturewatch-places-import"
+primary_region = "lhr"
+kill_signal = "SIGINT"
+kill_timeout = 30
+
+[build]
+  dockerfile = "Dockerfile"
+
+[processes]
+  app = "python3 -u /app/import_wdpa.py"
+
+[[mounts]]
+  source = "places_import"
+  destination = "/tmp"
+
+[[vm]]
+  size = "performance-2x"
+  memory = "4gb"
+  processes = ["app"]

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 import posixpath
 import tempfile
@@ -18,6 +19,7 @@ import urllib.request
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote
 
 PINNED_NAME = "WDPCA"
 PINNED_RELEASE = "2026-10-01"
@@ -27,6 +29,10 @@ PINNED_URL = (
 )
 PINNED_SHA256 = "f5f5e50f230923619ad60faf8296e4f39a4d8c1b14bb6ea80e82ea6db6292b1c"
 DEFAULT_DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+# Hosted project ref and session pooler. Identifiers, not secrets.
+HOSTED_PROJECT_REF = "fwfbmvwdbsutmalhszvi"
+HOSTED_POOLER_HOST = "aws-0-eu-west-2.pooler.supabase.com"
+PROGRESS_EVERY = 10_000
 IUCN_CATEGORIES = {
     "Ia",
     "Ib",
@@ -83,20 +89,94 @@ def main() -> None:
     import psycopg
     from psycopg.rows import dict_row
 
-    database_url = os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL
-    with psycopg.connect(database_url, row_factory=dict_row) as conn:
-        source = fetch_source(conn)
-        with tempfile.TemporaryDirectory(prefix="wdpa-") as tmp:
-            root = Path(tmp)
-            zip_path = root / "wdpa.zip"
-            download(source["download_url"], zip_path, source["checksum"])
-            gdb = extract_geodatabase(zip_path, root / "extract")
+    with tempfile.TemporaryDirectory(prefix="wdpa-") as tmp:
+        root = Path(tmp)
+        zip_path = root / "wdpa.zip"
+        print("download started", flush=True)
+        download(PINNED_URL, zip_path, PINNED_SHA256)
+        print("download finished", flush=True)
+        gdb = extract_geodatabase(zip_path, root / "extract")
+        print(f"geodatabase ready: {gdb.name}", flush=True)
+        database_url, hosted = database_url_for_run()
+        with psycopg.connect(
+            database_url,
+            row_factory=dict_row,
+            connect_timeout=30,
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5,
+        ) as conn:
+            prepare_session(conn, hosted)
+            source = fetch_source(conn)
+            print("source row matches the pin", flush=True)
+            print("import started", flush=True)
             terrestrial, gis_area_count, stored = import_geodatabase(
                 conn, source["id"], gdb
             )
-    print(f"terrestrial polygons: {terrestrial}")
-    print(f"GIS_AREA >= 10: {gis_area_count}")
-    print(f"stored area_km2 >= 10: {stored}")
+    print(f"terrestrial polygons: {terrestrial}", flush=True)
+    print(f"GIS_AREA >= 10: {gis_area_count}", flush=True)
+    print(f"stored area_km2 >= 10: {stored}", flush=True)
+
+
+def database_url_for_run() -> tuple[str, bool]:
+    """Return a database URL and whether it is the hosted login role.
+
+    A laptop network drop rolls back the whole load, so the hosted run sets
+    SUPABASE_ACCESS_TOKEN and mints a login role only after the zip is on disk.
+    """
+    token = os.environ.get("SUPABASE_ACCESS_TOKEN", "").strip()
+    if not token:
+        return os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL, False
+    _secrets.append(token)
+    request = urllib.request.Request(
+        f"https://api.supabase.com/v1/projects/{HOSTED_PROJECT_REF}/cli/login-role",
+        data=json.dumps({"read_only": False}).encode(),
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "User-Agent": "sooty-earth-records",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise SystemExit(f"login role failed: HTTP {exc.code}") from exc
+    role = str(payload.get("role") or "")
+    password = str(payload.get("password") or "")
+    if not role or not password:
+        raise SystemExit("login role response did not include a role")
+    _secrets.append(password)
+    print(f"login role ready, ttl_seconds={payload.get('ttl_seconds')}", flush=True)
+    user = quote(f"{role}.{HOSTED_PROJECT_REF}", safe="")
+    url = (
+        f"postgresql://{user}:{quote(password, safe='')}"
+        f"@{HOSTED_POOLER_HOST}:5432/postgres"
+    )
+    return url, True
+
+
+def prepare_session(conn, hosted: bool) -> None:
+    conn.execute("set statement_timeout = 0")
+    conn.execute("set idle_in_transaction_session_timeout = 0")
+    if not hosted:
+        return
+    conn.execute("set role postgres")
+    who = conn.execute("select current_user").fetchone()
+    print(f"connected as {who['current_user']}", flush=True)
+
+
+def scrub(text: str) -> str:
+    cleaned = text
+    for secret in _secrets:
+        if secret:
+            cleaned = cleaned.replace(secret, "***")
+    return cleaned
+
+
+_secrets: list[str] = []
 
 
 def fetch_source(conn) -> dict:
@@ -216,10 +296,15 @@ def import_geodatabase(conn, source_release_id, gdb: Path) -> tuple[int, int, in
                 ) on commit drop
                 """
             )
-            terrestrial, gis_area_count, _accepted = stream_candidates(cur, layers)
+            terrestrial, gis_area_count, accepted = stream_candidates(cur, layers)
+            print(
+                f"candidates sent: {accepted}; checking geometry validity",
+                flush=True,
+            )
             if terrestrial == 0:
                 raise SystemExit("no terrestrial polygons in the download")
             reject_invalid(cur)
+            print("upsert started", flush=True)
             stored = upsert_places(cur, source_release_id)
         if stored == 0:
             raise SystemExit("refusing to store zero places")
@@ -259,6 +344,12 @@ def stream_candidates(cur, layers) -> tuple[int, int, int]:
             if realm != "Terrestrial":
                 continue
             terrestrial += 1
+            if terrestrial % PROGRESS_EVERY == 0:
+                print(
+                    f"terrestrial polygons read: {terrestrial}; "
+                    f"candidates sent: {accepted + len(batch)}",
+                    flush=True,
+                )
             iso3 = text(feature, "ISO3")
             source_id = text(feature, "SITE_PID")
             if not source_id:
@@ -446,9 +537,9 @@ if __name__ == "__main__":
 
     try:
         main()
-    except psycopg.errors.ForeignKeyViolation as exc:
+    except psycopg.errors.ForeignKeyViolation:
         raise SystemExit(
             "refusing to replace October 2026 places that already have facts"
-        ) from exc
+        ) from None
     except psycopg.Error as exc:
-        raise SystemExit(f"database error: {exc}") from exc
+        raise SystemExit(f"database error: {scrub(str(exc))}") from None
