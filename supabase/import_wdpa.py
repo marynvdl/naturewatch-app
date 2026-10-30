@@ -84,7 +84,8 @@ REQUIRED_FIELDS = (
 TOO_SMALL_DEGREE_AREA = 10.0 / (112.0 * 112.0)
 BATCH_ROWS = 100
 # A few polygons are very large. Send a batch early when it reaches this size.
-BATCH_BYTES = 64 * 1024 * 1024
+BATCH_BYTES = 16 * 1024 * 1024
+MAX_SEGMENT = 1200
 CONNECT_ATTEMPTS = 6
 UPLOAD_ATTEMPTS = 6
 FILTERED_NAME = "filtered.tsv.gz"
@@ -498,7 +499,9 @@ def open_connection(attempts: int = CONNECT_ATTEMPTS):
                 keepalives_idle=30,
                 keepalives_interval=10,
                 keepalives_count=5,
+                tcp_user_timeout=120_000,
             )
+            limit_segment_size(conn)
             prepare_session(conn, hosted)
             conn.commit()
             return conn
@@ -512,6 +515,21 @@ def open_connection(attempts: int = CONNECT_ATTEMPTS):
             time.sleep(delay)
             delay = min(delay * 2, 240)
     raise SystemExit("could not connect to the database")
+
+
+def limit_segment_size(conn) -> None:
+    """Send smaller TCP segments. On Fly a large COPY stalled, with data queued
+    and never acknowledged, which is what a blocked path MTU looks like."""
+    import socket
+
+    try:
+        sock = socket.socket(fileno=os.dup(conn.pgconn.socket))
+        try:
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, MAX_SEGMENT)
+        finally:
+            sock.close()
+    except (OSError, AttributeError):
+        pass
 
 
 def prepare_session(conn, hosted: bool) -> None:
