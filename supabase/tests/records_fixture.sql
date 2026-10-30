@@ -158,24 +158,24 @@ declare
   generated text;
   expression text;
 begin
-  select count(*) into pilot_count from public.pilot_places;
+  select count(*) into pilot_count from public.protected_areas;
   if pilot_count <> 2 then
-    raise exception 'pilot_places returned % rows, expected 2', pilot_count;
+    raise exception 'protected_areas returned % rows, expected 2', pilot_count;
   end if;
   if not exists (
-    select 1 from public.pilot_places where source_id = 'fixture-pilot' and iso3 = 'ZAF'
+    select 1 from public.protected_areas where source_id = 'fixture-pilot' and iso3 = 'ZAF'
   ) then
-    raise exception 'pilot_places omitted the South Africa place';
+    raise exception 'protected_areas omitted the South Africa place';
   end if;
   if not exists (
-    select 1 from public.pilot_places where source_id = 'fixture-abroad' and iso3 = 'BWA'
+    select 1 from public.protected_areas where source_id = 'fixture-abroad' and iso3 = 'BWA'
   ) then
-    raise exception 'pilot_places omitted the place outside South Africa';
+    raise exception 'protected_areas omitted the place outside South Africa';
   end if;
 
   select release_month, area_km2
     into release, pilot_area
-  from public.pilot_places
+  from public.protected_areas
   where source_id = 'fixture-pilot';
 
   if release <> date '2026-10-01'
@@ -184,9 +184,9 @@ begin
     raise exception 'release month is not October 2026: %', release;
   end if;
   if exists (
-    select 1 from public.pilot_places where source_name is distinct from 'WDPCA'
+    select 1 from public.protected_areas where source_name is distinct from 'WDPCA'
   ) then
-    raise exception 'pilot_places is not joined to the WDPCA source';
+    raise exception 'protected_areas is not joined to the WDPCA source';
   end if;
 
   select
@@ -218,8 +218,8 @@ begin
   if small_area >= 10 then
     raise exception 'filter fixture area_km2 % should be under 10', small_area;
   end if;
-  if exists (select 1 from public.pilot_places where source_id = 'fixture-small') then
-    raise exception 'the place below 10 km2 was returned by pilot_places';
+  if exists (select 1 from public.protected_areas where source_id = 'fixture-small') then
+    raise exception 'the place below 10 km2 was returned by protected_areas';
   end if;
 
   select is_generated, generation_expression
@@ -466,7 +466,7 @@ begin
     end if;
 
     select count(*) into pilot_count
-    from public.pilot_places
+    from public.protected_areas
     where release_month = date '2026-10-01';
     if pilot_count <> 2 then
       raise exception '% saw % October 2026 pilot rows, expected 2', role_name, pilot_count;
@@ -530,28 +530,28 @@ begin
 
   select count(*), min(total_count)
     into window_count, window_total
-  from public.pilot_place_window(
+  from public.protected_area_window(
     '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
   );
   if window_count <> 2 or window_total <> 2 then
-    raise exception 'pilot_place_window returned % of %, expected 2 of 2',
+    raise exception 'protected_area_window returned % of %, expected 2 of 2',
       window_count, window_total;
   end if;
 
   select * into window_row
-  from public.pilot_place_window(
+  from public.protected_area_window(
     '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
   ) as listed
   where listed.name = 'Pilot Park';
   if to_jsonb(window_row) ? 'geom' then
-    raise exception 'pilot_place_window returned geom';
+    raise exception 'protected_area_window returned geom';
   end if;
   if window_row.cropland_percent is null then
-    raise exception 'pilot_place_window did not join the South Africa cropland fact';
+    raise exception 'protected_area_window did not join the South Africa cropland fact';
   end if;
 
   select * into window_row
-  from public.pilot_place_window(
+  from public.protected_area_window(
     '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
   ) as listed
   where listed.name = 'Chobe Fixture';
@@ -563,44 +563,44 @@ begin
   end if;
 
   select count(*) into extent_count
-  from public.pilot_places_in_extent(26, -27, 28, -25);
+  from public.protected_areas_in_extent(26, -27, 28, -25);
   if extent_count <> 1 then
     raise exception 'extent that covers the park returned %', extent_count;
   end if;
   select count(*) into extent_count
-  from public.pilot_places_in_extent(23.5, -21.5, 24.5, -20.5);
+  from public.protected_areas_in_extent(23.5, -21.5, 24.5, -20.5);
   if extent_count <> 1 then
     raise exception 'extent that covers the place outside South Africa returned %', extent_count;
   end if;
   select count(*) into extent_count
-  from public.pilot_places_in_extent(0, -10, 1, -9);
+  from public.protected_areas_in_extent(0, -10, 1, -9);
   if extent_count <> 0 then
     raise exception 'extent that misses the park returned %', extent_count;
   end if;
 
-  if public.pilot_place_window_count(
+  if public.protected_area_window_count(
     'Pilot', false, null, null, 0, 100, null, null, null, null
   ) <> 1 then
     raise exception 'name search did not match Pilot Park';
   end if;
-  if public.pilot_place_window_count(
+  if public.protected_area_window_count(
     'zzz', false, null, null, 0, 100, null, null, null, null
   ) <> 0 then
     raise exception 'missing name search was not empty';
   end if;
 
-  select place_count into stats_count from public.pilot_place_filter_stats();
+  select place_count into stats_count from public.protected_area_filter_stats();
   if stats_count <> 2 then
     raise exception 'filter stats counted % places, expected 2', stats_count;
   end if;
   if (
     select array_length(size_bins, 1)
-    from public.pilot_place_filter_stats()
+    from public.protected_area_filter_stats()
   ) <> 40 then
     raise exception 'filter stats did not return histogram bins';
   end if;
 
-  kept := public.pilot_place_kept_ids(null, null, 0, 100);
+  kept := public.protected_area_kept_ids(null, null, 0, 100);
   if array_length(kept, 1) <> 2 then
     raise exception 'kept ids returned %', kept;
   end if;
@@ -637,7 +637,7 @@ begin
   perform set_config('role', 'anon', true);
   select count(*), min(total_count)
     into window_count, window_total
-  from public.pilot_place_window(
+  from public.protected_area_window(
     '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
   );
   if window_count <> 50 or window_total <> 53 then
@@ -647,7 +647,7 @@ begin
 
   select count(*), min(total_count)
     into window_count, window_total
-  from public.pilot_place_window(
+  from public.protected_area_window(
     '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50, 50
   );
   if window_count <> 3 or window_total <> 53 then

@@ -31,7 +31,7 @@ Fire is the pipeline that runs today: Earth Engine to `nature-watch-bucket`, the
 
 The connection between data and app is defined by **published object paths** and the **layer catalogue** at `frontend/naturewatch/src/catalog/layers.json`.
 
-The `sources`, `places`, and `facts` tables are in Supabase. The places page reads `pilot_place_window`, 50 rows at a time. The Places list on the map reads `pilot_place_window`, 50 rows at a time from an offset, and optional extent through `pilot_places_in_extent`. Filter charts read `pilot_place_filter_stats`. None of those reads return `places.geom`. The FastAPI service does not read these tables.
+The `sources`, `places`, and `facts` tables are in Supabase. `protected_areas` is the worldwide read view: terrestrial protected areas of at least 10 km². The places page reads `protected_area_window`, 50 rows at a time. The Places list on the map reads `protected_area_window`, 50 rows at a time from an offset, and optional extent through `protected_areas_in_extent`. Filter charts read `protected_area_filter_stats`. None of those reads return `places.geom`. The FastAPI service does not read these tables.
 
 ## 2. Storage and access
 

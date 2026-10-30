@@ -25,7 +25,7 @@ export function formatKm2(km2: number): string {
 /**
  * Place area for the profile tag and the list card.
  * Whole square kilometres, or two decimal places below 100 km².
- * @param km2 - `pilot_places.area_km2`.
+ * @param km2 - `protected_areas.area_km2`.
  * @returns The number, with thousands separators.
  */
 export function formatAreaTag(km2: number): string {

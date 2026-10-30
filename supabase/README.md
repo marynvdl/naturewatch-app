@@ -8,7 +8,7 @@ The October 2026 WDPCA row is pinned in `supabase/migrations/20261021120000_reco
 
 `site_id` is the Protected Planet id (`https://www.protectedplanet.net/<site_id>`).
 
-The places page reads `pilot_place_window`, 50 rows at a time, ordered by name. The Places list on the map reads `pilot_place_window` (50 matching rows at a time, from an offset) and `pilot_place_filter_stats` for the filter charts. Extent filtering uses `pilot_places_in_extent`, which accepts a bounding box and returns attributes only. Those reads return attributes, not `places.geom`. Filter charts use the database counts.
+The places page reads `protected_area_window`, 50 rows at a time, ordered by name. The Places list on the map reads `protected_area_window` (50 matching rows at a time, from an offset) and `protected_area_filter_stats` for the filter charts. Extent filtering uses `protected_areas_in_extent`, which accepts a bounding box and returns attributes only. Those reads return attributes, not `places.geom`. Filter charts use the database counts. The view behind those reads is `protected_areas`.
 
 `places`, `sources`, `facts`, `fact_methods`, and `pilot_place_map` have row-level security on. `anon` and `authenticated` can select rows and cannot insert, update, or delete. `service_role` keeps select, insert, update, and delete on `sources`, `places`, `facts`, and `fact_methods`. On `pilot_place_map` it can select. `places.geom` stays ungranted.
 
@@ -40,7 +40,7 @@ DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
 It streams terrestrial polygons in batches of 200. A polygon whose `GIS_AREA` is under 1 km² and whose outline cannot reach 10 km² is left out of the database batch. Calculated `area_km2` still decides what is stored. The script prints the count of terrestrial polygons, the count with `GIS_AREA >= 10`, then the count stored with calculated `area_km2 >= 10`. Only the last set is stored. Rows are upserted on `(source_release_id, source_id)`, so a place already stored keeps its id and its cropland facts. A second run updates that October 2026 source in place.
 
 ```sql
-select count(*) from pilot_places;
+select count(*) from protected_areas;
 ```
 
 Check the checksum refusal locally, without a download of the real file:
