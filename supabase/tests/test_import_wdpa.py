@@ -27,6 +27,15 @@ def load_import_wdpa():
 
 import_wdpa = load_import_wdpa()
 
+try:
+    import osgeo.ogr  # noqa: F401
+    import pyproj  # noqa: F401
+    import shapely  # noqa: F401
+
+    HAS_AREA_LIBRARIES = True
+except ImportError:
+    HAS_AREA_LIBRARIES = False
+
 
 class FakeBody(io.BytesIO):
     status = 200
@@ -107,12 +116,98 @@ class ImportWdpaTest(unittest.TestCase):
         tiny = FakeGeometry(0.0001)
         self.assertFalse(import_wdpa.stage_this_polygon(tiny, 0.2))
         self.assertTrue(import_wdpa.stage_this_polygon(tiny, 10))
-        with mock.patch.object(import_wdpa, "geodesic_area_km2", return_value=9.95):
+        with mock.patch.object(import_wdpa, "geodesic_area_km2", return_value=9.995):
             self.assertTrue(import_wdpa.stage_this_polygon(tiny, 5))
         with mock.patch.object(import_wdpa, "geodesic_area_km2", return_value=9.0):
             self.assertFalse(import_wdpa.stage_this_polygon(tiny, 5))
+        stats = {"unmeasured": 0}
         with mock.patch.object(import_wdpa, "geodesic_area_km2", return_value=None):
-            self.assertTrue(import_wdpa.stage_this_polygon(tiny, 5))
+            self.assertTrue(import_wdpa.stage_this_polygon(tiny, 5, stats))
+        self.assertEqual(stats["unmeasured"], 1)
+
+    @unittest.skipUnless(HAS_AREA_LIBRARIES, "needs GDAL, shapely and pyproj")
+    def test_real_geometries_are_measured_and_filtered(self):
+        from osgeo import ogr
+
+        def square(side_degrees):
+            half = side_degrees / 2
+            ring = (
+                f"{-half} {-half},{half} {-half},{half} {half},{-half} {half},{-half} {-half}"
+            )
+            return ogr.CreateGeometryFromWkt(f"POLYGON(({ring}))")
+
+        small = square(0.02)
+        large = square(0.1)
+        # GDAL hands back a bytearray. shapely reads only bytes.
+        self.assertIsInstance(large.ExportToIsoWkb(), bytearray)
+        measured_large = import_wdpa.geodesic_area_km2(large)
+        measured_small = import_wdpa.geodesic_area_km2(small)
+        self.assertIsNotNone(measured_large)
+        self.assertIsNotNone(measured_small)
+        self.assertAlmostEqual(measured_large, 123.6, delta=1.0)
+        self.assertAlmostEqual(measured_small, 4.94, delta=0.1)
+
+        stats = {"unmeasured": 0}
+        self.assertFalse(import_wdpa.stage_this_polygon(small, 5.0, stats))
+        self.assertTrue(import_wdpa.stage_this_polygon(large, 5.0, stats))
+        self.assertTrue(import_wdpa.stage_this_polygon(small, 10.0, stats))
+        self.assertEqual(stats["unmeasured"], 0)
+
+    @unittest.skipUnless(HAS_AREA_LIBRARIES, "needs GDAL, shapely and pyproj")
+    def test_a_hole_is_subtracted_from_the_area(self):
+        from osgeo import ogr
+
+        solid = ogr.CreateGeometryFromWkt(
+            "POLYGON((0 0,0.1 0,0.1 0.1,0 0.1,0 0))"
+        )
+        holed = ogr.CreateGeometryFromWkt(
+            "POLYGON((0 0,0.1 0,0.1 0.1,0 0.1,0 0),(0.02 0.02,0.02 0.08,0.08 0.08,0.08 0.02,0.02 0.02))"
+        )
+        self.assertLess(
+            import_wdpa.geodesic_area_km2(holed),
+            import_wdpa.geodesic_area_km2(solid) * 0.7,
+        )
+
+    def test_the_filtered_file_round_trips_awkward_text(self):
+        import csv
+        import gzip
+
+        rows = [
+            ["a1", "1", 'Name with\ttab and "quotes"', "", "II", "ZAF", "Terrestrial", "0101"],
+            ["a2", "2", "Line one\nline two", "Park", "", "", "Terrestrial", "0102"],
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / import_wdpa.FILTERED_NAME
+            with gzip.open(path, "wt", newline="") as handle:
+                writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+                writer.writerows(rows)
+            work = Path(tmp)
+            self.assertEqual(list(import_wdpa.read_rows(work)), rows)
+
+    def test_upload_refuses_a_filtered_file_that_changed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            (work / import_wdpa.FILTERED_NAME).write_text("a\t1\n")
+            digest = import_wdpa.file_sha256(work / import_wdpa.FILTERED_NAME)
+            (work / import_wdpa.MANIFEST_NAME).write_text(
+                json.dumps(
+                    {
+                        "pin_sha256": import_wdpa.PINNED_SHA256,
+                        "rows_sha256": digest,
+                        "kept": 1,
+                    }
+                )
+            )
+            self.assertEqual(import_wdpa.read_manifest(work)["kept"], 1)
+            (work / import_wdpa.FILTERED_NAME).write_text("a\t1\nb\t2\n")
+            with self.assertRaises(SystemExit) as raised:
+                import_wdpa.read_manifest(work)
+            self.assertIn("manifest checksum", str(raised.exception))
+
+    def test_no_step_deletes_a_stored_place(self):
+        source = MODULE_PATH.read_text()
+        self.assertNotIn("delete from public.places ", source)
+        self.assertNotIn("delete from places ", source)
 
 
 class FakeGeometry:

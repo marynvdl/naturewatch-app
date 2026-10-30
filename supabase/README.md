@@ -4,7 +4,7 @@
 
 The map draws protected-area boundaries from the published PMTiles archive. `pilot_place_map` stays in the database as the South Africa copy. A trigger still copies only those South Africa rows from `places` and `sources`. Places from other countries stay out of that table. The app has no polygon download.
 
-The October 2026 WDPCA row is pinned in `supabase/migrations/20261021120000_records.sql` and `supabase/migrations/20261029200000_global_protected_areas.sql`: release month `2026-10-01`, the global public zip, and the SHA-256 checksum of that zip. `import_wdpa.py` carries the same URL and checksum. It downloads that URL and stops if the file is missing or the checksum differs. It does not use a local geodatabase as the source. The download stays in a temporary directory and is not committed. The CloudFront `/current/` file is the South Africa extract. The global October file is the object named in the pin.
+The October 2026 WDPCA row is pinned in `supabase/migrations/20261021120000_records.sql` and `supabase/migrations/20261029200000_global_protected_areas.sql`: release month `2026-10-01`, the global public zip, and the SHA-256 checksum of that zip. `import_wdpa.py` carries the same URL and checksum. It downloads that URL and stops if the file is missing or the checksum differs. It does not use a local geodatabase as the source. The download stays in a work directory and is not committed. The CloudFront `/current/` file is the South Africa extract. The global October file is the object named in the pin.
 
 `site_id` is the Protected Planet id (`https://www.protectedplanet.net/<site_id>`).
 
@@ -28,25 +28,40 @@ The fixture rolls back. It expects `places` to be empty, so run it before the im
 
 ## Import
 
-The script needs Python with the GDAL bindings (`osgeo`) and `psycopg`.
+The script needs Python with the GDAL bindings (`osgeo`), `psycopg`, `shapely`, and `pyproj`.
 
 ```bash
 python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -r supabase/requirements.txt
-DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-  .venv/bin/python supabase/import_wdpa.py
 ```
 
-It downloads the pinned zip before it opens a database connection. Polygons whose area cannot reach 10 km² are left out. The rest are copied into `places_load` in batches of 100, and each batch is committed. `places_load` is not granted to `anon` or `authenticated`. A second start skips `source_id`s already in that table. When the copy is finished, one transaction upserts rows with calculated `area_km2 >= 10` into `places` and removes October rows that are not in the stage. Rows are upserted on `(source_release_id, source_id)`, so a place already stored keeps its id and its cropland facts. The script then drops `places_load`. It prints the count of terrestrial polygons, the count with `GIS_AREA >= 10`, then the count stored.
+Follow this procedure for this release and for the next places import. It has four steps. Only the last one changes `places`.
+
+1. `build` downloads the pinned zip, checks its checksum, and reads the geodatabase. It keeps terrestrial polygons whose area can reach 10 km², checks each one is valid, and writes `filtered.tsv.gz` and `manifest.json` to the work directory. It then removes the extracted geodatabase to free space. It makes no database connection. The manifest records the counts and a checksum of the file. Review those counts before anything is uploaded.
+2. `probe` times a connection to the database for two minutes and tests one small `COPY`. Nothing stays in the database. Run it before a long upload, and run it alone to test a connection.
+3. `upload` copies `filtered.tsv.gz` into `places_load` in committed batches of 100. It stops if the file no longer matches its manifest. A dropped connection reconnects and continues. A second start skips the `source_id`s already staged. `places_load` is not granted to `anon` or `authenticated`.
+4. `merge` runs one transaction. It refuses unless every row of the file is staged, every staged geometry is valid, and every place already stored is in the stage at 10 km² or more. It then inserts and updates `places` on `(source_release_id, source_id)`, so a stored place keeps its id and its cropland facts. It never deletes a place. It rolls back if a place id or a facts row is lost, and then drops `places_load`.
+
+`run`, the default, does `build`, a 30 second `probe`, and `upload`. Run `merge` afterwards, once the stage has been checked.
+
+```bash
+export WDPA_WORK_DIR=/tmp/wdpa-work
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+  .venv/bin/python supabase/import_wdpa.py run
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+  .venv/bin/python supabase/import_wdpa.py merge
+```
+
+The script prints the count of terrestrial polygons, the count with `GIS_AREA >= 10`, then the count stored. Calculated `area_km2` from PostGIS decides what is stored. A polygon whose area the script cannot measure is kept and counted as `unmeasured` in the manifest, so a measuring fault cannot drop a place.
 
 ```sql
 select count(*) from protected_areas;
 ```
 
-Check the checksum refusal locally, without a download of the real file:
+Check the checksum refusal and the area filter locally, without a download of the real file:
 
 ```bash
-python3 -m unittest supabase/tests/test_import_wdpa.py
+.venv/bin/python -m unittest supabase/tests/test_import_wdpa.py
 ```
 
 ## Hosted import
@@ -55,11 +70,11 @@ Do not run this against the hosted database until the row count and the database
 
 The October 2026 global zip is 2,051,430,236 bytes. Reading that zip, without storing it, counts 490,511 terrestrial polygons in `WDPA_WDOECM_poly_Oct2026`. 51,001 of those have `GIS_AREA` of at least 10. The point layer and the source table are not stored. The stored count is the calculated `area_km2 >= 10` line, which can differ. Record `select count(*) from protected_areas` and `pg_size_pretty(pg_database_size(current_database()))` after the merge commits.
 
-Follow this approach for the next places import. Copy the kept polygons into `places_load` in committed batches, then merge them in one short transaction. Do not hold the whole load in one transaction, and do not send it through the Supabase pooler. A dropped connection keeps the batches already committed. The next start continues from `places_load`.
+Do not run the hosted load from a laptop, and do not hold the load in one transaction. A single long transaction rolls back the whole load when a connection drops. Do not send a bulk load through the Supabase pooler. Filter and validate the file first, copy it in committed batches, then merge once. Do not upload a polygon that the merge will reject.
 
-Do not run the hosted load from a laptop. Run it on Fly app `naturewatch-places-import` in London (`lhr`). That app is only this load. Do not deploy it as `naturewatch` or `naturewatch-demo`. The machine is `performance-2x` with 4 GB of memory, about $0.10 an hour in London. A 12 GB volume named `places_import` is mounted at `/tmp` for the zip and the geodatabase. Destroy the machine, the volume, and the app when the load has committed. A stopped machine and a leftover volume keep billing.
+Run it on Fly app `naturewatch-places-import` in London (`lhr`). That app is only this load. Do not deploy it as `naturewatch` or `naturewatch-demo`. The machine is `performance-2x` with 4 GB of memory, about $0.10 an hour in London. A 12 GB volume named `places_import` is mounted at `/tmp` for the zip, the geodatabase, and the filtered file. The work directory is on that volume, so a stopped machine does not download or filter again. The machine does not restart on its own. Destroy the app and the volume when the load has committed. A stopped machine and a leftover volume keep billing.
 
-Apply the migrations first. The app secret `SUPABASE_ACCESS_TOKEN` is a Supabase access token. The script uses it only after the zip is on disk, to mint a login role, then connects directly to `db.fwfbmvwdbsutmalhszvi.supabase.co` and runs `set role postgres`. It also sets `statement_timeout` and `idle_in_transaction_session_timeout` to 0, and turns on TCP keepalives. Do not commit the token, a database URL, or the service-role key. Do not put the service-role key in the frontend.
+Apply the migrations first. The app secret `SUPABASE_ACCESS_TOKEN` is a Supabase access token. The script mints a short-lived login role each time it connects, connects directly to `db.fwfbmvwdbsutmalhszvi.supabase.co`, and runs `set role postgres`. A login or connection timeout is retried with a growing pause. The script sets `statement_timeout` and `idle_in_transaction_session_timeout` to 0 and turns on TCP keepalives. Do not commit the token, a database URL, or the service-role key. Do not put the service-role key in the frontend.
 
 ```bash
 fly apps create naturewatch-places-import
@@ -85,12 +100,34 @@ fly deploy supabase \
 fly logs --app naturewatch-places-import
 ```
 
-Deploy starts the load. Leave that machine running. `fly machine update` stops the process, so do not update the machine during the load. The deploy restart policy is `on-fail`: a finished load stays stopped, and a failed load starts again from the rows already in `places_load`. After the three counts are printed, destroy the app so it cannot start another run.
+Deploy starts `run`: `build`, a 30 second `probe`, then `upload`. If a volume reports "insufficient resources", destroy it and create a new one. To test only the connection, deploy with `--env WDPA_STEP=probe --env WDPA_PROBE_SECONDS=900`. The log shows ping times. A step that fails stays stopped. Start it again with `fly machine start`. It continues from the files and rows already there.
 
-The log prints `download started`, `connecting directly`, `already staged`, a `staged` line after each committed batch, `checking geometry validity`, `upsert started`, and the three counts. A failed checksum stops before the merge. A database error rolls back only the open batch or the merge. `places_load` stays until the merge commits.
+The log prints, in order:
+
+- `download started` and `geodatabase ready`.
+- `terrestrial polygons read` with the number kept, every 10,000 polygons.
+- The manifest counts, then `probe pings` and `probe copy`.
+- `staged` with the count of the file, every 500 rows, and `upload finished`.
+
+Check the stage before the merge. The count of `places_load` equals `kept` in the manifest, `places` is unchanged, and the database has room for the merge.
+
+```sql
+select count(*), count(*) filter (where area_km2 >= 10) from places_load;
+select count(*) from places;
+select pg_size_pretty(pg_database_size(current_database()));
+```
+
+Then run the merge on the same machine and volume:
+
+```bash
+fly machine list --app naturewatch-places-import
+fly machine update MACHINE_ID --env WDPA_STEP=merge --yes \
+  --app naturewatch-places-import
+fly logs --app naturewatch-places-import
+```
+
+The merge prints `stage ok`, `upsert started`, and the three counts. A refusal names the check that failed and changes nothing. After the counts, confirm the hosted counts and that a South Africa place still has its cropland fact, then destroy the app. That removes the machine, the volume, and the token.
 
 ```bash
 fly apps destroy naturewatch-places-import --yes
 ```
-
-That removes the machine, the volume, and the token. Confirm the hosted counts before destroying the app.

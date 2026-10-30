@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
-"""Load the pinned October 2026 WDPCA extract into places.
+"""Load the pinned October 2026 WDPCA extract into places, in four steps.
+
+  build   Download and check the pinned zip, then write one filtered and
+          validated file of terrestrial polygons of about 10 km2 or more.
+          No database connection.
+  probe   Time a connection to the database and test one small COPY.
+          Writes nothing that stays.
+  upload  Copy the filtered file into public.places_load in committed
+          batches. A second start continues from the rows already there.
+  merge   One transaction: check the stage, then insert and update places on
+          (source_release_id, source_id). It never deletes a place.
+
+`run` (the default) does build, probe, then upload. Run `merge` afterwards,
+once the stage has been checked.
 
 The download URL and SHA-256 checksum are the sources row from the records
 migration. This script always downloads that URL. It does not read a local
@@ -8,16 +21,21 @@ geodatabase as the source.
 
 from __future__ import annotations
 
+import csv
+import gzip
 import hashlib
 import hmac
 import json
 import os
 import posixpath
+import shutil
+import statistics
+import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import zipfile
-from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
 
@@ -30,12 +48,12 @@ PINNED_URL = (
 PINNED_SHA256 = "f5f5e50f230923619ad60faf8296e4f39a4d8c1b14bb6ea80e82ea6db6292b1c"
 DEFAULT_DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 # Hosted project ref and the direct database host. Identifiers, not secrets.
-# Bulk COPY goes to this host. The pooler stalls on large geometry binds.
 HOSTED_PROJECT_REF = "fwfbmvwdbsutmalhszvi"
 HOSTED_DIRECT_HOST = f"db.{HOSTED_PROJECT_REF}.supabase.co"
 PROGRESS_EVERY = 10_000
-# Local geodesic area can sit just under the PostGIS spheroid area.
-LOCAL_AREA_MARGIN_KM2 = 9.9
+# The local geodesic area matches PostGIS to about 1e-10. A polygon below this
+# cannot reach 10 km2 once PostGIS measures it.
+STAGE_MIN_KM2 = 9.99
 IUCN_CATEGORIES = {
     "Ia",
     "Ib",
@@ -63,10 +81,34 @@ REQUIRED_FIELDS = (
 # planar area is below this cannot reach 10 km².
 TOO_SMALL_DEGREE_AREA = 10.0 / (112.0 * 112.0)
 BATCH_ROWS = 100
-COPY_BATCH = """
-copy batch (
-  source_id, site_id, name, designation, iucn_category, iso3, realm, wkb
-) from stdin
+# A few polygons are very large. Send a batch early when it reaches this size.
+BATCH_BYTES = 64 * 1024 * 1024
+CONNECT_ATTEMPTS = 6
+UPLOAD_ATTEMPTS = 6
+FILTERED_NAME = "filtered.tsv.gz"
+MANIFEST_NAME = "manifest.json"
+COLUMNS = (
+    "source_id",
+    "site_id",
+    "name",
+    "designation",
+    "iucn_category",
+    "iso3",
+    "realm",
+    "wkb_hex",
+)
+COPY_BATCH = f"copy batch ({', '.join(COLUMNS)}) from stdin"
+CREATE_BATCH = """
+create temp table if not exists batch (
+  source_id text,
+  site_id text,
+  name text,
+  designation text,
+  iucn_category text,
+  iso3 text,
+  realm text,
+  wkb_hex text
+) on commit delete rows
 """
 INSERT_BATCH = """
 insert into public.places_load (
@@ -83,66 +125,313 @@ select
   iso3,
   realm,
   extensions.ST_Multi(
-    extensions.ST_Force2D(extensions.ST_GeomFromWKB(wkb, 4326))
+    extensions.ST_Force2D(
+      extensions.ST_GeomFromWKB(decode(wkb_hex, 'hex'), 4326)
+    )
   )::extensions.geometry(MultiPolygon, 4326)
 from batch
 on conflict (source_release_id, source_id) do nothing
 """
 
+csv.field_size_limit(2**31 - 1)
 
-@dataclass(frozen=True)
-class PlaceFeature:
-    source_id: str
-    site_id: str
-    name: str
-    designation: str | None
-    iucn_category: str | None
-    iso3: str | None
-    realm: str
-    wkb: bytes
+
+class LoginRoleError(Exception):
+    """The database login could not be minted. Safe to retry."""
 
 
 def main() -> None:
-    import psycopg
-    from psycopg.rows import dict_row
+    command = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("WDPA_STEP", "run")
+    work = work_dir()
+    if command == "build":
+        build(work)
+    elif command == "probe":
+        default_seconds = os.environ.get("WDPA_PROBE_SECONDS", "120")
+        probe(work, int(sys.argv[2]) if len(sys.argv) > 2 else int(default_seconds))
+    elif command == "upload":
+        upload(work)
+    elif command == "merge":
+        merge(work)
+    elif command == "run":
+        build(work)
+        probe(work, 30)
+        upload(work)
+        print("upload finished. Check the stage, then run: merge", flush=True)
+    else:
+        raise SystemExit(f"unknown command {command!r}: build, probe, upload, merge, run")
 
-    if os.environ.get("SUPABASE_ACCESS_TOKEN", "").strip():
-        confirm_direct_connection()
-    with tempfile.TemporaryDirectory(prefix="wdpa-") as tmp:
-        root = Path(tmp)
-        zip_path = root / "wdpa.zip"
+
+def work_dir() -> Path:
+    path = Path(os.environ.get("WDPA_WORK_DIR") or Path(tempfile.gettempdir()) / "wdpa-work")
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# --- build: no database ------------------------------------------------------
+
+
+def build(work: Path) -> dict:
+    manifest_path = work / MANIFEST_NAME
+    filtered = work / FILTERED_NAME
+    if manifest_path.exists() and filtered.exists():
+        manifest = read_manifest(work)
+        print(f"filtered file already built: {manifest['kept']} polygons", flush=True)
+        return manifest
+
+    zip_path = work / "wdpa.zip"
+    if zip_path.exists() and file_sha256(zip_path) == PINNED_SHA256:
+        print("download already on disk and matches the pin", flush=True)
+    else:
         print("download started", flush=True)
         download(PINNED_URL, zip_path, PINNED_SHA256)
         print("download finished", flush=True)
-        gdb = extract_geodatabase(zip_path, root / "extract")
-        print(f"geodatabase ready: {gdb.name}", flush=True)
-        database_url, hosted = database_url_for_run()
-        with psycopg.connect(
-            database_url,
-            row_factory=dict_row,
-            connect_timeout=30,
-            keepalives=1,
-            keepalives_idle=30,
-            keepalives_interval=10,
-            keepalives_count=5,
-        ) as conn:
-            prepare_session(conn, hosted)
-            source = fetch_source(conn)
-            print("source row matches the pin", flush=True)
-            print("import started", flush=True)
-            terrestrial, gis_area_count, stored = import_geodatabase(
-                conn, source["id"], gdb
-            )
-    print(f"terrestrial polygons: {terrestrial}", flush=True)
-    print(f"GIS_AREA >= 10: {gis_area_count}", flush=True)
-    print(f"stored area_km2 >= 10: {stored}", flush=True)
+    extract_dir = work / "extract"
+    marker = extract_dir / ".complete"
+    if marker.exists():
+        gdbs = sorted(path for path in extract_dir.rglob("*.gdb") if path.is_dir())
+        gdb = gdbs[0]
+    else:
+        gdb = extract_geodatabase(zip_path, extract_dir)
+        marker.write_text("ok\n")
+    print(f"geodatabase ready: {gdb.name}", flush=True)
+
+    part = work / (FILTERED_NAME + ".part")
+    stats = write_filtered(gdb, part)
+    digest = file_sha256(part)
+    part.replace(filtered)
+    # The geodatabase is not needed again. Free its space on the volume.
+    shutil.rmtree(extract_dir, ignore_errors=True)
+    manifest = {
+        "pin_sha256": PINNED_SHA256,
+        "rows_sha256": digest,
+        "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        **stats,
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    print(json.dumps(manifest), flush=True)
+    return manifest
+
+
+def write_filtered(gdb: Path, out: Path) -> dict:
+    try:
+        from osgeo import ogr
+    except ImportError as exc:
+        raise SystemExit("GDAL Python bindings (osgeo) are required") from exc
+    require_area_libraries()
+
+    ogr.UseExceptions()
+    dataset = ogr.Open(str(gdb), 0)
+    if dataset is None:
+        raise SystemExit(f"could not open geodatabase {gdb.name}")
+    problems: list[str] = []
+    seen: set[str] = set()
+    stats = {
+        "terrestrial": 0,
+        "gis_area_ge_10": 0,
+        "kept": 0,
+        "kept_gis_area_ge_10": 0,
+        "skipped_below_threshold": 0,
+        "unmeasured": 0,
+    }
+    try:
+        layers = polygon_layers(dataset)
+        if not layers:
+            raise SystemExit("download has no polygon layer")
+        with gzip.open(out, "wt", newline="", compresslevel=3) as handle:
+            writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+            for layer in layers:
+                missing = [
+                    name
+                    for name in REQUIRED_FIELDS
+                    if layer.GetLayerDefn().GetFieldIndex(name) < 0
+                ]
+                if missing:
+                    raise SystemExit(
+                        f"{layer.GetName()} is missing fields: {', '.join(missing)}"
+                    )
+                for feature in layer:
+                    row = filter_feature(feature, ogr, seen, problems, stats)
+                    if row is not None:
+                        writer.writerow(row)
+                        stats["kept"] += 1
+    finally:
+        dataset.Release()
+    if stats["terrestrial"] == 0:
+        raise SystemExit("no terrestrial polygons in the download")
+    if problems:
+        out.unlink(missing_ok=True)
+        for problem in problems[:100]:
+            print(problem)
+        raise SystemExit(f"{len(problems)} polygons failed validation")
+    return stats
+
+
+def filter_feature(feature, ogr, seen: set[str], problems: list[str], stats: dict):
+    """Return the row to stage, or None when the polygon is left out."""
+    realm = text(feature, "REALM")
+    if realm != "Terrestrial":
+        return None
+    stats["terrestrial"] += 1
+    if stats["terrestrial"] % PROGRESS_EVERY == 0:
+        print(
+            f"terrestrial polygons read: {stats['terrestrial']}; kept: {stats['kept']}",
+            flush=True,
+        )
+    source_id = text(feature, "SITE_PID")
+    if not source_id:
+        problems.append("missing SITE_PID on a terrestrial polygon")
+        return None
+    if source_id in seen:
+        problems.append(f"duplicate SITE_PID {source_id}")
+        return None
+    seen.add(source_id)
+    geometry = feature.GetGeometryRef()
+    if geometry is None or geometry.IsEmpty():
+        problems.append(f"invalid geometry {source_id}: missing geometry")
+        return None
+    flat_type = ogr.GT_Flatten(geometry.GetGeometryType())
+    if flat_type not in (ogr.wkbPolygon, ogr.wkbMultiPolygon):
+        problems.append(f"invalid geometry {source_id}: {geometry.GetGeometryName()}")
+        return None
+    site_id = text(feature, "SITE_ID")
+    if not site_id:
+        problems.append(f"missing SITE_ID for {source_id}")
+        return None
+    name = text(feature, "NAME_ENG") or text(feature, "NAME")
+    if not name:
+        problems.append(f"missing name for {source_id}")
+        return None
+    iucn = text(feature, "IUCN_CAT")
+    if iucn is not None and iucn not in IUCN_CATEGORIES:
+        problems.append(f"{source_id}: IUCN_CAT {iucn!r} is outside the WDPA set")
+        return None
+    gis_area = number(feature, "GIS_AREA")
+    if gis_area is not None and gis_area >= 10:
+        stats["gis_area_ge_10"] += 1
+    if not stage_this_polygon(geometry, gis_area, stats):
+        stats["skipped_below_threshold"] += 1
+        return None
+    if not geometry.IsValid():
+        problems.append(f"invalid geometry {source_id}: not valid")
+        return None
+    if gis_area is not None and gis_area >= 10:
+        stats["kept_gis_area_ge_10"] += 1
+    return [
+        source_id,
+        site_id,
+        name,
+        text(feature, "DESIG_ENG") or "",
+        iucn or "",
+        text(feature, "ISO3") or "",
+        realm,
+        bytes(geometry.ExportToWkb(ogr.wkbNDR)).hex(),
+    ]
+
+
+def stage_this_polygon(geometry, gis_area: float | None, stats: dict | None = None) -> bool:
+    """True when the polygon should go into the filtered file.
+
+    GIS_AREA of at least 10 is kept. A smaller or missing GIS_AREA is kept only
+    when a geodesic measurement of the outline reaches STAGE_MIN_KM2. A polygon
+    that cannot be measured is kept and counted, so a measuring fault can never
+    drop a place. PostGIS makes the final decision at the merge.
+    """
+    if too_small_to_store(geometry, gis_area):
+        return False
+    if gis_area is not None and gis_area >= 10:
+        return True
+    measured = geodesic_area_km2(geometry)
+    if measured is None:
+        if stats is not None:
+            stats["unmeasured"] = stats.get("unmeasured", 0) + 1
+        return True
+    return measured >= STAGE_MIN_KM2
+
+
+def require_area_libraries() -> None:
+    try:
+        import pyproj  # noqa: F401
+        import shapely  # noqa: F401
+    except ImportError as exc:
+        raise SystemExit(
+            "shapely and pyproj are required to measure polygon areas"
+        ) from exc
+
+
+_geod = None
+
+
+def geodesic_area_km2(geometry) -> float | None:
+    """Geodesic area on the WGS84 ellipsoid, as PostGIS measures a geography.
+
+    GDAL returns the geometry as a bytearray and shapely reads only bytes.
+    Returns None when this one geometry cannot be measured.
+    """
+    global _geod
+    require_area_libraries()
+    from pyproj import Geod
+    from shapely import wkb as shapely_wkb
+
+    try:
+        if _geod is None:
+            _geod = Geod(ellps="WGS84")
+        shape = shapely_wkb.loads(bytes(geometry.ExportToIsoWkb()))
+        area_m2, _perimeter = _geod.geometry_area_perimeter(shape)
+        return abs(float(area_m2)) / 1e6
+    except Exception:
+        return None
+
+
+def too_small_to_store(geometry, gis_area: float | None) -> bool:
+    """True when both the source area and the outline are below 10 km².
+
+    GIS_AREA under 1 km² can still hide a large outline, so the outline is
+    checked too. Calculated area_km2 remains the rule for anything stored.
+    """
+    if gis_area is None or gis_area >= 1:
+        return False
+    try:
+        planar = abs(float(geometry.GetArea()))
+    except (TypeError, ValueError):
+        return False
+    return 0 < planar < TOO_SMALL_DEGREE_AREA
+
+
+def read_manifest(work: Path) -> dict:
+    manifest_path = work / MANIFEST_NAME
+    filtered = work / FILTERED_NAME
+    if not manifest_path.exists() or not filtered.exists():
+        raise SystemExit("no filtered file: run build first")
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("pin_sha256") != PINNED_SHA256:
+        raise SystemExit("filtered file was built from a different pin")
+    if file_sha256(filtered) != manifest.get("rows_sha256"):
+        raise SystemExit("filtered file does not match its manifest checksum")
+    return manifest
+
+
+def read_rows(work: Path):
+    with gzip.open(work / FILTERED_NAME, "rt", newline="") as handle:
+        for row in csv.reader(handle, delimiter="\t"):
+            yield row
+
+
+def file_sha256(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+# --- database connection -----------------------------------------------------
 
 
 def database_url_for_run() -> tuple[str, bool]:
     """Return a database URL and whether it is the hosted login role.
 
-    The hosted run sets SUPABASE_ACCESS_TOKEN and mints a login role only after
-    the zip is on disk. The URL uses the direct database host.
+    The hosted run sets SUPABASE_ACCESS_TOKEN and mints a short-lived login role
+    when it connects. The URL uses the direct database host.
     """
     token = os.environ.get("SUPABASE_ACCESS_TOKEN", "").strip()
     if not token:
@@ -162,14 +451,17 @@ def database_url_for_run() -> tuple[str, bool]:
         with urllib.request.urlopen(request, timeout=60) as response:
             payload = json.load(response)
     except urllib.error.HTTPError as exc:
-        raise SystemExit(f"login role failed: HTTP {exc.code}") from exc
+        if exc.code in (401, 403):
+            raise SystemExit(f"login role refused: HTTP {exc.code}") from None
+        raise LoginRoleError(f"login role failed: HTTP {exc.code}") from None
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise LoginRoleError(f"login role failed: {type(exc).__name__}") from None
     role = str(payload.get("role") or "")
     password = str(payload.get("password") or "")
     if not role or not password:
-        raise SystemExit("login role response did not include a role")
+        raise LoginRoleError("login role response did not include a role")
     _secrets.append(password)
     print(f"login role ready, ttl_seconds={payload.get('ttl_seconds')}", flush=True)
-    print(f"connecting directly to {HOSTED_DIRECT_HOST}", flush=True)
     user = quote(role, safe="")
     url = (
         f"postgresql://{user}:{quote(password, safe='')}"
@@ -178,23 +470,37 @@ def database_url_for_run() -> tuple[str, bool]:
     return url, True
 
 
-def confirm_direct_connection() -> None:
+def open_connection(attempts: int = CONNECT_ATTEMPTS):
+    """Connect, retrying a login or connection timeout with a growing pause."""
     import psycopg
     from psycopg.rows import dict_row
 
-    database_url, hosted = database_url_for_run()
-    with psycopg.connect(
-        database_url,
-        row_factory=dict_row,
-        connect_timeout=30,
-        keepalives=1,
-        keepalives_idle=30,
-        keepalives_interval=10,
-        keepalives_count=5,
-    ) as conn:
-        prepare_session(conn, hosted)
-        conn.execute("select 1")
-    print("direct connection ok", flush=True)
+    delay = 15
+    for attempt in range(1, attempts + 1):
+        try:
+            url, hosted = database_url_for_run()
+            conn = psycopg.connect(
+                url,
+                row_factory=dict_row,
+                connect_timeout=30,
+                keepalives=1,
+                keepalives_idle=30,
+                keepalives_interval=10,
+                keepalives_count=5,
+            )
+            prepare_session(conn, hosted)
+            conn.commit()
+            return conn
+        except (psycopg.OperationalError, LoginRoleError) as exc:
+            print(
+                f"connect attempt {attempt} of {attempts} failed: {first_line(exc)}",
+                flush=True,
+            )
+            if attempt == attempts:
+                raise SystemExit("could not connect to the database") from None
+            time.sleep(delay)
+            delay = min(delay * 2, 240)
+    raise SystemExit("could not connect to the database")
 
 
 def prepare_session(conn, hosted: bool) -> None:
@@ -207,15 +513,194 @@ def prepare_session(conn, hosted: bool) -> None:
     print(f"connected as {who['current_user']}", flush=True)
 
 
-def scrub(text: str) -> str:
-    cleaned = text
+def scrub(text_value: str) -> str:
+    cleaned = text_value
     for secret in _secrets:
         if secret:
             cleaned = cleaned.replace(secret, "***")
     return cleaned
 
 
+def first_line(exc: BaseException) -> str:
+    lines = scrub(str(exc)).splitlines()
+    return lines[0] if lines else type(exc).__name__
+
+
 _secrets: list[str] = []
+
+
+# --- probe -------------------------------------------------------------------
+
+
+def probe(work: Path, seconds: int = 120) -> None:
+    """Time the connection, then test one COPY. Nothing stays in the database."""
+    import psycopg
+
+    conn = open_connection()
+    latencies: list[float] = []
+    failures = 0
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        started = time.monotonic()
+        try:
+            conn.execute("select 1").fetchone()
+            conn.commit()
+            latencies.append(time.monotonic() - started)
+        except psycopg.Error as exc:
+            failures += 1
+            print(f"probe ping failed: {first_line(exc)}", flush=True)
+            conn = open_connection(2)
+        time.sleep(5)
+    if latencies:
+        print(
+            "probe pings: "
+            f"{len(latencies)} ok, {failures} failed, "
+            f"min {min(latencies) * 1000:.0f} ms, "
+            f"median {statistics.median(latencies) * 1000:.0f} ms, "
+            f"max {max(latencies) * 1000:.0f} ms",
+            flush=True,
+        )
+    if failures or not latencies:
+        raise SystemExit("probe failed: the connection is not reliable")
+    if (work / FILTERED_NAME).exists():
+        rows = []
+        for row in read_rows(work):
+            rows.append(row)
+            if len(rows) == BATCH_ROWS:
+                break
+        with conn.cursor() as cur:
+            cur.execute("set search_path to public, extensions")
+            cur.execute(CREATE_BATCH)
+            copy_rows(cur, rows)
+            cur.execute(
+                "select count(*) as rows, "
+                "sum(extensions.ST_NPoints(extensions.ST_GeomFromWKB(decode(wkb_hex, 'hex'), 4326))) as points "
+                "from batch"
+            )
+            result = cur.fetchone()
+        conn.rollback()
+        print(f"probe copy: {result['rows']} rows, {result['points']} points", flush=True)
+    conn.close()
+
+
+# --- upload ------------------------------------------------------------------
+
+
+def copy_rows(cur, rows: list[list[str]]) -> None:
+    with cur.copy(COPY_BATCH) as copy:
+        for row in rows:
+            copy.write_row([value if value != "" else None for value in row])
+
+
+def upload(work: Path) -> None:
+    import psycopg
+
+    manifest = read_manifest(work)
+    conn = open_connection()
+    attempts = 0
+    while True:
+        try:
+            staged = prepare_stage(conn)
+            print(f"already staged: {len(staged)} of {manifest['kept']}", flush=True)
+            total = send_rows(conn, work, staged, manifest["kept"])
+            print(f"staged: {total} of {manifest['kept']}", flush=True)
+            break
+        except (psycopg.OperationalError, psycopg.InterfaceError) as exc:
+            if isinstance(exc, psycopg.errors.InsufficientResources):
+                raise
+            attempts += 1
+            print(
+                f"upload connection lost ({attempts} of {UPLOAD_ATTEMPTS}): "
+                f"{first_line(exc)}",
+                flush=True,
+            )
+            if attempts >= UPLOAD_ATTEMPTS:
+                raise SystemExit("upload stopped: the connection kept failing") from None
+            try:
+                conn.close()
+            except Exception:
+                pass
+            time.sleep(30)
+            conn = open_connection()
+    conn.close()
+
+
+def prepare_stage(conn) -> set[str]:
+    source = fetch_source(conn)
+    with conn.cursor() as cur:
+        cur.execute("set search_path to public, extensions")
+        ensure_places_load(cur)
+        cur.execute(CREATE_BATCH)
+        cur.execute(
+            "select source_id from public.places_load where source_release_id = %s",
+            (source["id"],),
+        )
+        staged = {row["source_id"] for row in cur.fetchall()}
+    conn.commit()
+    return staged
+
+
+def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
+    source = fetch_source(conn)
+    batch: list[list[str]] = []
+    batch_size = 0
+    total = len(staged)
+    sent_batches = 0
+
+    def flush() -> None:
+        nonlocal total, sent_batches, batch_size
+        if not batch:
+            return
+        with conn.cursor() as cur:
+            copy_rows(cur, batch)
+            cur.execute(INSERT_BATCH, (source["id"],))
+        conn.commit()
+        total += len(batch)
+        staged.update(row[0] for row in batch)
+        batch.clear()
+        batch_size = 0
+        sent_batches += 1
+        if sent_batches % 5 == 0:
+            print(f"staged: {total} of {expected}", flush=True)
+
+    for row in read_rows(work):
+        if row[0] in staged:
+            continue
+        batch.append(row)
+        batch_size += len(row[-1])
+        if len(batch) >= BATCH_ROWS or batch_size >= BATCH_BYTES:
+            flush()
+    flush()
+    return total
+
+
+def ensure_places_load(cur) -> None:
+    cur.execute(
+        """
+        create table if not exists public.places_load (
+          source_release_id uuid not null,
+          source_id text not null,
+          site_id text not null,
+          name text not null,
+          designation text,
+          iucn_category text,
+          iso3 text,
+          realm text not null,
+          geom extensions.geometry(MultiPolygon, 4326) not null,
+          area_km2 double precision generated always as (
+            extensions.st_area(geom::extensions.geography, true) / 1e6
+          ) stored,
+          primary key (source_release_id, source_id)
+        )
+        """
+    )
+    cur.execute("alter table public.places_load enable row level security")
+    cur.execute(
+        """
+        revoke all on table public.places_load
+        from public, anon, authenticated, service_role
+        """
+    )
 
 
 def fetch_source(conn) -> dict:
@@ -246,6 +731,162 @@ def fetch_source(conn) -> dict:
         )
     row["checksum"] = checksum
     return row
+
+
+# --- merge -------------------------------------------------------------------
+
+
+def merge(work: Path) -> None:
+    import psycopg
+
+    manifest = read_manifest(work)
+    conn = open_connection()
+    source = fetch_source(conn)
+    release = source["id"]
+    try:
+        with conn.cursor() as cur:
+            cur.execute("set search_path to public, extensions")
+            cur.execute(
+                "select count(*) as n from public.places_load where source_release_id = %s",
+                (release,),
+            )
+            staged = int(cur.fetchone()["n"])
+            if staged != manifest["kept"]:
+                raise SystemExit(
+                    f"refusing to merge: {staged} rows staged, {manifest['kept']} in the filtered file"
+                )
+            reject_invalid(cur)
+            cur.execute(
+                """
+                select count(*) as n from public.places_load
+                where source_release_id = %s and area_km2 < 10
+                """,
+                (release,),
+            )
+            below = int(cur.fetchone()["n"])
+            cur.execute(
+                """
+                select place.source_id
+                from public.places as place
+                where place.source_release_id = %s
+                  and not exists (
+                    select 1 from public.places_load as stage
+                    where stage.source_release_id = place.source_release_id
+                      and stage.source_id = place.source_id
+                      and stage.area_km2 >= 10
+                  )
+                order by place.source_id
+                """,
+                (release,),
+            )
+            missing = [row["source_id"] for row in cur.fetchall()]
+            if missing:
+                raise SystemExit(
+                    f"refusing to merge: {len(missing)} stored places are not in the stage at "
+                    f"10 km2 or more: {', '.join(missing[:20])}"
+                )
+            cur.execute(
+                "create temp table before_ids on commit drop as "
+                "select id from public.places where source_release_id = %s",
+                (release,),
+            )
+            cur.execute("select count(*) as n from public.facts")
+            facts_before = int(cur.fetchone()["n"])
+            print(f"stage ok: {staged} staged, {below} below 10 km2 stay out", flush=True)
+            print("upsert started", flush=True)
+            stored = upsert_places(cur, release)
+            cur.execute(
+                "select count(*) as n from before_ids "
+                "where id not in (select id from public.places)"
+            )
+            lost = int(cur.fetchone()["n"])
+            cur.execute("select count(*) as n from public.facts")
+            facts_after = int(cur.fetchone()["n"])
+            if lost or facts_after != facts_before or stored == 0:
+                conn.rollback()
+                raise SystemExit(
+                    f"merge rolled back: {lost} places lost, facts {facts_before} -> {facts_after}, stored {stored}"
+                )
+        conn.commit()
+        with conn.cursor() as cur:
+            cur.execute("drop table public.places_load")
+        conn.commit()
+    except psycopg.errors.ForeignKeyViolation:
+        conn.rollback()
+        raise SystemExit("refusing to replace places that already have facts") from None
+    print(f"terrestrial polygons: {manifest['terrestrial']}", flush=True)
+    print(f"GIS_AREA >= 10: {manifest['gis_area_ge_10']}", flush=True)
+    print(f"stored area_km2 >= 10: {stored}", flush=True)
+    conn.close()
+
+
+def reject_invalid(cur) -> None:
+    cur.execute(
+        """
+        select source_id, extensions.ST_IsValidReason(geom) as reason
+        from public.places_load
+        where not extensions.ST_IsValid(geom)
+        order by source_id
+        """
+    )
+    invalid = cur.fetchall()
+    if not invalid:
+        return
+    for row in invalid:
+        print(f"invalid geometry {row['source_id']}: {row['reason']}")
+    raise SystemExit(1)
+
+
+def upsert_places(cur, source_release_id) -> int:
+    """Insert and update only. A stored place is never deleted."""
+    cur.execute(
+        """
+        insert into public.places (
+          source_release_id,
+          source_id,
+          site_id,
+          name,
+          place_type,
+          designation,
+          iucn_category,
+          iso3,
+          realm,
+          geom
+        )
+        select
+          source_release_id,
+          source_id,
+          site_id,
+          name,
+          'protected_area',
+          designation,
+          iucn_category,
+          iso3,
+          realm,
+          geom
+        from public.places_load
+        where source_release_id = %s and area_km2 >= 10
+        on conflict (source_release_id, source_id) do update
+        set
+          site_id = excluded.site_id,
+          name = excluded.name,
+          place_type = excluded.place_type,
+          designation = excluded.designation,
+          iucn_category = excluded.iucn_category,
+          iso3 = excluded.iso3,
+          realm = excluded.realm,
+          geom = excluded.geom
+        """,
+        (source_release_id,),
+    )
+    cur.execute(
+        "select count(*) as stored from public.places where source_release_id = %s",
+        (source_release_id,),
+    )
+    return int(cur.fetchone()["stored"])
+
+
+# --- download and geodatabase ------------------------------------------------
 
 
 def download(url: str, dest: Path, expected_sha256: str) -> None:
@@ -302,342 +943,6 @@ def extract_geodatabase(zip_path: Path, dest: Path) -> Path:
     return gdbs[0]
 
 
-def import_geodatabase(conn, source_release_id, gdb: Path) -> tuple[int, int, int]:
-    try:
-        from osgeo import ogr
-    except ImportError as exc:
-        raise SystemExit("GDAL Python bindings (osgeo) are required") from exc
-
-    ogr.UseExceptions()
-    dataset = ogr.Open(str(gdb), 0)
-    if dataset is None:
-        raise SystemExit(f"could not open geodatabase {gdb.name}")
-    try:
-        layers = polygon_layers(dataset)
-        if not layers:
-            raise SystemExit("download has no polygon layer")
-        with conn.cursor() as cur:
-            cur.execute("set search_path to public, extensions")
-            ensure_places_load(cur)
-            conn.commit()
-            cur.execute(
-                """
-                create temp table batch (
-                  source_id text,
-                  site_id text,
-                  name text,
-                  designation text,
-                  iucn_category text,
-                  iso3 text,
-                  realm text,
-                  wkb bytea
-                ) on commit delete rows
-                """
-            )
-            conn.commit()
-            staged = load_staged_ids(cur, source_release_id)
-            print(f"already staged: {len(staged)}", flush=True)
-            terrestrial, gis_area_count, accepted = stream_candidates(
-                conn, cur, layers, source_release_id, staged
-            )
-            print(
-                f"staged: {accepted}; checking geometry validity",
-                flush=True,
-            )
-            if terrestrial == 0:
-                raise SystemExit("no terrestrial polygons in the download")
-            reject_invalid(cur)
-            print("upsert started", flush=True)
-            stored = upsert_places(cur, source_release_id)
-            if stored == 0:
-                conn.rollback()
-                raise SystemExit("refusing to store zero places")
-            conn.commit()
-            cur.execute("drop table public.places_load")
-            conn.commit()
-        return terrestrial, gis_area_count, stored
-    finally:
-        dataset.Release()
-
-
-def ensure_places_load(cur) -> None:
-    cur.execute(
-        """
-        create table if not exists public.places_load (
-          source_release_id uuid not null,
-          source_id text not null,
-          site_id text not null,
-          name text not null,
-          designation text,
-          iucn_category text,
-          iso3 text,
-          realm text not null,
-          geom extensions.geometry(MultiPolygon, 4326) not null,
-          area_km2 double precision generated always as (
-            extensions.st_area(geom::extensions.geography, true) / 1e6
-          ) stored,
-          primary key (source_release_id, source_id)
-        )
-        """
-    )
-    cur.execute("alter table public.places_load enable row level security")
-    cur.execute(
-        """
-        revoke all on table public.places_load
-        from public, anon, authenticated, service_role
-        """
-    )
-
-
-def load_staged_ids(cur, source_release_id) -> set[str]:
-    cur.execute(
-        """
-        select source_id
-        from public.places_load
-        where source_release_id = %s
-        """,
-        (source_release_id,),
-    )
-    return {row["source_id"] for row in cur.fetchall()}
-
-
-def stream_candidates(conn, cur, layers, source_release_id, staged: set[str]) -> tuple[int, int, int]:
-    from osgeo import ogr
-
-    problems: list[str] = []
-    seen: set[str] = set()
-    batch: list[tuple] = []
-    terrestrial = 0
-    gis_area_count = 0
-    accepted = len(staged)
-
-    def flush() -> None:
-        nonlocal accepted
-        if not batch:
-            return
-        with cur.copy(COPY_BATCH) as copy:
-            for row in batch:
-                copy.write_row(row)
-        cur.execute(INSERT_BATCH, (source_release_id,))
-        accepted += len(batch)
-        staged.update(row[0] for row in batch)
-        batch.clear()
-        conn.commit()
-        print(f"staged: {accepted}", flush=True)
-
-    for layer in layers:
-        missing = [
-            name
-            for name in REQUIRED_FIELDS
-            if layer.GetLayerDefn().GetFieldIndex(name) < 0
-        ]
-        if missing:
-            raise SystemExit(f"{layer.GetName()} is missing fields: {', '.join(missing)}")
-        for feature in layer:
-            realm = text(feature, "REALM")
-            if realm != "Terrestrial":
-                continue
-            terrestrial += 1
-            if terrestrial % PROGRESS_EVERY == 0:
-                print(
-                    f"terrestrial polygons read: {terrestrial}; "
-                    f"staged: {accepted + len(batch)}",
-                    flush=True,
-                )
-            iso3 = text(feature, "ISO3")
-            source_id = text(feature, "SITE_PID")
-            if not source_id:
-                problems.append("missing SITE_PID on a terrestrial polygon")
-                continue
-            if source_id in seen:
-                problems.append(f"duplicate SITE_PID {source_id}")
-                continue
-            seen.add(source_id)
-            if source_id in staged:
-                continue
-            geometry = feature.GetGeometryRef()
-            if geometry is None or geometry.IsEmpty():
-                problems.append(f"invalid geometry {source_id}: missing geometry")
-                continue
-            flat_type = ogr.GT_Flatten(geometry.GetGeometryType())
-            if flat_type not in (ogr.wkbPolygon, ogr.wkbMultiPolygon):
-                problems.append(
-                    f"invalid geometry {source_id}: {geometry.GetGeometryName()}"
-                )
-                continue
-            site_id = text(feature, "SITE_ID")
-            if not site_id:
-                problems.append(f"missing SITE_ID for {source_id}")
-                continue
-            name = text(feature, "NAME_ENG") or text(feature, "NAME")
-            if not name:
-                problems.append(f"missing name for {source_id}")
-                continue
-            iucn = text(feature, "IUCN_CAT")
-            if iucn is not None and iucn not in IUCN_CATEGORIES:
-                problems.append(f"{source_id}: IUCN_CAT {iucn!r} is outside the WDPA set")
-                continue
-            gis_area = number(feature, "GIS_AREA")
-            if gis_area is not None and gis_area >= 10:
-                gis_area_count += 1
-            if not stage_this_polygon(geometry, gis_area):
-                continue
-            batch.append(
-                (
-                    source_id,
-                    site_id,
-                    name,
-                    text(feature, "DESIG_ENG"),
-                    iucn,
-                    iso3,
-                    realm,
-                    geometry.ExportToWkb(ogr.wkbNDR),
-                )
-            )
-            if len(batch) >= BATCH_ROWS:
-                flush()
-    flush()
-    if problems:
-        for problem in problems:
-            print(problem)
-        raise SystemExit(1)
-    return terrestrial, gis_area_count, accepted
-
-
-def stage_this_polygon(geometry, gis_area: float | None) -> bool:
-    """True when the polygon should be copied into the staging table.
-
-    GIS_AREA of at least 10 is staged and checked again in PostGIS.
-    Anything smaller is staged only when a local geodesic measurement is
-    near 10 km², or when that measurement cannot be made.
-    """
-    if too_small_to_store(geometry, gis_area):
-        return False
-    if gis_area is not None and gis_area >= 10:
-        return True
-    measured = geodesic_area_km2(geometry)
-    if measured is None:
-        return True
-    return measured >= LOCAL_AREA_MARGIN_KM2
-
-
-def geodesic_area_km2(geometry) -> float | None:
-    global _geod
-    try:
-        from pyproj import Geod
-        from shapely import wkb as shapely_wkb
-    except ImportError:
-        return None
-    try:
-        if _geod is None:
-            _geod = Geod(ellps="WGS84")
-        shape = shapely_wkb.loads(geometry.ExportToIsoWkb())
-        area_m2, _perimeter = _geod.geometry_area_perimeter(shape)
-        return abs(float(area_m2)) / 1e6
-    except Exception:
-        return None
-
-
-_geod = None
-
-
-def too_small_to_store(geometry, gis_area: float | None) -> bool:
-    """True when both the source area and the outline are below 10 km².
-
-    GIS_AREA under 1 km² can still hide a large outline, so the outline is
-    checked too. Calculated area_km2 remains the rule for anything inserted.
-    """
-    if gis_area is None or gis_area >= 1:
-        return False
-    try:
-        planar = abs(float(geometry.GetArea()))
-    except (TypeError, ValueError):
-        return False
-    return 0 < planar < TOO_SMALL_DEGREE_AREA
-
-
-def reject_invalid(cur) -> None:
-    cur.execute(
-        """
-        select source_id, extensions.ST_IsValidReason(geom) as reason
-        from public.places_load
-        where not extensions.ST_IsValid(geom)
-        order by source_id
-        """
-    )
-    invalid = cur.fetchall()
-    if not invalid:
-        return
-    for row in invalid:
-        print(f"invalid geometry {row['source_id']}: {row['reason']}")
-    raise SystemExit(1)
-
-
-def upsert_places(cur, source_release_id) -> int:
-    cur.execute(
-        """
-        insert into public.places (
-          source_release_id,
-          source_id,
-          site_id,
-          name,
-          place_type,
-          designation,
-          iucn_category,
-          iso3,
-          realm,
-          geom
-        )
-        select
-          %s,
-          source_id,
-          site_id,
-          name,
-          'protected_area',
-          designation,
-          iucn_category,
-          iso3,
-          realm,
-          geom
-        from public.places_load
-        where area_km2 >= 10
-        on conflict (source_release_id, source_id) do update
-        set
-          site_id = excluded.site_id,
-          name = excluded.name,
-          place_type = excluded.place_type,
-          designation = excluded.designation,
-          iucn_category = excluded.iucn_category,
-          iso3 = excluded.iso3,
-          realm = excluded.realm,
-          geom = excluded.geom
-        """,
-        (source_release_id,),
-    )
-    cur.execute(
-        """
-        delete from public.places as place
-        where place.source_release_id = %s
-          and not exists (
-            select 1
-            from public.places_load
-            where places_load.source_id = place.source_id
-              and places_load.area_km2 >= 10
-          )
-        """,
-        (source_release_id,),
-    )
-    cur.execute(
-        """
-        select count(*) as stored
-        from public.places
-        where source_release_id = %s
-        """,
-        (source_release_id,),
-    )
-    return int(cur.fetchone()["stored"])
-
-
 def polygon_layers(dataset):
     from osgeo import ogr
 
@@ -670,9 +975,5 @@ if __name__ == "__main__":
 
     try:
         main()
-    except psycopg.errors.ForeignKeyViolation:
-        raise SystemExit(
-            "refusing to replace October 2026 places that already have facts"
-        ) from None
     except psycopg.Error as exc:
         raise SystemExit(f"database error: {scrub(str(exc))}") from None

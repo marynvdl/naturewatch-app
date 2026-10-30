@@ -10,6 +10,10 @@ kill_timeout = 30
 [processes]
   app = "python3 -u /app/import_wdpa.py"
 
+# A failed step stops. Start the next step by hand with fly machine update.
+[[restart]]
+  policy = "no"
+
 [[mounts]]
   source = "places_import"
   destination = "/tmp"
