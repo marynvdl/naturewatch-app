@@ -29,10 +29,13 @@ PINNED_URL = (
 )
 PINNED_SHA256 = "f5f5e50f230923619ad60faf8296e4f39a4d8c1b14bb6ea80e82ea6db6292b1c"
 DEFAULT_DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-# Hosted project ref and session pooler. Identifiers, not secrets.
+# Hosted project ref and the direct database host. Identifiers, not secrets.
+# Bulk COPY goes to this host. The pooler stalls on large geometry binds.
 HOSTED_PROJECT_REF = "fwfbmvwdbsutmalhszvi"
-HOSTED_POOLER_HOST = "aws-0-eu-west-2.pooler.supabase.com"
+HOSTED_DIRECT_HOST = f"db.{HOSTED_PROJECT_REF}.supabase.co"
 PROGRESS_EVERY = 10_000
+# Local geodesic area can sit just under the PostGIS spheroid area.
+LOCAL_AREA_MARGIN_KM2 = 9.9
 IUCN_CATEGORIES = {
     "Ia",
     "Ib",
@@ -56,21 +59,35 @@ REQUIRED_FIELDS = (
     "ISO3",
     "GIS_AREA",
 )
-INSERT_CANDIDATE = """
-insert into candidate (
-  source_id, site_id, name, designation, iucn_category, iso3, realm, geom
-)
-values (
-  %s, %s, %s, %s, %s, %s, %s,
-  extensions.ST_Multi(
-    extensions.ST_Force2D(extensions.ST_GeomFromWKB(%s, 4326))
-  )::extensions.geometry(MultiPolygon, 4326)
-)
-"""
 # 112 km is longer than one degree anywhere on Earth, so a polygon whose
 # planar area is below this cannot reach 10 km².
 TOO_SMALL_DEGREE_AREA = 10.0 / (112.0 * 112.0)
-BATCH_ROWS = 200
+BATCH_ROWS = 100
+COPY_BATCH = """
+copy batch (
+  source_id, site_id, name, designation, iucn_category, iso3, realm, wkb
+) from stdin
+"""
+INSERT_BATCH = """
+insert into public.places_load (
+  source_release_id, source_id, site_id, name, designation,
+  iucn_category, iso3, realm, geom
+)
+select
+  %s,
+  source_id,
+  site_id,
+  name,
+  designation,
+  iucn_category,
+  iso3,
+  realm,
+  extensions.ST_Multi(
+    extensions.ST_Force2D(extensions.ST_GeomFromWKB(wkb, 4326))
+  )::extensions.geometry(MultiPolygon, 4326)
+from batch
+on conflict (source_release_id, source_id) do nothing
+"""
 
 
 @dataclass(frozen=True)
@@ -89,6 +106,8 @@ def main() -> None:
     import psycopg
     from psycopg.rows import dict_row
 
+    if os.environ.get("SUPABASE_ACCESS_TOKEN", "").strip():
+        confirm_direct_connection()
     with tempfile.TemporaryDirectory(prefix="wdpa-") as tmp:
         root = Path(tmp)
         zip_path = root / "wdpa.zip"
@@ -122,8 +141,8 @@ def main() -> None:
 def database_url_for_run() -> tuple[str, bool]:
     """Return a database URL and whether it is the hosted login role.
 
-    A laptop network drop rolls back the whole load, so the hosted run sets
-    SUPABASE_ACCESS_TOKEN and mints a login role only after the zip is on disk.
+    The hosted run sets SUPABASE_ACCESS_TOKEN and mints a login role only after
+    the zip is on disk. The URL uses the direct database host.
     """
     token = os.environ.get("SUPABASE_ACCESS_TOKEN", "").strip()
     if not token:
@@ -150,12 +169,32 @@ def database_url_for_run() -> tuple[str, bool]:
         raise SystemExit("login role response did not include a role")
     _secrets.append(password)
     print(f"login role ready, ttl_seconds={payload.get('ttl_seconds')}", flush=True)
-    user = quote(f"{role}.{HOSTED_PROJECT_REF}", safe="")
+    print(f"connecting directly to {HOSTED_DIRECT_HOST}", flush=True)
+    user = quote(role, safe="")
     url = (
         f"postgresql://{user}:{quote(password, safe='')}"
-        f"@{HOSTED_POOLER_HOST}:5432/postgres"
+        f"@{HOSTED_DIRECT_HOST}:5432/postgres"
     )
     return url, True
+
+
+def confirm_direct_connection() -> None:
+    import psycopg
+    from psycopg.rows import dict_row
+
+    database_url, hosted = database_url_for_run()
+    with psycopg.connect(
+        database_url,
+        row_factory=dict_row,
+        connect_timeout=30,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
+    ) as conn:
+        prepare_session(conn, hosted)
+        conn.execute("select 1")
+    print("direct connection ok", flush=True)
 
 
 def prepare_session(conn, hosted: bool) -> None:
@@ -279,26 +318,30 @@ def import_geodatabase(conn, source_release_id, gdb: Path) -> tuple[int, int, in
             raise SystemExit("download has no polygon layer")
         with conn.cursor() as cur:
             cur.execute("set search_path to public, extensions")
+            ensure_places_load(cur)
+            conn.commit()
             cur.execute(
                 """
-                create temp table candidate (
-                  source_id text primary key,
+                create temp table batch (
+                  source_id text,
                   site_id text,
                   name text,
                   designation text,
                   iucn_category text,
                   iso3 text,
                   realm text,
-                  geom extensions.geometry(MultiPolygon, 4326) not null,
-                  area_km2 double precision generated always as (
-                    extensions.st_area(geom::extensions.geography, true) / 1e6
-                  ) stored
-                ) on commit drop
+                  wkb bytea
+                ) on commit delete rows
                 """
             )
-            terrestrial, gis_area_count, accepted = stream_candidates(cur, layers)
+            conn.commit()
+            staged = load_staged_ids(cur, source_release_id)
+            print(f"already staged: {len(staged)}", flush=True)
+            terrestrial, gis_area_count, accepted = stream_candidates(
+                conn, cur, layers, source_release_id, staged
+            )
             print(
-                f"candidates sent: {accepted}; checking geometry validity",
+                f"staged: {accepted}; checking geometry validity",
                 flush=True,
             )
             if terrestrial == 0:
@@ -306,14 +349,59 @@ def import_geodatabase(conn, source_release_id, gdb: Path) -> tuple[int, int, in
             reject_invalid(cur)
             print("upsert started", flush=True)
             stored = upsert_places(cur, source_release_id)
-        if stored == 0:
-            raise SystemExit("refusing to store zero places")
+            if stored == 0:
+                conn.rollback()
+                raise SystemExit("refusing to store zero places")
+            conn.commit()
+            cur.execute("drop table public.places_load")
+            conn.commit()
         return terrestrial, gis_area_count, stored
     finally:
         dataset.Release()
 
 
-def stream_candidates(cur, layers) -> tuple[int, int, int]:
+def ensure_places_load(cur) -> None:
+    cur.execute(
+        """
+        create table if not exists public.places_load (
+          source_release_id uuid not null,
+          source_id text not null,
+          site_id text not null,
+          name text not null,
+          designation text,
+          iucn_category text,
+          iso3 text,
+          realm text not null,
+          geom extensions.geometry(MultiPolygon, 4326) not null,
+          area_km2 double precision generated always as (
+            extensions.st_area(geom::extensions.geography, true) / 1e6
+          ) stored,
+          primary key (source_release_id, source_id)
+        )
+        """
+    )
+    cur.execute("alter table public.places_load enable row level security")
+    cur.execute(
+        """
+        revoke all on table public.places_load
+        from public, anon, authenticated, service_role
+        """
+    )
+
+
+def load_staged_ids(cur, source_release_id) -> set[str]:
+    cur.execute(
+        """
+        select source_id
+        from public.places_load
+        where source_release_id = %s
+        """,
+        (source_release_id,),
+    )
+    return {row["source_id"] for row in cur.fetchall()}
+
+
+def stream_candidates(conn, cur, layers, source_release_id, staged: set[str]) -> tuple[int, int, int]:
     from osgeo import ogr
 
     problems: list[str] = []
@@ -321,15 +409,21 @@ def stream_candidates(cur, layers) -> tuple[int, int, int]:
     batch: list[tuple] = []
     terrestrial = 0
     gis_area_count = 0
-    accepted = 0
+    accepted = len(staged)
 
     def flush() -> None:
         nonlocal accepted
         if not batch:
             return
-        cur.executemany(INSERT_CANDIDATE, batch)
+        with cur.copy(COPY_BATCH) as copy:
+            for row in batch:
+                copy.write_row(row)
+        cur.execute(INSERT_BATCH, (source_release_id,))
         accepted += len(batch)
+        staged.update(row[0] for row in batch)
         batch.clear()
+        conn.commit()
+        print(f"staged: {accepted}", flush=True)
 
     for layer in layers:
         missing = [
@@ -347,7 +441,7 @@ def stream_candidates(cur, layers) -> tuple[int, int, int]:
             if terrestrial % PROGRESS_EVERY == 0:
                 print(
                     f"terrestrial polygons read: {terrestrial}; "
-                    f"candidates sent: {accepted + len(batch)}",
+                    f"staged: {accepted + len(batch)}",
                     flush=True,
                 )
             iso3 = text(feature, "ISO3")
@@ -359,6 +453,8 @@ def stream_candidates(cur, layers) -> tuple[int, int, int]:
                 problems.append(f"duplicate SITE_PID {source_id}")
                 continue
             seen.add(source_id)
+            if source_id in staged:
+                continue
             geometry = feature.GetGeometryRef()
             if geometry is None or geometry.IsEmpty():
                 problems.append(f"invalid geometry {source_id}: missing geometry")
@@ -384,7 +480,7 @@ def stream_candidates(cur, layers) -> tuple[int, int, int]:
             gis_area = number(feature, "GIS_AREA")
             if gis_area is not None and gis_area >= 10:
                 gis_area_count += 1
-            if too_small_to_store(geometry, gis_area):
+            if not stage_this_polygon(geometry, gis_area):
                 continue
             batch.append(
                 (
@@ -408,6 +504,43 @@ def stream_candidates(cur, layers) -> tuple[int, int, int]:
     return terrestrial, gis_area_count, accepted
 
 
+def stage_this_polygon(geometry, gis_area: float | None) -> bool:
+    """True when the polygon should be copied into the staging table.
+
+    GIS_AREA of at least 10 is staged and checked again in PostGIS.
+    Anything smaller is staged only when a local geodesic measurement is
+    near 10 km², or when that measurement cannot be made.
+    """
+    if too_small_to_store(geometry, gis_area):
+        return False
+    if gis_area is not None and gis_area >= 10:
+        return True
+    measured = geodesic_area_km2(geometry)
+    if measured is None:
+        return True
+    return measured >= LOCAL_AREA_MARGIN_KM2
+
+
+def geodesic_area_km2(geometry) -> float | None:
+    global _geod
+    try:
+        from pyproj import Geod
+        from shapely import wkb as shapely_wkb
+    except ImportError:
+        return None
+    try:
+        if _geod is None:
+            _geod = Geod(ellps="WGS84")
+        shape = shapely_wkb.loads(geometry.ExportToIsoWkb())
+        area_m2, _perimeter = _geod.geometry_area_perimeter(shape)
+        return abs(float(area_m2)) / 1e6
+    except Exception:
+        return None
+
+
+_geod = None
+
+
 def too_small_to_store(geometry, gis_area: float | None) -> bool:
     """True when both the source area and the outline are below 10 km².
 
@@ -427,7 +560,7 @@ def reject_invalid(cur) -> None:
     cur.execute(
         """
         select source_id, extensions.ST_IsValidReason(geom) as reason
-        from candidate
+        from public.places_load
         where not extensions.ST_IsValid(geom)
         order by source_id
         """
@@ -466,7 +599,7 @@ def upsert_places(cur, source_release_id) -> int:
           iso3,
           realm,
           geom
-        from candidate
+        from public.places_load
         where area_km2 >= 10
         on conflict (source_release_id, source_id) do update
         set
@@ -487,9 +620,9 @@ def upsert_places(cur, source_release_id) -> int:
         where place.source_release_id = %s
           and not exists (
             select 1
-            from candidate
-            where candidate.source_id = place.source_id
-              and candidate.area_km2 >= 10
+            from public.places_load
+            where places_load.source_id = place.source_id
+              and places_load.area_km2 >= 10
           )
         """,
         (source_release_id,),

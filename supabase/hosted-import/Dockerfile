@@ -6,6 +6,8 @@ RUN apt-get update \
         python3 \
         python3-gdal \
         python3-psycopg \
+        python3-pyproj \
+        python3-shapely \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1
