@@ -27,8 +27,7 @@ The map stays the main surface. Keep the Budding Places layout, type, and area t
 
 - Molding Places: signing in, edit mode, curated text, overlap review, which places are drawn, and approving photographs.
 - Ecoregions, countries, and a comparison table of places.
-- Cropland facts for places outside the South Africa set already stored.
-- Raster PMTiles. Those tiles stay individual XYZ files. This parcel is the places archive only.
+- Cropland facts for places outside the South Africa set, and the cropland raster PMTiles archive, are [Cropland 2024 global](cropland-2024-global.md). This parcel is the places archive only.
 - A production release. Merge into `develop` only.
 
 ## Tasks
