@@ -12,7 +12,7 @@ kill_timeout = 30
 
 # A failed step stops. Start the next step by hand with fly machine update.
 [[restart]]
-  policy = "no"
+  policy = "never"
 
 [[mounts]]
   source = "places_import"

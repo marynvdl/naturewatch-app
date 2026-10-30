@@ -100,7 +100,9 @@ fly deploy supabase \
 fly logs --app naturewatch-places-import
 ```
 
-Deploy starts `run`: `build`, a 30 second `probe`, then `upload`. If a volume reports "insufficient resources", destroy it and create a new one. To test only the connection, deploy with `--env WDPA_STEP=probe --env WDPA_PROBE_SECONDS=900`. The log shows ping times. A step that fails stays stopped. Start it again with `fly machine start`. It continues from the files and rows already there.
+Use absolute paths for `--config` and `--dockerfile` if Fly reports the Dockerfile as not found. A machine that is stopped stays stopped after a deploy, so start it with `fly machine start MACHINE_ID --app naturewatch-places-import`.
+
+Deploy starts `run`: `build`, a 30 second `probe`, then `upload`. To go step by step, deploy with `--env WDPA_STEP=build`, then run `probe`, then `upload`, one at a time. If a volume reports "insufficient resources", destroy it and create a new one. To test only the connection, deploy with `--env WDPA_STEP=probe --env WDPA_PROBE_SECONDS=900`. The log shows ping times. A step that fails stays stopped. Start it again with `fly machine start`. It continues from the files and rows already there.
 
 The log prints, in order:
 
