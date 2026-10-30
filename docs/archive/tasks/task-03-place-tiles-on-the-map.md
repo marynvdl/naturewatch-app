@@ -1,6 +1,8 @@
 # Task 03 — Place tiles on the map
 
-Parcel: [Places Tiles](../parcels/places-tiles.md)
+Archived. This task is not active.
+
+Parcel: [Places Tiles](../../parcels/places-tiles.md)
 
 Repository: naturewatch-app. Start only after task 02 has published the archive.
 

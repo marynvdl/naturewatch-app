@@ -128,9 +128,12 @@ describe('place figures', () => {
     expect(binCounts([0, 0.1, 0.5, 0.99, 1], 4)).toEqual([2, 0, 1, 2]);
   });
 
-  it('names the country, or keeps the code when no name is known', () => {
+  it('names one country and leaves a transboundary code as stored', () => {
     expect(countryName('ZAF')).toBe('South Africa');
-    expect(countryName('BWA')).toBe('BWA');
+    expect(countryName('BWA')).toBe('Botswana');
+    expect(countryName('TZA')).toBe('Tanzania');
+    expect(countryName('ZAF;BWA')).toBe('ZAF;BWA');
+    expect(countryName('ZZZ')).toBe('ZZZ');
     expect(countryName(null)).toBe('');
   });
 

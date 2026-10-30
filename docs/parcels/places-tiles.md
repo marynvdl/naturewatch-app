@@ -6,7 +6,7 @@ The second of three places parcels. Budding Places is the public browsing experi
 
 Prepare Sooty Earth to display Places globally and efficiently. Expand the stored protected areas to terrestrial areas larger than 10 km² worldwide, publish those boundaries as PMTiles, and keep the list a short ranked window beside a map that draws what is in view.
 
-The stored places stay the South Africa pilot until the last app task. Do not list the world while the map still loads every boundary from `pilot_place_map`. Do not invent places, descriptions, photographs, or measurements.
+Task 04 stores terrestrial protected areas worldwide. The published tiles stay the South Africa archive until task 05. Do not invent places, descriptions, photographs, or measurements.
 
 ## List and map
 
@@ -39,9 +39,9 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 - [x] [task-01-place-list-window.md](../archive/tasks/task-01-place-list-window.md) — naturewatch-app
   - *Goal:* Replace loading every stored place into the list with a bounded query. Default sort is largest first. Cap 50. Keep the other sorts. Add the extent option, off by default. Do not change boundary loading.
-- [ ] [task-02-places-pmtiles.md](https://github.com/marynvdl/naturewatch-analysis/blob/develop/docs/tasks/task-02-places-pmtiles.md) — naturewatch-analysis
+- [x] [task-02-places-pmtiles.md](https://github.com/marynvdl/naturewatch-analysis/blob/main/docs/archive/tasks/task-02-places-pmtiles.md) — naturewatch-analysis
   - *Goal:* Build one PMTiles archive from the authoritative places, prove it on the current South Africa rows, and publish it to `nature-watch-tiles`.
-- [ ] [task-03-place-tiles-on-the-map.md](../tasks/task-03-place-tiles-on-the-map.md) — naturewatch-app
+- [x] [task-03-place-tiles-on-the-map.md](../archive/tasks/task-03-place-tiles-on-the-map.md) — naturewatch-app
   - *Goal:* Draw boundaries from the published PMTiles archive. Stop calling `loadPlaceMap`. A click still opens the Supabase profile.
 - [ ] [task-04-global-protected-areas.md](../tasks/task-04-global-protected-areas.md) — naturewatch-app
   - *Goal:* Store terrestrial protected areas worldwide with calculated `area_km2` of at least 10. Keep existing South Africa ids and cropland facts. Do not copy global geometries into `pilot_place_map`.

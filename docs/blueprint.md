@@ -31,7 +31,7 @@ Fire is the pipeline that runs today: Earth Engine to `nature-watch-bucket`, the
 
 The connection between data and app is defined by **published object paths** and the **layer catalogue** at `frontend/naturewatch/src/catalog/layers.json`.
 
-The `sources`, `places`, and `facts` tables are in Supabase. The places page reads `pilot_places` and `facts` in the browser with the anon key. The Places list on the map reads `pilot_place_window`, 50 rows at a time from an offset, and optional extent through `pilot_places_in_extent`. Filter charts read `pilot_place_filter_stats`. None of those reads return `places.geom`. The FastAPI service does not read these tables.
+The `sources`, `places`, and `facts` tables are in Supabase. The places page reads `pilot_place_window`, 50 rows at a time. The Places list on the map reads `pilot_place_window`, 50 rows at a time from an offset, and optional extent through `pilot_places_in_extent`. Filter charts read `pilot_place_filter_stats`. None of those reads return `places.geom`. The FastAPI service does not read these tables.
 
 ## 2. Storage and access
 
@@ -75,15 +75,15 @@ The cropland seed objects are at `gs://nature-watch-bucket/seeds/cropland/glad/2
 
 `frontend/naturewatch/src/catalog/layers.json` is what the map reads. A static STAC catalogue is a generated view of a recipe, written beside the sprout raster. The app does not read STAC.
 
-Cropland facts for the 941 pilot places are stored for sprout `cropland-2024-v1`, method `area-weighted-spheroid-v1`.
+Cropland facts for the South Africa places already stored stay on sprout `cropland-2024-v1`, method `area-weighted-spheroid-v1`. Places added by the global import have no cropland fact.
 
-The catalog layer `cropland` publishes that 2024 product for South Africa. Its tiles are class values at `gs://nature-watch-tiles/cropland/2024/v1/{z}/{x}/{y}.png`, zooms 0–12. The client colours class 1 and leaves class 0 clear. The tile bucket allows the develop app and local dev (`http://localhost:5173` and `http://127.0.0.1:5173`) to read those pixels. Closer than zoom 12 enlarges the zoom 12 tiles. `/places` lists the pilot protected areas. `/places/:id` shows the name, the stored cropland square kilometres and percent, the WDPCA release month, attribution, and a Protected Planet link. **Places** on the map draws boundaries from the places PMTiles archive, as a Mapbox GL JS vector source (native PMTiles needs Mapbox GL JS 3.21 or later). Each tile feature carries `id` (`places.id`), `area_km2`, and `cropland_percent` when a fact exists, so the size and cropland filter applies to the tiles directly. The app no longer reads `pilot_place_map`; the table stays in the database. A click opens the place profile from Supabase. To move the map to a chosen place, the app calls `place_bounds(id)`, which returns west, south, east, and north only. The `places.geom` column itself stays ungranted. The app does not offer a polygon download. The page and the overlay need `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` at build time. The develop deploy reads those from GitHub secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+The catalog layer `cropland` publishes that 2024 product for South Africa. Its tiles are class values at `gs://nature-watch-tiles/cropland/2024/v1/{z}/{x}/{y}.png`, zooms 0–12. The client colours class 1 and leaves class 0 clear. The tile bucket allows the develop app and local dev (`http://localhost:5173` and `http://127.0.0.1:5173`) to read those pixels. Closer than zoom 12 enlarges the zoom 12 tiles. `/places` lists terrestrial protected areas of at least 10 km², 50 at a time by name. `/places/:id` shows the name, the stored cropland square kilometres and percent, the WDPCA release month, attribution, and a Protected Planet link. **Places** on the map draws boundaries from the places PMTiles archive, as a Mapbox GL JS vector source (native PMTiles needs Mapbox GL JS 3.21 or later). Each tile feature carries `id` (`places.id`), `area_km2`, and `cropland_percent` when a fact exists, so the size and cropland filter applies to the tiles directly. The app no longer reads `pilot_place_map`; the table stays in the database. A click opens the place profile from Supabase. To move the map to a chosen place, the app calls `place_bounds(id)`, which returns west, south, east, and north only. The `places.geom` column itself stays ungranted. The app does not offer a polygon download. The page and the overlay need `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` at build time. The develop deploy reads those from GitHub secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 
 Accepted for the first Sooty Earth release, and not yet built:
 
 - The interface is rebranded to Sooty Earth on `develop` before any production release. That work is a parcel. The old step list is archived.
 
-The first places are terrestrial protected areas in South Africa with calculated `area_km2` of at least 10. Source rasters and tiles stay in Cloud Storage.
+The stored places are terrestrial protected areas worldwide with calculated `area_km2` of at least 10. The published boundary archive remains the South Africa tiles until it is rebuilt. Source rasters and tiles stay in Cloud Storage.
 
 ## 6. Decisions still needed
 
