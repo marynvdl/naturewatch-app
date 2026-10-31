@@ -66,9 +66,11 @@ Check the checksum refusal and the area filter locally, without a download of th
 
 ## Hosted import
 
-Do not run this against the hosted database until the row count and the database size are accepted.
+The global October 2026 load was run on 31 October 2026. It stored 51,001 places (`protected_areas`: 51,001, South Africa 941 with their 941 cropland facts) and the database grew from 0.8 GB to 3.5 GB. 25 polygons were measured under 10 km² and left out. The database was on Nano (0.5 GB of memory) when the load began. It crashed into recovery under the geometry inserts and the connection dropped repeatedly. A temporary move to Large (8 GB, about $0.15 an hour) finished the load, then it went back down. Before the next global load, check the compute size. Use Large or bigger for the load and keep the disk free for the new rows.
 
-The October 2026 global zip is 2,051,430,236 bytes. Reading that zip, without storing it, counts 490,511 terrestrial polygons in `WDPA_WDOECM_poly_Oct2026`. 51,001 of those have `GIS_AREA` of at least 10. The point layer and the source table are not stored. The stored count is the calculated `area_km2 >= 10` line, which can differ. Record `select count(*) from protected_areas` and `pg_size_pretty(pg_database_size(current_database()))` after the merge commits.
+Do not run this against the hosted database until the row count, the database size, and the compute size are accepted.
+
+The October 2026 global zip is 2,051,430,236 bytes. Reading that zip, without storing it, counts 490,511 terrestrial polygons in `WDPA_WDOECM_poly_Oct2026`. 51,001 of those have `GIS_AREA` of at least 10. The point layer and the source table are not stored. The stored count is the calculated `area_km2 >= 10` line, which can differ. Record `select count(*) from protected_areas` and `pg_size_pretty(pg_database_size(current_database()))` after the check passes.
 
 Do not run the hosted load from a laptop, and do not hold the load in one transaction. A single long transaction rolls back the whole load when a connection drops. Do not send a bulk load through the Supabase pooler. Filter and validate the file first, then copy it in committed batches. Do not upload a polygon the database will reject. Check the free disk before loading: a stage table and `places` together can fill it.
 
