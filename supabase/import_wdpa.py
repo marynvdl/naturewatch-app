@@ -82,12 +82,13 @@ REQUIRED_FIELDS = (
 # 112 km is longer than one degree anywhere on Earth, so a polygon whose
 # planar area is below this cannot reach 10 km².
 TOO_SMALL_DEGREE_AREA = 10.0 / (112.0 * 112.0)
-BATCH_ROWS = 100
+BATCH_ROWS = 50
 # A few polygons are very large. Send a batch early when it reaches this size.
-BATCH_BYTES = 16 * 1024 * 1024
+BATCH_BYTES = 4 * 1024 * 1024
 MAX_SEGMENT = 1200
 CONNECT_ATTEMPTS = 6
 UPLOAD_ATTEMPTS = 6
+COMMITTED = {"batches": 0}
 FILTERED_NAME = "filtered.tsv.gz"
 MANIFEST_NAME = "manifest.json"
 COLUMNS = (
@@ -637,6 +638,9 @@ def upload(work: Path) -> None:
         except (psycopg.OperationalError, psycopg.InterfaceError) as exc:
             if isinstance(exc, psycopg.errors.InsufficientResources):
                 raise
+            if COMMITTED["batches"]:
+                attempts = 0
+                COMMITTED["batches"] = 0
             attempts += 1
             print(
                 f"upload connection lost ({attempts} of {UPLOAD_ATTEMPTS}): "
@@ -735,6 +739,7 @@ def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
         batch.clear()
         batch_size = 0
         sent_batches += 1
+        COMMITTED["batches"] += 1
         if sent_batches % 5 == 0:
             print(f"sent: {total} of {expected}", flush=True)
 
