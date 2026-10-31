@@ -6,7 +6,7 @@ The second of three places parcels. Budding Places is the public browsing experi
 
 Prepare Sooty Earth to display Places globally and efficiently. Expand the stored protected areas to terrestrial areas larger than 10 km² worldwide, publish those boundaries as PMTiles, and keep the list a short ranked window beside a map that draws what is in view.
 
-Task 04 stores terrestrial protected areas worldwide. The published tiles stay the South Africa archive until task 05. Do not invent places, descriptions, photographs, or measurements.
+Task 04 stored terrestrial protected areas worldwide: 51,001 places of at least 10 km², loaded on 31 October 2026. The published tiles stay the South Africa archive until task 05. Do not invent places, descriptions, photographs, or measurements.
 
 ## List and map
 
@@ -43,7 +43,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* Build one PMTiles archive from the authoritative places, prove it on the current South Africa rows, and publish it to `nature-watch-tiles`.
 - [x] [task-03-place-tiles-on-the-map.md](../archive/tasks/task-03-place-tiles-on-the-map.md) — naturewatch-app
   - *Goal:* Draw boundaries from the published PMTiles archive. Stop calling `loadPlaceMap`. A click still opens the Supabase profile.
-- [ ] [task-04-global-protected-areas.md](../tasks/task-04-global-protected-areas.md) — naturewatch-app
+- [x] [task-04-global-protected-areas.md](../archive/tasks/task-04-global-protected-areas.md) — naturewatch-app
   - *Goal:* Store terrestrial protected areas worldwide with calculated `area_km2` of at least 10. Keep existing South Africa ids and cropland facts. Do not copy global geometries into `pilot_place_map`.
 - [ ] [task-05-republish-places-pmtiles.md](https://github.com/marynvdl/naturewatch-analysis/blob/develop/docs/tasks/task-05-republish-places-pmtiles.md) — naturewatch-analysis
   - *Goal:* Rebuild that archive from the global places and replace the published object. Record the run cost.
