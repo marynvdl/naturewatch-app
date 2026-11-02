@@ -25,6 +25,7 @@ import useTimelineStore from '@/store/TimelineStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
 import { resolveLayerYear } from '@/catalog';
 import { classRasterPaint } from '@/catalog/rasterColor';
+import { rasterSourceSpec } from '@/catalog/rasterSource';
 import usePlacesStore from '@/store/PlacesStore';
 import { usePlaceBoundaries } from '@/places/usePlaceBoundaries';
 import useDrawerStore from '@/store/DrawerStore';
@@ -529,13 +530,10 @@ function addSourceToMap(
   if (map) {
     if (layer.type === 'raster') {
       if (!map?.getSource(layer.title + activeYear.value)) {
-        map.addSource(layer.title + activeYear.value, {
-          type: 'raster',
-          tiles: [layerUrl],
-          tileSize: 256,
-          // Without this the map requests tiles that do not exist beyond maxzoom
-          ...(layer.max_zoom !== undefined && { maxzoom: layer.max_zoom }),
-        });
+        map.addSource(
+          layer.title + activeYear.value,
+          rasterSourceSpec(layerUrl, layer.max_zoom)
+        );
       }
     } else if (layer.type === 'circle' || layer.type === 'line') {
       if (!map?.getSource(layer.title + activeYear.value)) {

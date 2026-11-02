@@ -68,11 +68,11 @@ The `tch_3` tiles are the published rendering of canopy at least 3 m. The same v
 
 ## Cropland
 
-**Source named in the catalog.** UMD GLAD annual cropland, https://glad.umd.edu/dataset/annual-croplands. One snapshot, 2024, clipped to South Africa. This is a different product from the Crops snapshots above.
+**Source named in the catalog.** UMD GLAD annual cropland, https://glad.umd.edu/dataset/annual-croplands. One snapshot, 2024, for the world. This is a different product from the Crops snapshots above.
 
-**Tile address.** `https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v1/{z}/{x}/{y}.png`. Zooms 0–12. A missing tile is empty. Beyond zoom 12 the map enlarges zoom 12 with nearest resampling.
+**Tile address.** One PMTiles archive, `https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v2/cropland.pmtiles`. Zooms 0–12. A missing tile is empty. Coarser zooms are built with `q3` resampling, so a cell is cropland when more than a quarter of the valid pixels under it are. Beyond zoom 12 the map enlarges zoom 12 with nearest resampling.
 
-**Values.** Each pixel is an 8-bit gray value plus alpha. Gray 1 is cropland and gray 0 is other land. Alpha 0 is nodata, including land outside South Africa. The files are not coloured. The map is set to colour class 1 orange (`#e59139`) and leave class 0 clear.
+**Values.** Each pixel is an 8-bit gray value plus alpha. Gray 1 is cropland and gray 0 is other land. Alpha 0 is nodata, including ocean and any 10° tile the publisher does not provide. The files are not coloured. The map is set to colour class 1 orange (`#e59139`) and leave class 0 clear.
 
 **Browser read.** Mapbox asks for each tile with a browser read. The bucket allows `https://naturewatch.fly.dev`, `http://localhost:5173`, and `http://127.0.0.1:5173`. A response saved before that permission existed is reused for up to an hour and then fails in the console even though a new request would succeed. The catalog tile addresses end in `?v=1` so the map does not reuse those saved responses.
 

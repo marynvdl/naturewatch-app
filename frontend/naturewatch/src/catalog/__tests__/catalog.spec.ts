@@ -11,6 +11,7 @@ import {
   resolveLayerYear,
 } from '../index';
 import { classRasterPaint } from '../rasterColor';
+import { isPmtilesUrl } from '../rasterSource';
 import type { Catalog } from '../types';
 
 describe('layer catalog', () => {
@@ -37,11 +38,12 @@ describe('layer catalog', () => {
     });
   });
 
-  it('gives every raster layer a tile URL with z, x and y', () => {
+  it('gives every raster layer a tile URL with z, x and y, or one PMTiles archive', () => {
     catalog.layers
       .filter(layer => layer.tiles.type === 'raster')
       .forEach(layer => {
         const full = layer.tiles.url + (layer.tiles.query ?? '');
+        if (isPmtilesUrl(full)) return;
         expect(full, layer.id).toContain('{z}');
         expect(full, layer.id).toContain('{x}');
         expect(full, layer.id).toContain('{y}');
@@ -229,7 +231,7 @@ describe('layer catalog', () => {
     expect(layer?.status).toBe('published');
     expect(layer?.years).toEqual({ available: [2024], meaning: 'snapshot' });
     expect(layer?.tiles).toMatchObject({
-      url: 'https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v1/{z}/{x}/{y}.png?v=1',
+      url: 'https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v2/cropland.pmtiles',
       maxzoom: 12,
       resampling: 'nearest',
       colorClasses: [{ value: 1, color: '#e59139' }],
