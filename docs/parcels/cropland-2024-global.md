@@ -19,7 +19,7 @@ Opening a place reads the fact from Supabase. Square kilometres show to two deci
 Objects:
 
 - Seed: `gs://nature-watch-bucket/seeds/cropland/glad/2024/v2/`
-- Sprout: `gs://nature-watch-bucket/sprouts/cropland/2024/v2/cropland-2024.tif`, id `cropland-2024-v2`
+- Sprout: `gs://nature-watch-bucket/sprouts/cropland/2024/v2/cropland-2024.vrt` (a collection VRT over per-tile COGs in `.../v2/tiles/`), id `cropland-2024-v2`
 - Tiles: `gs://nature-watch-tiles/cropland/2024/v2/cropland.pmtiles`
 
 ## Cost and a later orchestrator

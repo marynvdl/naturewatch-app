@@ -33,7 +33,7 @@ A colour means the source dataset recorded something in that square or at that p
 | Tree height | Estimated canopy height in 2020, in metres. Pale green is about 3 m, mid green about 15 m, and dark green about 30 m or taller. The colours are already in the tiles. | Not a measurement of every tree. Canopy below 3 m is not drawn, and heights above 30 m are not separated. |
 | Built | Buildings in the 2023 snapshot, including a 2020 fill where the main source has no coverage. | Not a use (home, mine, road). Other timeline years still show 2023. |
 | Crops | Cropland class in 2015 or 2019. | Not crop type or yield. Later timeline years still show 2019. |
-| Cropland | Cropland class in 2024, for South Africa. Orange is class 1. The tiles store the class, and the map applies the colour. Other land stays clear. | Not the 2015 or 2019 crops snapshots. Not crop type or yield. Years before 2024 do not show it. Closer than zoom 12 enlarges the zoom 12 tiles. |
+| Cropland | Cropland class in 2024, worldwide. Orange is class 1. The tiles store the class, and the map applies the colour. Other land stays clear. | Not the 2015 or 2019 crops snapshots. Not crop type or yield. Years before 2024 do not show it. Closer than zoom 12 enlarges the zoom 12 tiles. |
 | Dams | The same points for 2016–2022. | The catalog does not name the source. The points do not change with the year. |
 
 All, bare ground, mines, and rivers are marked “Coming soon”. They are not published layers.
