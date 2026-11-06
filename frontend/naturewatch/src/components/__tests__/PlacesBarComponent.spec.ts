@@ -590,6 +590,7 @@ describe('Places panel', () => {
 
     expect(store.selectedId).not.toBeNull();
     expect(store.visible).toBe(true);
+    expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
   });
 
   it('keeps the search and the place type when the profile closes', async () => {

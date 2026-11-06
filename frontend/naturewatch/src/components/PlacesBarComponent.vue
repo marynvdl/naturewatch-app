@@ -181,12 +181,17 @@ function showBoundaries() {
 }
 
 /**
- * Choose a place from the list. The boundaries are drawn so the place
- * shows on the map even when the list came from a search.
+ * Choose a place from the list. The boundaries are drawn, and Protected
+ * areas is switched on, so the place shows on the map even when the list came
+ * from a search.
  * @param id - The stored place id.
  */
 function chooseResult(id: string) {
-  if (placesStore.selectedId !== id) showBoundaries();
+  if (placesStore.selectedId !== id) {
+    // The boundaries are protected areas, so that type shows as on too
+    if (placeType.value === null) placeType.value = 'protected_area';
+    showBoundaries();
+  }
   placesStore.selectPlace(id);
 }
 
