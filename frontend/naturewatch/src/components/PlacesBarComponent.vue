@@ -63,6 +63,18 @@ const loadingEarlier = ref(false);
 const loadingMore = ref(false);
 const moreExhausted = ref(false);
 let listRequest = 0;
+/** Cancels the list requests in flight when a newer list query starts. */
+let listAbort: AbortController | null = null;
+
+/**
+ * Cancel the list requests in flight and start a new set.
+ * @returns The signal for the new requests.
+ */
+function newListSignal(): AbortSignal {
+  listAbort?.abort();
+  listAbort = new AbortController();
+  return listAbort.signal;
+}
 let listWait: ReturnType<typeof setTimeout> | null = null;
 let moreObserver: IntersectionObserver | null = null;
 const WINDOW_AHEAD = PLACE_LIST_LIMIT / 2;
@@ -199,12 +211,14 @@ async function ensureStats() {
 async function refreshList() {
   if (!showProtected.value && !searchingAll.value) return;
   const request = ++listRequest;
+  const signal = newListSignal();
   loadingMore.value = false;
+  loadingEarlier.value = false;
   moreExhausted.value = false;
   const first = listStatus.value === 'idle';
   if (first) listStatus.value = 'loading';
   if (showProtected.value) await ensureStats();
-  const result = await loadPilotPlaceWindow(listQuery(0));
+  const result = await loadPilotPlaceWindow(listQuery(0), signal);
   if (request !== listRequest) return;
   listStatus.value = result.status === 'ok' ? 'ok' : result.status;
   if (result.status === 'ok') {
@@ -225,7 +239,10 @@ async function loadMore() {
   const request = listRequest;
   const offset = windowStart.value + places.value.length;
   loadingMore.value = true;
-  const result = await loadPilotPlaceWindow(listQuery(offset));
+  const result = await loadPilotPlaceWindow(
+    listQuery(offset),
+    listAbort?.signal
+  );
   if (request !== listRequest) return;
   loadingMore.value = false;
   if (result.status !== 'ok') return;
@@ -246,7 +263,10 @@ async function loadEarlier() {
   const request = listRequest;
   const offset = Math.max(0, windowStart.value - PLACE_LIST_LIMIT);
   loadingEarlier.value = true;
-  const result = await loadPilotPlaceWindow(listQuery(offset));
+  const result = await loadPilotPlaceWindow(
+    listQuery(offset),
+    listAbort?.signal
+  );
   if (request !== listRequest) return;
   loadingEarlier.value = false;
   if (result.status !== 'ok') return;
@@ -268,11 +288,12 @@ async function loadEarlier() {
  */
 async function loadAround(id: string): Promise<boolean> {
   const request = ++listRequest;
-  const ranked = await loadPilotPlaceRank(listQuery(), id);
+  const signal = newListSignal();
+  const ranked = await loadPilotPlaceRank(listQuery(), id, signal);
   if (request !== listRequest) return false;
   if (ranked.status !== 'ok' || ranked.rank === null) return false;
   const offset = Math.max(0, ranked.rank - WINDOW_AHEAD);
-  const result = await loadPilotPlaceWindow(listQuery(offset));
+  const result = await loadPilotPlaceWindow(listQuery(offset), signal);
   if (request !== listRequest || result.status !== 'ok') return false;
   loadingMore.value = false;
   loadingEarlier.value = false;
@@ -394,6 +415,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  listAbort?.abort();
   moreObserver?.disconnect();
   moreObserver = null;
 });

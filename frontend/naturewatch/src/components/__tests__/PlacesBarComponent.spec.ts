@@ -171,7 +171,8 @@ describe('Places panel', () => {
     expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
-      expect.objectContaining({ sort: 'size-desc' as PlaceSort, extent: null })
+      expect.objectContaining({ sort: 'size-desc' as PlaceSort, extent: null }),
+      expect.any(AbortSignal)
     );
 
     await wrapper.get('input[aria-label="Search places"]').setValue('kruger');
@@ -288,7 +289,8 @@ describe('Places panel', () => {
     );
     expect(wrapper.get('.place-card-name').text()).toBe('Park 01');
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
-      expect.objectContaining({ sort: 'size-desc' as PlaceSort })
+      expect.objectContaining({ sort: 'size-desc' as PlaceSort }),
+      expect.any(AbortSignal)
     );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
@@ -338,7 +340,8 @@ describe('Places panel', () => {
     expect(wrapper.get('.places-count').text()).toBe('60 places');
     expect(wrapper.findAll('.place-number').at(-1)?.text()).toBe('60');
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ offset: 50 })
+      expect.objectContaining({ offset: 50 }),
+      expect.any(AbortSignal)
     );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
@@ -432,7 +435,8 @@ describe('Places panel', () => {
     expect(extent.classes()).not.toContain('is-on');
     expect(extent.attributes('aria-pressed')).toBe('false');
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ extent: null })
+      expect.objectContaining({ extent: null }),
+      expect.any(AbortSignal)
     );
 
     await extent.trigger('click');
@@ -440,14 +444,16 @@ describe('Places panel', () => {
     expect(extent.classes()).toContain('is-on');
     expect(names()).toEqual(['Kruger National Park']);
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ extent: [20, -30, 40, -20] })
+      expect.objectContaining({ extent: [20, -30, 40, -20] }),
+      expect.any(AbortSignal)
     );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
 
     store.viewBounds = [21, -29, 39, -21];
     await flushPromises();
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ extent: [21, -29, 39, -21] })
+      expect.objectContaining({ extent: [21, -29, 39, -21] }),
+      expect.any(AbortSignal)
     );
 
     await extent.trigger('click');
@@ -458,7 +464,8 @@ describe('Places panel', () => {
       'Addo Elephant National Park',
     ]);
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ extent: null })
+      expect.objectContaining({ extent: null }),
+      expect.any(AbortSignal)
     );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
@@ -475,7 +482,8 @@ describe('Places panel', () => {
     );
     expect(loadPlaceRelease).not.toHaveBeenCalled();
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
-      expect.objectContaining({ search: 'kru', searchPrefix: true })
+      expect.objectContaining({ search: 'kru', searchPrefix: true }),
+      expect.any(AbortSignal)
     );
 
     await wrapper.get('input[aria-label="Search places"]').setValue('park');
@@ -555,10 +563,12 @@ describe('Places panel', () => {
 
     expect(loadPilotPlaceRank).toHaveBeenCalledWith(
       expect.objectContaining({ sort: 'size-desc' }),
-      missingPlace.id
+      missingPlace.id,
+      expect.any(AbortSignal)
     );
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ offset: 95 })
+      expect.objectContaining({ offset: 95 }),
+      expect.any(AbortSignal)
     );
     const numbers = wrapper.findAll('.place-number').map(item => item.text());
     expect(numbers).toEqual(['96', '97']);

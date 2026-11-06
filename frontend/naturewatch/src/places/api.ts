@@ -177,19 +177,22 @@ export async function loadPilotPlaces(search = ''): Promise<PlaceWindowResult> {
 /**
  * At most 50 pilot places for the current list query, plus how many match.
  * @param query - Search, sort, filters, and optional map extent.
+ * @param signal - Cancels the request when a newer one replaces it.
  * @returns The window, or why it could not be loaded.
  */
 export async function loadPilotPlaceWindow(
-  query: PlaceWindowQuery
+  query: PlaceWindowQuery,
+  signal?: AbortSignal
 ): Promise<PlaceWindowResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
-  const { data, error } = await supabase.rpc('protected_area_window', {
+  const call = supabase.rpc('protected_area_window', {
     ...matchedArgs(query),
     p_sort: query.sort,
     p_limit: PLACE_LIST_LIMIT,
     ...(query.offset ? { p_offset: query.offset } : {}),
   });
+  const { data, error } = await (signal ? call.abortSignal(signal) : call);
   if (error || !data) return { status: 'error' };
   const rows = data as WindowRow[];
   const total = Number(rows[0]?.total_count ?? 0);
@@ -211,20 +214,23 @@ export async function loadPilotPlaceWindow(
  * Where one place sits in the list for the current query.
  * @param query - Search, sort, filters, and optional map extent.
  * @param id - `places.id`.
+ * @param signal - Cancels the request when a newer one replaces it.
  * @returns The zero-based position, null when the place is not in the list, or why it could not be found.
  */
 export async function loadPilotPlaceRank(
   query: Omit<PlaceWindowQuery, 'offset'>,
-  id: string
+  id: string,
+  signal?: AbortSignal
 ): Promise<PlaceRankResult> {
   if (!PLACE_ID.test(id)) return { status: 'ok', rank: null };
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
-  const { data, error } = await supabase.rpc('protected_area_rank', {
+  const call = supabase.rpc('protected_area_rank', {
     ...matchedArgs(query),
     p_sort: query.sort,
     p_id: id,
   });
+  const { data, error } = await (signal ? call.abortSignal(signal) : call);
   if (error) return { status: 'error' };
   return { status: 'ok', rank: data === null ? null : Number(data) };
 }
