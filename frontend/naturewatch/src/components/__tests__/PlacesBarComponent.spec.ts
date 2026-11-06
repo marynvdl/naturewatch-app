@@ -624,6 +624,11 @@ describe('Places panel', () => {
     await typeButton(wrapper, 'Protected areas').trigger('click');
     await flushPromises();
 
+    vi.mocked(loadPilotPlaceRank).mockResolvedValue({
+      status: 'ok',
+      rank: 1,
+    });
+
     const box = (top: number): DOMRect =>
       ({
         top,
@@ -639,7 +644,12 @@ describe('Places panel', () => {
     const rects = vi
       .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
       .mockImplementation(function (this: HTMLElement) {
-        if (this.classList.contains('places-list')) return box(100);
+        if (
+          this.classList.contains('places-list') ||
+          this.classList.contains('places-results')
+        ) {
+          return box(100);
+        }
         if (this.dataset.placeId === places[1].id) return box(340);
         return box(0);
       });
@@ -648,7 +658,11 @@ describe('Places panel', () => {
     await flushPromises();
 
     const list = wrapper.get('.places-list').element as HTMLElement;
-    expect(list.scrollTop).toBe(240);
+    const scroller =
+      getComputedStyle(list).overflowY === 'visible'
+        ? (list.closest('.places-results') as HTMLElement)
+        : list;
+    expect(scroller.scrollTop).toBe(240);
     expect(wrapper.text()).toContain('Kruger National Park');
     rects.mockRestore();
   });
