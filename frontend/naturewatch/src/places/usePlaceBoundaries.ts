@@ -2,6 +2,7 @@ import { nextTick, watch } from 'vue';
 import type * as mapboxgl from 'mapbox-gl';
 import useBasemapStore from '@/store/BasemapStore';
 import usePlacesStore from '@/store/PlacesStore';
+import { useMeasureStore } from '@/store/MeasureStore';
 import { PLACE_TILES_URL, PLACE_TILE_LAYER, loadPlaceBounds } from './api';
 import { boundsInsideFrame, type LngLatBounds } from './display';
 
@@ -85,6 +86,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
 } {
   const placesStore = usePlacesStore();
   const basemapStore = useBasemapStore();
+  const measureStore = useMeasureStore();
   let listening = false;
   let boundsListening = false;
   const knownBounds = new Map<string, LngLatBounds | null>();
@@ -312,6 +314,8 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * Select the clicked boundary, or clear it when it is already selected.
    */
   function onPlaceClick(event: mapboxgl.MapMouseEvent) {
+    // A click while measuring places a point. It does not choose a place.
+    if (measureStore.drawing) return;
     const id = event.features?.[0]?.properties?.id;
     if (id === undefined || id === null || id === '') return;
     const placeId = String(id);

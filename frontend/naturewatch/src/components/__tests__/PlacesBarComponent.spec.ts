@@ -4,6 +4,7 @@ import { createPinia } from 'pinia';
 import PlacesBarComponent from '@/components/PlacesBarComponent.vue';
 import {
   loadPilotPlaceFilterStats,
+  loadPilotPlaceRank,
   loadPilotPlaceWindow,
   loadPlaceRelease,
 } from '@/places/api';
@@ -41,7 +42,9 @@ vi.mock('@/places/api', () => ({
   loadPilotPlaceWindow: vi.fn(),
   loadPilotPlaceWindowCount: vi.fn(),
   loadPilotPlaceFilterStats: vi.fn(),
+  loadPilotPlaceRank: vi.fn(),
   loadPlaceRelease: vi.fn(),
+  PLACE_LIST_LIMIT: 50,
 }));
 
 const places = [
@@ -119,6 +122,10 @@ describe('Places panel', () => {
     ioCallback = null;
     vi.clearAllMocks();
     vi.mocked(loadPilotPlaceFilterStats).mockResolvedValue(stats);
+    vi.mocked(loadPilotPlaceRank).mockResolvedValue({
+      status: 'ok',
+      rank: null,
+    });
     vi.mocked(loadPilotPlaceWindow).mockImplementation(async query => {
       const prefix = query.search.trim().toLocaleLowerCase();
       let list = places;
@@ -164,7 +171,8 @@ describe('Places panel', () => {
     expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
-      expect.objectContaining({ sort: 'size-desc' as PlaceSort, extent: null })
+      expect.objectContaining({ sort: 'size-desc' as PlaceSort, extent: null }),
+      expect.any(AbortSignal)
     );
 
     await wrapper.get('input[aria-label="Search places"]').setValue('kruger');
@@ -281,7 +289,8 @@ describe('Places panel', () => {
     );
     expect(wrapper.get('.place-card-name').text()).toBe('Park 01');
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
-      expect.objectContaining({ sort: 'size-desc' as PlaceSort })
+      expect.objectContaining({ sort: 'size-desc' as PlaceSort }),
+      expect.any(AbortSignal)
     );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
@@ -331,7 +340,8 @@ describe('Places panel', () => {
     expect(wrapper.get('.places-count').text()).toBe('60 places');
     expect(wrapper.findAll('.place-number').at(-1)?.text()).toBe('60');
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ offset: 50 })
+      expect.objectContaining({ offset: 50 }),
+      expect.any(AbortSignal)
     );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
@@ -425,7 +435,8 @@ describe('Places panel', () => {
     expect(extent.classes()).not.toContain('is-on');
     expect(extent.attributes('aria-pressed')).toBe('false');
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ extent: null })
+      expect.objectContaining({ extent: null }),
+      expect.any(AbortSignal)
     );
 
     await extent.trigger('click');
@@ -433,14 +444,16 @@ describe('Places panel', () => {
     expect(extent.classes()).toContain('is-on');
     expect(names()).toEqual(['Kruger National Park']);
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ extent: [20, -30, 40, -20] })
+      expect.objectContaining({ extent: [20, -30, 40, -20] }),
+      expect.any(AbortSignal)
     );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
 
     store.viewBounds = [21, -29, 39, -21];
     await flushPromises();
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ extent: [21, -29, 39, -21] })
+      expect.objectContaining({ extent: [21, -29, 39, -21] }),
+      expect.any(AbortSignal)
     );
 
     await extent.trigger('click');
@@ -451,7 +464,8 @@ describe('Places panel', () => {
       'Addo Elephant National Park',
     ]);
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ extent: null })
+      expect.objectContaining({ extent: null }),
+      expect.any(AbortSignal)
     );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
@@ -468,7 +482,8 @@ describe('Places panel', () => {
     );
     expect(loadPlaceRelease).not.toHaveBeenCalled();
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
-      expect.objectContaining({ search: 'kru', searchPrefix: true })
+      expect.objectContaining({ search: 'kru', searchPrefix: true }),
+      expect.any(AbortSignal)
     );
 
     await wrapper.get('input[aria-label="Search places"]').setValue('park');
@@ -523,6 +538,59 @@ describe('Places panel', () => {
     expect(wrapper.get('.places-count').text()).toBe('1 of 941 places');
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
     expect(loadPilotPlaceWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads the rows around a map-chosen place and keeps its rank', async () => {
+    vi.mocked(loadPilotPlaceWindow).mockImplementation(async query => ({
+      status: 'ok',
+      places: query.offset ? [missingPlace, places[1]] : [places[0]],
+      total: 941,
+    }));
+    vi.mocked(loadPilotPlaceRank).mockResolvedValue({
+      status: 'ok',
+      rank: 120,
+    });
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    const store = usePlacesStore(pinia);
+    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await flushPromises();
+
+    store.selectPlace(missingPlace.id, 'map');
+    await flushPromises();
+
+    expect(loadPilotPlaceRank).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: 'size-desc' }),
+      missingPlace.id,
+      expect.any(AbortSignal)
+    );
+    expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 95 }),
+      expect.any(AbortSignal)
+    );
+    const numbers = wrapper.findAll('.place-number').map(item => item.text());
+    expect(numbers).toEqual(['96', '97']);
+    expect(wrapper.text()).toContain('A small reserve');
+  });
+
+  it('draws the boundaries when a searched place is chosen', async () => {
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    const store = usePlacesStore(pinia);
+    await wrapper.get('input[aria-label="Search places"]').setValue('kruger');
+    await flushPromises();
+    expect(store.visible).toBe(false);
+
+    await wrapper.get('button.place-result').trigger('click');
+    await flushPromises();
+
+    expect(store.selectedId).not.toBeNull();
+    expect(store.visible).toBe(true);
+    expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
   });
 
   it('keeps the search and the place type when the profile closes', async () => {

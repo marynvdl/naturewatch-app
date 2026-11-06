@@ -35,6 +35,17 @@ let draw: MapboxDraw | null = null;
 /** Keep the length and area buttons in step with the draw tool. */
 function syncMode() {
   mode.value = draw?.getMode() ?? 'simple_select';
+  if (mode.value !== 'simple_select') {
+    measureStore.setDrawing(true);
+    return;
+  }
+  // The click that finishes a shape ends the mode first. Keep the flag
+  // until that same click has passed, so it cannot choose a place.
+  window.setTimeout(() => {
+    measureStore.setDrawing(
+      (draw?.getMode() ?? 'simple_select') !== 'simple_select'
+    );
+  }, 0);
 }
 
 /** Start a length or area measurement, or stop it if that tool is already on. */
@@ -74,6 +85,7 @@ onMounted(() => {
   map.value?.on('draw.actionable', syncMode);
   map.value?.on('draw.create', syncMode);
   map.value?.on('draw.delete', syncMode);
+  map.value?.on('draw.modechange', syncMode);
 
   watch(
     () => measureStore.shouldDeleteAll,
@@ -249,6 +261,8 @@ onBeforeUnmount(() => {
   map.value?.off('draw.actionable', syncMode);
   map.value?.off('draw.create', syncMode);
   map.value?.off('draw.delete', syncMode);
+  map.value?.off('draw.modechange', syncMode);
+  measureStore.setDrawing(false);
   unwatch();
 });
 

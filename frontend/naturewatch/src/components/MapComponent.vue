@@ -300,7 +300,8 @@ function updateLayerOpacityOnMap(
 
 onMounted(() => {
   // Create the controls
-  const nav = new mapboxgl.NavigationControl();
+  // The compass resets bearing and tilt together, and shows the tilt.
+  const nav = new mapboxgl.NavigationControl({ visualizePitch: true });
 
   // Initiate map
   const mapInstance = new mapboxgl.Map(mapOptions) as mapboxgl.Map;
@@ -342,6 +343,10 @@ onMounted(() => {
   mapInstance.on('contextmenu', e => {
     displayCoordinates(e.lngLat, e.originalEvent);
   });
+  // The popup is fixed on the screen, so it must not stay behind a moving map
+  mapInstance.on('movestart', () =>
+    coordinatesComponentRef.value?.closePopup()
+  );
 
   timelineStore.bindTileWait(() => waitForVisibleTiles(mapInstance));
 });
@@ -428,7 +433,9 @@ function setLabels(map: mapboxgl.Map | null) {
           // Keep labels added with the MeasureComponent
           !layer.id.includes('measure-label') &&
           // Keep lines and polygons added with the MeasureComponent
-          !layer.id.includes('gl-draw')
+          !layer.id.includes('gl-draw') &&
+          // Keep the place outlines, which Places controls
+          !layer.id.startsWith('places-')
         ) {
           // Toggle visibility
           if (areLabelsVisible.value) {
