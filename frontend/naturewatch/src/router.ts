@@ -96,7 +96,8 @@ router.afterEach((to, from) => {
 
   const posthog = usePosthog();
 
-  posthog.capture('$pageview', {
+  // PostHog only starts on the live hostnames, so it is missing on localhost
+  posthog?.capture('$pageview', {
     path: to.path,
     referrer: from.fullPath,
     search: to.fullPath.includes('?') ? to.fullPath.split('?')[1] : '',
