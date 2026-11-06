@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onBeforeUnmount, watch } from 'vue';
 import { Copy } from '@lucide/vue';
 
 const props = defineProps({
@@ -18,6 +18,7 @@ const props = defineProps({
 });
 
 const show = ref(false);
+const popup = ref<HTMLElement | null>(null);
 const coordinates = computed(() => {
   if (props.lngLat) {
     const lat = props.lngLat.lat.toFixed(5);
@@ -38,6 +39,38 @@ function openPopup() {
   show.value = true;
 }
 
+/** Close the popup. */
+function closePopup() {
+  show.value = false;
+}
+
+/** Close when a press lands outside the popup. */
+function onPressOutside(event: PointerEvent) {
+  if (popup.value?.contains(event.target as Node)) return;
+  closePopup();
+}
+
+/** Close on Escape. */
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') closePopup();
+}
+
+/** Listen for a dismissing press or key only while the popup is open. */
+watch(show, open => {
+  if (open) {
+    document.addEventListener('pointerdown', onPressOutside, true);
+    document.addEventListener('keydown', onKeydown);
+  } else {
+    document.removeEventListener('pointerdown', onPressOutside, true);
+    document.removeEventListener('keydown', onKeydown);
+  }
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onPressOutside, true);
+  document.removeEventListener('keydown', onKeydown);
+});
+
 /**
  * Copies coordinates to clipboard.
  */
@@ -47,12 +80,14 @@ function copyCoordinates() {
 
 defineExpose({
   openPopup,
+  closePopup,
 });
 </script>
 
 <template>
   <div
     v-if="show && coordinates"
+    ref="popup"
     class="coordinate-pop"
     :style="{ top: y + 'px', left: x + 'px' }"
   >

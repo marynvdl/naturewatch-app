@@ -161,6 +161,16 @@ function showBoundaries() {
   if (!placesStore.visible) placesStore.toggle();
 }
 
+/**
+ * Choose a place from the list. The boundaries are drawn so the place
+ * shows on the map even when the list came from a search.
+ * @param id - The stored place id.
+ */
+function chooseResult(id: string) {
+  if (placesStore.selectedId !== id) showBoundaries();
+  placesStore.selectPlace(id);
+}
+
 /** Remove the protected areas when they are drawn. */
 function hideBoundaries() {
   if (placesStore.visible) placesStore.toggle();
@@ -502,7 +512,7 @@ watch(
                 :aria-current="
                   placesStore.selectedId === place.id ? 'true' : undefined
                 "
-                @click="placesStore.selectPlace(place.id)"
+                @click="chooseResult(place.id)"
               >
                 <span class="place-thumb" aria-hidden="true">
                   <Image :size="20" :stroke-width="1.25" />
