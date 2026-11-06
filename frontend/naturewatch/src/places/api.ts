@@ -85,6 +85,12 @@ export type PlaceFilterStatsResult =
   | { status: 'unconfigured' }
   | { status: 'error' };
 
+/** Result of finding where one place sits in the list. */
+export type PlaceRankResult =
+  | { status: 'ok'; rank: number | null }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
 type WindowRow = PlaceSummary & { total_count: number | string };
 
 /** Result of opening one place. */
@@ -199,6 +205,28 @@ export async function loadPilotPlaceWindow(
       cropland_percent: row.cropland_percent,
     })),
   };
+}
+
+/**
+ * Where one place sits in the list for the current query.
+ * @param query - Search, sort, filters, and optional map extent.
+ * @param id - `places.id`.
+ * @returns The zero-based position, null when the place is not in the list, or why it could not be found.
+ */
+export async function loadPilotPlaceRank(
+  query: Omit<PlaceWindowQuery, 'offset'>,
+  id: string
+): Promise<PlaceRankResult> {
+  if (!PLACE_ID.test(id)) return { status: 'ok', rank: null };
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('protected_area_rank', {
+    ...matchedArgs(query),
+    p_sort: query.sort,
+    p_id: id,
+  });
+  if (error) return { status: 'error' };
+  return { status: 'ok', rank: data === null ? null : Number(data) };
 }
 
 /**

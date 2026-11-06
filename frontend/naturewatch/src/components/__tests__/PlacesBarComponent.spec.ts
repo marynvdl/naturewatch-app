@@ -4,6 +4,7 @@ import { createPinia } from 'pinia';
 import PlacesBarComponent from '@/components/PlacesBarComponent.vue';
 import {
   loadPilotPlaceFilterStats,
+  loadPilotPlaceRank,
   loadPilotPlaceWindow,
   loadPlaceRelease,
 } from '@/places/api';
@@ -41,7 +42,9 @@ vi.mock('@/places/api', () => ({
   loadPilotPlaceWindow: vi.fn(),
   loadPilotPlaceWindowCount: vi.fn(),
   loadPilotPlaceFilterStats: vi.fn(),
+  loadPilotPlaceRank: vi.fn(),
   loadPlaceRelease: vi.fn(),
+  PLACE_LIST_LIMIT: 50,
 }));
 
 const places = [
@@ -119,6 +122,10 @@ describe('Places panel', () => {
     ioCallback = null;
     vi.clearAllMocks();
     vi.mocked(loadPilotPlaceFilterStats).mockResolvedValue(stats);
+    vi.mocked(loadPilotPlaceRank).mockResolvedValue({
+      status: 'ok',
+      rank: null,
+    });
     vi.mocked(loadPilotPlaceWindow).mockImplementation(async query => {
       const prefix = query.search.trim().toLocaleLowerCase();
       let list = places;
@@ -523,6 +530,56 @@ describe('Places panel', () => {
     expect(wrapper.get('.places-count').text()).toBe('1 of 941 places');
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
     expect(loadPilotPlaceWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads the rows around a map-chosen place and keeps its rank', async () => {
+    vi.mocked(loadPilotPlaceWindow).mockImplementation(async query => ({
+      status: 'ok',
+      places: query.offset ? [missingPlace, places[1]] : [places[0]],
+      total: 941,
+    }));
+    vi.mocked(loadPilotPlaceRank).mockResolvedValue({
+      status: 'ok',
+      rank: 120,
+    });
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    const store = usePlacesStore(pinia);
+    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await flushPromises();
+
+    store.selectPlace(missingPlace.id, 'map');
+    await flushPromises();
+
+    expect(loadPilotPlaceRank).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: 'size-desc' }),
+      missingPlace.id
+    );
+    expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 95 })
+    );
+    const numbers = wrapper.findAll('.place-number').map(item => item.text());
+    expect(numbers).toEqual(['96', '97']);
+    expect(wrapper.text()).toContain('A small reserve');
+  });
+
+  it('draws the boundaries when a searched place is chosen', async () => {
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    const store = usePlacesStore(pinia);
+    await wrapper.get('input[aria-label="Search places"]').setValue('kruger');
+    await flushPromises();
+    expect(store.visible).toBe(false);
+
+    await wrapper.get('button.place-result').trigger('click');
+    await flushPromises();
+
+    expect(store.selectedId).not.toBeNull();
+    expect(store.visible).toBe(true);
   });
 
   it('keeps the search and the place type when the profile closes', async () => {

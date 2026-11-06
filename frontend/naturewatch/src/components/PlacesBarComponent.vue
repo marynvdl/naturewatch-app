@@ -16,9 +16,11 @@ import {
 } from '@/components/ui/popover';
 import {
   loadPilotPlaceFilterStats,
+  loadPilotPlaceRank,
   loadPilotPlaceWindow,
   type PlaceSummary,
   type PlaceWindowQuery,
+  PLACE_LIST_LIMIT,
 } from '@/places/api';
 import {
   countryName,
@@ -44,6 +46,8 @@ const listStatus = ref<'idle' | 'loading' | 'ok' | 'unconfigured' | 'error'>(
 );
 const nothingStored = 'Well, this is awkward. We have nothing to show.';
 const places = ref<PlaceSummary[]>([]);
+/** Matching rows before the first loaded one. A place's number is this plus its index plus one. */
+const windowStart = ref(0);
 const matchTotal = ref(0);
 const storedCount = ref(0);
 const statsReady = ref(false);
@@ -54,11 +58,14 @@ const query = ref('');
 const listInView = ref(false);
 const resultsList = ref<HTMLElement | null>(null);
 const moreSentinel = ref<HTMLElement | null>(null);
+const earlierSentinel = ref<HTMLElement | null>(null);
+const loadingEarlier = ref(false);
 const loadingMore = ref(false);
 const moreExhausted = ref(false);
 let listRequest = 0;
 let listWait: ReturnType<typeof setTimeout> | null = null;
 let moreObserver: IntersectionObserver | null = null;
+const WINDOW_AHEAD = PLACE_LIST_LIMIT / 2;
 const listWaitMs = import.meta.env.MODE === 'test' ? 0 : 200;
 
 const needle = computed(() => query.value.trim());
@@ -202,6 +209,7 @@ async function refreshList() {
   listStatus.value = result.status === 'ok' ? 'ok' : result.status;
   if (result.status === 'ok') {
     places.value = result.places;
+    windowStart.value = 0;
     matchTotal.value = result.total;
     await nextTick();
     const scroller = listScroller();
@@ -213,9 +221,9 @@ async function refreshList() {
 async function loadMore() {
   if (loadingMore.value) return;
   if (listStatus.value !== 'ok') return;
-  if (places.value.length >= matchTotal.value) return;
+  if (windowStart.value + places.value.length >= matchTotal.value) return;
   const request = listRequest;
-  const offset = places.value.length;
+  const offset = windowStart.value + places.value.length;
   loadingMore.value = true;
   const result = await loadPilotPlaceWindow(listQuery(offset));
   if (request !== listRequest) return;
@@ -231,27 +239,77 @@ async function loadMore() {
   places.value = [...places.value, ...extra];
 }
 
-/** Watch the end of the list so scrolling loads the next page. */
+/** Load the 50 rows before the first loaded one, keeping the view where it is. */
+async function loadEarlier() {
+  if (loadingEarlier.value || windowStart.value === 0) return;
+  if (listStatus.value !== 'ok') return;
+  const request = listRequest;
+  const offset = Math.max(0, windowStart.value - PLACE_LIST_LIMIT);
+  loadingEarlier.value = true;
+  const result = await loadPilotPlaceWindow(listQuery(offset));
+  if (request !== listRequest) return;
+  loadingEarlier.value = false;
+  if (result.status !== 'ok') return;
+  const have = new Set(places.value.map(place => place.id));
+  const fresh = result.places.filter(place => !have.has(place.id));
+  const scroller = listScroller();
+  const before = scroller?.scrollHeight ?? 0;
+  places.value = [...fresh, ...places.value];
+  windowStart.value = offset;
+  await nextTick();
+  if (scroller) scroller.scrollTop += scroller.scrollHeight - before;
+}
+
+/**
+ * Replace the list with the rows around a place, so the place keeps its
+ * ranked position and the places before and after it are loaded.
+ * @param id - The place to centre on.
+ * @returns Whether the place is now in the list.
+ */
+async function loadAround(id: string): Promise<boolean> {
+  const request = ++listRequest;
+  const ranked = await loadPilotPlaceRank(listQuery(), id);
+  if (request !== listRequest) return false;
+  if (ranked.status !== 'ok' || ranked.rank === null) return false;
+  const offset = Math.max(0, ranked.rank - WINDOW_AHEAD);
+  const result = await loadPilotPlaceWindow(listQuery(offset));
+  if (request !== listRequest || result.status !== 'ok') return false;
+  loadingMore.value = false;
+  loadingEarlier.value = false;
+  moreExhausted.value = false;
+  places.value = result.places;
+  windowStart.value = offset;
+  matchTotal.value = result.total;
+  await nextTick();
+  return result.places.some(place => place.id === id);
+}
+
+/** Watch the ends of the list so scrolling loads the rows beyond them. */
 function watchMore() {
   moreObserver?.disconnect();
   moreObserver = null;
-  const sentinel = moreSentinel.value;
   const root = listScroller();
-  if (
-    typeof IntersectionObserver === 'undefined' ||
-    !sentinel ||
-    !root ||
-    moreExhausted.value ||
-    places.value.length >= matchTotal.value
-  )
-    return;
+  if (typeof IntersectionObserver === 'undefined' || !root) return;
+  const later = moreSentinel.value;
+  const earlier = earlierSentinel.value;
+  const hasLater =
+    later &&
+    !moreExhausted.value &&
+    windowStart.value + places.value.length < matchTotal.value;
+  const hasEarlier = earlier && windowStart.value > 0;
+  if (!hasLater && !hasEarlier) return;
   moreObserver = new IntersectionObserver(
     entries => {
-      if (entries.some(entry => entry.isIntersecting)) void loadMore();
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        if (entry.target === earlier) void loadEarlier();
+        else void loadMore();
+      });
     },
     { root, rootMargin: '80px' }
   );
-  moreObserver.observe(sentinel);
+  if (hasLater) moreObserver.observe(later);
+  if (hasEarlier) moreObserver.observe(earlier);
 }
 
 /** Wait for typing or a map move before querying again. */
@@ -323,7 +381,13 @@ function selectPlaceType(type: PlaceTypeId) {
 }
 
 watch(
-  () => [places.value.length, matchTotal.value, listStatus.value] as const,
+  () =>
+    [
+      places.value.length,
+      windowStart.value,
+      matchTotal.value,
+      listStatus.value,
+    ] as const,
   () => {
     void nextTick(watchMore);
   }
@@ -335,18 +399,24 @@ onBeforeUnmount(() => {
 });
 
 /**
- * Scroll a place chosen on the map to the top of the list when it is in the
- * window. The profile opens either way.
+ * Scroll a place chosen on the map to the top of the list. When the place is
+ * not loaded, load the rows around its ranked position first. The profile
+ * opens either way.
  */
 watch(
   () => [placesStore.selectedId, placesStore.selectedFrom] as const,
   async ([id, source]) => {
     if (!id || source !== 'map') return;
+    if (!showProtected.value && !searchingAll.value) return;
     await nextTick();
+    const find = () =>
+      resultsList.value?.querySelector<HTMLElement>(
+        `[data-place-id="${CSS.escape(id)}"]`
+      );
+    if (!find() && !(await loadAround(id))) return;
+    if (placesStore.selectedId !== id) return;
     const list = resultsList.value;
-    const row = list?.querySelector<HTMLElement>(
-      `[data-place-id="${CSS.escape(id)}"]`
-    );
+    const row = find();
     if (!list || !row) return;
     const scroller = listScroller() ?? list;
     const top = Math.max(
@@ -499,12 +569,18 @@ watch(
           </p>
           <ul v-else aria-label="Place results">
             <li
+              v-if="windowStart > 0"
+              ref="earlierSentinel"
+              class="places-more"
+              aria-hidden="true"
+            />
+            <li
               v-for="(place, index) in shown"
               :key="place.id"
               :data-place-id="place.id"
             >
               <span class="place-number" aria-hidden="true">
-                {{ index + 1 }}
+                {{ windowStart + index + 1 }}
               </span>
               <button
                 type="button"
@@ -532,7 +608,7 @@ watch(
             </li>
           </ul>
           <div
-            v-if="shown.length > 0 && shown.length < matchTotal"
+            v-if="shown.length > 0 && windowStart + shown.length < matchTotal"
             ref="moreSentinel"
             class="places-more"
             aria-hidden="true"
