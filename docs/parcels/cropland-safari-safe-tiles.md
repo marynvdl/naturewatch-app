@@ -17,7 +17,7 @@ So the cause is the tile encoding, not Mapbox settings or the colour expression.
 
 ## Plan
 
-Task 09 first finds the cheapest reliable route, with no billable processing, then stops for approval. It compares RGB with R = 0 and 1 against RGB or RGBA with R = 0 and 255, and checks whether the existing archive can be transcoded without redoing the COG-to-tile build. It tests the real Mapbox and PMTiles path in Safari and Chrome. After approval it writes `cropland/2024/v3/cropland.pmtiles` and verifies it before publishing.
+Task 09 first finds the cheapest reliable route, with no billable processing, then stops for approval. It compares RGB with R = 0 and 1 against RGB or RGBA with R = 0 and 255, and checks whether the existing archive can be transcoded without redoing the COG-to-tile build. It measures cold load in the browser against Global Forest Watch treeloss, benchmarks tile and archive size, and recommends delivery and layout changes (CDN, cache headers, PMTiles directories, optional 512 px tiles) where they help. It tests the real Mapbox and PMTiles path in Safari and Chrome. After approval it writes `cropland/2024/v3/cropland.pmtiles` and verifies it before publishing.
 
 Task 10 points the layer at v3 and adjusts the colour paint if the encoding needs it. The v2 archive stays until v3 is live.
 
