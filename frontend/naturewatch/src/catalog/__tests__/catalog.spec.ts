@@ -10,7 +10,11 @@ import {
   getTimelineRange,
   resolveLayerYear,
 } from '../index';
-import { classRasterPaint } from '../rasterColor';
+import {
+  classRasterPaint,
+  sharePaintColor,
+  shareRasterPaint,
+} from '../rasterColor';
 import { isPmtilesUrl } from '../rasterSource';
 import type { Catalog } from '../types';
 
@@ -174,7 +178,6 @@ describe('layer catalog', () => {
       'fire',
       'bare',
       'mines',
-      'crops',
       'cropland',
       'rivers',
       'dams',
@@ -225,22 +228,100 @@ describe('layer catalog', () => {
     expect(card?.content).toContain('CC BY 4.0');
   });
 
-  it('colours cropland class 1 and leaves class 0 clear', () => {
+  it('paints cropland share tiles graded below zoom 11 and solid from it', () => {
     const layer = catalog.layers.find(entry => entry.id === 'cropland');
-    expect(layer?.title).toBe('Cropland');
+    expect(layer?.title).toBe('Crops');
     expect(layer?.status).toBe('published');
     expect(layer?.years).toEqual({ available: [2024], meaning: 'snapshot' });
     expect(layer?.tiles).toMatchObject({
-      url: 'https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v2/cropland.pmtiles',
-      maxzoom: 12,
+      url: 'https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v3/cropland.pmtiles',
+      maxzoom: 11,
+      tileSize: 512,
       resampling: 'nearest',
-      colorClasses: [{ value: 1, color: '#e59139' }],
+      sharePaint: {
+        color: '#e59139',
+        colorSatellite: '#f49a3c',
+        steps: 7,
+        solidZoom: 11,
+      },
     });
+    expect(layer?.tiles.colorClasses).toBeUndefined();
+    expect(
+      sharePaintColor(
+        layer?.tiles.sharePaint ?? { color: '', steps: 1, solidZoom: 0 },
+        false
+      )
+    ).toBe('#e59139');
+    expect(
+      sharePaintColor(
+        layer?.tiles.sharePaint ?? { color: '', steps: 1, solidZoom: 0 },
+        true
+      )
+    ).toBe('#f49a3c');
     expect(resolveLayerYear([2024], 2024, 'snapshot')).toBe(2024);
     expect(resolveLayerYear([2024], 2025, 'snapshot')).toBe(2024);
     expect(resolveLayerYear([2024], 2016, 'snapshot')).toBeNull();
 
-    const paint = classRasterPaint(layer?.tiles.colorClasses ?? []);
+    const paint = shareRasterPaint(
+      layer?.tiles.sharePaint ?? {
+        color: '#e59139',
+        steps: 7,
+        solidZoom: 11,
+      }
+    );
+    expect(paint.solidZoom).toBe(11);
+    expect(paint.graded['raster-color-mix']).toEqual([255, 0, 0, 0]);
+    expect(paint.graded['raster-color-range']).toEqual([0, 255]);
+    expect(paint.graded['raster-fade-duration']).toBe(0);
+    expect(paint.graded['raster-color']).toEqual([
+      'interpolate',
+      ['linear'],
+      ['raster-value'],
+      0,
+      'rgba(229,145,57,0)',
+      5,
+      'rgba(229,145,57,0.30714285714285716)',
+      21,
+      'rgba(229,145,57,0.41428571428571426)',
+      47,
+      'rgba(229,145,57,0.5214285714285714)',
+      83,
+      'rgba(229,145,57,0.6285714285714286)',
+      130,
+      'rgba(229,145,57,0.7357142857142858)',
+      187,
+      'rgba(229,145,57,0.8428571428571427)',
+      255,
+      'rgba(229,145,57,0.95)',
+    ]);
+    expect(paint.solid['raster-color']).toEqual([
+      'step',
+      ['raster-value'],
+      'rgba(229,145,57,0)',
+      128,
+      'rgba(229,145,57,1)',
+    ]);
+
+    const mapLayer = buildMapLayers(catalog).find(
+      entry => entry.title === 'Crops'
+    );
+    expect(mapLayer?.share_paint).toEqual({
+      color: '#e59139',
+      colorSatellite: '#f49a3c',
+      steps: 7,
+      solidZoom: 11,
+    });
+    expect(mapLayer?.tile_size).toBe(512);
+    expect(mapLayer?.max_zoom).toBe(11);
+    expect(mapLayer?.resampling).toBe('nearest');
+    expect(mapLayer?.tooltip).toBe('2024');
+    const card = buildInfoCards(catalog).find(entry => entry.title === 'Crops');
+    expect(card?.content).toContain('Faint orange');
+    expect(card?.content).toContain('From zoom 11');
+  });
+
+  it('still colours class-value tiles through classRasterPaint', () => {
+    const paint = classRasterPaint([{ value: 1, color: '#e59139' }]);
     expect(paint['raster-color-mix']).toEqual([255, 0, 0, 0]);
     expect(paint['raster-fade-duration']).toBe(0);
     expect(paint['raster-color-range']).toEqual([0, 1]);
@@ -251,14 +332,6 @@ describe('layer catalog', () => {
       0.5,
       '#e59139',
     ]);
-
-    const mapLayer = buildMapLayers(catalog).find(
-      entry => entry.title === 'Cropland'
-    );
-    expect(mapLayer?.color_classes).toEqual([{ value: 1, color: '#e59139' }]);
-    expect(mapLayer?.max_zoom).toBe(12);
-    expect(mapLayer?.resampling).toBe('nearest');
-    expect(mapLayer?.tooltip).toBe('2024');
   });
 
   it('only enables published layers', () => {

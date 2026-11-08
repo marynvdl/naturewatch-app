@@ -24,7 +24,11 @@ import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
 import type MapLayer from '@/interfaces/MapLayerInterface';
 import { resolveLayerYear } from '@/catalog';
-import { classRasterPaint } from '@/catalog/rasterColor';
+import {
+  classRasterPaint,
+  sharePaintColor,
+  shareRasterPaint,
+} from '@/catalog/rasterColor';
 import { rasterSourceSpec } from '@/catalog/rasterSource';
 import usePlacesStore from '@/store/PlacesStore';
 import { usePlaceBoundaries } from '@/places/usePlaceBoundaries';
@@ -275,27 +279,40 @@ function updateLayerOpacityOnMap(
   opacity: number,
   map: mapboxgl.Map | null
 ) {
-  const fullLayerId = layerTitle + activeYear.value; // Construct the full layer ID
-  if (map) {
+  if (!map) return;
+  const opacityValue = opacity / 100;
+  for (const fullLayerId of rasterMapIds(layerTitle, activeYear.value, map)) {
     const layer = map.getLayer(fullLayerId);
-    if (layer) {
-      const opacityValue = opacity / 100;
-
-      // Determine the correct opacity property based on layer type
-      const layerType = layer.type;
-      let opacityProperty: 'raster-opacity' | 'circle-opacity' | '' = '';
-      if (layerType === 'raster') {
-        opacityProperty = 'raster-opacity';
-      } else if (layerType === 'circle') {
-        opacityProperty = 'circle-opacity';
-      }
-      // Add more conditions for other layer types if needed
-
-      if (opacityProperty) {
-        map.setPaintProperty(fullLayerId, opacityProperty, opacityValue);
-      }
+    if (!layer) continue;
+    let opacityProperty: 'raster-opacity' | 'circle-opacity' | '' = '';
+    if (layer.type === 'raster') {
+      opacityProperty = 'raster-opacity';
+    } else if (layer.type === 'circle') {
+      opacityProperty = 'circle-opacity';
+    }
+    if (opacityProperty) {
+      map.setPaintProperty(fullLayerId, opacityProperty, opacityValue);
     }
   }
+}
+
+/** Mapbox layer ids for a catalog layer in a given year, including the solid share companion. */
+function rasterMapIds(
+  layerTitle: string,
+  year: number,
+  map: mapboxgl.Map
+): string[] {
+  const base = layerTitle + year;
+  return [base, `${base}-solid`].filter(id => map.getLayer(id));
+}
+
+/** Remove the map layers for a catalog layer in a given year. */
+function removeRasterLayers(
+  layerTitle: string,
+  year: number,
+  map: mapboxgl.Map
+) {
+  rasterMapIds(layerTitle, year, map).forEach(id => map.removeLayer(id));
 }
 
 onMounted(() => {
@@ -485,11 +502,11 @@ function updateMapLayer(
 ) {
   if (layer.visible) {
     addSourceAndLayer(layer, activeYear.value, map);
-    if (previousYear && map.getLayer(layer.title + previousYear)) {
-      map.removeLayer(layer.title + previousYear);
+    if (previousYear) {
+      removeRasterLayers(layer.title, previousYear, map);
     }
   } else if (map.getSource(layer.title + activeYear.value)) {
-    map.removeLayer(layer.title + activeYear.value);
+    removeRasterLayers(layer.title, activeYear.value, map);
   }
 }
 
@@ -539,7 +556,7 @@ function addSourceToMap(
       if (!map?.getSource(layer.title + activeYear.value)) {
         map.addSource(
           layer.title + activeYear.value,
-          rasterSourceSpec(layerUrl, layer.max_zoom)
+          rasterSourceSpec(layerUrl, layer.max_zoom, layer.tile_size)
         );
       }
     } else if (layer.type === 'circle' || layer.type === 'line') {
@@ -560,8 +577,8 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
     const currentOpacity = mapLayerStore.getLayerOpacity(layer.title) / 100;
 
     // Add layer below labels and lines
-    let firstLineId;
-    let firstLabelId;
+    let firstLineId: string | undefined;
+    let firstLabelId: string | undefined;
 
     const style = map.getStyle();
     if (style && style.layers) {
@@ -578,20 +595,53 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
     const layerId = layer.title + activeYear.value;
     const onStandard = !!style?.imports?.length;
     if (layer.type === 'raster') {
-      const spec: mapboxgl.RasterLayer = {
-        id: layerId,
-        type: 'raster',
-        source: layerId,
-        paint: {
-          'raster-opacity': currentOpacity, // Set the opacity here
-          ...(layer.resampling && { 'raster-resampling': layer.resampling }),
-          ...(layer.color_classes?.length
-            ? classRasterPaint(layer.color_classes)
-            : {}),
-        },
-      };
-      if (onStandard) spec.slot = 'middle';
-      map.addLayer(spec, onStandard ? undefined : firstLineId);
+      const share = layer.share_paint
+        ? shareRasterPaint({
+            ...layer.share_paint,
+            color: sharePaintColor(
+              layer.share_paint,
+              currentBasemap.value.title === 'Satellite'
+            ),
+          })
+        : null;
+      const variants: {
+        id: string;
+        paint: ReturnType<typeof classRasterPaint> | Record<string, never>;
+        maxzoom?: number;
+        minzoom?: number;
+      }[] = share
+        ? [
+            { id: layerId, paint: share.graded, maxzoom: share.solidZoom },
+            {
+              id: `${layerId}-solid`,
+              paint: share.solid,
+              minzoom: share.solidZoom,
+            },
+          ]
+        : [
+            {
+              id: layerId,
+              paint: layer.color_classes?.length
+                ? classRasterPaint(layer.color_classes)
+                : {},
+            },
+          ];
+      variants.forEach(variant => {
+        const spec: mapboxgl.RasterLayer = {
+          id: variant.id,
+          type: 'raster',
+          source: layerId,
+          paint: {
+            'raster-opacity': currentOpacity,
+            ...(layer.resampling && { 'raster-resampling': layer.resampling }),
+            ...variant.paint,
+          },
+        };
+        if (variant.maxzoom !== undefined) spec.maxzoom = variant.maxzoom;
+        if (variant.minzoom !== undefined) spec.minzoom = variant.minzoom;
+        if (onStandard) spec.slot = 'middle';
+        map.addLayer(spec, onStandard ? undefined : firstLineId);
+      });
     } else if (layer.type === 'circle') {
       const spec: mapboxgl.CircleLayer = {
         id: layerId,

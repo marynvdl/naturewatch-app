@@ -125,14 +125,47 @@
               "maximum": 22,
               "description": "Highest zoom level the tiles exist for. Beyond it the map enlarges the last level instead of requesting missing tiles. Leave out to request every zoom level."
             },
+            "tileSize": {
+              "type": "integer",
+              "enum": [256, 512],
+              "description": "Pixel size of each tile. 512 px tiles use a zoom range one less than 256 px tiles of the same resolution. Leave out for 256."
+            },
             "resampling": {
               "enum": ["linear", "nearest"],
               "description": "Raster only. How pixels are drawn when enlarged. nearest keeps data pixels sharp. Leave out for the Mapbox default (linear)."
             },
+            "sharePaint": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["color", "steps", "solidZoom"],
+              "description": "Share tiles. The red channel is cropland share on a 0–255 scale. The map paints a graded orange below solidZoom and a solid class from it.",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-Fa-f]{6}$"
+                },
+                "colorSatellite": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-Fa-f]{6}$",
+                  "description": "Paint colour on the satellite basemap. Leave out to use color."
+                },
+                "steps": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 255,
+                  "description": "Graded steps. Shades are 0 to steps inclusive. Shade k stores share (k / steps) squared."
+                },
+                "solidZoom": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 22
+                }
+              }
+            },
             "colorClasses": {
               "type": "array",
               "minItems": 1,
-              "description": "Class values the client colours. The tile stores each class as an 8-bit gray value. Classes that are not listed stay transparent.",
+              "description": "Class values the client colours. The tile stores each class in the red channel. Classes that are not listed stay transparent.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,

@@ -45,8 +45,17 @@ export default interface MapLayer {
   query_string?: string;
   /** Highest zoom level the tiles exist for; the map enlarges that level beyond it */
   max_zoom?: number;
+  /** Pixel size of each tile. Leave out for 256. */
+  tile_size?: 256 | 512;
   /** How raster pixels are drawn when enlarged */
   resampling?: 'linear' | 'nearest';
   /** Class values the client colours. Unlisted classes stay transparent. */
   color_classes?: { value: number; color: string }[];
+  /** Share tiles: red is cropland share 0–255. Graded below solidZoom, solid from it. */
+  share_paint?: {
+    color: string;
+    colorSatellite?: string;
+    steps: number;
+    solidZoom: number;
+  };
 }

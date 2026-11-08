@@ -33,10 +33,19 @@ export interface CatalogLayer {
     query?: string;
     /** Highest zoom level the tiles exist for. Beyond it the map enlarges the last level. */
     maxzoom?: number;
+    /** Pixel size of each tile. Leave out for 256. */
+    tileSize?: 256 | 512;
     /** How raster pixels are drawn when enlarged. Use nearest for data pixels that should stay sharp. */
     resampling?: 'linear' | 'nearest';
     /** Class values the client colours. Unlisted classes stay transparent. */
     colorClasses?: { value: number; color: string }[];
+    /** Share tiles: red is cropland share 0–255. Graded below solidZoom, solid from it. */
+    sharePaint?: {
+      color: string;
+      colorSatellite?: string;
+      steps: number;
+      solidZoom: number;
+    };
     sourceLayer?: string;
     circle?: { radius: number; colorSatellite: string; colorStreets: string };
   };

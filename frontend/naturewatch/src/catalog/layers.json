@@ -157,35 +157,8 @@
       }
     },
     {
-      "id": "crops",
-      "title": "Crops",
-      "group": "threats",
-      "status": "published",
-      "display": {
-        "buttonType": "small",
-        "icon": "mdi-barley",
-        "color": "#e59139"
-      },
-      "tiles": {
-        "type": "raster",
-        "url": "https://storage.googleapis.com/nature-watch-tiles/crop/",
-        "query": "{year}/{z}/{x}/{y}.png?v=1"
-      },
-      "years": {
-        "available": [2015, 2019],
-        "meaning": "snapshot"
-      },
-      "source": {
-        "name": "UMD GLAD Global Cropland Expansion in the 21st Century",
-        "url": "https://glad.umd.edu/dataset/croplands"
-      },
-      "info": {
-        "content": "Cropland from the <a href=\"https://glad.umd.edu/dataset/croplands\" target=\"_blank\">UMD GLAD Global Cropland Expansion</a> dataset. The map publishes two snapshots, 2015 and 2019. For any timeline year after 2019, the crops layer still shows 2019. A coloured area means the dataset classed that place as cropland in the snapshot year. It does not show crop type or yield."
-      }
-    },
-    {
       "id": "cropland",
-      "title": "Cropland",
+      "title": "Crops",
       "group": "threats",
       "status": "published",
       "display": {
@@ -196,10 +169,16 @@
       },
       "tiles": {
         "type": "raster",
-        "url": "https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v2/cropland.pmtiles",
-        "maxzoom": 12,
+        "url": "https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v3/cropland.pmtiles",
+        "maxzoom": 11,
+        "tileSize": 512,
         "resampling": "nearest",
-        "colorClasses": [{ "value": 1, "color": "#e59139" }]
+        "sharePaint": {
+          "color": "#e59139",
+          "colorSatellite": "#f49a3c",
+          "steps": 7,
+          "solidZoom": 11
+        }
       },
       "years": {
         "available": [2024],
@@ -207,11 +186,11 @@
       },
       "source": {
         "name": "UMD GLAD annual cropland",
-        "version": "v2",
+        "version": "v3",
         "url": "https://glad.umd.edu/dataset/annual-croplands"
       },
       "info": {
-        "content": "Cropland for 2024 from the <a href=\"https://glad.umd.edu/dataset/annual-croplands\" target=\"_blank\">UMD GLAD annual cropland</a> dataset. The snapshot is global 2024. It is a different product from the 2015 and 2019 crops snapshots. Orange marks class 1, the dataset's cropland class. The tiles store the class value, and the map applies the colour. Other land and missing data stay clear. It does not show crop type or yield. Tiles come from one archive and run through zoom 12, and closer zoom enlarges them. Coarser zooms mark a cell as cropland when more than a quarter of the pixels under it are. A timeline year before 2024 does not show this layer."
+        "content": "Crops for 2024 from the <a href=\"https://glad.umd.edu/dataset/annual-croplands\" target=\"_blank\">UMD GLAD annual cropland</a> dataset. The snapshot is global 2024. Orange is how much of each cell is cropland: faint where sparse, strong where dense. From zoom 11 the map draws a cell solid if at least half of it is cropland. Other land and missing data stay clear. It does not show crop type or yield. Tiles come from one archive and run through zoom 11, and closer zoom enlarges them. A timeline year before 2024 does not show this layer.\n    <ul>\n    <li>Clear: no cropland, ocean, or missing data</li>\n    <li>Faint orange: a small share of the cell is cropland</li>\n    <li>Strong orange: most of the cell is cropland</li>\n    <li>From zoom 11: orange is cropland, clear is not</li>\n    </ul>"
       }
     },
     {

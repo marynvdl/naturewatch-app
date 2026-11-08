@@ -2,7 +2,8 @@
 import { catalog } from '@/catalog';
 import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
-import { computed, onMounted, ref } from 'vue';
+import { useMediaQuery } from '@vueuse/core';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { Info, Settings } from '@lucide/vue';
 import LayerIcon from '@/components/LayerIcon.vue';
 import {
@@ -38,6 +39,18 @@ const infoByTitle = new Map(
 const infoTitle = ref<string | null>(null);
 const layerPanel = ref<HTMLElement | null>(null);
 const settingsSideOffset = ref(8);
+const isNarrow = useMediaQuery('(max-width: 720px)');
+/** Sit next to the gear while info is open so the wider card can use the viewport. */
+const popoverSideOffset = computed(() =>
+  infoTitle.value ? 8 : settingsSideOffset.value
+);
+/** On a small screen the wide card drops under the gear instead of clipping left. */
+const popoverSide = computed(() =>
+  infoTitle.value && isNarrow.value ? 'bottom' : 'left'
+);
+const popoverAlign = computed(() =>
+  infoTitle.value && isNarrow.value ? 'end' : 'start'
+);
 
 /** Keep the settings card to the left of the layers panel, clear of the buttons. */
 function placeSettingsBesidePanel() {
@@ -47,11 +60,85 @@ function placeSettingsBesidePanel() {
   settingsSideOffset.value = Math.round(panel.offsetWidth - padRight - 20 + 8);
 }
 
-onMounted(placeSettingsBesidePanel);
+onMounted(() => {
+  placeSettingsBesidePanel();
+  window.addEventListener('resize', onPopoverViewportChange);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', onPopoverViewportChange);
+});
+
+let fitTimer = 0;
+
+/**
+ * Read the translate from a computed CSS matrix.
+ * @param transform - getComputedStyle transform value
+ */
+function matrixTranslate(transform: string): { x: number; y: number } {
+  const match = transform.match(/matrix(?:3d)?\(([^)]+)\)/);
+  if (!match) return { x: 0, y: 0 };
+  const n = match[1].split(',').map(value => parseFloat(value.trim()));
+  if (n.length === 6) return { x: n[4], y: n[5] };
+  if (n.length === 16) return { x: n[12], y: n[13] };
+  return { x: 0, y: 0 };
+}
+
+/** Keep an open info card inside the viewport, scrolling if the copy is long. */
+function fitWidePopover() {
+  const el = document.querySelector(
+    '.layer-popover.is-wide'
+  ) as HTMLElement | null;
+  const wrap = el?.parentElement;
+  if (!el || !wrap) return;
+  const pad = 12;
+  const maxBox = window.innerHeight - pad * 2;
+  el.style.setProperty('max-height', `${Math.max(160, maxBox)}px`, 'important');
+
+  const rect = wrap.getBoundingClientRect();
+  let dy = 0;
+  let dx = 0;
+  if (rect.bottom > window.innerHeight - pad) {
+    dy = window.innerHeight - pad - rect.bottom;
+  }
+  if (rect.top + dy < pad) dy = pad - rect.top;
+  if (rect.left + dx < pad) dx = pad - rect.left;
+  else if (rect.right + dx > window.innerWidth - pad) {
+    dx = window.innerWidth - pad - rect.right;
+  }
+  if (dx || dy) {
+    const { x, y } = matrixTranslate(getComputedStyle(wrap).transform);
+    wrap.style.transform = `translate(${x + dx}px, ${y + dy}px)`;
+  }
+
+  const after = wrap.getBoundingClientRect();
+  const room = window.innerHeight - Math.max(pad, after.top) - pad;
+  el.style.setProperty(
+    'max-height',
+    `${Math.max(160, Math.min(room, maxBox))}px`,
+    'important'
+  );
+}
+
+/** Wait for the popover to finish placing, then clamp it to the viewport. */
+function scheduleFitWidePopover() {
+  window.clearTimeout(fitTimer);
+  nextTick(() => {
+    requestAnimationFrame(() => requestAnimationFrame(fitWidePopover));
+    fitTimer = window.setTimeout(fitWidePopover, 120);
+  });
+}
+
+/** Re-place the settings card and keep open info inside the viewport. */
+function onPopoverViewportChange() {
+  placeSettingsBesidePanel();
+  if (infoTitle.value) scheduleFitWidePopover();
+}
 
 /** Show or hide the description inside the open settings panel. */
 function toggleInfo(title: string) {
   infoTitle.value = infoTitle.value === title ? null : title;
+  if (infoTitle.value) scheduleFitWidePopover();
 }
 
 /** Close the description when its settings panel closes. */
@@ -124,11 +211,16 @@ function onOpacity(title: string, value: unknown) {
                   </button>
                 </PopoverTrigger>
                 <PopoverContent
-                  side="left"
-                  align="start"
-                  :avoid-collisions="false"
-                  :side-offset="settingsSideOffset"
-                  class="layer-popover nw:z-[1200] nw:max-h-[70vh] nw:gap-3 nw:overflow-y-auto nw:shadow-none"
+                  :key="infoTitle === item.title ? 'info' : 'settings'"
+                  :side="popoverSide"
+                  :align="popoverAlign"
+                  :avoid-collisions="true"
+                  :collision-padding="12"
+                  :side-offset="popoverSideOffset"
+                  :class="[
+                    'layer-popover nw:z-[1200] nw:gap-3 nw:shadow-none',
+                    infoTitle === item.title ? 'is-wide' : '',
+                  ]"
                 >
                   <div
                     class="nw:flex nw:items-center nw:justify-between nw:gap-2"
@@ -283,6 +375,10 @@ function onOpacity(title: string, value: unknown) {
 
 .layer-info-button[aria-expanded='true'] {
   background: var(--on);
+}
+
+.layer-info {
+  overflow-wrap: anywhere;
 }
 
 .layer-info :deep(a) {

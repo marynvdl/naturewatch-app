@@ -4,8 +4,19 @@ import { isPmtilesUrl, rasterSourceSpec } from '../rasterSource';
 describe('rasterSourceSpec', () => {
   it('loads one PMTiles archive as a source url', () => {
     const url =
-      'https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v2/cropland.pmtiles';
+      'https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v3/cropland.pmtiles';
     expect(isPmtilesUrl(url)).toBe(true);
+    expect(rasterSourceSpec(url, 11, 512)).toEqual({
+      type: 'raster',
+      tileSize: 512,
+      url,
+      maxzoom: 11,
+    });
+  });
+
+  it('defaults to 256 px tiles', () => {
+    const url =
+      'https://storage.googleapis.com/nature-watch-tiles/cropland/2024/v2/cropland.pmtiles';
     expect(rasterSourceSpec(url, 12)).toEqual({
       type: 'raster',
       tileSize: 256,

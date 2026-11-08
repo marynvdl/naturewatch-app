@@ -76,8 +76,10 @@ export function buildMapLayers(source: Catalog): MapLayer[] {
     }
     if (tiles.query) mapLayer.query_string = tiles.query;
     if (tiles.maxzoom !== undefined) mapLayer.max_zoom = tiles.maxzoom;
+    if (tiles.tileSize) mapLayer.tile_size = tiles.tileSize;
     if (tiles.resampling) mapLayer.resampling = tiles.resampling;
     if (tiles.colorClasses) mapLayer.color_classes = tiles.colorClasses;
+    if (tiles.sharePaint) mapLayer.share_paint = tiles.sharePaint;
     if (tiles.sourceLayer) mapLayer.sourceLayer = tiles.sourceLayer;
     if (tiles.circle) {
       mapLayer.circle_radius = tiles.circle.radius;

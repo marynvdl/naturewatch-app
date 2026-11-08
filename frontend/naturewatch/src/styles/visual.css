@@ -260,7 +260,22 @@ select:not(:disabled),
 
 @layer utilities {
   .nw.layer-popover {
+    box-sizing: border-box;
     width: 200px !important;
+    max-width: min(200px, calc(100vw - 1.5rem)) !important;
+    max-height: min(
+      70dvh,
+      calc(100dvh - 24px),
+      var(--reka-popover-content-available-height, 70dvh)
+    ) !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     border-radius: 12px !important;
+  }
+
+  .nw.layer-popover.is-wide {
+    width: min(22rem, calc(100vw - 1.5rem)) !important;
+    max-width: min(22rem, calc(100vw - 1.5rem)) !important;
   }
 }
