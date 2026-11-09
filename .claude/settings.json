@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git fetch*)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr checks*)",
+      "Bash(npx vitest run*)",
+      "Bash(npm run lint*)",
+      "Bash(npm run type-check*)",
+      "Bash(npm run test:unit*)",
+      "Bash(npm run test:coverage*)",
+      "Bash(pytest*)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.local)",
+      "Bash(git push* develop*)",
+      "Bash(git push* main*)",
+      "Bash(flyctl deploy*)",
+      "Bash(fly deploy*)",
+      "Bash(gh pr create*--base main*)",
+      "Bash(gh pr create*-B main*)",
+      "Bash(gh pr merge*)"
+    ]
+  }
+}
