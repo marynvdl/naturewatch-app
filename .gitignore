@@ -163,3 +163,10 @@ cython_debug/
 # WDPA extracts downloaded for the records import
 *.gdb/
 WDPA_WDOECM_*.zip
+
+# macOS and local screenshots
+.DS_Store
+.shots/
+
+# Claude Code personal settings
+.claude/settings.local.json
