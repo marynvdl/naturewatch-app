@@ -185,6 +185,11 @@ Each stage is its own migration and pull request. Take a backup or check point-i
 ### Backfill rules
 
 - **Sites.** A Place is the whole WDPCA site ([record 19](../database/decisions.md#19-a-conservation-area-place-is-the-whole-wdpca-site)). For each of the 74 sites with several stored parcels, keep the place with the largest parcel. Set the other 112 to `merged`, with `merged_into_place_id` pointing at it. Flag the 7 sites whose parcels differ in designation. *Task 05 does this with `merge_wdpa_site_parcels()`, after the site boundaries are copied. The merged places' SITE_PIDs point at the kept place. The kept place's `conservation_area_details.source_attributes` lists every parcel under `parcels`, and the 7 mixed sites carry `designations_differ: true`.*
+- **Mixed designations.** Merging the 7 sites whose parcels differ in designation lost places worth monitoring on their own: Gorongosa National Park (two parcels, 4,042 km²) became part of the Gorongosa Buffer Zone (9,446 km²), named "Gorongoza". Task 05a gives each designation in those 7 sites its own place.
+- **Zoned sites.** 10 sites with one designation are zoned like Gorongosa, with a core and a buffer or outer zone stored as separate parcels. Task 05 merged them, and task 05a leaves them merged. Decide them with the buffer question: cut the core out of the buffer, or record buffers and zones as designations.
+  - Mexico, an IUCN Ia core inside the category VI site: Balam Kin (555783753), Balam Ku (555783754), Canoas (555783756), Ríos y Montañas de la Comarca Lagunera (555783781), Sierra de Vallejo-Río Ameca (555783785), Sierra Tecuani (555783786), Wanha' (555783790).
+  - Argentina, UNESCO-MAB biosphere reserves with a "Zona núcleo" and a "Zona de amortiguamiento": Laguna de los Pozuelos (16894), San Guillermo (23).
+  - Russia, UNESCO-MAB biosphere reserve with four named parts inside its 873 km² outline: Great Volzhsko-Kamsky (209777).
 - **Boundaries.** One version 1 boundary per site: the union of its parcels, made one MultiPolygon. Collecting the parcels without a union gave a valid shape for only 22 of the 74 sites on 10 November 2026, because parcels touch or overlap (14 sites overlap, by up to 4,042 km²). The union is valid for all 74 and counts an overlap once. `review_status = 'approved'`, `is_current = true`, source WDPCA October 2026, `source_record_id` = SITE_ID.
 - **Source ids.** One confirmed `wdpa_site_id` row per place, and one confirmed `wdpa_site_pid` row per parcel, pointing at the kept place. First and last seen in October 2026.
 - **Details.** `designation`, `iucn_category`, `iso3`, and `realm` move to `conservation_area_details`. The missing WDPCA fields stay null until the next import.
@@ -243,6 +248,8 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Add `place_categories`, `place_types`, `conservation_area_details`, `place_source_ids`, `publication_status`, `merged_into_place_id`. Backfill. Replace the enum.
 - [ ] [Task 05 — Boundaries](../tasks/task-05-boundaries.md) — naturewatch-app
   - *Goal:* Add `place_boundaries`, copy the geometry in batches, and verify. Merge the parcels of each multi-parcel site into one place, as in the backfill rule **Sites**. Switch the existing functions to it.
+- [ ] Task 05a — One place per designation — naturewatch-app
+  - *Goal:* For the 7 sites whose parcels differ in designation (backfill rule **Mixed designations**), give each designation its own place, with the union of that designation's parcels as its version 1 boundary. Keep WDPCA's shapes, overlaps included. Amend record 19 of decisions.md. The 10 zoned sites stay merged.
 - [ ] Task 05b — Generic reads and reconciliation — naturewatch-app
   - *Goal:* Add the generic `place_*` reads and temporary wrappers. Move the importer's writes to site boundaries in `place_boundaries`. Add the reconciliation report: it classifies every record as in record 4 of decisions.md, and refuses to write unless every record matches cleanly.
 - [ ] Task 06 — Boundary QC and eligibility — both repos
