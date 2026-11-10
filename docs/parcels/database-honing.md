@@ -10,7 +10,7 @@ The proposed design is [docs/database/design.md](../database/design.md). The dec
 
 Improve the existing database rather than rebuild it. Keep what works. Give Places a stable identity independent of their boundary. Make every Stat traceable to a boundary version, a sprout, a method, and a run. Add shared provenance, boundary quality control, and room for recognitions, images, and contributors.
 
-The Stats Pipeline is paused until the stages below have landed. A later parcel finds the most efficient way to calculate stats. Analysis task-06 and app task-08 of [Cropland 2024 global](cropland-2024-global.md) wait for it.
+The Stats Pipeline is paused until the stages below have landed. A later parcel finds the most efficient way to calculate stats. The global cropland facts, analysis task-06 and app task-08 of [Cropland 2024 global](../archive/parcels/cropland-2024-global.md), were archived not done and wait for it.
 
 ## A. Current state
 
