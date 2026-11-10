@@ -237,7 +237,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Run the read-only queries in **To verify**. Record the results here. Write the ADR on whether a Place is a WDPCA site or a parcel.
 - [x] [Task 02 — Hygiene](../archive/tasks/task-02-database-hygiene.md) — both repos
   - *Goal:* Drop `pilot_place_map` and its triggers. Add timestamps and `set_updated_at()`. Fix the stale `pilot_places` read in `facts/cropland.py`.
-- [ ] Task 03 — Sources — naturewatch-app
+- [ ] [Task 03 — Sources](../tasks/task-03-sources.md) — naturewatch-app
   - *Goal:* Rename `sources` to `source_releases`, keeping ids. Add the new `sources` table and `licences`. Add citations. Update the importer.
 - [ ] Task 04 — Types and details — naturewatch-app
   - *Goal:* Add `place_categories`, `place_types`, `conservation_area_details`, `place_source_ids`, `publication_status`, `merged_into_place_id`. Backfill. Replace the enum.
