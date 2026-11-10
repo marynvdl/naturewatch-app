@@ -20,8 +20,14 @@
       "Bash(npm run type-check*)",
       "Bash(npm run test:unit*)",
       "Bash(npm run test:coverage*)",
-      "Bash(pytest*)"
+      "Bash(pytest*)",
+      "Bash(git -C ../naturewatch-analysis status*)",
+      "Bash(git -C ../naturewatch-analysis diff*)",
+      "Bash(git -C ../naturewatch-analysis log*)",
+      "Bash(git -C ../naturewatch-analysis show*)",
+      "Bash(git -C ../naturewatch-analysis branch --show-current)"
     ],
+    "additionalDirectories": ["../naturewatch-analysis"],
     "deny": [
       "Read(**/.env)",
       "Read(**/.env.*.local)",

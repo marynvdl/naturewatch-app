@@ -1,6 +1,6 @@
 ---
 name: task
-description: Start one parcel task from docs/tasks. Use when Maryn says /task <file>, "do task NN", or "start the next task".
+description: Start one parcel task from docs/tasks. Use when the user says /task <file>, "do task NN", or "start the next task".
 argument-hint: <docs/tasks/task-file.md>
 disable-model-invocation: true
 ---
@@ -10,7 +10,7 @@ disable-model-invocation: true
 Task file: $ARGUMENTS
 
 1. Read the task file and the parcel it names in `docs/parcels/`. If no file was given, find the first unticked task in the active parcels and ask which one is meant.
-2. Check the task is marked for naturewatch-app. If it is for naturewatch-analysis, stop and say to run it from that checkout.
+2. Check which repo the task is marked for. If it is naturewatch-analysis, read `../naturewatch-analysis/CLAUDE.md` and `../naturewatch-analysis/.claude/skills/task/SKILL.md`. Then follow steps 3–10 of that skill in `../naturewatch-analysis` instead of the steps below. Its branches start from `main`, and its pull requests go into `main`.
 3. Check every task above it in the parcel is ticked, and any "Start only after" condition in the task file is met. If not, stop and say what is missing.
 4. Check the working tree is clean. Then `git switch develop`, `git pull --ff-only`, and `git switch -c feat/<task-file-name-without-.md>`.
 5. Read the files the task names, and `docs/blueprint.md` where it is relevant. Write a plan that follows the task's "Do this", "Do not", and "Done when" sections, and wait for approval.

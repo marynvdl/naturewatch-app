@@ -14,7 +14,7 @@ This document describes the working system and agreed direction. Commands and br
 | The hand-edited layer catalog | [cookbook/recipes/](https://github.com/marynvdl/naturewatch-analysis/tree/main/cookbook/recipes) in marynvdl/naturewatch-analysis |
 | How to run a step, and what that run cost | The step README in marynvdl/naturewatch-analysis |
 | Work parcels | `docs/parcels/` in this repo |
-| A single task | `docs/tasks/` in the repo that does the work |
+| A single task | `docs/tasks/` in this repo. The task names the repo that does the work. |
 
 *Updated 29 October 2026. Reader docs live in `docs/user/`. The first-release roadmap is archived. Pipeline procedure, cost, and scripts stay in naturewatch-analysis. `nature-watch-bucket` was made private on 22 October 2026.*
 

@@ -41,19 +41,19 @@ Tile resampling is chosen on a sample. Task 04 builds that sample. Task 05 start
 
 ## Tasks
 
-Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. When a task has merged, move its file to `docs/archive/tasks/` in that repo, and point the tick at that copy.
+Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. When a task has merged, move its file to `docs/archive/tasks/` in naturewatch-app, and point the tick at that copy.
 
-- [ ] [task-01-cropland-global-2024-recipe.md](https://github.com/marynvdl/naturewatch-analysis/blob/docs/cropland-global-2024-tasks/docs/tasks/task-01-cropland-global-2024-recipe.md) — naturewatch-analysis
+- [ ] [task-01-cropland-global-2024-recipe.md](../archive/tasks/task-01-cropland-global-2024-recipe.md) — naturewatch-analysis
   - *Goal:* Add the global recipe beside the South Africa recipe, name every GLAD 10° tile, and write the expected cost. No transfer and no Batch job.
-- [ ] [task-02-cropland-global-2024-seed.md](https://github.com/marynvdl/naturewatch-analysis/blob/docs/cropland-global-2024-tasks/docs/tasks/task-02-cropland-global-2024-seed.md) — naturewatch-analysis
+- [ ] [task-02-cropland-global-2024-seed.md](../tasks/task-02-cropland-global-2024-seed.md) — naturewatch-analysis
   - *Goal:* After approval, transfer the tiles named in the recipe into the version 2 seed path and check them. Record the run cost.
-- [ ] [task-03-cropland-global-2024-sprout.md](https://github.com/marynvdl/naturewatch-analysis/blob/docs/cropland-global-2024-tasks/docs/tasks/task-03-cropland-global-2024-sprout.md) — naturewatch-analysis
+- [ ] [task-03-cropland-global-2024-sprout.md](../tasks/task-03-cropland-global-2024-sprout.md) — naturewatch-analysis
   - *Goal:* After approval, write the version 2 Cloud Optimized GeoTIFF and its static STAC files. Record the run cost.
-- [ ] [task-04-cropland-global-2024-tile-sample.md](https://github.com/marynvdl/naturewatch-analysis/blob/docs/cropland-global-2024-tasks/docs/tasks/task-04-cropland-global-2024-tile-sample.md) — naturewatch-analysis
+- [ ] [task-04-cropland-global-2024-tile-sample.md](../tasks/task-04-cropland-global-2024-tile-sample.md) — naturewatch-analysis
   - *Goal:* Build the tiles step as one PMTiles archive. Prove resampling on a small window and stop for approval. Do not build the global archive.
-- [ ] [task-05-cropland-global-2024-pmtiles.md](https://github.com/marynvdl/naturewatch-analysis/blob/docs/cropland-global-2024-tasks/docs/tasks/task-05-cropland-global-2024-pmtiles.md) — naturewatch-analysis
+- [ ] [task-05-cropland-global-2024-pmtiles.md](../tasks/task-05-cropland-global-2024-pmtiles.md) — naturewatch-analysis
   - *Goal:* After the sample is approved, write zooms 0–12 to the version 2 PMTiles object. Record the run cost.
-- [ ] [task-06-cropland-global-2024-facts.md](https://github.com/marynvdl/naturewatch-analysis/blob/docs/cropland-global-2024-tasks/docs/tasks/task-06-cropland-global-2024-facts.md) — naturewatch-analysis
+- [ ] [task-06-cropland-global-2024-facts.md](../tasks/task-06-cropland-global-2024-facts.md) — naturewatch-analysis
   - *Goal:* Write cropland facts for every stored place on sprout `cropland-2024-v2`. Record the run cost.
 - [ ] [task-07-cropland-global-2024-on-the-map.md](../tasks/task-07-cropland-global-2024-on-the-map.md) — naturewatch-app
   - *Goal:* Draw the global cropland layer from the published PMTiles archive. Keep class colouring in the client.

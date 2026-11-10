@@ -32,19 +32,19 @@ The map stays the main surface. Keep the Budding Places layout, type, and area t
 
 ## Tasks
 
-Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in the repo that does the work. When a task has merged, move its file to `docs/archive/tasks/` in that repo, and point the tick at that copy.
+Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. When a task has merged, move its file to `docs/archive/tasks/` in naturewatch-app, and point the tick at that copy.
 
 [Budding Places](../archive/parcels/budding-places.md) is archived. Start the first task from `develop`.
 
 - [x] [task-01-place-list-window.md](../archive/tasks/task-01-place-list-window.md) — naturewatch-app
   - *Goal:* Replace loading every stored place into the list with a bounded query. Default sort is largest first. Cap 50. Keep the other sorts. Add the extent option, off by default. Do not change boundary loading.
-- [x] [task-02-places-pmtiles.md](https://github.com/marynvdl/naturewatch-analysis/blob/main/docs/archive/tasks/task-02-places-pmtiles.md) — naturewatch-analysis
+- [x] [task-02-places-pmtiles.md](../archive/tasks/task-02-places-pmtiles.md) — naturewatch-analysis
   - *Goal:* Build one PMTiles archive from the authoritative places, prove it on the current South Africa rows, and publish it to `nature-watch-tiles`.
 - [x] [task-03-place-tiles-on-the-map.md](../archive/tasks/task-03-place-tiles-on-the-map.md) — naturewatch-app
   - *Goal:* Draw boundaries from the published PMTiles archive. Stop calling `loadPlaceMap`. A click still opens the Supabase profile.
 - [x] [task-04-global-protected-areas.md](../archive/tasks/task-04-global-protected-areas.md) — naturewatch-app
   - *Goal:* Store terrestrial protected areas worldwide with calculated `area_km2` of at least 10. Keep existing South Africa ids and cropland facts. Do not copy global geometries into `pilot_place_map`.
-- [ ] [task-05-republish-places-pmtiles.md](https://github.com/marynvdl/naturewatch-analysis/blob/develop/docs/tasks/task-05-republish-places-pmtiles.md) — naturewatch-analysis
+- [ ] [task-05-republish-places-pmtiles.md](../tasks/task-05-republish-places-pmtiles.md) — naturewatch-analysis
   - *Goal:* Rebuild that archive from the global places and replace the published object. Record the run cost.
 
 ## Done when
