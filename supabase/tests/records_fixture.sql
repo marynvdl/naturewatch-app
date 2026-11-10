@@ -262,66 +262,79 @@ begin
     raise exception 'row level security is not enabled on sources, facts, or fact_methods';
   end if;
 
-  if not exists (
-    select 1
-    from pg_class
-    where oid = 'public.pilot_place_map'::regclass
-      and relkind = 'r'
-      and relrowsecurity
-  ) then
-    raise exception 'pilot_place_map is not a table with row level security';
+  if to_regclass('public.pilot_place_map') is not null
+    or to_regprocedure('public.sync_pilot_place_map()') is not null then
+    raise exception 'pilot_place_map or sync_pilot_place_map still exists';
+  end if;
+
+  if (
+    select count(*)
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name in ('sources', 'places', 'facts', 'fact_methods')
+      and column_name in ('created_at', 'updated_at')
+      and data_type = 'timestamp with time zone'
+      and is_nullable = 'NO'
+      and column_default = 'now()'
+  ) <> 8 then
+    raise exception 'sources, places, facts, or fact_methods is missing created_at or updated_at with default now()';
+  end if;
+
+  if (
+    select count(*)
+    from pg_trigger
+    where not tgisinternal
+      and tgfoid = 'public.set_updated_at()'::regprocedure
+      and tgrelid in (
+        'public.sources'::regclass,
+        'public.places'::regclass,
+        'public.facts'::regclass,
+        'public.fact_methods'::regclass
+      )
+  ) <> 4 then
+    raise exception 'set_updated_at() is not the update trigger on all four tables';
   end if;
 
   if exists (
     select 1
-    from public.pilot_place_map as mapped
-    join public.places on places.id = mapped.id
-    where not extensions.st_equals(mapped.geom, places.geom)
+    from public.places
+    where source_id = 'fixture-pilot'
+      and (created_at <> now() or updated_at <> now())
   ) then
-    raise exception 'pilot_place_map does not return the stored boundary';
-  end if;
-
-  if exists (
-    select 1
-    from public.pilot_place_map
-    where name = 'Small Park'
-  ) then
-    raise exception 'the place below 10 km2 was copied to pilot_place_map';
+    raise exception 'a new place did not get created_at and updated_at now()';
   end if;
 
   update public.places
+  set
+    created_at = timestamptz '2000-01-01 00:00:00+00',
+    updated_at = timestamptz '2000-01-01 00:00:00+00'
+  where source_id = 'fixture-pilot';
+  update public.places
   set name = 'Pilot Park Renamed'
   where source_id = 'fixture-pilot';
-  if (
-    select name
-    from public.pilot_place_map
-    where name = 'Pilot Park Renamed'
-  ) is null then
-    raise exception 'pilot_place_map did not follow the place name';
+  if not exists (
+    select 1
+    from public.places
+    where source_id = 'fixture-pilot'
+      and name = 'Pilot Park Renamed'
+      and created_at = timestamptz '2000-01-01 00:00:00+00'
+      and updated_at = now()
+  ) then
+    raise exception 'an update did not set updated_at, or it changed created_at';
   end if;
   update public.places
   set name = 'Pilot Park'
   where source_id = 'fixture-pilot';
 
-  update public.sources
-  set name = 'WDPCA check'
-  where name = 'WDPCA'
-    and release_month = date '2026-10-01';
-  if (
-    select source_name
-    from public.pilot_place_map
-    where source_name = 'WDPCA check'
-  ) is null then
-    raise exception 'pilot_place_map did not follow the source name';
+  if has_function_privilege('anon', 'public.set_updated_at()', 'execute')
+    or has_function_privilege('authenticated', 'public.set_updated_at()', 'execute') then
+    raise exception 'anon or authenticated can execute set_updated_at';
   end if;
-  update public.sources
-  set name = 'WDPCA'
-  where name = 'WDPCA check'
-    and release_month = date '2026-10-01';
 
-  if has_function_privilege('anon', 'public.sync_pilot_place_map()', 'execute')
-    or has_function_privilege('authenticated', 'public.sync_pilot_place_map()', 'execute') then
-    raise exception 'anon or authenticated can execute sync_pilot_place_map';
+  if not has_column_privilege('anon', 'public.places', 'created_at', 'SELECT')
+    or not has_column_privilege('anon', 'public.places', 'updated_at', 'SELECT')
+    or not has_column_privilege('authenticated', 'public.places', 'updated_at', 'SELECT') then
+    raise exception 'anon or authenticated cannot select places.created_at or updated_at';
   end if;
 
   if has_column_privilege('anon', 'public.places', 'geom', 'SELECT')
@@ -340,12 +353,10 @@ begin
   if has_table_privilege('anon', 'public.sources', 'INSERT')
     or has_table_privilege('anon', 'public.facts', 'INSERT')
     or has_table_privilege('anon', 'public.fact_methods', 'INSERT')
-    or has_table_privilege('anon', 'public.pilot_place_map', 'INSERT')
     or has_table_privilege('authenticated', 'public.sources', 'INSERT')
     or has_table_privilege('authenticated', 'public.facts', 'INSERT')
-    or has_table_privilege('authenticated', 'public.fact_methods', 'INSERT')
-    or has_table_privilege('authenticated', 'public.pilot_place_map', 'INSERT') then
-    raise exception 'anon or authenticated can insert sources, facts, fact_methods, or pilot_place_map';
+    or has_table_privilege('authenticated', 'public.fact_methods', 'INSERT') then
+    raise exception 'anon or authenticated can insert sources, facts, or fact_methods';
   end if;
 
   insert into public.facts (
@@ -470,18 +481,6 @@ begin
     where release_month = date '2026-10-01';
     if pilot_count <> 2 then
       raise exception '% saw % October 2026 pilot rows, expected 2', role_name, pilot_count;
-    end if;
-    if exists (
-      select 1 from public.pilot_place_map where name = 'Chobe Fixture'
-    ) then
-      raise exception '% copied a place outside South Africa onto pilot_place_map', role_name;
-    end if;
-
-    select count(*) into pilot_count
-    from public.pilot_place_map
-    where name = 'Pilot Park';
-    if pilot_count <> 1 then
-      raise exception '% saw % map boundaries, expected 1', role_name, pilot_count;
     end if;
 
     if (
