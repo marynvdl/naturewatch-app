@@ -239,7 +239,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Drop `pilot_place_map` and its triggers. Add timestamps and `set_updated_at()`. Fix the stale `pilot_places` read in `facts/cropland.py`.
 - [x] [Task 03 — Sources](../archive/tasks/task-03-sources.md) — naturewatch-app
   - *Goal:* Rename `sources` to `source_releases`, keeping ids. Add the new `sources` table and `licences`. Add citations. Update the importer.
-- [x] [Task 04 — Types and details](../tasks/task-04-types-and-details.md) — naturewatch-app
+- [x] [Task 04 — Types and details](../archive/tasks/task-04-types-and-details.md) — naturewatch-app
   - *Goal:* Add `place_categories`, `place_types`, `conservation_area_details`, `place_source_ids`, `publication_status`, `merged_into_place_id`. Backfill. Replace the enum.
 - [ ] Task 05 — Boundaries — naturewatch-app
   - *Goal:* Add `place_boundaries`, copy the geometry in batches, and verify. Merge the parcels of each multi-parcel site into one place, as in the backfill rule **Sites**. Switch functions to it. Add the generic `place_*` reads and temporary wrappers. Add the reconciliation report to the importer.
