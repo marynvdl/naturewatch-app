@@ -1,12 +1,12 @@
 # Task 04 — Types and details
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repository: naturewatch-app. Start only after task 03 has merged into `develop` (pull request #391).
 
 ## Goal
 
-Add `place_categories`, `place_types`, `conservation_area_details`, and `place_source_ids`, as in section 4.1 of [design.md](../database/design.md) and records 2, 3, 4, 13, 18, and 19 of [decisions.md](../database/decisions.md). Add `publication_status` and `merged_into_place_id` to `places`. Backfill them. Replace the `place_type` enum with `place_type_id`. Switch every reader to the new tables. Then drop the enum and the old WDPCA columns from `places`. Apply the migration to the hosted database after approval.
+Add `place_categories`, `place_types`, `conservation_area_details`, and `place_source_ids`, as in section 4.1 of [design.md](../../database/design.md) and records 2, 3, 4, 13, 18, and 19 of [decisions.md](../../database/decisions.md). Add `publication_status` and `merged_into_place_id` to `places`. Backfill them. Replace the `place_type` enum with `place_type_id`. Switch every reader to the new tables. Then drop the enum and the old WDPCA columns from `places`. Apply the migration to the hosted database after approval.
 
 The merge of multi-parcel sites waits for task 05. There it happens together with the site boundary (decided 10 November 2026). In this task every place stays `published`, and no place is merged.
 
