@@ -57,6 +57,8 @@ Types: `uuid`, `text`, `timestamptz`, `date`, `double precision`, `integer`, `bo
 
 ### 4.1 Places
 
+*In place* for `place_categories`, `place_types`, `places.place_type_id`, `publication_status`, `merged_into_place_id`, `place_source_ids`, and `conservation_area_details` since task 04 (`20261112100000_types_and_details.sql`). Only the category and type `conservation_area` are stored. `places.submitted_by` and `place_source_ids.matched_by` come with `profiles` in task 10. `recognition_details` and `old_growth_details` come with their records. The WDPCA fields not yet imported (`protection_kind`, `designation_type`, `legal_status`, `status_year`, `governance_type`, `source_attributes`) stay null until the next import. Every place is `published` until task 05 merges the parcels of one site.
+
 **`place_categories`** — lookup.
 
 | Column | Type | Notes |

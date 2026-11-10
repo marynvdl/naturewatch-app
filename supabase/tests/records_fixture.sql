@@ -65,92 +65,80 @@ begin
   end if;
 end $$;
 
-insert into public.places (
-  source_release_id,
-  source_id,
-  site_id,
-  name,
-  place_type,
-  designation,
-  iucn_category,
-  iso3,
-  realm,
-  geom
+-- A place in the task 04 shape: the place, its details, and its parcel id.
+create function pg_temp.fixture_place(
+  p_pid text,
+  p_site text,
+  p_name text,
+  p_iucn text,
+  p_iso3 text,
+  p_wkt text,
+  p_status text default 'published'
 )
-select
-  id,
-  'fixture-pilot',
-  'fixture-pilot-site',
-  'Pilot Park',
-  'protected_area',
-  'National Park',
-  'II',
-  'ZAF',
-  'Terrestrial',
-  extensions.ST_GeomFromText(
-    'MULTIPOLYGON(((27 -26, 27.2 -26, 27.2 -25.8, 27 -25.8, 27 -26)))',
-    4326
-  )::extensions.geometry(MultiPolygon, 4326)
-from public.source_releases
-where source_id = 'wdpca' and version_label = 'October 2026';
+returns uuid
+language plpgsql
+as $$
+declare
+  new_id uuid;
+  release uuid;
+begin
+  select id into release
+  from public.source_releases
+  where source_id = 'wdpca' and version_label = 'October 2026';
 
-insert into public.places (
-  source_release_id,
-  source_id,
-  site_id,
-  name,
-  place_type,
-  designation,
-  iucn_category,
-  iso3,
-  realm,
-  geom
-)
-select
-  id,
-  'fixture-small',
-  'fixture-small-site',
-  'Small Park',
-  'protected_area',
-  'National Park',
-  'IV',
-  'ZAF',
-  'Terrestrial',
-  extensions.ST_GeomFromText(
-    'MULTIPOLYGON(((27.5 -26, 27.502 -26, 27.502 -25.998, 27.5 -25.998, 27.5 -26)))',
-    4326
-  )::extensions.geometry(MultiPolygon, 4326)
-from public.source_releases
-where source_id = 'wdpca' and version_label = 'October 2026';
+  insert into public.places (name, place_type_id, publication_status, geom)
+  values (
+    p_name,
+    'conservation_area',
+    p_status,
+    extensions.ST_GeomFromText(p_wkt, 4326)::extensions.geometry(MultiPolygon, 4326)
+  )
+  returning id into new_id;
 
-insert into public.places (
-  source_release_id,
-  source_id,
-  site_id,
-  name,
-  place_type,
-  designation,
-  iucn_category,
-  iso3,
-  realm,
-  geom
-)
-select
-  id,
-  'fixture-abroad',
-  'fixture-abroad-site',
-  'Chobe Fixture',
-  'protected_area',
-  'National Park',
-  'II',
-  'BWA',
-  'Terrestrial',
-  extensions.ST_GeomFromText(
-    'MULTIPOLYGON(((24 -21, 24.2 -21, 24.2 -20.8, 24 -20.8, 24 -21)))',
-    4326
-  )::extensions.geometry(MultiPolygon, 4326)
-from public.source_releases
-where source_id = 'wdpca' and version_label = 'October 2026';
+  insert into public.conservation_area_details (
+    place_id, designation, iucn_category, iso3, realm,
+    source_id, source_release_id, source_record_id, source_url
+  ) values (
+    new_id, 'National Park', p_iucn, string_to_array(p_iso3, ';'), 'Terrestrial',
+    'wdpca', release, p_site, 'https://www.protectedplanet.net/' || p_site
+  );
+
+  insert into public.place_source_ids (
+    place_id, source_id, id_kind, source_record_id, match_status,
+    first_seen_release_id, last_seen_release_id
+  ) values (
+    new_id, 'wdpca', 'wdpa_site_pid', p_pid, 'confirmed', release, release
+  );
+  return new_id;
+end;
+$$;
+
+-- The place a confirmed SITE_PID points at.
+create function pg_temp.fixture_id(p_pid text)
+returns uuid
+language sql
+stable
+as $$
+  select place_id
+  from public.place_source_ids
+  where source_id = 'wdpca'
+    and id_kind = 'wdpa_site_pid'
+    and match_status = 'confirmed'
+    and source_record_id = p_pid;
+$$;
+
+select pg_temp.fixture_place(
+  'fixture-pilot', 'fixture-pilot-site', 'Pilot Park', 'II', 'ZAF',
+  'MULTIPOLYGON(((27 -26, 27.2 -26, 27.2 -25.8, 27 -25.8, 27 -26)))'
+);
+select pg_temp.fixture_place(
+  'fixture-small', 'fixture-small-site', 'Small Park', 'IV', 'ZAF',
+  'MULTIPOLYGON(((27.5 -26, 27.502 -26, 27.502 -25.998, 27.5 -25.998, 27.5 -26)))'
+);
+select pg_temp.fixture_place(
+  'fixture-abroad', 'fixture-abroad-site', 'Chobe Fixture', 'II', 'BWA',
+  'MULTIPOLYGON(((24 -21, 24.2 -21, 24.2 -20.8, 24 -20.8, 24 -21)))'
+);
 
 do $$
 declare
@@ -201,7 +189,7 @@ begin
     extensions.ST_Area(geom::extensions.geography, true) / 1e6
   into pilot_area, pilot_expected
   from public.places
-  where source_id = 'fixture-pilot';
+  where id = pg_temp.fixture_id('fixture-pilot');
 
   if pilot_area is distinct from pilot_expected then
     raise exception 'pilot area_km2 % does not match the geography calculation %',
@@ -216,7 +204,7 @@ begin
     extensions.ST_Area(geom::extensions.geography, true) / 1e6
   into small_area, small_expected
   from public.places
-  where source_id = 'fixture-small';
+  where id = pg_temp.fixture_id('fixture-small');
 
   if small_area is distinct from small_expected then
     raise exception 'small area_km2 % does not match the geography calculation %',
@@ -305,12 +293,15 @@ begin
     select count(*)
     from information_schema.columns
     where table_schema = 'public'
-      and table_name in ('sources', 'source_releases', 'licences', 'places', 'facts', 'fact_methods')
+      and table_name in (
+        'sources', 'source_releases', 'licences', 'places', 'facts', 'fact_methods',
+        'place_categories', 'place_types', 'conservation_area_details', 'place_source_ids'
+      )
       and column_name in ('created_at', 'updated_at')
       and data_type = 'timestamp with time zone'
       and is_nullable = 'NO'
       and column_default = 'now()'
-  ) <> 12 then
+  ) <> 20 then
     raise exception 'a table is missing created_at or updated_at with default now()';
   end if;
 
@@ -325,16 +316,20 @@ begin
         'public.licences'::regclass,
         'public.places'::regclass,
         'public.facts'::regclass,
-        'public.fact_methods'::regclass
+        'public.fact_methods'::regclass,
+        'public.place_categories'::regclass,
+        'public.place_types'::regclass,
+        'public.conservation_area_details'::regclass,
+        'public.place_source_ids'::regclass
       )
-  ) <> 6 then
-    raise exception 'set_updated_at() is not the update trigger on all six tables';
+  ) <> 10 then
+    raise exception 'set_updated_at() is not the update trigger on all ten tables';
   end if;
 
   if exists (
     select 1
     from public.places
-    where source_id = 'fixture-pilot'
+    where id = pg_temp.fixture_id('fixture-pilot')
       and (created_at <> now() or updated_at <> now())
   ) then
     raise exception 'a new place did not get created_at and updated_at now()';
@@ -344,14 +339,14 @@ begin
   set
     created_at = timestamptz '2000-01-01 00:00:00+00',
     updated_at = timestamptz '2000-01-01 00:00:00+00'
-  where source_id = 'fixture-pilot';
+  where id = pg_temp.fixture_id('fixture-pilot');
   update public.places
   set name = 'Pilot Park Renamed'
-  where source_id = 'fixture-pilot';
+  where id = pg_temp.fixture_id('fixture-pilot');
   if not exists (
     select 1
     from public.places
-    where source_id = 'fixture-pilot'
+    where id = pg_temp.fixture_id('fixture-pilot')
       and name = 'Pilot Park Renamed'
       and created_at = timestamptz '2000-01-01 00:00:00+00'
       and updated_at = now()
@@ -360,7 +355,7 @@ begin
   end if;
   update public.places
   set name = 'Pilot Park'
-  where source_id = 'fixture-pilot';
+  where id = pg_temp.fixture_id('fixture-pilot');
 
   if has_function_privilege('anon', 'public.set_updated_at()', 'execute')
     or has_function_privilege('authenticated', 'public.set_updated_at()', 'execute') then
@@ -404,7 +399,7 @@ begin
   )
   select id, 'cropland-2024-v1', 'area-weighted-spheroid-v1', 1.5, 100.0 / 3.0, 0.98
   from public.places
-  where source_id = 'fixture-pilot';
+  where id = pg_temp.fixture_id('fixture-pilot');
 
   begin
     insert into public.facts (
@@ -412,7 +407,7 @@ begin
     )
     select id, 'cropland-2024-v1', 'area-weighted-spheroid-v1', 2, 20, 1
     from public.places
-    where source_id = 'fixture-pilot';
+    where id = pg_temp.fixture_id('fixture-pilot');
     raise exception 'duplicate fact was inserted';
   exception
     when unique_violation then
@@ -425,71 +420,196 @@ begin
     )
     select id, 'cropland-2024-v1', 'missing-method', 1, 1, 1
     from public.places
-    where source_id = 'fixture-pilot';
+    where id = pg_temp.fixture_id('fixture-pilot');
     raise exception 'fact with an unknown method was inserted';
   exception
     when foreign_key_violation then
       null;
   end;
 
-  declare
-    kept_id uuid;
-  begin
-    select id into kept_id
-    from public.places
-    where source_id = 'fixture-pilot';
+  -- Task 04: types, details, and source ids ----------------------------------
 
-    insert into public.places (
-      source_release_id,
-      source_id,
-      site_id,
-      name,
-      place_type,
-      designation,
-      iucn_category,
-      iso3,
-      realm,
-      geom
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'places'
+      and column_name in (
+        'place_type', 'source_release_id', 'source_id', 'site_id',
+        'designation', 'iucn_category', 'iso3', 'realm'
+      )
+  ) or to_regtype('public.place_type') is not null then
+    raise exception 'places still has the place_type enum or an old WDPCA column';
+  end if;
+
+  if exists (
+    select 1
+    from pg_class
+    where oid in (
+      'public.place_categories'::regclass,
+      'public.place_types'::regclass,
+      'public.conservation_area_details'::regclass,
+      'public.place_source_ids'::regclass
     )
-    select
-      source_release_id,
-      source_id,
-      site_id,
-      name,
-      place_type,
-      designation,
-      iucn_category,
-      iso3,
-      realm,
-      geom
-    from public.places
-    where source_id = 'fixture-pilot'
-    on conflict (source_release_id, source_id) do update
-    set
-      site_id = excluded.site_id,
-      name = excluded.name,
-      place_type = excluded.place_type,
-      designation = excluded.designation,
-      iucn_category = excluded.iucn_category,
-      iso3 = excluded.iso3,
-      realm = excluded.realm,
-      geom = excluded.geom;
+      and not relrowsecurity
+  ) then
+    raise exception 'row level security is not enabled on a task 04 table';
+  end if;
 
-    if (
-      select id from public.places where source_id = 'fixture-pilot'
-    ) is distinct from kept_id then
-      raise exception 'upsert changed the South Africa place id';
-    end if;
-    if (
-      select count(*)
-      from public.facts
-      where place_id = kept_id
-        and sprout_id = 'cropland-2024-v1'
-        and method_id = 'area-weighted-spheroid-v1'
-    ) <> 1 then
-      raise exception 'South Africa place lost its cropland fact';
-    end if;
+  if (select count(*) from public.place_types) <> 1
+    or not exists (
+      select 1 from public.place_types
+      where id = 'conservation_area'
+        and place_category_id = 'conservation_area'
+        and details_kind = 'conservation_area'
+    ) then
+    raise exception 'place_types does not hold only conservation_area';
+  end if;
+
+  if exists (
+    select 1 from public.places
+    where place_type_id <> 'conservation_area' or publication_status <> 'published'
+  ) then
+    raise exception 'a fixture place is not a published conservation area';
+  end if;
+
+  if (
+    select data_type from information_schema.columns
+    where table_schema = 'public' and table_name = 'protected_areas' and column_name = 'iso3'
+  ) <> 'text' then
+    raise exception 'protected_areas.iso3 is not text';
+  end if;
+
+  update public.conservation_area_details
+  set iso3 = array['BWA', 'ZWE']
+  where place_id = pg_temp.fixture_id('fixture-abroad');
+  if (
+    select iso3 from public.protected_areas where source_id = 'fixture-abroad'
+  ) is distinct from 'BWA;ZWE' then
+    raise exception 'protected_areas did not join a two-country iso3 with ;';
+  end if;
+  update public.conservation_area_details
+  set iso3 = array['BWA']
+  where place_id = pg_temp.fixture_id('fixture-abroad');
+
+  if (
+    select site_id from public.protected_areas where source_id = 'fixture-pilot'
+  ) is distinct from 'fixture-pilot-site' then
+    raise exception 'protected_areas.site_id does not read the details source record';
+  end if;
+
+  begin
+    insert into public.place_source_ids (
+      place_id, source_id, id_kind, source_record_id, match_status
+    ) values (
+      pg_temp.fixture_id('fixture-abroad'), 'wdpca', 'wdpa_site_pid', 'fixture-pilot', 'confirmed'
+    );
+    raise exception 'a second confirmed row for one SITE_PID was stored';
+  exception
+    when unique_violation then
+      null;
   end;
+
+  insert into public.place_source_ids (
+    place_id, source_id, id_kind, source_record_id, match_status
+  ) values (
+    pg_temp.fixture_id('fixture-abroad'), 'wdpca', 'wdpa_site_pid', 'fixture-pilot', 'proposed'
+  );
+  delete from public.place_source_ids
+  where match_status = 'proposed' and source_record_id = 'fixture-pilot';
+
+  begin
+    update public.places
+    set merged_into_place_id = pg_temp.fixture_id('fixture-abroad')
+    where id = pg_temp.fixture_id('fixture-pilot');
+    raise exception 'merged_into_place_id was set on a published place';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  begin
+    update public.places
+    set publication_status = 'merged', merged_into_place_id = id
+    where id = pg_temp.fixture_id('fixture-pilot');
+    raise exception 'a place was merged into itself';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  begin
+    update public.places
+    set publication_status = 'hidden'
+    where id = pg_temp.fixture_id('fixture-pilot');
+    raise exception 'an unknown publication status was stored';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  declare
+    other_id uuid;
+  begin
+    insert into public.place_categories (id, title) values ('fixture_category', 'Fixture');
+    insert into public.place_types (id, place_category_id, title)
+    values ('fixture_type', 'fixture_category', 'Fixture type');
+    insert into public.places (name, place_type_id, publication_status, geom)
+    values (
+      'Not a conservation area',
+      'fixture_type',
+      'published',
+      extensions.ST_GeomFromText(
+        'MULTIPOLYGON(((10 10, 10.2 10, 10.2 10.2, 10 10.2, 10 10)))', 4326
+      )::extensions.geometry(MultiPolygon, 4326)
+    )
+    returning id into other_id;
+    begin
+      insert into public.conservation_area_details (place_id, iso3, source_id)
+      values (other_id, array['ZAF'], 'wdpca');
+      raise exception 'conservation area details were stored for another type';
+    exception
+      when check_violation then
+        null;
+    end;
+    delete from public.places where id = other_id;
+    delete from public.place_types where id = 'fixture_type';
+    delete from public.place_categories where id = 'fixture_category';
+  end;
+
+  begin
+    insert into public.conservation_area_details (place_id, iso3, source_id, source_release_id)
+    values (pg_temp.fixture_id('fixture-pilot'), array['ZAF'], 'wdpca', gen_random_uuid());
+    raise exception 'details were stored twice, or with a release of another source';
+  exception
+    when unique_violation or foreign_key_violation then
+      null;
+  end;
+
+  perform pg_temp.fixture_place(
+    'fixture-draft', 'fixture-draft-site', 'Draft Park', 'II', 'ZAF',
+    'MULTIPOLYGON(((29 -26, 29.2 -26, 29.2 -25.8, 29 -25.8, 29 -26)))',
+    'draft'
+  );
+  if exists (select 1 from public.protected_areas where source_id = 'fixture-draft')
+    or exists (
+      select 1 from public.protected_areas_in_extent(28.5, -27, 29.5, -25)
+    )
+    or exists (select 1 from public.place_bounds(pg_temp.fixture_id('fixture-draft'))) then
+    raise exception 'a draft place was returned by protected_areas, the extent, or place_bounds';
+  end if;
+  if not exists (select 1 from public.place_bounds(pg_temp.fixture_id('fixture-pilot'))) then
+    raise exception 'place_bounds did not return the published pilot place';
+  end if;
+
+  if (
+    select count(*) from public.facts
+    where place_id = pg_temp.fixture_id('fixture-pilot')
+      and sprout_id = 'cropland-2024-v1'
+      and method_id = 'area-weighted-spheroid-v1'
+  ) <> 1 then
+    raise exception 'South Africa place lost its cropland fact';
+  end if;
 end $$;
 
 do $$
@@ -510,11 +630,41 @@ begin
     end;
 
     select count(*) into readable from (
-      select source_id from public.places
+      select id, place_type_id, publication_status, merged_into_place_id from public.places
     ) as attribute_rows;
     if readable <> 3 then
-      raise exception '% saw % place rows, expected 3', role_name, readable;
+      raise exception '% saw % place rows, expected the 3 published ones', role_name, readable;
     end if;
+
+    if (select count(*) from public.place_categories) <> 1
+      or (select count(*) from public.place_types) <> 1
+      or (select count(*) from public.conservation_area_details) <> 3
+      or (select count(*) from public.place_source_ids) <> 3 then
+      raise exception '% cannot read the task 04 tables, or read a draft place''s rows', role_name;
+    end if;
+
+    begin
+      insert into public.place_types (id, place_category_id, title)
+      values ('fixture_type', 'conservation_area', 'x');
+      raise exception '% inserted a place type', role_name;
+    exception
+      when insufficient_privilege then
+        null;
+    end;
+    begin
+      update public.conservation_area_details set designation = 'x';
+      raise exception '% updated conservation area details', role_name;
+    exception
+      when insufficient_privilege then
+        null;
+    end;
+    begin
+      delete from public.place_source_ids;
+      raise exception '% deleted place source ids', role_name;
+    exception
+      when insufficient_privilege then
+        null;
+    end;
 
     if (select count(*) from public.sources) <> 1
       or (select count(*) from public.source_releases) <> 1
@@ -657,33 +807,20 @@ begin
 
   perform set_config('role', 'postgres', true);
 
-  insert into public.places (
-    source_release_id, source_id, site_id, name, place_type, designation,
-    iucn_category, iso3, realm, geom
-  )
-  select
-    source_releases.id,
+  perform pg_temp.fixture_place(
     'fixture-cap-' || extra.n,
     'fixture-cap-site-' || extra.n,
     'Cap Park ' || extra.n,
-    'protected_area',
-    'National Park',
     'II',
     'ZAF',
-    'Terrestrial',
-    extensions.ST_GeomFromText(
-      'MULTIPOLYGON((('
+    'MULTIPOLYGON((('
       || (27 + extra.n)::text || ' -24, '
       || (27.2 + extra.n)::text || ' -24, '
       || (27.2 + extra.n)::text || ' -23.8, '
       || (27 + extra.n)::text || ' -23.8, '
-      || (27 + extra.n)::text || ' -24)))',
-      4326
-    )::extensions.geometry(MultiPolygon, 4326)
-  from public.source_releases
-  cross join generate_series(1, 51) as extra(n)
-  where source_releases.source_id = 'wdpca'
-    and source_releases.version_label = 'October 2026';
+      || (27 + extra.n)::text || ' -24)))'
+  )
+  from generate_series(1, 51) as extra(n);
 
   perform set_config('role', 'anon', true);
   select count(*), min(total_count)

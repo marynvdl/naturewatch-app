@@ -7,9 +7,13 @@
   probe   Time a connection to the database and test one small COPY.
           Writes nothing that stays.
   upload  Write the filtered file straight into public.places in committed
-          batches, on (source_release_id, source_id). Rows under 10 km2 are
-          left out. A second start continues from the places already there.
-          It never deletes a place. The geometry is stored once, because the
+          batches. Each row is matched to a place through its confirmed
+          wdpa_site_pid row in place_source_ids. A new row gets a published
+          conservation area place, its conservation_area_details row, and its
+          wdpa_site_pid row. After the last batch, each site gets one
+          wdpa_site_id row. Rows under 10 km2 are left out. A second start
+          continues from the places already there and keeps their ids. It
+          never deletes a place. The geometry is stored once, because the
           database disk is too small to hold a stage and the places.
   merge   Read-only check of the result against the file (the name is kept
           for the existing commands): counts, invalid geometry, facts.
@@ -115,8 +119,33 @@ create temp table if not exists batch (
   wkb_hex text
 ) on commit delete rows
 """
-INSERT_BATCH = """
-with parsed as (
+CREATE_BATCH_PLACE = """
+create temp table if not exists batch_place (
+  source_id text,
+  site_id text,
+  name text,
+  designation text,
+  iucn_category text,
+  iso3 text,
+  realm text,
+  geom extensions.geometry(MultiPolygon, 4326),
+  place_id uuid,
+  is_new boolean
+) on commit delete rows
+"""
+# Match each staged row to its place through the confirmed SITE_PID row. A row
+# with no match gets a new id here, so the statements below can refer to it.
+MATCH_BATCH = """
+insert into batch_place (
+  source_id, site_id, name, designation, iucn_category, iso3, realm, geom,
+  place_id, is_new
+)
+select
+  parsed.source_id, parsed.site_id, parsed.name, parsed.designation,
+  parsed.iucn_category, parsed.iso3, parsed.realm, parsed.geom,
+  coalesce(ids.place_id, gen_random_uuid()),
+  ids.place_id is null
+from (
   select
     source_id, site_id, name, designation, iucn_category, iso3, realm,
     extensions.ST_Multi(
@@ -125,26 +154,83 @@ with parsed as (
       )
     )::extensions.geometry(MultiPolygon, 4326) as geom
   from batch
-)
-insert into public.places (
-  source_release_id, source_id, site_id, name, place_type, designation,
-  iucn_category, iso3, realm, geom
+) as parsed
+left join public.place_source_ids as ids
+  on ids.source_id = 'wdpca'
+  and ids.id_kind = 'wdpa_site_pid'
+  and ids.match_status = 'confirmed'
+  and ids.source_record_id = parsed.source_id
+where extensions.st_area(parsed.geom::extensions.geography, true) / 1e6 >= 10
+"""
+INSERT_PLACES = """
+insert into public.places (id, name, place_type_id, publication_status, geom)
+select place_id, name, 'conservation_area', 'published', geom
+from batch_place
+where is_new
+"""
+UPDATE_PLACES = """
+update public.places
+set name = batch_place.name, geom = batch_place.geom
+from batch_place
+where not batch_place.is_new
+  and places.id = batch_place.place_id
+"""
+UPSERT_DETAILS = """
+insert into public.conservation_area_details (
+  place_id, designation, iucn_category, iso3, realm,
+  source_id, source_release_id, source_record_id, source_url
 )
 select
-  %s, source_id, site_id, name, 'protected_area', designation,
-  iucn_category, iso3, realm, geom
-from parsed
-where extensions.st_area(geom::extensions.geography, true) / 1e6 >= 10
-on conflict (source_release_id, source_id) do update
+  place_id, designation, iucn_category, string_to_array(iso3, ';'), realm,
+  'wdpca', %(release)s, site_id, 'https://www.protectedplanet.net/' || site_id
+from batch_place
+on conflict (place_id) do update
 set
-  site_id = excluded.site_id,
-  name = excluded.name,
-  place_type = excluded.place_type,
   designation = excluded.designation,
   iucn_category = excluded.iucn_category,
   iso3 = excluded.iso3,
   realm = excluded.realm,
-  geom = excluded.geom
+  source_release_id = excluded.source_release_id,
+  source_record_id = excluded.source_record_id,
+  source_url = excluded.source_url
+"""
+UPSERT_PARCEL_IDS = """
+insert into public.place_source_ids (
+  place_id, source_id, id_kind, source_record_id, match_status,
+  first_seen_release_id, last_seen_release_id
+)
+select place_id, 'wdpca', 'wdpa_site_pid', source_id, 'confirmed', %(release)s, %(release)s
+from batch_place
+on conflict (source_id, id_kind, source_record_id) where match_status = 'confirmed'
+do update set last_seen_release_id = excluded.last_seen_release_id
+"""
+# One row per site, pointing at the place with the largest parcel. A site that
+# already has one keeps its place.
+UPSERT_SITE_IDS = """
+insert into public.place_source_ids (
+  place_id, source_id, id_kind, source_record_id, match_status,
+  first_seen_release_id, last_seen_release_id
+)
+select distinct on (details.source_record_id)
+  details.place_id, 'wdpca', 'wdpa_site_id', details.source_record_id, 'confirmed',
+  %(release)s, %(release)s
+from public.conservation_area_details as details
+join public.places on places.id = details.place_id
+where details.source_id = 'wdpca'
+  and details.source_release_id = %(release)s
+order by details.source_record_id, places.area_km2 desc, places.id
+on conflict (source_id, id_kind, source_record_id) where match_status = 'confirmed'
+do update set last_seen_release_id = excluded.last_seen_release_id
+"""
+# The SITE_PIDs stored for a release, with their place.
+STORED_PARCELS = """
+select ids.source_record_id as source_id, places.id, places.area_km2
+from public.place_source_ids as ids
+join public.places on places.id = ids.place_id
+where ids.source_id = 'wdpca'
+  and ids.id_kind = 'wdpa_site_pid'
+  and ids.match_status = 'confirmed'
+  and ids.last_seen_release_id = %s
 """
 
 csv.field_size_limit(2**31 - 1)
@@ -663,10 +749,7 @@ def prepare_stage(conn, work: Path) -> set[str]:
     source = fetch_source(conn)
     with conn.cursor() as cur:
         cur.execute("set search_path to public, extensions")
-        cur.execute(
-            "select source_id from public.places where source_release_id = %s",
-            (source["id"],),
-        )
+        cur.execute(STORED_PARCELS, (source["id"],))
         stored = {row["source_id"] for row in cur.fetchall()}
     conn.commit()
     in_file = {row[0] for row in read_rows(work)}
@@ -676,48 +759,30 @@ def prepare_stage(conn, work: Path) -> set[str]:
             f"refusing to load: {len(missing)} stored places are not in the filtered "
             f"file: {', '.join(missing[:20])}"
         )
-    move_leftover_stage(conn, source["id"])
+    refuse_leftover_stage(conn)
     with conn.cursor() as cur:
         cur.execute(CREATE_BATCH)
-        cur.execute(
-            "select source_id from public.places where source_release_id = %s",
-            (source["id"],),
-        )
+        cur.execute(CREATE_BATCH_PLACE)
+        cur.execute(STORED_PARCELS, (source["id"],))
         stored = {row["source_id"] for row in cur.fetchall()}
     conn.commit()
     return stored
 
 
-def move_leftover_stage(conn, release) -> None:
-    """Move rows left in places_load by an earlier run into places, then drop it."""
+def refuse_leftover_stage(conn) -> None:
+    """Stop if places_load from a run before task 04 is still there.
+
+    Its rows have the old places columns, which no longer exist.
+    """
     with conn.cursor() as cur:
         cur.execute("select to_regclass('public.places_load') is not null as present")
         present = bool(cur.fetchone()["present"])
     conn.commit()
-    if not present:
-        return
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            insert into public.places (
-              source_release_id, source_id, site_id, name, place_type, designation,
-              iucn_category, iso3, realm, geom
-            )
-            select source_release_id, source_id, site_id, name, 'protected_area',
-              designation, iucn_category, iso3, realm, geom
-            from public.places_load
-            where source_release_id = %s and area_km2 >= 10
-            on conflict (source_release_id, source_id) do update
-            set site_id = excluded.site_id, name = excluded.name,
-              place_type = excluded.place_type, designation = excluded.designation,
-              iucn_category = excluded.iucn_category, iso3 = excluded.iso3,
-              realm = excluded.realm, geom = excluded.geom
-            """,
-            (release,),
+    if present:
+        raise SystemExit(
+            "refusing to load: public.places_load from an older run still exists. "
+            "Check it and drop it first."
         )
-        print(f"moved {cur.rowcount} rows from places_load into places", flush=True)
-        cur.execute("drop table public.places_load")
-    conn.commit()
 
 
 def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
@@ -733,7 +798,7 @@ def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
             return
         with conn.cursor() as cur:
             copy_rows(cur, batch)
-            cur.execute(INSERT_BATCH, (source["id"],))
+            write_batch(cur, source["id"])
         conn.commit()
         total += len(batch)
         staged.update(row[0] for row in batch)
@@ -752,7 +817,20 @@ def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
         if len(batch) >= BATCH_ROWS or batch_size >= BATCH_BYTES:
             flush()
     flush()
+    with conn.cursor() as cur:
+        cur.execute(UPSERT_SITE_IDS, {"release": source["id"]})
+    conn.commit()
     return total
+
+
+def write_batch(cur, release) -> None:
+    """Write one copied batch into places, its details, and its parcel ids."""
+    cur.execute(MATCH_BATCH)
+    cur.execute(INSERT_PLACES)
+    cur.execute(UPDATE_PLACES)
+    cur.execute(UPSERT_DETAILS, {"release": release})
+    cur.execute(UPSERT_PARCEL_IDS, {"release": release})
+    cur.execute("truncate batch_place")
 
 
 def fetch_source(conn) -> dict:
@@ -807,21 +885,39 @@ def merge(work: Path) -> None:
     problems: list[str] = []
     with conn.cursor() as cur:
         cur.execute("set search_path to public, extensions")
-        cur.execute(
-            "select source_id, area_km2 from public.places where source_release_id = %s",
-            (release,),
-        )
+        cur.execute(STORED_PARCELS, (release,))
         stored = {row["source_id"]: row["area_km2"] for row in cur.fetchall()}
         cur.execute(
             """
-            select source_id, extensions.ST_IsValidReason(geom) as reason
-            from public.places
-            where source_release_id = %s and not extensions.ST_IsValid(geom)
-            order by source_id
+            select ids.source_record_id as source_id,
+              extensions.ST_IsValidReason(places.geom) as reason
+            from public.place_source_ids as ids
+            join public.places on places.id = ids.place_id
+            where ids.source_id = 'wdpca'
+              and ids.id_kind = 'wdpa_site_pid'
+              and ids.match_status = 'confirmed'
+              and ids.last_seen_release_id = %s
+              and not extensions.ST_IsValid(places.geom)
+            order by ids.source_record_id
             """,
             (release,),
         )
         invalid = cur.fetchall()
+        cur.execute(
+            """
+            select
+              (select count(distinct source_record_id)
+               from public.conservation_area_details
+               where source_id = 'wdpca' and source_release_id = %(release)s) as sites,
+              (select count(*)
+               from public.place_source_ids
+               where source_id = 'wdpca' and id_kind = 'wdpa_site_id'
+                 and match_status = 'confirmed'
+                 and last_seen_release_id = %(release)s) as site_ids
+            """,
+            {"release": release},
+        )
+        site_counts = cur.fetchone()
         cur.execute("select count(*) as n from public.facts")
         facts = int(cur.fetchone()["n"])
         cur.execute("select to_regclass('public.places_load') is not null as present")
@@ -843,10 +939,15 @@ def merge(work: Path) -> None:
             print(f"invalid geometry {row['source_id']}: {row['reason']}")
     if stage_left:
         problems.append("places_load still exists")
+    if site_counts["site_ids"] != site_counts["sites"]:
+        problems.append(
+            f"{site_counts['sites']} sites but {site_counts['site_ids']} wdpa_site_id rows"
+        )
     print(f"terrestrial polygons: {manifest['terrestrial']}", flush=True)
     print(f"GIS_AREA >= 10: {manifest['gis_area_ge_10']}", flush=True)
     print(f"stored areas of 10 km2 or more: {len(stored)}", flush=True)
     print(f"in the file but not stored (should be under 10 km2): {len(absent)}", flush=True)
+    print(f"sites: {site_counts['sites']}", flush=True)
     print(f"facts: {facts}", flush=True)
     if len(stored) < manifest["gis_area_ge_10"]:
         problems.append("fewer places stored than polygons with GIS_AREA >= 10")
