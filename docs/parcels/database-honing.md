@@ -233,7 +233,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
 
 - [x] [Task 01 — Verify](../tasks/task-01-verify-database-assumptions.md) — naturewatch-app
   - *Goal:* Run the read-only queries in **To verify**. Record the results here. Write the ADR on whether a Place is a WDPCA site or a parcel.
-- [ ] Task 02 — Hygiene — both repos
+- [ ] [Task 02 — Hygiene](../tasks/task-02-database-hygiene.md) — both repos
   - *Goal:* Drop `pilot_place_map` and its triggers. Add timestamps and `set_updated_at()`. Fix the stale `pilot_places` read in `facts/cropland.py`.
 - [ ] Task 03 — Sources — naturewatch-app
   - *Goal:* Rename `sources` to `source_releases`, keeping ids. Add the new `sources` table and `licences`. Add citations. Update the importer.
