@@ -42,11 +42,11 @@ Task 02 dropped `pilot_place_map` and `sync_pilot_place_map`, and added `created
 
 ### Weaknesses (verified)
 
-1. **Identity is tied to one release.** `places` is unique on `(source_release_id, source_id)`. A November WDPCA release would get a new `sources` row, so every place would get a new id. PMTiles ids and facts would break.
+1. **Identity is tied to one release.** `places` is unique on `(source_release_id, source_id)`. A November WDPCA release would get a new `sources` row, so every place would get a new id. PMTiles ids and facts would break. *Since task 04 a place's WDPCA ids are stored in `place_source_ids`, and the importer matches on them. Task 05 adds the reconciliation report.*
 2. **Identity and boundary are one row.** A corrected boundary can only overwrite the old one. There is no history.
 3. **Facts are not reproducible.** `facts` has no boundary reference, no run, no timestamp. The upsert in `naturewatch-analysis/facts/cropland.py` overwrites on `(place_id, sprout_id, method_id)`. `sprout_id` is free text with no foreign key.
 4. **The crops ids are hard-coded** in the SQL functions (`20261030100000_protected_areas.sql`), in `frontend/naturewatch/src/places/display.ts:4`, and in `cookbook/recipes/places-protected-areas.yaml` in the analysis repo.
-5. **`place_type` is an enum** (`wild_space`, `protected_area`, `ecoregion`, `country`, `river_catchment`). It does not match the planned hierarchy. Enum values cannot easily be removed.
+5. **`place_type` is an enum** (`wild_space`, `protected_area`, `ecoregion`, `country`, `river_catchment`). It does not match the planned hierarchy. Enum values cannot easily be removed. *Fixed by task 04.*
 6. **`sources` is a release, not a source.** There is no dataset, licence, citation, or publication level. *Fixed by task 03.*
 7. **WDPCA attributes are missing.** `DESIG_TYPE`, `STATUS`, `STATUS_YR`, `GOV_TYPE`, and `PA_DEF` are not imported. World Heritage Sites, Ramsar sites, and other international designations can only be found by their `designation` text.
 8. **No timestamps** on any table. *Fixed by task 02.*
@@ -184,7 +184,7 @@ Each stage is its own migration and pull request. Take a backup or check point-i
 
 ### Backfill rules
 
-- **Sites.** A Place is the whole WDPCA site ([record 19](../database/decisions.md#19-a-conservation-area-place-is-the-whole-wdpca-site)). For each of the 74 sites with several stored parcels, keep the place with the largest parcel. Set the other 112 to `merged`, with `merged_into_place_id` pointing at it. Flag the 7 sites whose parcels differ in designation.
+- **Sites.** A Place is the whole WDPCA site ([record 19](../database/decisions.md#19-a-conservation-area-place-is-the-whole-wdpca-site)). For each of the 74 sites with several stored parcels, keep the place with the largest parcel. Set the other 112 to `merged`, with `merged_into_place_id` pointing at it. Flag the 7 sites whose parcels differ in designation. *Done in task 05, together with the site boundary. Until then every place stays `published`, and each `wdpa_site_id` row already points at the place to keep.*
 - **Boundaries.** One version 1 boundary per site: its parcels collected into one MultiPolygon. `review_status = 'approved'`, `is_current = true`, source WDPCA October 2026, `source_record_id` = SITE_ID.
 - **Source ids.** One confirmed `wdpa_site_id` row per place, and one confirmed `wdpa_site_pid` row per parcel, pointing at the kept place. First and last seen in October 2026.
 - **Details.** `designation`, `iucn_category`, `iso3`, and `realm` move to `conservation_area_details`. The missing WDPCA fields stay null until the next import.
@@ -239,10 +239,10 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Drop `pilot_place_map` and its triggers. Add timestamps and `set_updated_at()`. Fix the stale `pilot_places` read in `facts/cropland.py`.
 - [x] [Task 03 — Sources](../archive/tasks/task-03-sources.md) — naturewatch-app
   - *Goal:* Rename `sources` to `source_releases`, keeping ids. Add the new `sources` table and `licences`. Add citations. Update the importer.
-- [ ] Task 04 — Types and details — naturewatch-app
+- [x] [Task 04 — Types and details](../tasks/task-04-types-and-details.md) — naturewatch-app
   - *Goal:* Add `place_categories`, `place_types`, `conservation_area_details`, `place_source_ids`, `publication_status`, `merged_into_place_id`. Backfill. Replace the enum.
 - [ ] Task 05 — Boundaries — naturewatch-app
-  - *Goal:* Add `place_boundaries`, copy the geometry in batches, and verify. Switch functions to it. Add the generic `place_*` reads and temporary wrappers. Add the reconciliation report to the importer.
+  - *Goal:* Add `place_boundaries`, copy the geometry in batches, and verify. Merge the parcels of each multi-parcel site into one place, as in the backfill rule **Sites**. Switch functions to it. Add the generic `place_*` reads and temporary wrappers. Add the reconciliation report to the importer.
 - [ ] Task 06 — Boundary QC and eligibility — both repos
   - *Goal:* Add `boundary_checks` and the eligibility columns, RPC, and view. Run the four starting checks. Review the flagged records.
 - [ ] Task 07 — Stats — both repos

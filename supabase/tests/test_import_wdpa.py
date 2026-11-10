@@ -128,6 +128,49 @@ class ImportWdpaTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             import_wdpa.fetch_source(conn)
 
+    def test_rows_match_places_through_confirmed_parcel_ids(self):
+        sql = import_wdpa.MATCH_BATCH
+        self.assertIn("public.place_source_ids", sql)
+        self.assertIn("ids.id_kind = 'wdpa_site_pid'", sql)
+        self.assertIn("ids.match_status = 'confirmed'", sql)
+        self.assertIn("/ 1e6 >= 10", sql)
+        self.assertIn("'conservation_area', 'published'", import_wdpa.INSERT_PLACES)
+
+    def test_the_importer_writes_no_old_places_column(self):
+        source = MODULE_PATH.read_text()
+        for old in ("place_type,", "'protected_area'", "on conflict (source_release_id, source_id)"):
+            self.assertNotIn(old, source)
+        self.assertIn("string_to_array(iso3, ';')", import_wdpa.UPSERT_DETAILS)
+
+    def test_each_site_points_at_its_largest_parcel(self):
+        sql = import_wdpa.UPSERT_SITE_IDS
+        self.assertIn("distinct on (details.source_record_id)", sql)
+        self.assertIn("order by details.source_record_id, places.area_km2 desc, places.id", sql)
+        self.assertIn("'wdpa_site_id'", sql)
+
+    def test_write_batch_writes_places_before_their_details_and_ids(self):
+        cursor = mock.MagicMock()
+        import_wdpa.write_batch(cursor, "release-id")
+        statements = [call.args[0] for call in cursor.execute.call_args_list]
+        self.assertEqual(
+            statements,
+            [
+                import_wdpa.MATCH_BATCH,
+                import_wdpa.INSERT_PLACES,
+                import_wdpa.UPDATE_PLACES,
+                import_wdpa.UPSERT_DETAILS,
+                import_wdpa.UPSERT_PARCEL_IDS,
+                "truncate batch_place",
+            ],
+        )
+        self.assertEqual(cursor.execute.call_args_list[3].args[1], {"release": "release-id"})
+
+    def test_upload_refuses_an_old_places_load(self):
+        conn, _ = self._source_connection({"present": True})
+        with self.assertRaises(SystemExit) as raised:
+            import_wdpa.refuse_leftover_stage(conn)
+        self.assertIn("places_load", str(raised.exception))
+
     def test_hosted_url_uses_the_direct_database_host(self):
         body = FakeBody(
             json.dumps(
