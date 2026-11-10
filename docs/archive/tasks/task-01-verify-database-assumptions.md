@@ -1,6 +1,6 @@
 # Task 01 — Verify
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repository: naturewatch-app. Start only after the Database Honing planning documents have merged into `develop` (pull request #382, merged 10 November 2026).
 
@@ -14,7 +14,7 @@ Run the read-only queries in the parcel's **To verify** section against the host
 - The 941 South Africa cropland facts were written on 22 October 2026 by Batch job `facts-cropland-2024-v1-20261022180517` (`naturewatch-analysis/facts/README.md`). The global load ran on 31 October 2026 and its upsert overwrote `geom` for places that already existed (`supabase/import_wdpa.py`).
 - The facts run stored no place area. It stored `area_km2`, `percent = 100 × area_km2 / valid km²`, and `valid_coverage = valid km² / places.area_km2`, at full precision. So, where `percent` and `valid_coverage` are both above 0, the place area at the time of the run is `100 × area_km2 / (percent × valid_coverage)`.
 - `places.id` is a UUID. Batches page by id with keyset pagination (`where id > $last order by id limit $n`), not `id between`.
-- The decision is open in record 4 of [decisions.md](../database/decisions.md). Its leaning is that a Place is the whole site.
+- The decision is open in record 4 of [decisions.md](../../database/decisions.md). Its leaning is that a Place is the whole site.
 
 ## Do this
 
@@ -26,7 +26,7 @@ Run every query read-only: in a read-only transaction or as a read-only role, wi
 4. **Recognitions.** Run the designation count. Record the designations that are international or regional, with their counts.
 5. **Disk.** Record the disk size and free space from the Supabase dashboard, and `pg_database_size` and `pg_total_relation_size('public.places')` from the database. Propose the size to grow to before task 05, with the reason.
 6. Write the results under **To verify** in the parcel. Mark each settled statement as verified, with the date and the query. Where a result changes a statement elsewhere in the parcel or in `design.md`, correct that statement.
-7. Add a decision record to [decisions.md](../database/decisions.md): a Place is a WDPCA site or a parcel. Use the counts from step 1 and the effect on the 10 km² rule. The user chooses. Update the **Open** paragraph of record 4 to point at the new record.
+7. Add a decision record to [decisions.md](../../database/decisions.md): a Place is a WDPCA site or a parcel. Use the counts from step 1 and the effect on the 10 km² rule. The user chooses. Update the **Open** paragraph of record 4 to point at the new record.
 8. Tick task 01 in the parcel.
 
 ## Do not
