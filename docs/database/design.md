@@ -242,7 +242,7 @@ Unique: `(source_id, version_label)`, `(id, source_id)` for the composite foreig
 | --- | --- |
 | `source_id` text not null, FK → `sources` | |
 | `source_release_id` uuid null | Composite FK `(source_release_id, source_id)` → `source_releases (id, source_id)`, so a release always belongs to its source |
-| `source_record_id` text null | SITE_PID, `File:…jpg`, an observation id |
+| `source_record_id` text null | SITE_ID, `File:…jpg`, an observation id |
 | `source_url` text null | The record's own page |
 
 Examples: a WDPCA boundary fills all four. A boundary from a paper has a publication source and no release. A Commons image has `wikimedia-commons` and its file name. A user upload has `sooty-earth-contributors` and `uploaded_by`.

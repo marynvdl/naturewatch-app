@@ -14,7 +14,7 @@ The Stats Pipeline is paused until the stages below have landed. A later parcel 
 
 ## A. Current state
 
-This is a snapshot from 9 November 2026. It reads the migrations in `supabase/migrations/`, the importer, the frontend, and the analysis repo. No database was queried. Statements marked **To verify** are assumptions.
+This is a snapshot from 9 November 2026. It reads the migrations in `supabase/migrations/`, the importer, the frontend, and the analysis repo. No database was queried. Statements marked **To verify** were assumptions. Task 01 checked them on 10 November 2026.
 
 ### Tables
 
@@ -66,36 +66,85 @@ Views and functions: the view `protected_areas` (terrestrial, at least 10 km²),
 
 ### To verify
 
-Run these as read-only queries, with approval, before stage 4. They settle the assumptions the design rests on.
+Task 01 ran these on 10 November 2026 against the hosted database, through the Supabase MCP server in read-only mode (role `supabase_read_only_user`, `transaction_read_only = on`, statement timeout 2 minutes). Nothing was written. PostGIS is in the `extensions` schema, so its functions are qualified. At the time: 51,001 places in 50,889 sites, 941 facts.
 
-- **SITE_ID and SITE_PID.** Confirmed from the current WDPCA manual on 10 November 2026. `SITE_ID` identifies the protected area or OECM as a whole and stays stable for that site. It was `WDPAID`. `SITE_PID` identifies one parcel, a separate part of a site. It was `WDPA_PID`. Today each stored place is one parcel. Still to count: how many sites have several stored parcels.
+- **SITE_ID and SITE_PID.** Verified 10 November 2026. From the current WDPCA manual: `SITE_ID` identifies the protected area or OECM as a whole and stays stable for that site. It was `WDPAID`. `SITE_PID` identifies one parcel, a separate part of a site. It was `WDPA_PID`. Each stored place is one parcel.
 
-  ```sql
-  select count(*) from (
-    select site_id from places group by site_id having count(*) > 1
-  ) as multi;
-  ```
+  74 sites have more than one stored parcel. They hold 186 places, 0.4% of the total. 62 sites have 2 parcels, 8 have 3, 2 have 4, 1 has 5, and 1 has 25 (`555758870`, Fish And Wildlife Development Fund, Canada). 59 of the 74 use one name on every parcel, 67 use one designation, and all 74 sit in one `iso3`. The 15 with several names are zones or numbered parts of one area: biosphere core and buffer zones (Laguna de los Pozuelos, San Guillermo), the parts of Great Volzhsko-Kamsky, the Iberá nuclei, and Mongolian parks split into /A/ and /B/. Parcels of one site can carry different designations. Gorongosa (`801`) has a National Park parcel and a Buffer Zone parcel.
 
-- **South Africa geometry.** The 941 cropland facts were calculated on 22 October. The global load ran on 31 October. Check that the South Africa geometries did not change in between, by comparing `area_km2` with the place areas recorded in the facts run. If they differ, the v1 facts belong to a boundary we no longer have.
-- **Shape statistics.** Component count, hole count, and vertex count per place, to set the first QC thresholds. Run in batches by id range:
+  Only parcels of at least 10 km² are stored. A site's smaller parcels are not in the database, so these counts are a lower bound for the source.
 
   ```sql
-  select id, name, iso3,
-    st_numgeometries(geom) as components,
-    (select sum(st_numinteriorrings(d.geom)) from st_dump(geom) as d) as holes,
-    st_npoints(geom) as vertices
-  from places
-  where id between $1 and $2;
+  with s as (
+    select site_id, count(*) n, count(distinct name) names,
+      count(distinct designation) desigs, count(distinct iso3) isos
+    from places group by site_id having count(*) > 1)
+  select count(*), sum(n), max(n),
+    count(*) filter (where names = 1),
+    count(*) filter (where desigs = 1),
+    count(*) filter (where isos = 1)
+  from s;
   ```
 
-- **Recognitions.** Which designations are international or regional:
+- **South Africa geometry.** Verified 10 November 2026. The check passed. The facts run stored no place area, but `percent = 100 × area_km2 / valid` and `valid_coverage = valid / places.area_km2` at full precision give it back as `100 × area_km2 / (percent × valid_coverage)`. All 663 facts where both are above 0 agree with today's `places.area_km2`. The largest relative difference is 4.9e-15, and the largest absolute difference is 1.6e-11 km². 278 facts have `percent = 0` (2 of them also have `valid_coverage = 0`) and cannot be checked this way. Equal areas show the boundaries did not change, but do not prove it. 431 facts have `valid_coverage` slightly above 1, at most 1.00031. That comes from counting pixel fractions against the polygon's area, and is not an error.
 
   ```sql
-  select designation, count(*) from places group by designation order by 2 desc;
+  select count(*) filter (where abs(r - now_km2) / now_km2 <= 1e-9) as agree,
+    count(*) filter (where abs(r - now_km2) / now_km2 > 1e-9) as differ,
+    max(abs(r - now_km2) / now_km2) as max_rel_diff
+  from (
+    select p.area_km2 as now_km2,
+      100 * f.area_km2 / (f.percent * f.valid_coverage) as r
+    from facts f join places p on p.id = f.place_id
+    where f.percent > 0 and f.valid_coverage > 0
+  ) as t;
   ```
 
-  Expect World Heritage, Ramsar, UNESCO Biosphere Reserve, and regional sets such as Natura 2000 and the Emerald Network.
-- **Disk.** The user confirmed on 10 November 2026 that the Supabase disk can be grown for the geometry copy. Before task 05, record the disk size, the free space, and the size to grow to.
+- **Shape statistics.** Verified 10 November 2026. One pass over all places took 29 seconds. Holes are `st_nrings - st_numgeometries`, the interior rings across every part.
+
+  | Measure | Median | 90th percentile | 99th percentile | Maximum |
+  | --- | --- | --- | --- | --- |
+  | Components | 1 | 7 | 125 | 24,389 |
+  | Holes | 0 | 5 | 89 | 14,448 |
+  | Vertices | 844 | 7,659 | 53,141 | 1,952,317 |
+
+  35,378 places (69%) have one part and 37,557 (74%) have no hole. 603 have more than 100 parts and 135 more than 1,000. 198 have more than 100,000 vertices and 6 more than a million. Most parts: California Coastal (USA, 24,389), Old Growth Management Areas (Mapped Legal) (CAN, 20,166), Metsälain erityisen tärkeät elinympäristöt Pohjois-Pohjanmaa (FIN, 17,914), Aleutian Islands World War II National Monument – Kiska Area 4 (USA, 17,151), Kawésqar (CHL, 15,437). Most vertices: Torne och Kalix älvsystem (SWE, two records, 1,952,317 and 1,945,166), Kawésqar (1,870,347), Vindelälven (SWE, 1,674,464), Catchment Reserve Protection Area (KOR, 1,323,071), Tornionjoen-Muonionjoen vesistöalue (FIN, 1,060,218). Many of the largest are collections, not single areas: Finnish forest-act habitats per region, Danish municipal private land, Dutch NNN provinces. River-system Natura 2000 sites in Sweden appear twice with near-identical shapes, once as a Special Area of Conservation and once as a Special Protection Area.
+
+  ```sql
+  with s as (
+    select st_numgeometries(geom) c,
+      st_nrings(geom) - st_numgeometries(geom) h,
+      st_npoints(geom) v
+    from places)
+  select
+    percentile_disc(array[0.5, 0.9, 0.99, 1]) within group (order by c),
+    percentile_disc(array[0.5, 0.9, 0.99, 1]) within group (order by h),
+    percentile_disc(array[0.5, 0.9, 0.99, 1]) within group (order by v)
+  from s;
+  ```
+
+- **Recognitions.** Verified 10 November 2026. There are 980 distinct designations and none is null. Matched by name, the international and regional sets are:
+
+  | Set | Designations | Places |
+  | --- | --- | --- |
+  | Natura 2000 (EU) | Special Areas of Conservation (Habitats Directive) 4,758; Special Protection Area (Birds Directive) 2,875; Site of Community Importance (Habitats Directive) 620 | 8,253 |
+  | Ramsar | Wetland of International Importance (Ramsar Site) | 1,079 |
+  | Emerald Network (Council of Europe) | Emerald Network | 1,012 |
+  | UNESCO-MAB Biosphere Reserve | UNESCO-MAB Biosphere Reserve | 220 |
+  | World Heritage | World Heritage Site (natural or mixed) | 207 |
+  | ASEAN Heritage Park | ASEAN Heritage Park | 11 |
+  | Cartagena Convention | Specially Protected Area (Cartagena Convention) | 4 |
+  | OSPAR | Marine Protected Area (OSPAR) | 3 |
+
+  Together 10,789 places, 21% of the total. Some national designations use the same words: Natura 2000 SCI 244, Natura 2000 SPA 125, Natura 2000 122, Biosphere Reserve 49, and smaller variants of biosphere zones, RAMSAR, ZSC and ZPS, and ASEAN Heritage Park combined with a national designation. Which of these are international is settled by `DESIG_TYPE` in task 09, not by name.
+
+  ```sql
+  select designation, count(*) from places
+  where designation ~* '(world heritage|ramsar|biosphere|unesco|natura 2000|community importance|special protection area|special areas? of conservation|emerald|asean|ospar|cartagena|geopark)'
+  group by designation order by 2 desc;
+  ```
+
+- **Disk.** Verified 10 November 2026. The dashboard shows 4.62 GB used of an 8 GB disk. `pg_database_size` is 3,684,800,179 bytes (3,514 MB). `pg_total_relation_size('public.places')` is 3,650,945,024 bytes (3,482 MB), 99% of the database. The geometry copy in task 05 adds about 3.5 GB, plus its GiST index and the write-ahead log while the backfill runs. 4.62 + 3.5 GB already passes 8 GB. Grow the disk to 16 GB before task 05: room for the copy, the index, the log, and a margin, without leaning on automatic disk growth during the backfill. Check the price and whether the disk can be shrunk again on the dashboard before growing it.
 
 ## G. Migration
 
@@ -133,11 +182,12 @@ Each stage is its own migration and pull request. Take a backup or check point-i
 
 ### Backfill rules
 
-- **Boundaries.** One version 1 boundary per place, `review_status = 'approved'`, `is_current = true`, source WDPCA October 2026, `source_record_id` = SITE_PID.
-- **Source ids.** One confirmed `wdpa_site_pid` and one `wdpa_site_id` row per place, first and last seen in October 2026.
+- **Sites.** A Place is the whole WDPCA site ([record 19](../database/decisions.md#19-a-conservation-area-place-is-the-whole-wdpca-site)). For each of the 74 sites with several stored parcels, keep the place with the largest parcel. Set the other 112 to `merged`, with `merged_into_place_id` pointing at it. Flag the 7 sites whose parcels differ in designation.
+- **Boundaries.** One version 1 boundary per site: its parcels collected into one MultiPolygon. `review_status = 'approved'`, `is_current = true`, source WDPCA October 2026, `source_record_id` = SITE_ID.
+- **Source ids.** One confirmed `wdpa_site_id` row per place, and one confirmed `wdpa_site_pid` row per parcel, pointing at the kept place. First and last seen in October 2026.
 - **Details.** `designation`, `iucn_category`, `iso3`, and `realm` move to `conservation_area_details`. The missing WDPCA fields stay null until the next import.
 - **Types.** Every current place becomes type `conservation_area`, `publication_status = 'published'`.
-- **Stats.** Each `facts` row becomes three `place_stats` rows (`crops_area`, `crops_percent`, `valid_coverage`). They belong to one run for Batch job `facts-cropland-2024-v1-20261022180517` on 22 October 2026, against the version 1 boundary. This holds only if the South Africa geometry check passes. If it fails, the rows are kept and the run is marked `retracted` with the reason. Then add a `stat_selections` row for crops 2024.
+- **Stats.** Each `facts` row becomes three `place_stats` rows (`crops_area`, `crops_percent`, `valid_coverage`). They belong to one run for Batch job `facts-cropland-2024-v1-20261022180517` on 22 October 2026, against the version 1 boundary. The South Africa geometry check passed on 10 November 2026, so the run is not retracted. Then add a `stat_selections` row for crops 2024.
 - **QC.** Run the four starting checks in batches. Boundaries that pass become `eligible`. Flagged ones, such as the Canadian record with over a hundred small parts, stay published, with `qc_status = 'flagged'` and `stats_eligibility = 'pending'`, until reviewed.
 - **Timestamps.** Use the known dates: 31 October 2026 for the global import, 22 October 2026 for the facts run. Otherwise use the migration time, and say so in the migration.
 
@@ -181,7 +231,7 @@ Supported by the design, not built in this work:
 
 Do one task at a time, in this order. Each task is one branch and one pull request. Task files are written when a task starts. A task that changes the hosted database waits for approval of its row counts, disk, and compute.
 
-- [ ] [Task 01 — Verify](../tasks/task-01-verify-database-assumptions.md) — naturewatch-app
+- [x] [Task 01 — Verify](../tasks/task-01-verify-database-assumptions.md) — naturewatch-app
   - *Goal:* Run the read-only queries in **To verify**. Record the results here. Write the ADR on whether a Place is a WDPCA site or a parcel.
 - [ ] Task 02 — Hygiene — both repos
   - *Goal:* Drop `pilot_place_map` and its triggers. Add timestamps and `set_updated_at()`. Fix the stale `pilot_places` read in `facts/cropland.py`.
