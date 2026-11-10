@@ -31,9 +31,9 @@ Task 09 first finds the cheapest reliable route, with no billable processing, th
 
 Do one task at a time, in this order. Start a task only after the one above it has merged.
 
-- [x] [task-09-cropland-rgb-tiles-v3.md](https://github.com/marynvdl/naturewatch-analysis/blob/main/docs/tasks/task-09-cropland-rgb-tiles-v3.md) — naturewatch-analysis
+- [x] [task-09-cropland-rgb-tiles-v3.md](../tasks/task-09-cropland-rgb-tiles-v3.md) — naturewatch-analysis
   - *Goal:* Find the cheapest reliable Safari-safe encoding, prove it on the real map path, stop for approval, then publish and verify the v3 archive.
-- [x] [task-09b-cropland-share-tiles-v3.md](https://github.com/marynvdl/naturewatch-analysis/blob/main/docs/tasks/task-09b-cropland-share-tiles-v3.md) — naturewatch-analysis
+- [x] [task-09b-cropland-share-tiles-v3.md](../tasks/task-09b-cropland-share-tiles-v3.md) — naturewatch-analysis
   - *Goal:* Publish the version 3 archive as 512 px share tiles, zooms 0–11, eight √share shades.
 - [x] [task-10-cropland-rgb-tiles-on-the-map.md](../tasks/task-10-cropland-rgb-tiles-on-the-map.md) — naturewatch-app
   - *Goal:* Point the Crops layer at v3, paint the share, and keep the info card on screen.

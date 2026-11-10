@@ -18,10 +18,11 @@ Write each fact once.
 
 ## Parcels and tasks
 
-A parcel in `docs/parcels/` lists tasks in order. Each task points at one `docs/tasks/<file>.md` in the repo that does the work. `/task <file>` starts a task and `/archive-task <file>` files it after merge.
+A parcel in `docs/parcels/` lists tasks in order. Each task points at one `docs/tasks/<file>.md` in this repo, for both repos. The task file names the repo that does the work. `/task <file>` starts a task and `/archive-task <file>` files it after merge.
 
 - A task marked for naturewatch-app is done in this repo.
-- A task marked for naturewatch-analysis is done in that repo, from its own checkout.
+- A task marked for naturewatch-analysis is done in `../naturewatch-analysis`, from this session. Read `../naturewatch-analysis/CLAUDE.md` first and follow it there: branch from `main`, its cost rules, one pull request into `main`. Run git there with `git -C ../naturewatch-analysis`.
+- A task that touches both repos gets one branch and one pull request in each. Link each pull request from the other.
 - Do the named task only. Do not start the next task until that one is finished.
 
 ## Direction
@@ -32,7 +33,7 @@ Plan a task before changing code, and wait for the plan to be approved.
 
 ## Secrets
 
-Never commit, push, or paste a key or token. That includes a service-account JSON key, a private key, an API token, a password, and the contents of a GitHub secret or `.env` file. A workflow names a secret as `${{ secrets.SECRET_NAME }}`. A service-account email and a secret's name are identifiers. If a secret value is already in the repo, do not repeat it. Tell Maryn so it can be rotated.
+Never commit, push, or paste a key or token. That includes a service-account JSON key, a private key, an API token, a password, and the contents of a GitHub secret or `.env` file. A workflow names a secret as `${{ secrets.SECRET_NAME }}`. A service-account email and a secret's name are identifiers. If a secret value is already in the repo, do not repeat it. Tell the user so it can be rotated.
 
 ## Git and releases
 

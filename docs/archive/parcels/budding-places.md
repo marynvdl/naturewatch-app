@@ -19,7 +19,7 @@ The refined mock-up at [budding-places.html](budding-places.html) is the interac
 ## Left for later
 
 - Molding Places: signing in, edit mode, curated text, overlap review, which places are drawn, and approving photographs. This parcel does not write to Supabase.
-- [Places Tiles](../../parcels/places-tiles.md): a larger protected-area set, PMTiles, and a faster way to draw boundaries. This parcel leaves boundary loading as it is.
+- [Places Tiles](places-tiles.md): a larger protected-area set, PMTiles, and a faster way to draw boundaries. This parcel leaves boundary loading as it is.
 - Species records, and disturbance measurements other than the cropland fact already stored.
 - A production release. Merge into `develop` only.
 

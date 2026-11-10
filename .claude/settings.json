@@ -20,8 +20,14 @@
       "Bash(npm run type-check*)",
       "Bash(npm run test:unit*)",
       "Bash(npm run test:coverage*)",
-      "Bash(pytest*)"
+      "Bash(pytest*)",
+      "Bash(git -C ../naturewatch-analysis status*)",
+      "Bash(git -C ../naturewatch-analysis diff*)",
+      "Bash(git -C ../naturewatch-analysis log*)",
+      "Bash(git -C ../naturewatch-analysis show*)",
+      "Bash(git -C ../naturewatch-analysis branch --show-current)"
     ],
+    "additionalDirectories": ["../naturewatch-analysis"],
     "deny": [
       "Read(**/.env)",
       "Read(**/.env.*.local)",
@@ -30,8 +36,8 @@
       "Bash(git push* main*)",
       "Bash(flyctl deploy*)",
       "Bash(fly deploy*)",
-      "Bash(gh pr create*--base main*)",
-      "Bash(gh pr create*-B main*)",
+      "Bash(gh pr create*--head develop*)",
+      "Bash(gh pr create*-H develop*)",
       "Bash(gh pr merge*)"
     ]
   }

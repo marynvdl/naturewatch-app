@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Task file: $ARGUMENTS
 
-1. Confirm the task's pull request has merged into `develop` (`gh pr list --state merged --search <task name>`). If it has not, stop.
+1. Confirm the task's pull request has merged. For a naturewatch-app task it merges into `develop` here (`gh pr list --state merged --search <task name>`). For a naturewatch-analysis task it merges into `main` there (`gh pr list -R marynvdl/naturewatch-analysis --state merged --search <task name>`). If it has not merged, stop. Task files for both repos are archived here.
 2. Branch from an up-to-date `develop`: `chore/archive-<task-file-name-without-.md>`.
 3. `git mv` the task file into `docs/archive/tasks/`. Fix any relative links inside it that the move breaks.
 4. In the parcel, tick the task (`- [x]`) and point its link at the archived copy.
