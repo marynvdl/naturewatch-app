@@ -28,6 +28,8 @@ This is a snapshot from 9 November 2026. It reads the migrations in `supabase/mi
 
 Views and functions: the view `protected_areas` (terrestrial, at least 10 km²), and the functions `protected_areas_in_extent`, `protected_area_matched`, `protected_area_window`, `protected_area_window_count`, `protected_area_rank`, `protected_area_kept_ids`, `protected_area_filter_stats`, `place_bounds`, `places_set_bbox` (trigger), `sync_pilot_place_map` (trigger).
 
+Task 02 dropped `pilot_place_map` and `sync_pilot_place_map`, and added `created_at`, `updated_at`, and `set_updated_at()` on 10 November 2026.
+
 ### What works and should be kept
 
 - `area_km2` is a generated column on the WGS84 spheroid. It cannot drift from the geometry (`20261021120000_records.sql`).
@@ -47,10 +49,10 @@ Views and functions: the view `protected_areas` (terrestrial, at least 10 km²),
 5. **`place_type` is an enum** (`wild_space`, `protected_area`, `ecoregion`, `country`, `river_catchment`). It does not match the planned hierarchy. Enum values cannot easily be removed.
 6. **`sources` is a release, not a source.** There is no dataset, licence, citation, or publication level.
 7. **WDPCA attributes are missing.** `DESIG_TYPE`, `STATUS`, `STATUS_YR`, `GOV_TYPE`, and `PA_DEF` are not imported. World Heritage Sites, Ramsar sites, and other international designations can only be found by their `designation` text.
-8. **No timestamps** on any table.
+8. **No timestamps** on any table. *Fixed by task 02.*
 9. **No auth, profiles, roles, or audit.**
-10. **`pilot_place_map` is dead weight.** The app stopped reading it. Its trigger still fires on every `places` insert or update.
-11. **A stale read in the analysis repo.** `facts/cropland.py` selects `from public.pilot_places`, which was renamed to `protected_areas` on 30 October. The next run would fail.
+10. **`pilot_place_map` is dead weight.** The app stopped reading it. Its trigger still fires on every `places` insert or update. *Fixed by task 02.*
+11. **A stale read in the analysis repo.** `facts/cropland.py` selects `from public.pilot_places`, which was renamed to `protected_areas` on 30 October. The next run would fail. *Fixed by task 02: it reads `protected_areas` for South Africa.*
 12. **Default grants.** Postgres grants `execute` on every new function to `public`, and Supabase's default privileges grant new tables and functions in `public` to `anon` and `authenticated`. The existing migrations revoke correctly. Every new migration must do the same.
 13. **The importer's upsert overwrites geometry.** `on conflict … do update set … geom = excluded.geom`.
 
@@ -60,7 +62,7 @@ Views and functions: the view `protected_areas` (terrestrial, at least 10 km²),
 | --- | --- |
 | Frontend `places/api.ts` | `protected_areas` view, `facts` table, RPCs `protected_area_window`, `protected_area_rank`, `protected_area_filter_stats`, `place_bounds` |
 | `supabase/import_wdpa.py` | Writes `places` with `geom`. Reads `sources`. |
-| Analysis `facts/cropland.py` | Reads `pilot_places` (stale) and `places.geom`. Writes `facts`, `fact_methods`. |
+| Analysis `facts/cropland.py` | Reads `protected_areas` (South Africa) and `places.geom`. Writes `facts`, `fact_methods`. |
 | Analysis `places/protected_areas.py` | Reads `places.geom` and `facts`. Writes PMTiles features with `id` = `places.id`. |
 | FastAPI service | Does not read these tables. |
 
@@ -233,7 +235,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
 
 - [x] [Task 01 — Verify](../tasks/task-01-verify-database-assumptions.md) — naturewatch-app
   - *Goal:* Run the read-only queries in **To verify**. Record the results here. Write the ADR on whether a Place is a WDPCA site or a parcel.
-- [ ] [Task 02 — Hygiene](../tasks/task-02-database-hygiene.md) — both repos
+- [x] [Task 02 — Hygiene](../tasks/task-02-database-hygiene.md) — both repos
   - *Goal:* Drop `pilot_place_map` and its triggers. Add timestamps and `set_updated_at()`. Fix the stale `pilot_places` read in `facts/cropland.py`.
 - [ ] Task 03 — Sources — naturewatch-app
   - *Goal:* Rename `sources` to `source_releases`, keeping ids. Add the new `sources` table and `licences`. Add citations. Update the importer.
