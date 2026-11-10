@@ -23,6 +23,6 @@ Task file: $ARGUMENTS
    - Both repos: do the naturewatch-analysis part as above, and the naturewatch-app part here with steps 6–10.
 6. Read the files the task names, and `docs/blueprint.md` where it is relevant. If the task file was approved in step 4, that is the plan. Otherwise write a plan that follows the task's "Do this", "Do not", and "Done when" sections, and wait for approval.
 7. Make the change. Update `docs/blueprint.md` and `docs/user/` only where the task says, keeping each fact in one place.
-8. Run the relevant tests: the catalog suite (`cd frontend/naturewatch && npx vitest run src/catalog`) for catalog or frontend changes, `npm run type-check` and `npm run lint` for frontend code, and pytest for `app/` or `supabase/`. If the task asks for a browser check, run the dev server on `http://localhost` and check a wide screen and a narrow screen. Report what was seen.
+8. Run the relevant tests: the catalog suite (`cd frontend/naturewatch && npx vitest run src/catalog`) for catalog or frontend changes, `npm run type-check` and `npm run lint` for frontend code, and pytest for `app/` or `supabase/`. If the task asks for a browser check, or changes what the app shows, run the `browser-check` skill on the routes involved. Report what each wide and narrow screenshot shows, and any errors.
 9. Commit only the task's files, with no AI attribution. Push the branch and open a pull request into `develop`. Report the pull request URL and the required checks. Do not wait for them, and do not merge.
 10. Stop. Do not start the next task.
