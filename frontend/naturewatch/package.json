@@ -26,6 +26,7 @@
     "preview": "vite preview",
     "lint": "eslint . --fix --cache --cache-location ./node_modules/.vite/vite-plugin-eslint && prettier . -w -u",
     "lint:style": "stylelint \"./**/*.{css,sass,scss,htm,html,vue}\" --fix --cache-location ./node_modules/.vite/vite-plugin-stylelint  && prettier  \"./**/*.{css,sass,scss,htm,html,vue}\" -w -u",
+    "browser-check": "node scripts/browser-check.mjs",
     "test:unit": "vitest",
     "test:coverage": "vitest run --coverage",
     "build-only": "vite build",
@@ -50,6 +51,7 @@
   },
   "devDependencies": {
     "@babel/types": "^8.0.10",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tsconfig/node18": "^18.2.4",
     "@types/jsdom": "^30.0.0",

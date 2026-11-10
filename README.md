@@ -64,6 +64,7 @@ Use `http://localhost` for the dev server. The tile bucket’s browser rules all
 | `npm run build:analyze` | Bundle analyzer |
 | `npm run build:clean` | Delete `dist` |
 | `npm run preview` | Serve the production build |
+| `npm run browser-check -- --out <dir> <route> …` | Screenshot routes in headless Chromium at 1440×900 and 390×844 and list console errors and failed requests. Needs `npx playwright install chromium` once. |
 
 There is no `npm test` or `npm run coverage` script.
 

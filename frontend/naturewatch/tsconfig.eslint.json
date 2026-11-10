@@ -5,7 +5,8 @@
     "vitest/**/*",
     "vitest.config.ts",
     "vite.config.mts",
-    "env.d.ts"
+    "env.d.ts",
+    "scripts/**/*.mjs"
     // Add any other directories or files you want ESLint to check
   ],
   "exclude": ["src/styles/visual.css"]
