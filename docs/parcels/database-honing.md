@@ -233,7 +233,7 @@ Supported by the design, not built in this work:
 
 Do one task at a time, in this order. Each task is one branch and one pull request. Task files are written when a task starts. A task that changes the hosted database waits for approval of its row counts, disk, and compute.
 
-- [x] [Task 01 — Verify](../tasks/task-01-verify-database-assumptions.md) — naturewatch-app
+- [x] [Task 01 — Verify](../archive/tasks/task-01-verify-database-assumptions.md) — naturewatch-app
   - *Goal:* Run the read-only queries in **To verify**. Record the results here. Write the ADR on whether a Place is a WDPCA site or a parcel.
 - [x] [Task 02 — Hygiene](../tasks/task-02-database-hygiene.md) — both repos
   - *Goal:* Drop `pilot_place_map` and its triggers. Add timestamps and `set_updated_at()`. Fix the stale `pilot_places` read in `facts/cropland.py`.
