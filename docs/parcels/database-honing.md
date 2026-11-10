@@ -95,7 +95,7 @@ Run these as read-only queries, with approval, before stage 4. They settle the a
   ```
 
   Expect World Heritage, Ramsar, UNESCO Biosphere Reserve, and regional sets such as Natura 2000 and the Emerald Network.
-- **Disk.** Maryn confirmed on 10 November 2026 that the Supabase disk can be grown for the geometry copy. Before task 05, record the disk size, the free space, and the size to grow to.
+- **Disk.** The user confirmed on 10 November 2026 that the Supabase disk can be grown for the geometry copy. Before task 05, record the disk size, the free space, and the size to grow to.
 
 ## G. Migration
 
