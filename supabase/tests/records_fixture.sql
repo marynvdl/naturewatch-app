@@ -65,7 +65,9 @@ begin
   end if;
 end $$;
 
--- A place in the task 04 shape: the place, its details, and its parcel id.
+-- A place in the task 05 shape: the place, its details, its parcel id, its
+-- site id when the site is new, and, unless p_backfill is false, its version 1
+-- boundary through the backfill.
 create function pg_temp.fixture_place(
   p_pid text,
   p_site text,
@@ -73,7 +75,8 @@ create function pg_temp.fixture_place(
   p_iucn text,
   p_iso3 text,
   p_wkt text,
-  p_status text default 'published'
+  p_status text default 'published',
+  p_backfill boolean default true
 )
 returns uuid
 language plpgsql
@@ -109,6 +112,19 @@ begin
   ) values (
     new_id, 'wdpca', 'wdpa_site_pid', p_pid, 'confirmed', release, release
   );
+
+  insert into public.place_source_ids (
+    place_id, source_id, id_kind, source_record_id, match_status,
+    first_seen_release_id, last_seen_release_id
+  ) values (
+    new_id, 'wdpca', 'wdpa_site_id', p_site, 'confirmed', release, release
+  )
+  on conflict (source_id, id_kind, source_record_id) where match_status = 'confirmed'
+  do nothing;
+
+  if p_backfill then
+    perform public.backfill_place_boundaries(null, 100000);
+  end if;
   return new_id;
 end;
 $$;
@@ -639,7 +655,7 @@ begin
     if (select count(*) from public.place_categories) <> 1
       or (select count(*) from public.place_types) <> 1
       or (select count(*) from public.conservation_area_details) <> 3
-      or (select count(*) from public.place_source_ids) <> 3 then
+      or (select count(*) from public.place_source_ids) <> 6 then
       raise exception '% cannot read the task 04 tables, or read a draft place''s rows', role_name;
     end if;
 
@@ -842,6 +858,223 @@ begin
     raise exception 'offset window returned % of %, expected 3 of 53',
       window_count, window_total;
   end if;
+end $$;
+
+-- Task 05: boundaries and the site merge ---------------------------------------
+
+do $$
+declare
+  pilot uuid := pg_temp.fixture_id('fixture-pilot');
+  north_id uuid;
+  south_id uuid;
+  largest double precision;
+  total double precision;
+  site_area double precision;
+  bounds record;
+begin
+  perform set_config('role', 'postgres', true);
+
+  if not exists (
+    select 1 from pg_class where oid = 'public.place_boundaries'::regclass and relrowsecurity
+  ) then
+    raise exception 'row level security is not enabled on place_boundaries';
+  end if;
+  if has_column_privilege('anon', 'public.place_boundaries', 'geom', 'SELECT')
+    or has_column_privilege('authenticated', 'public.place_boundaries', 'geom', 'SELECT') then
+    raise exception 'anon or authenticated can select place_boundaries.geom';
+  end if;
+  if has_table_privilege('anon', 'public.place_boundaries', 'INSERT')
+    or has_table_privilege('authenticated', 'public.place_boundaries', 'UPDATE') then
+    raise exception 'anon or authenticated can write place_boundaries';
+  end if;
+  if has_function_privilege('anon', 'public.backfill_place_boundaries(uuid, integer)', 'execute')
+    or has_function_privilege('authenticated', 'public.merge_wdpa_site_parcels()', 'execute') then
+    raise exception 'anon or authenticated can run the backfill or the merge';
+  end if;
+  if to_regclass('public.place_boundaries_geom_idx') is null then
+    raise exception 'place_boundaries_geom_idx is missing';
+  end if;
+
+  if exists (
+    select 1
+    from public.places
+    where not exists (
+      select 1 from public.place_boundaries as b
+      where b.place_id = places.id and b.is_current and b.version_number = 1
+        and b.review_status = 'approved' and b.source_id = 'wdpca'
+        and b.area_km2 = places.area_km2
+        and b.bbox_west = extensions.st_xmin(places.geom)
+        and b.bbox_north = extensions.st_ymax(places.geom)
+    )
+  ) then
+    raise exception 'a fixture place has no version 1 boundary equal to its geometry';
+  end if;
+  if (
+    select count(*) from public.place_boundaries
+  ) <> (select count(*) from public.places) then
+    raise exception 'the backfill wrote a second boundary for a place';
+  end if;
+
+  begin
+    insert into public.place_boundaries (
+      place_id, version_number, geom, source_id, review_status, is_current
+    )
+    select place_id, 2, geom, source_id, 'approved', true
+    from public.place_boundaries where place_id = pilot;
+    raise exception 'a second current boundary was stored';
+  exception
+    when unique_violation then
+      null;
+  end;
+  begin
+    insert into public.place_boundaries (
+      place_id, version_number, geom, source_id, review_status, is_current
+    )
+    select place_id, 2, geom, source_id, 'proposed', true
+    from public.place_boundaries where place_id = pilot;
+    raise exception 'a current boundary that is not approved was stored';
+  exception
+    when check_violation then
+      null;
+  end;
+  begin
+    insert into public.place_boundaries (
+      place_id, version_number, geom, source_id, review_status
+    ) values (
+      pilot, 2,
+      extensions.ST_GeomFromText(
+        'MULTIPOLYGON(((27 -26, 27.2 -25.8, 27.2 -26, 27 -25.8, 27 -26)))', 4326
+      )::extensions.geometry(MultiPolygon, 4326),
+      'wdpca', 'approved'
+    );
+    raise exception 'an approved invalid boundary was stored';
+  exception
+    when check_violation then
+      null;
+  end;
+  insert into public.place_boundaries (
+    place_id, version_number, geom, source_id, review_status
+  ) values (
+    pilot, 2,
+    extensions.ST_GeomFromText(
+      'MULTIPOLYGON(((27 -26, 27.2 -25.8, 27.2 -26, 27 -25.8, 27 -26)))', 4326
+    )::extensions.geometry(MultiPolygon, 4326),
+    'wdpca', 'proposed'
+  );
+
+  -- A site of two parcels that overlap. The larger one is created first, so
+  -- the site's wdpa_site_id row points at it.
+  north_id := pg_temp.fixture_place(
+    'fixture-twin-north', 'fixture-twin-site', 'Twin Park North', 'II', 'ZAF',
+    'MULTIPOLYGON(((30 -26, 30.3 -26, 30.3 -25.7, 30 -25.7, 30 -26)))',
+    'published', false
+  );
+  south_id := pg_temp.fixture_place(
+    'fixture-twin-south', 'fixture-twin-site', 'Twin Park South', 'IV', 'ZAF',
+    'MULTIPOLYGON(((30.1 -26.2, 30.3 -26.2, 30.3 -25.9, 30.1 -25.9, 30.1 -26.2)))',
+    'published', false
+  );
+  update public.conservation_area_details
+  set designation = 'Buffer Zone'
+  where place_id = south_id;
+
+  begin
+    perform public.merge_wdpa_site_parcels();
+    raise exception 'the merge ran before every site had a boundary';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  perform public.backfill_place_boundaries(null, 2);
+  perform public.backfill_place_boundaries(null, 100000);
+  if exists (select 1 from public.place_boundaries where place_id = south_id) then
+    raise exception 'the parcel that is not kept got a boundary';
+  end if;
+
+  select max(area_km2), sum(area_km2) into largest, total
+  from public.places where id in (north_id, south_id);
+  select area_km2 into site_area
+  from public.place_boundaries where place_id = north_id and is_current;
+  if site_area is null or site_area <= largest or site_area >= total then
+    raise exception 'the site boundary area % is not the union of parcels % and %',
+      site_area, largest, total;
+  end if;
+
+  if public.merge_wdpa_site_parcels() <> 1 then
+    raise exception 'the merge did not merge exactly one place';
+  end if;
+  if public.merge_wdpa_site_parcels() <> 0 then
+    raise exception 'a second merge changed a place';
+  end if;
+  if not exists (
+    select 1 from public.places
+    where id = south_id and publication_status = 'merged' and merged_into_place_id = north_id
+  ) or exists (
+    select 1 from public.places
+    where publication_status = 'merged' and id <> south_id
+  ) then
+    raise exception 'the smaller parcel was not merged into the kept place, or another was';
+  end if;
+  if pg_temp.fixture_id('fixture-twin-south') <> north_id then
+    raise exception 'the merged SITE_PID does not point at the kept place';
+  end if;
+  if (
+    select jsonb_array_length(source_attributes -> 'parcels')
+    from public.conservation_area_details where place_id = north_id
+  ) <> 2
+    or (
+      select source_attributes -> 'designations_differ'
+      from public.conservation_area_details where place_id = north_id
+    ) is distinct from 'true'::jsonb
+    or (
+      select source_attributes -> 'parcels' -> 1 ->> 'site_pid'
+      from public.conservation_area_details where place_id = north_id
+    ) is distinct from 'fixture-twin-south' then
+    raise exception 'the kept place does not record both parcels and their designations';
+  end if;
+
+  if (select area_km2 from public.protected_areas where id = north_id)
+      is distinct from site_area
+    or exists (select 1 from public.protected_areas where id = south_id) then
+    raise exception 'protected_areas does not read the site boundary, or lists the merged parcel';
+  end if;
+  if not exists (
+    select 1 from public.protected_areas_in_extent(30.15, -26.15, 30.25, -26.1)
+    where id = north_id and area_km2 = site_area
+  ) then
+    raise exception 'the extent does not match the site boundary box';
+  end if;
+  select * into bounds from public.place_bounds(north_id);
+  if bounds.west <> 30 or bounds.south <> -26.2 or bounds.east <> 30.3 or bounds.north <> -25.7 then
+    raise exception 'place_bounds did not return the site box: %', bounds;
+  end if;
+  if exists (select 1 from public.place_bounds(south_id)) then
+    raise exception 'place_bounds returned a merged place';
+  end if;
+
+  perform set_config('role', 'anon', true);
+  begin
+    execute 'select geom from public.place_boundaries';
+    raise exception 'anon read place_boundaries.geom';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+  if exists (
+    select 1 from public.place_boundaries
+    where not is_current
+      or place_id = pg_temp.fixture_id('fixture-draft')
+  ) then
+    raise exception 'anon read a boundary that is not current, or a draft place''s';
+  end if;
+  if (select area_km2 from public.place_boundaries where place_id = north_id) <> site_area then
+    raise exception 'anon cannot read the current boundary''s area';
+  end if;
+  if exists (select 1 from public.places where id = south_id) then
+    raise exception 'anon read a merged place';
+  end if;
+  perform set_config('role', 'postgres', true);
 end $$;
 
 \echo records fixture ok
