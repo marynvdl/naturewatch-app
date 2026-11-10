@@ -43,7 +43,7 @@ Task 02 dropped `pilot_place_map` and `sync_pilot_place_map`, and added `created
 ### Weaknesses (verified)
 
 1. **Identity is tied to one release.** `places` is unique on `(source_release_id, source_id)`. A November WDPCA release would get a new `sources` row, so every place would get a new id. PMTiles ids and facts would break. *Since task 04 a place's WDPCA ids are stored in `place_source_ids`, and the importer matches on them. Task 05 adds the reconciliation report.*
-2. **Identity and boundary are one row.** A corrected boundary can only overwrite the old one. There is no history.
+2. **Identity and boundary are one row.** A corrected boundary can only overwrite the old one. There is no history. *Fixed by task 05: boundaries are versions in `place_boundaries`.*
 3. **Facts are not reproducible.** `facts` has no boundary reference, no run, no timestamp. The upsert in `naturewatch-analysis/facts/cropland.py` overwrites on `(place_id, sprout_id, method_id)`. `sprout_id` is free text with no foreign key.
 4. **The crops ids are hard-coded** in the SQL functions (`20261030100000_protected_areas.sql`), in `frontend/naturewatch/src/places/display.ts:4`, and in `cookbook/recipes/places-protected-areas.yaml` in the analysis repo.
 5. **`place_type` is an enum** (`wild_space`, `protected_area`, `ecoregion`, `country`, `river_catchment`). It does not match the planned hierarchy. Enum values cannot easily be removed. *Fixed by task 04.*
@@ -184,8 +184,8 @@ Each stage is its own migration and pull request. Take a backup or check point-i
 
 ### Backfill rules
 
-- **Sites.** A Place is the whole WDPCA site ([record 19](../database/decisions.md#19-a-conservation-area-place-is-the-whole-wdpca-site)). For each of the 74 sites with several stored parcels, keep the place with the largest parcel. Set the other 112 to `merged`, with `merged_into_place_id` pointing at it. Flag the 7 sites whose parcels differ in designation. *Done in task 05, together with the site boundary. Until then every place stays `published`, and each `wdpa_site_id` row already points at the place to keep.*
-- **Boundaries.** One version 1 boundary per site: its parcels collected into one MultiPolygon. `review_status = 'approved'`, `is_current = true`, source WDPCA October 2026, `source_record_id` = SITE_ID.
+- **Sites.** A Place is the whole WDPCA site ([record 19](../database/decisions.md#19-a-conservation-area-place-is-the-whole-wdpca-site)). For each of the 74 sites with several stored parcels, keep the place with the largest parcel. Set the other 112 to `merged`, with `merged_into_place_id` pointing at it. Flag the 7 sites whose parcels differ in designation. *Task 05 does this with `merge_wdpa_site_parcels()`, after the site boundaries are copied. The merged places' SITE_PIDs point at the kept place. The kept place's `conservation_area_details.source_attributes` lists every parcel under `parcels`, and the 7 mixed sites carry `designations_differ: true`.*
+- **Boundaries.** One version 1 boundary per site: the union of its parcels, made one MultiPolygon. Collecting the parcels without a union gave a valid shape for only 22 of the 74 sites on 10 November 2026, because parcels touch or overlap (14 sites overlap, by up to 4,042 km²). The union is valid for all 74 and counts an overlap once. `review_status = 'approved'`, `is_current = true`, source WDPCA October 2026, `source_record_id` = SITE_ID.
 - **Source ids.** One confirmed `wdpa_site_id` row per place, and one confirmed `wdpa_site_pid` row per parcel, pointing at the kept place. First and last seen in October 2026.
 - **Details.** `designation`, `iucn_category`, `iso3`, and `realm` move to `conservation_area_details`. The missing WDPCA fields stay null until the next import.
 - **Types.** Every current place becomes type `conservation_area`, `publication_status = 'published'`.

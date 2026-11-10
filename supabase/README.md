@@ -1,6 +1,6 @@
 # Records
 
-`sources`, `source_releases`, `licences`, `place_categories`, `place_types`, `places`, `conservation_area_details`, `place_source_ids`, and `facts` are the Sooty Earth place store. `places.geom` is not granted to `anon` or `authenticated`. The FastAPI service does not read these tables.
+`sources`, `source_releases`, `licences`, `place_categories`, `place_types`, `places`, `place_boundaries`, `conservation_area_details`, `place_source_ids`, and `facts` are the Sooty Earth place store. A place is a whole WDPCA site. `place_boundaries` holds its boundary versions, and one at most is current. `places.geom` and `place_boundaries.geom` are not granted to `anon` or `authenticated`. `places.geom`, `places.area_km2`, and the bbox columns on `places` stay until Database Honing task 08, because the analysis scripts still read them. The reads below use the current boundary. The FastAPI service does not read these tables.
 
 The map draws protected-area boundaries from the published PMTiles archive. The app has no polygon download.
 
@@ -10,7 +10,7 @@ The October 2026 WDPCA release is pinned in `supabase/migrations/20261021120000_
 
 The places page reads `protected_area_window`, 50 rows at a time, ordered by name. The Places list on the map reads `protected_area_window` (50 matching rows at a time, from an offset) and `protected_area_filter_stats` for the filter charts. Extent filtering uses `protected_areas_in_extent`, which accepts a bounding box and returns attributes only. Those reads return attributes, not `places.geom`. Filter charts use the database counts. The view behind those reads is `protected_areas`.
 
-Every table here has row-level security on. `anon` and `authenticated` can select rows and cannot insert, update, or delete. They see only `published` places, and the details and source ids of published places. `service_role` keeps select, insert, update, and delete on every table here. `places.geom` stays ungranted.
+Every table here has row-level security on. `anon` and `authenticated` can select rows and cannot insert, update, or delete. They see only `published` places, the details and source ids of published places, and the current boundary of a published place, without its geometry. `service_role` keeps select, insert, update, and delete on every table here. `places.geom` stays ungranted.
 
 `fact_methods` names the formula for a facts row. `facts.method_id` points at it. `facts.sprout_id` is the sprout id from the recipe, which is also the STAC collection id. The stored area, percent, and valid coverage are full precision. Square kilometres are shown to two decimal places, percent to one, and valid coverage to three.
 
@@ -26,7 +26,22 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
 
 The fixture rolls back. It expects `places` to be empty, so run it before the import.
 
+## Boundaries
+
+`backfill_boundaries.py` copied each site's geometry from `places.geom` into `place_boundaries` (Database Honing task 05). Apply `20261113100000_place_boundaries.sql` first. `run` calls `backfill_place_boundaries()` in committed batches of 500 sites and builds the GiST index. It continues after the last committed batch when started again. It stops on an invalid geometry and names the place, without repairing it. `verify` only reads. Apply `20261113110000_boundaries_readers.sql` after `verify` passes: it merges the parcels of each site with `merge_wdpa_site_parcels()` and moves the reads to the current boundary.
+
+```bash
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+  .venv/bin/python supabase/backfill_boundaries.py run
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+  .venv/bin/python supabase/backfill_boundaries.py verify
+```
+
+With `SUPABASE_ACCESS_TOKEN` set instead of `DATABASE_URL`, it connects to the hosted database with a short-lived login role, as the import does.
+
 ## Import
+
+**Do not run `upload` until Database Honing task 05b.** It still writes `places.geom` per parcel. Since task 05 a merged parcel's SITE_PID points at its site's kept place, so `upload` would overwrite that place's geometry with one parcel, and it writes no boundary.
 
 The script needs Python with the GDAL bindings (`osgeo`), `psycopg`, `shapely`, and `pyproj`.
 
