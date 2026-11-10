@@ -18,7 +18,7 @@ Write each fact once.
 
 ## Parcels and tasks
 
-A parcel in `docs/parcels/` lists tasks in order. Each task points at one `docs/tasks/<file>.md` in this repo, for both repos. The task file names the repo that does the work. `/task <file>` starts a task and `/archive-task <file>` files it after merge.
+A parcel in `docs/parcels/` lists tasks in order. Each task points at one `docs/tasks/<file>.md` in this repo, for both repos. The task file names the repo that does the work. `/task <file>` starts a task. When the task is done, its last commit on that branch ticks it in the parcel and moves the task file to `docs/archive/tasks/`.
 
 A task file is written when its task starts, as the first commit on that task's `feat/` branch in this repo, and approved before any other change. It does not get its own docs branch or pull request.
 
