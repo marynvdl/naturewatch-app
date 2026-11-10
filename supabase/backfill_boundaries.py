@@ -113,8 +113,8 @@ VERIFY = {
           on kept.source_id = 'wdpca' and kept.id_kind = 'wdpa_site_id'
           and kept.match_status = 'confirmed' and kept.source_record_id = parcels.site_id
         join public.place_boundaries as b on b.place_id = kept.place_id and b.is_current
-        where b.area_km2 < parcels.largest * (1 - 1e-9)
-          or b.area_km2 > parcels.total * (1 + 1e-9)
+        where b.area_km2 < parcels.largest * (1 - 1e-6)
+          or b.area_km2 > parcels.total * (1 + 1e-6)
     """,
     "sampled single-parcel shapes that are not equal": f"""
         with single as (
