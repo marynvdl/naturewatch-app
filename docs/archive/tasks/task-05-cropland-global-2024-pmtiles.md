@@ -1,5 +1,7 @@
 # Task 05 — Cropland global PMTiles
 
+Archived. This task is not active.
+
 Parcel: [Cropland 2024 global](../parcels/cropland-2024-global.md).
 
 Repository: naturewatch-analysis. Start only after task 04 has recorded an approved resampling on the global recipe.

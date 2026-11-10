@@ -1,5 +1,7 @@
 # Task 06 — Cropland global facts
 
+Archived 10 November 2026. Not done. The global cropland facts wait for Database Honing and a later Stats parcel.
+
 Parcel: [Cropland 2024 global](../parcels/cropland-2024-global.md).
 
 Repository: naturewatch-analysis. Start only after task 03 has written the sprout and Places Tiles task 04 in naturewatch-app has finished the hosted place import. In this parcel’s order, start it after task 05 has merged.

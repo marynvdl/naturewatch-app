@@ -1,6 +1,6 @@
 # Task 02 — Places PMTiles
 
-Parcel: [Places Tiles](../../parcels/places-tiles.md).
+Parcel: [Places Tiles](../parcels/places-tiles.md).
 
 Repository: naturewatch-analysis. Start only after Places Tiles task 01 has merged.
 

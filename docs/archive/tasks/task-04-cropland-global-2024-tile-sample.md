@@ -1,5 +1,7 @@
 # Task 04 — Cropland tile sample
 
+Archived. This task is not active.
+
 Parcel: [Cropland 2024 global](../parcels/cropland-2024-global.md).
 
 Repository: naturewatch-analysis. Start only after task 03 has written the sprout.

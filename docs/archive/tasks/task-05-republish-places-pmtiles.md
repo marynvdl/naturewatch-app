@@ -1,5 +1,7 @@
 # Task 05 — Republish places PMTiles
 
+Archived. This task is not active.
+
 Parcel: [Places Tiles](../parcels/places-tiles.md).
 
 Repository: naturewatch-analysis. Start only after Places Tiles task 04 has finished the hosted import.

@@ -1,5 +1,7 @@
 # Task 02 — Cropland global seed
 
+Archived. This task is not active.
+
 Parcel: [Cropland 2024 global](../parcels/cropland-2024-global.md).
 
 Repository: naturewatch-analysis. Start only after task 01 has merged.

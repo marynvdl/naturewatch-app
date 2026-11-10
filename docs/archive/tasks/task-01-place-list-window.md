@@ -2,7 +2,7 @@
 
 Archived. This task is not active.
 
-Parcel: [Places Tiles](../../parcels/places-tiles.md)
+Parcel: [Places Tiles](../parcels/places-tiles.md)
 
 Repository: naturewatch-app. Start from `develop`.
 

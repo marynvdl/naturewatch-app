@@ -1,5 +1,7 @@
 # Task 03 — Cropland global sprout
 
+Archived. This task is not active.
+
 Parcel: [Cropland 2024 global](../parcels/cropland-2024-global.md).
 
 Repository: naturewatch-analysis. Start only after task 02 has finished the seed.

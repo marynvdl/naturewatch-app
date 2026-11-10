@@ -1,6 +1,6 @@
 # Task 01 — Cropland global recipe
 
-Parcel: [Cropland 2024 global](../../parcels/cropland-2024-global.md).
+Parcel: [Cropland 2024 global](../parcels/cropland-2024-global.md).
 
 Repository: naturewatch-analysis. Start from `main`. This is the first task in that parcel.
 

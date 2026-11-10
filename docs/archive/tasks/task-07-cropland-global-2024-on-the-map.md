@@ -1,5 +1,7 @@
 # Task 07 — Cropland on the map
 
+Archived. This task is not active.
+
 Parcel: [Cropland 2024 global](../parcels/cropland-2024-global.md)
 
 Repository: naturewatch-app. Start only after task 05 has published the archive.
