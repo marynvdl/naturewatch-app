@@ -2,7 +2,7 @@
 
 Why the database is designed as it is. The design itself is [design.md](design.md). Each record states the decision, the reason, the alternatives considered, and what the choice costs. A superseded record is marked and kept.
 
-*Status of every record below: proposed, 9 November 2026, in the [Database Honing](../parcels/database-honing.md) parcel.*
+*Status of records 1 to 18: proposed, 9 November 2026, in the [Database Honing](../parcels/database-honing.md) parcel.*
 
 ## 1. One `places` table for every kind of Place
 
@@ -44,14 +44,14 @@ Why the database is designed as it is. The design itself is [design.md](design.m
 
 | What the import finds | What it does |
 | --- | --- |
-| The same SITE_PID, similar shape | Updates through a new boundary version |
-| The same SITE_PID, a very different shape | Adds the boundary as `proposed` and flags the place |
-| A new SITE_PID sharing a SITE_ID with a known place | Proposes a mapping. Creates no place until reviewed. |
-| Several known SITE_PIDs now one | Proposes mappings to each. Review chooses a merge or a new place. |
-| A new SITE_PID with no candidate | Creates a `draft` place |
-| A known SITE_PID that is missing | Keeps `last_seen_release_id`, flags the place. Never withdraws it automatically. |
+| The same SITE_ID, the same parcels, similar shape | Updates through a new boundary version |
+| The same SITE_ID, a very different shape | Adds the boundary as `proposed` and flags the place |
+| A new SITE_PID inside a known SITE_ID, or a known parcel gone from it | Adds the changed site boundary as `proposed` and flags the place |
+| Parcels of known sites now under one SITE_ID, or one site's parcels now under several | Proposes mappings to each. Review chooses a merge or a new place. |
+| A new SITE_ID with no candidate | Creates a `draft` place |
+| A known SITE_ID that is missing | Keeps `last_seen_release_id`, flags the place. Never withdraws it automatically. |
 
-**Open.** The WDPCA manual defines `SITE_ID` as the whole protected area or OECM, and `SITE_PID` as one of its parcels. Today each stored place is one parcel, so a site with several parcels shows as several Places with the same name. The leaning is that a Place should be the whole site, keyed on `SITE_ID`, with its parcels together as one boundary. Both ids are stored either way. Task 01 counts multi-parcel sites, and a later record makes the decision. Merging parcels changes the 10 km² rule, which would then apply to the site's total area.
+**Site or parcel.** A Place is the whole WDPCA site, keyed on `SITE_ID`. Record 19 has the decision and the counts behind it. Both `SITE_ID` and every `SITE_PID` are stored.
 
 **Alternatives.** Match on name or geometry alone. That is not reliable enough to run without a person.
 
@@ -216,3 +216,24 @@ The dependency table is in the [parcel](../parcels/database-honing.md#dependency
 **Decision.** Status fields are `text` with a CHECK constraint. Lists that grow, such as types, stats, and licences, are lookup tables.
 
 **Why.** A CHECK can be changed in one migration. An enum value cannot easily be removed or renamed, as the current `place_type` shows.
+
+## 19. A conservation area Place is the whole WDPCA site
+
+*Decided 10 November 2026 by the user, in task 01 of the [Database Honing](../parcels/database-honing.md) parcel. It settles the open question in record 4.*
+
+**Decision.** One Place per WDPCA `SITE_ID`. Its parcels, one per `SITE_PID`, together form the Place's boundary. `place_source_ids` holds one `wdpa_site_id` row per Place and one `wdpa_site_pid` row per parcel, all pointing at that Place. The 10 km² rule applies to the site's total area.
+
+**Why.**
+- WDPCA defines `SITE_ID` as the protected area or OECM as a whole, stable for that site. `SITE_PID` names one parcel, and parcels are split, joined, and renumbered between releases. Keying on the stable id leaves fewer changes for a person to review.
+- A park split into parts is one park to a reader. Today the Mongolian parks split into /A/ and /B/, the Iberá nuclei, and the core and buffer zones of a biosphere reserve show as several Places, mostly with the same name.
+- The change is small. On 10 November 2026, 74 of 50,889 sites had more than one stored parcel, holding 186 of 51,001 places. None is in South Africa, and none has a fact.
+
+**Alternatives.**
+- A Place per parcel, as today. Nothing would be merged, and each parcel would keep its own designation. A site would still show as several Places, and every split or join in WDPCA would need a review per parcel.
+- A Place per site that also keeps each parcel as its own linked record, so a parcel's designation and area survive. That is more tables and more review for 0.4% of places.
+
+**Cost.**
+- 186 places become 74. The 112 others are set to `merged`, with `merged_into_place_id` pointing at the kept place, so their ids still resolve. The kept place is the one with the largest parcel.
+- One designation per Place. 7 of the 74 sites mix designations across parcels. Gorongosa (`SITE_ID` 801) has a National Park parcel and a Buffer Zone parcel. The per-parcel values stay in `source_attributes`, and those Places are flagged for review.
+- Parcels under 10 km² were never imported, so a merged boundary leaves them out until the next import brings in every parcel of each site. A site whose parcels are each under 10 km², but which totals at least 10 km², is missing until then too.
+- Stats are calculated per site. A parcel-level figure needs its own calculation.
