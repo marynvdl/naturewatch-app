@@ -81,6 +81,52 @@ class ImportWdpaTest(unittest.TestCase):
             text = (ROOT / relative).read_text()
             self.assertIn(url, text, relative)
             self.assertIn(checksum, text, relative)
+        sources = (ROOT / "supabase/migrations/20261111100000_sources.sql").read_text()
+        self.assertIn(f"'{import_wdpa.PINNED_SOURCE}'", sources)
+        self.assertIn(f"'{import_wdpa.PINNED_VERSION}'", sources)
+
+    def _source_connection(self, row):
+        cursor = mock.MagicMock()
+        cursor.fetchone.return_value = row
+        conn = mock.MagicMock()
+        conn.cursor.return_value.__enter__.return_value = cursor
+        return conn, cursor
+
+    def _pinned_row(self, **changes):
+        row = {
+            "id": "a0c3e5b2-7d14-4f6a-9c88-2b6e1d0a94f3",
+            "source_id": import_wdpa.PINNED_SOURCE,
+            "version_label": import_wdpa.PINNED_VERSION,
+            "released_on": import_wdpa.PINNED_RELEASE,
+            "download_url": import_wdpa.PINNED_URL,
+            "checksum": import_wdpa.PINNED_SHA256.upper(),
+        }
+        row.update(changes)
+        return row
+
+    def test_fetch_source_reads_the_pinned_release(self):
+        conn, cursor = self._source_connection(self._pinned_row())
+        row = import_wdpa.fetch_source(conn)
+        sql, params = cursor.execute.call_args.args
+        self.assertIn("from public.source_releases", sql)
+        self.assertNotIn("release_month", sql)
+        self.assertEqual(params, (import_wdpa.PINNED_SOURCE, import_wdpa.PINNED_VERSION))
+        self.assertEqual(row["checksum"], import_wdpa.PINNED_SHA256)
+
+    def test_fetch_source_refuses_a_release_that_differs_from_the_pin(self):
+        for changes in (
+            {"released_on": "2026-11-01"},
+            {"download_url": "https://example.org/other.zip"},
+            {"checksum": "0" * 64},
+        ):
+            conn, _ = self._source_connection(self._pinned_row(**changes))
+            with self.assertRaises(SystemExit):
+                import_wdpa.fetch_source(conn)
+
+    def test_fetch_source_refuses_a_missing_release(self):
+        conn, _ = self._source_connection(None)
+        with self.assertRaises(SystemExit):
+            import_wdpa.fetch_source(conn)
 
     def test_hosted_url_uses_the_direct_database_host(self):
         body = FakeBody(

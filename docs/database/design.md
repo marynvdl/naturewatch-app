@@ -2,7 +2,7 @@
 
 The target design of the Sooty Earth database in Supabase (PostgreSQL with PostGIS). It came out of the [Database Honing](../parcels/database-honing.md) parcel. Why each choice was made is in [decisions.md](decisions.md).
 
-**Status: proposed.** No part of this design is in place yet. When a stage lands, its section is marked *in place*. The working schema until then is described in [docs/blueprint.md](../blueprint.md) and [supabase/README.md](../../supabase/README.md).
+**Status: proposed, partly in place.** When a stage lands, its section is marked *in place*. The working schema until then is described in [docs/blueprint.md](../blueprint.md) and [supabase/README.md](../../supabase/README.md).
 
 ## 1. What owns what
 
@@ -207,6 +207,8 @@ where b.is_current
 `is_current` implies approved and valid, through the constraints. Draft, withdrawn, and merged places are left out. A merged place's survivor has its own boundary. A run that needs draft places selects them explicitly and records that in its `selection`.
 
 ### 4.3 Sources and licences
+
+*In place* for `licences`, `sources`, and `source_releases` since task 03 (`20261111100000_sources.sql`). The provenance columns come with the tables that carry them, in later tasks.
 
 **`licences`**: `id` text PK (e.g. `cc-by-4.0`), `title`, `url`, `requires_attribution`, `share_alike`, `allows_commercial`.
 

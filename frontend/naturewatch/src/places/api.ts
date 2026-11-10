@@ -41,6 +41,8 @@ export interface PlaceDetail {
   siteId: string | null;
   releaseMonth: string;
   sourceName: string;
+  /** The release citation, shown as the profile's source line. */
+  citation: string;
   croplandKm2: number | null;
   percent: number | null;
 }
@@ -296,7 +298,7 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
   const { data: place, error } = await supabase
     .from('protected_areas')
     .select(
-      'id, name, designation, iso3, area_km2, site_id, release_month, source_name'
+      'id, name, designation, iso3, area_km2, site_id, release_month, source_name, citation'
     )
     .eq('id', id)
     .maybeSingle();
@@ -323,6 +325,7 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
       siteId: place.site_id,
       releaseMonth: place.release_month,
       sourceName: place.source_name,
+      citation: place.citation,
       croplandKm2: fact?.area_km2 ?? null,
       percent: fact?.percent ?? null,
     },

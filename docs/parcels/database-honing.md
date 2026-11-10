@@ -47,7 +47,7 @@ Task 02 dropped `pilot_place_map` and `sync_pilot_place_map`, and added `created
 3. **Facts are not reproducible.** `facts` has no boundary reference, no run, no timestamp. The upsert in `naturewatch-analysis/facts/cropland.py` overwrites on `(place_id, sprout_id, method_id)`. `sprout_id` is free text with no foreign key.
 4. **The crops ids are hard-coded** in the SQL functions (`20261030100000_protected_areas.sql`), in `frontend/naturewatch/src/places/display.ts:4`, and in `cookbook/recipes/places-protected-areas.yaml` in the analysis repo.
 5. **`place_type` is an enum** (`wild_space`, `protected_area`, `ecoregion`, `country`, `river_catchment`). It does not match the planned hierarchy. Enum values cannot easily be removed.
-6. **`sources` is a release, not a source.** There is no dataset, licence, citation, or publication level.
+6. **`sources` is a release, not a source.** There is no dataset, licence, citation, or publication level. *Fixed by task 03.*
 7. **WDPCA attributes are missing.** `DESIG_TYPE`, `STATUS`, `STATUS_YR`, `GOV_TYPE`, and `PA_DEF` are not imported. World Heritage Sites, Ramsar sites, and other international designations can only be found by their `designation` text.
 8. **No timestamps** on any table. *Fixed by task 02.*
 9. **No auth, profiles, roles, or audit.**

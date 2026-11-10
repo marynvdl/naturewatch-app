@@ -22,7 +22,9 @@ describe('Place view', () => {
         areaKm2: 19485.2,
         siteId: '873',
         releaseMonth: '2026-10-01',
-        sourceName: 'WDPCA',
+        sourceName: 'World Database on Protected and Conserved Areas',
+        citation:
+          'UNEP-WCMC and IUCN (2026), Protected Planet: The World Database on Protected and Conserved Areas (WDPCA) [On-line], October 2026, Cambridge, UK: UNEP-WCMC and IUCN. Available at: www.protectedplanet.net.',
         croplandKm2: 11.455618,
         percent: 0.0598,
       },

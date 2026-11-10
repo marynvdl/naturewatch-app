@@ -16,8 +16,8 @@
 
 `run` (the default) does build, probe, then upload. Run `merge` afterwards.
 
-The download URL and SHA-256 checksum are the sources row from the records
-migration. This script always downloads that URL. It does not read a local
+The download URL and SHA-256 checksum are the WDPCA October 2026 row in
+source_releases. This script always downloads that URL. It does not read a local
 geodatabase as the source.
 """
 
@@ -41,7 +41,8 @@ import zipfile
 from pathlib import Path
 from urllib.parse import quote
 
-PINNED_NAME = "WDPCA"
+PINNED_SOURCE = "wdpca"
+PINNED_VERSION = "October 2026"
 PINNED_RELEASE = "2026-10-01"
 PINNED_URL = (
     "https://pp-import-production.s3.eu-west-1.amazonaws.com/"
@@ -758,27 +759,36 @@ def fetch_source(conn) -> dict:
     with conn.cursor() as cur:
         cur.execute(
             """
-            select id, name, release_month::text as release_month, download_url, checksum
-            from public.sources
-            where name = %s and release_month = %s::date
+            select
+              source_releases.id,
+              source_releases.source_id,
+              source_releases.version_label,
+              source_releases.released_on::text as released_on,
+              source_releases.download_url,
+              source_releases.checksum
+            from public.source_releases
+            join public.sources on sources.id = source_releases.source_id
+            where source_releases.source_id = %s
+              and source_releases.version_label = %s
             """,
-            (PINNED_NAME, PINNED_RELEASE),
+            (PINNED_SOURCE, PINNED_VERSION),
         )
         row = cur.fetchone()
     if row is None:
         raise SystemExit(
-            "WDPCA October 2026 source row is missing. Apply the records migration first."
+            "WDPCA October 2026 release is missing from source_releases. Apply the migrations first."
         )
     download_url = row["download_url"]
     checksum = str(row["checksum"]).lower()
     if (
-        row["name"] != PINNED_NAME
-        or row["release_month"] != PINNED_RELEASE
+        row["source_id"] != PINNED_SOURCE
+        or row["version_label"] != PINNED_VERSION
+        or row["released_on"] != PINNED_RELEASE
         or download_url != PINNED_URL
         or checksum != PINNED_SHA256
     ):
         raise SystemExit(
-            "sources row does not match the pinned October 2026 WDPCA download"
+            "source_releases row does not match the pinned October 2026 WDPCA download"
         )
     row["checksum"] = checksum
     return row

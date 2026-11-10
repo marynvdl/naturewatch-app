@@ -1,16 +1,16 @@
 # Records
 
-`sources`, `places`, and `facts` are the Sooty Earth place store. `places.geom` is not granted to `anon` or `authenticated`. The FastAPI service does not read these tables.
+`sources`, `source_releases`, `licences`, `places`, and `facts` are the Sooty Earth place store. `places.geom` is not granted to `anon` or `authenticated`. The FastAPI service does not read these tables.
 
 The map draws protected-area boundaries from the published PMTiles archive. The app has no polygon download.
 
-The October 2026 WDPCA row is pinned in `supabase/migrations/20261021120000_records.sql` and `supabase/migrations/20261029200000_global_protected_areas.sql`: release month `2026-10-01`, the global public zip, and the SHA-256 checksum of that zip. `import_wdpa.py` carries the same URL and checksum. It downloads that URL and stops if the file is missing or the checksum differs. It does not use a local geodatabase as the source. The download stays in a work directory and is not committed. The CloudFront `/current/` file is the South Africa extract. The global October file is the object named in the pin.
+The October 2026 WDPCA release is pinned in `supabase/migrations/20261021120000_records.sql` and `supabase/migrations/20261029200000_global_protected_areas.sql`: release date `2026-10-01`, the global public zip, and the SHA-256 checksum of that zip. Since `20261111100000_sources.sql` it is the `source_releases` row with `source_id` `wdpca` and `version_label` `October 2026`, and it carries the citation. `import_wdpa.py` carries the same source, version label, URL, and checksum. It downloads that URL and stops if the file is missing or the checksum differs. It does not use a local geodatabase as the source. The download stays in a work directory and is not committed. The CloudFront `/current/` file is the South Africa extract. The global October file is the object named in the pin.
 
 `site_id` is the Protected Planet id (`https://www.protectedplanet.net/<site_id>`).
 
 The places page reads `protected_area_window`, 50 rows at a time, ordered by name. The Places list on the map reads `protected_area_window` (50 matching rows at a time, from an offset) and `protected_area_filter_stats` for the filter charts. Extent filtering uses `protected_areas_in_extent`, which accepts a bounding box and returns attributes only. Those reads return attributes, not `places.geom`. Filter charts use the database counts. The view behind those reads is `protected_areas`.
 
-`places`, `sources`, `facts`, and `fact_methods` have row-level security on. `anon` and `authenticated` can select rows and cannot insert, update, or delete. `service_role` keeps select, insert, update, and delete on `sources`, `places`, `facts`, and `fact_methods`. `places.geom` stays ungranted.
+`places`, `sources`, `source_releases`, `licences`, `facts`, and `fact_methods` have row-level security on. `anon` and `authenticated` can select rows and cannot insert, update, or delete. `service_role` keeps select, insert, update, and delete on `sources`, `source_releases`, `licences`, `places`, `facts`, and `fact_methods`. `places.geom` stays ungranted.
 
 `fact_methods` names the formula for a facts row. `facts.method_id` points at it. `facts.sprout_id` is the sprout id from the recipe, which is also the STAC collection id. The stored area, percent, and valid coverage are full precision. Square kilometres are shown to two decimal places, percent to one, and valid coverage to three.
 

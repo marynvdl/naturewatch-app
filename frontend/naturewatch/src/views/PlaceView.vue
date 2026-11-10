@@ -6,7 +6,6 @@ import {
   formatKm2,
   formatPercent,
   formatReleaseMonth,
-  PROTECTED_AREA_ATTRIBUTION,
   protectedPlanetUrl,
 } from '@/places/display';
 
@@ -51,7 +50,7 @@ watch(() => route.params.id, load);
       </p>
       <p v-else>No cropland figure is stored for this place.</p>
       <p>Release month: {{ formatReleaseMonth(place.releaseMonth) }}</p>
-      <p>{{ place.sourceName }}. {{ PROTECTED_AREA_ATTRIBUTION }}</p>
+      <p>{{ place.citation }}</p>
       <p v-if="place.siteId">
         <a
           :href="protectedPlanetUrl(place.siteId)"
