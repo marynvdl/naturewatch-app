@@ -5,13 +5,11 @@ import PlacePhotos from '@/components/PlacePhotos.vue';
 import { loadPilotPlace, type PlaceDetail } from '@/places/api';
 import {
   CROPLAND_NOT_CALCULATED,
-  PROTECTED_AREA_ATTRIBUTION,
   SPECIES_NOTHING_YET,
   countryName,
   formatAreaTag,
   formatKm2,
   formatPercent,
-  formatReleaseMonth,
 } from '@/places/display';
 import type { PlacePhoto } from '@/places/photos';
 
@@ -54,13 +52,7 @@ const subtitle = computed(() =>
 const hasCropland = computed(
   () => place.value?.croplandKm2 != null && place.value?.percent != null
 );
-const source = computed(() => {
-  if (!place.value) return '';
-  const release = place.value.releaseMonth
-    ? `, ${formatReleaseMonth(place.value.releaseMonth)}`
-    : '';
-  return `${place.value.sourceName}${release}. ${PROTECTED_AREA_ATTRIBUTION}`;
-});
+const source = computed(() => place.value?.citation ?? '');
 
 /** Load the stored record for the selected place. */
 async function load(id: string) {

@@ -18,7 +18,9 @@ const kruger: PlaceDetail = {
   areaKm2: 19485.2,
   siteId: '873',
   releaseMonth: '2026-10-01',
-  sourceName: 'WDPCA',
+  sourceName: 'World Database on Protected and Conserved Areas',
+  citation:
+    'UNEP-WCMC and IUCN (2026), Protected Planet: The World Database on Protected and Conserved Areas (WDPCA) [On-line], October 2026, Cambridge, UK: UNEP-WCMC and IUCN. Available at: www.protectedplanet.net.',
   croplandKm2: 11.455618,
   percent: 0.0598,
 };
@@ -72,8 +74,8 @@ describe('Place profile', () => {
     const overview = wrapper.get('[role="tabpanel"]').text();
     expect(overview).toContain('19,485.20 km²');
     const source = wrapper.get('.place-source').text();
-    expect(source).toContain('WDPCA, October 2026.');
-    expect(source).toContain('UNEP-WCMC and IUCN');
+    expect(source).toBe(kruger.citation);
+    expect(source).toContain('(WDPCA) [On-line], October 2026');
     expect(wrapper.text()).not.toMatch(/\bha\b|hectare/);
   });
 

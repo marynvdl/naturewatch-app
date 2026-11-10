@@ -14,13 +14,18 @@ begin
   end if;
   if not exists (
     select 1
-    from public.sources
-    where name = 'WDPCA'
-      and release_month = date '2026-10-01'
+    from public.source_releases
+    join public.sources on sources.id = source_releases.source_id
+    where source_releases.source_id = 'wdpca'
+      and source_releases.version_label = 'October 2026'
+      and source_releases.released_on = date '2026-10-01'
+      and source_releases.citation like 'UNEP-WCMC and IUCN (2026), Protected Planet: The World Database on Protected and Conserved Areas (WDPCA) [On-line], October 2026, %'
+      and sources.source_kind = 'dataset'
+      and sources.licence_id = 'wdpa-terms'
       and download_url = 'https://pp-import-production.s3.eu-west-1.amazonaws.com/WDPA_WDOECM_Oct2026_Public.zip'
       and checksum = 'f5f5e50f230923619ad60faf8296e4f39a4d8c1b14bb6ea80e82ea6db6292b1c'
   ) then
-    raise exception 'WDPCA October 2026 source row does not match the pin';
+    raise exception 'WDPCA October 2026 release does not match the pin';
   end if;
   if exists (
     select 1
@@ -86,8 +91,8 @@ select
     'MULTIPOLYGON(((27 -26, 27.2 -26, 27.2 -25.8, 27 -25.8, 27 -26)))',
     4326
   )::extensions.geometry(MultiPolygon, 4326)
-from public.sources
-where name = 'WDPCA' and release_month = date '2026-10-01';
+from public.source_releases
+where source_id = 'wdpca' and version_label = 'October 2026';
 
 insert into public.places (
   source_release_id,
@@ -115,8 +120,8 @@ select
     'MULTIPOLYGON(((27.5 -26, 27.502 -26, 27.502 -25.998, 27.5 -25.998, 27.5 -26)))',
     4326
   )::extensions.geometry(MultiPolygon, 4326)
-from public.sources
-where name = 'WDPCA' and release_month = date '2026-10-01';
+from public.source_releases
+where source_id = 'wdpca' and version_label = 'October 2026';
 
 insert into public.places (
   source_release_id,
@@ -144,8 +149,8 @@ select
     'MULTIPOLYGON(((24 -21, 24.2 -21, 24.2 -20.8, 24 -20.8, 24 -21)))',
     4326
   )::extensions.geometry(MultiPolygon, 4326)
-from public.sources
-where name = 'WDPCA' and release_month = date '2026-10-01';
+from public.source_releases
+where source_id = 'wdpca' and version_label = 'October 2026';
 
 do $$
 declare
@@ -184,9 +189,11 @@ begin
     raise exception 'release month is not October 2026: %', release;
   end if;
   if exists (
-    select 1 from public.protected_areas where source_name is distinct from 'WDPCA'
+    select 1 from public.protected_areas
+    where source_name is distinct from 'World Database on Protected and Conserved Areas'
+      or citation not like 'UNEP-WCMC and IUCN (2026), Protected Planet:%'
   ) then
-    raise exception 'protected_areas is not joined to the WDPCA source';
+    raise exception 'protected_areas is not joined to the WDPCA source and its citation';
   end if;
 
   select
@@ -254,13 +261,40 @@ begin
     from pg_class
     where oid in (
       'public.sources'::regclass,
+      'public.source_releases'::regclass,
+      'public.licences'::regclass,
       'public.facts'::regclass,
       'public.fact_methods'::regclass
     )
       and not relrowsecurity
   ) then
-    raise exception 'row level security is not enabled on sources, facts, or fact_methods';
+    raise exception 'row level security is not enabled on sources, source_releases, licences, facts, or fact_methods';
   end if;
+
+  if to_regclass('public.source_releases') is null
+    or (select count(*) from public.sources) <> 1
+    or (select count(*) from public.licences) <> 1
+    or not exists (
+      select 1 from public.licences
+      where id = 'wdpa-terms'
+        and requires_attribution
+        and not share_alike
+        and not allows_commercial
+    ) then
+    raise exception 'sources, source_releases, or licences does not hold the WDPCA rows';
+  end if;
+
+  begin
+    insert into public.source_releases (
+      id, source_id, version_label, released_on, download_url, checksum, citation
+    ) values (
+      gen_random_uuid(), 'no-such-source', 'v1', date '2026-01-01', 'x', 'x', 'x'
+    );
+    raise exception 'a release was stored for a missing source';
+  exception
+    when foreign_key_violation then
+      null;
+  end;
 
   if to_regclass('public.pilot_place_map') is not null
     or to_regprocedure('public.sync_pilot_place_map()') is not null then
@@ -271,13 +305,13 @@ begin
     select count(*)
     from information_schema.columns
     where table_schema = 'public'
-      and table_name in ('sources', 'places', 'facts', 'fact_methods')
+      and table_name in ('sources', 'source_releases', 'licences', 'places', 'facts', 'fact_methods')
       and column_name in ('created_at', 'updated_at')
       and data_type = 'timestamp with time zone'
       and is_nullable = 'NO'
       and column_default = 'now()'
-  ) <> 8 then
-    raise exception 'sources, places, facts, or fact_methods is missing created_at or updated_at with default now()';
+  ) <> 12 then
+    raise exception 'a table is missing created_at or updated_at with default now()';
   end if;
 
   if (
@@ -287,12 +321,14 @@ begin
       and tgfoid = 'public.set_updated_at()'::regprocedure
       and tgrelid in (
         'public.sources'::regclass,
+        'public.source_releases'::regclass,
+        'public.licences'::regclass,
         'public.places'::regclass,
         'public.facts'::regclass,
         'public.fact_methods'::regclass
       )
-  ) <> 4 then
-    raise exception 'set_updated_at() is not the update trigger on all four tables';
+  ) <> 6 then
+    raise exception 'set_updated_at() is not the update trigger on all six tables';
   end if;
 
   if exists (
@@ -351,12 +387,16 @@ begin
     raise exception 'anon or authenticated can insert places';
   end if;
   if has_table_privilege('anon', 'public.sources', 'INSERT')
+    or has_table_privilege('anon', 'public.source_releases', 'INSERT')
+    or has_table_privilege('anon', 'public.licences', 'INSERT')
+    or has_table_privilege('authenticated', 'public.source_releases', 'UPDATE')
+    or has_table_privilege('authenticated', 'public.licences', 'UPDATE')
     or has_table_privilege('anon', 'public.facts', 'INSERT')
     or has_table_privilege('anon', 'public.fact_methods', 'INSERT')
     or has_table_privilege('authenticated', 'public.sources', 'INSERT')
     or has_table_privilege('authenticated', 'public.facts', 'INSERT')
     or has_table_privilege('authenticated', 'public.fact_methods', 'INSERT') then
-    raise exception 'anon or authenticated can insert sources, facts, or fact_methods';
+    raise exception 'anon or authenticated can write sources, source_releases, licences, facts, or fact_methods';
   end if;
 
   insert into public.facts (
@@ -474,6 +514,17 @@ begin
     ) as attribute_rows;
     if readable <> 3 then
       raise exception '% saw % place rows, expected 3', role_name, readable;
+    end if;
+
+    if (select count(*) from public.sources) <> 1
+      or (select count(*) from public.source_releases) <> 1
+      or (select count(*) from public.licences) <> 1 then
+      raise exception '% cannot read sources, source_releases, and licences', role_name;
+    end if;
+    if exists (
+      select 1 from public.protected_areas where citation is null
+    ) then
+      raise exception '% read protected_areas without a citation', role_name;
     end if;
 
     select count(*) into pilot_count
@@ -611,7 +662,7 @@ begin
     iucn_category, iso3, realm, geom
   )
   select
-    sources.id,
+    source_releases.id,
     'fixture-cap-' || extra.n,
     'fixture-cap-site-' || extra.n,
     'Cap Park ' || extra.n,
@@ -629,9 +680,10 @@ begin
       || (27 + extra.n)::text || ' -24)))',
       4326
     )::extensions.geometry(MultiPolygon, 4326)
-  from public.sources
+  from public.source_releases
   cross join generate_series(1, 51) as extra(n)
-  where sources.name = 'WDPCA' and sources.release_month = date '2026-10-01';
+  where source_releases.source_id = 'wdpca'
+    and source_releases.version_label = 'October 2026';
 
   perform set_config('role', 'anon', true);
   select count(*), min(total_count)
