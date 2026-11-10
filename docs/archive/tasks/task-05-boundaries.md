@@ -1,12 +1,12 @@
 # Task 05 — Boundaries
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repository: naturewatch-app. Start only after task 04 has merged into `develop` (pull request #394), and after the disk is grown to 16 GB (step 6).
 
 ## Goal
 
-Add `place_boundaries`, as in section 4.2 of [design.md](../database/design.md) and records 5, 6, 17, and 19 of [decisions.md](../database/decisions.md). Copy every site's geometry into it as a version 1 boundary, in committed batches. Merge the parcels of each multi-parcel site into one place, as in the backfill rule **Sites**. Switch the database functions and the view that read a place's area or box to the current boundary. Apply it to the hosted database after approval.
+Add `place_boundaries`, as in section 4.2 of [design.md](../../database/design.md) and records 5, 6, 17, and 19 of [decisions.md](../../database/decisions.md). Copy every site's geometry into it as a version 1 boundary, in committed batches. Merge the parcels of each multi-parcel site into one place, as in the backfill rule **Sites**. Switch the database functions and the view that read a place's area or box to the current boundary. Apply it to the hosted database after approval.
 
 The generic `place_*` reads, the temporary wrappers, and the importer's move to `place_boundaries` with its reconciliation report are task 05b (decided 10 November 2026).
 

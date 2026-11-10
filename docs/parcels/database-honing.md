@@ -42,7 +42,7 @@ Task 02 dropped `pilot_place_map` and `sync_pilot_place_map`, and added `created
 
 ### Weaknesses (verified)
 
-1. **Identity is tied to one release.** `places` is unique on `(source_release_id, source_id)`. A November WDPCA release would get a new `sources` row, so every place would get a new id. PMTiles ids and facts would break. *Since task 04 a place's WDPCA ids are stored in `place_source_ids`, and the importer matches on them. Task 05 adds the reconciliation report.*
+1. **Identity is tied to one release.** `places` is unique on `(source_release_id, source_id)`. A November WDPCA release would get a new `sources` row, so every place would get a new id. PMTiles ids and facts would break. *Since task 04 a place's WDPCA ids are stored in `place_source_ids`, and the importer matches on them. Task 05b adds the reconciliation report.*
 2. **Identity and boundary are one row.** A corrected boundary can only overwrite the old one. There is no history. *Fixed by task 05: boundaries are versions in `place_boundaries`.*
 3. **Facts are not reproducible.** `facts` has no boundary reference, no run, no timestamp. The upsert in `naturewatch-analysis/facts/cropland.py` overwrites on `(place_id, sprout_id, method_id)`. `sprout_id` is free text with no foreign key.
 4. **The crops ids are hard-coded** in the SQL functions (`20261030100000_protected_areas.sql`), in `frontend/naturewatch/src/places/display.ts:4`, and in `cookbook/recipes/places-protected-areas.yaml` in the analysis repo.
@@ -246,7 +246,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Rename `sources` to `source_releases`, keeping ids. Add the new `sources` table and `licences`. Add citations. Update the importer.
 - [x] [Task 04 — Types and details](../archive/tasks/task-04-types-and-details.md) — naturewatch-app
   - *Goal:* Add `place_categories`, `place_types`, `conservation_area_details`, `place_source_ids`, `publication_status`, `merged_into_place_id`. Backfill. Replace the enum.
-- [ ] [Task 05 — Boundaries](../tasks/task-05-boundaries.md) — naturewatch-app
+- [x] [Task 05 — Boundaries](../archive/tasks/task-05-boundaries.md) — naturewatch-app
   - *Goal:* Add `place_boundaries`, copy the geometry in batches, and verify. Merge the parcels of each multi-parcel site into one place, as in the backfill rule **Sites**. Switch the existing functions to it.
 - [ ] Task 05a — One place per designation — naturewatch-app
   - *Goal:* For the 7 sites whose parcels differ in designation (backfill rule **Mixed designations**), give each designation its own place, with the union of that designation's parcels as its version 1 boundary. Keep WDPCA's shapes, overlaps included. Amend record 19 of decisions.md. The 10 zoned sites stay merged.
