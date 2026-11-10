@@ -20,6 +20,8 @@ Write each fact once.
 
 A parcel in `docs/parcels/` lists tasks in order. Each task points at one `docs/tasks/<file>.md` in this repo, for both repos. The task file names the repo that does the work. `/task <file>` starts a task and `/archive-task <file>` files it after merge.
 
+A task file is written when its task starts, as the first commit on that task's `feat/` branch in this repo, and approved before any other change. It does not get its own docs branch or pull request.
+
 - A task marked for naturewatch-app is done in this repo.
 - A task marked for naturewatch-analysis is done in `../naturewatch-analysis`, from this session. Read `../naturewatch-analysis/CLAUDE.md` first and follow it there: branch from `main`, its cost rules, one pull request into `main`. Run git there with `git -C ../naturewatch-analysis`.
 - A task that touches both repos gets one branch and one pull request in each. Link each pull request from the other.
