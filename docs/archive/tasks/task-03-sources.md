@@ -1,12 +1,12 @@
 # Task 03 — Sources
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repository: naturewatch-app. Start only after task 02 has merged into `develop` (pull requests #388 here and naturewatch-analysis#28).
 
 ## Goal
 
-Rename `sources` to `source_releases`, keeping its ids. Add the new `sources` table and `licences`, as in section 4.3 of [design.md](../database/design.md) and record 9 of [decisions.md](../database/decisions.md). Store the WDPCA October 2026 citation and show it on the place profile. Update the importer. Apply the migration to the hosted database after approval.
+Rename `sources` to `source_releases`, keeping its ids. Add the new `sources` table and `licences`, as in section 4.3 of [design.md](../../database/design.md) and record 9 of [decisions.md](../../database/decisions.md). Store the WDPCA October 2026 citation and show it on the place profile. Update the importer. Apply the migration to the hosted database after approval.
 
 ## Facts already stored
 
