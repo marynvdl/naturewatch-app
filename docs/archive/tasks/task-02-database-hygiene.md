@@ -1,6 +1,6 @@
 # Task 02 — Hygiene
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repositories: naturewatch-app and naturewatch-analysis. One branch and one pull request in each, linked to each other. Start only after task 01 has merged into `develop` (pull request #385).
 
