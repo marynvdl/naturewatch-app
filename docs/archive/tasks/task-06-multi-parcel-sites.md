@@ -1,6 +1,6 @@
 # Task 06 — Multi-parcel sites
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repository: naturewatch-app. Start only after task 05b has merged into `develop` (pull request #402).
 
