@@ -261,6 +261,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Add `place_boundaries`, copy the geometry in batches, and verify. Merge the parcels of each multi-parcel site into one place, as in the backfill rule **Sites**. Switch the existing functions to it.
 - [x] [Task 05a — Places cleanup](../archive/tasks/task-05a-places-cleanup.md) — naturewatch-app
   - *Goal:* Make every stored WDPCA parcel its own place again, undoing task 05's merge of the 74 sites. Mark each multi-parcel site's `wdpa_site_id` as `proposed` until a person decides. Supersede record 19 of decisions.md. The review queue is designed in task 06.
+  - *Follow-up:* `/places` timed out after task 05a. That was not caused by the task: 12,824 names were stored in TOAST beside the large `places.geom`, and the name sort read them again on every comparison. `20261115100000_places_name_storage.sql` keeps `places.name` in the row.
 - [ ] Task 05b — Generic reads and reconciliation — naturewatch-app
   - *Goal:* Add the generic `place_*` reads and temporary wrappers. Move the importer's writes to parcel boundaries in `place_boundaries`. Add the reconciliation report: it matches each record on SITE_PID and classifies it as in record 4 of decisions.md, and refuses to write unless every record matches cleanly.
 - [ ] Task 06 — Boundary QC and review queue — both repos
