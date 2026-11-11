@@ -255,6 +255,8 @@ Examples: a WDPCA boundary fills all four. A boundary from a paper has a publica
 
 ### 4.4 Stats
 
+*In place* since task 07 (`20261118100000_stats.sql`, `20261118110000_stats_backfill.sql`) for `stats`, `stat_methods`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. The 941 cropland facts are 2,823 `place_stats` rows of one run, on each place's version 1 boundary. `place_stats` is append-only by grant: `service_role` can select and insert only. A trigger refuses a boundary of another place. `stat_run_issues` comes with the parcel that resumes Stats, its first writer. `stat_selections.selected_by` comes with `profiles` in task 10. `facts` stays until the frontend moves in task 08.
+
 **`stats`** — what is measured.
 
 | Column | Type | Notes |
@@ -262,7 +264,7 @@ Examples: a WDPCA boundary fills all four. A boundary from a paper has a publica
 | `id` | text PK | e.g. `crops_area`, `crops_percent`, `valid_area`, `valid_coverage` |
 | `title` | text | |
 | `unit` | text | CHECK in `km2`, `percent`, `ratio`, `count`, … |
-| `denominator_stat_id` | text FK → `stats`, null | `crops_percent` → `valid_area` |
+| `denominator_stat_id` | text FK → `stats`, null | The stat a percentage or ratio is of, when that stat is stored. No `valid_area` stat is stored, so `crops_percent` has none, and its description names the valid area. |
 | `description` | text | |
 
 **`stat_methods`** — `fact_methods`, renamed. `id` text PK with a version (`area-weighted-spheroid-v1`), `summary`.
@@ -693,7 +695,7 @@ Contributors submit boundaries through `submit_boundary(place_id, geojson)`, not
 | `rpc('protected_area_window')`, `protected_area_rank`, `protected_area_filter_stats` | `place_window`, `place_rank`, `place_filter_stats`, with a place type parameter |
 | `rpc('place_bounds')` | `place_bounds`, reading the current boundary's bbox |
 
-*In place* since task 05b (`20261116100000_generic_place_reads.sql`) for `place_summaries`, `place_window`, `place_rank`, `place_filter_stats`, and `place_bounds`, together with `place_window_count`, `place_kept_ids`, `place_matched`, and `places_in_extent`. `listed_places` holds the conservation area list rule (terrestrial, at least 10 km²), and `place_crops_percent` holds the crops ids until `place_stats_preferred` in task 07. The old names stay only as wrappers until the frontend moves in task 08, then they are dropped.
+*In place* since task 05b (`20261116100000_generic_place_reads.sql`) for `place_summaries`, `place_window`, `place_rank`, `place_filter_stats`, and `place_bounds`, together with `place_window_count`, `place_kept_ids`, `place_matched`, and `places_in_extent`. `listed_places` holds the conservation area list rule (terrestrial, at least 10 km²). `place_crops_percent` reads `place_stats_preferred` for `crops_percent` since task 07, so no sprout or method id is written in SQL. The old names stay only as wrappers until the frontend moves in task 08, then they are dropped.
 
 ## 7. Naming
 

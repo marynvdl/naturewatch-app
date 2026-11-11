@@ -204,7 +204,7 @@ Each stage is its own migration and pull request. Take a backup or check point-i
 - **Source ids.** One confirmed `wdpa_site_pid` row per parcel, on its own place, and one `wdpa_site_id` row per site, on its largest parcel. First and last seen in October 2026.
 - **Details.** `designation`, `iucn_category`, `iso3`, and `realm` move to `conservation_area_details`. The missing WDPCA fields stay null until the next import.
 - **Types.** Every current place becomes type `conservation_area`, `publication_status = 'published'`.
-- **Stats.** Each `facts` row becomes three `place_stats` rows (`crops_area`, `crops_percent`, `valid_coverage`). They belong to one run for Batch job `facts-cropland-2024-v1-20261022180517` on 22 October 2026, against the version 1 boundary. The South Africa geometry check passed on 10 November 2026, so the run is not retracted. Then add a `stat_selections` row for crops 2024.
+- **Stats.** Each `facts` row becomes three `place_stats` rows (`crops_area`, `crops_percent`, `valid_coverage`). They belong to one run for Batch job `facts-cropland-2024-v1-20261022180517` on 22 October 2026, against the version 1 boundary. The South Africa geometry check passed on 10 November 2026, so the run is not retracted. Then add a `stat_selections` row for crops 2024. *Done by task 07 (`20261118110000_stats_backfill.sql`): 2,823 rows of one `succeeded` run, and a selection for each of the three stats.*
 - **QC.** Run the four starting checks in batches. Boundaries that pass become `eligible`. Flagged ones, such as the Canadian record with over a hundred small parts, stay published, with `qc_status = 'flagged'` and `stats_eligibility = 'pending'`, until reviewed. *Deferred by task 06 to the parcel that resumes Stats. On 11 November 2026, with example thresholds, 3,885 current boundaries had more than 10 parts, 603 more than 100, 2,809 more than 10 holes, and 198 more than 100,000 vertices.*
 - **Timestamps.** Use the known dates: 31 October 2026 for the global import, 22 October 2026 for the facts run. Otherwise use the migration time, and say so in the migration.
 
@@ -250,6 +250,7 @@ Supported by the design, not built in this work:
 - `reconcile` comparing a merged place with the union of its parcel records, and keeping a merged place's name and details on upload. Until then a merged place stops `upload`. With the next import.
 - A function to undo a merge. Each merged parcel's superseded boundary keeps its SITE_PID. With the first unmerge.
 - The reconcile report suggesting a decision for a new multi-parcel site from the criteria in record 20. With the next release that has new multi-parcel sites.
+- `stat_run_issues`, with the parcel that resumes Stats, its first writer. Until then a stats run stops on a place it cannot use and is marked `failed`. Moved out of task 07 on 11 November 2026.
 - More review queue checks, with the boundary quality work: likely recognitions and likely duplicates (task 09); reported area far from mapped area (`REP_AREA` against `GIS_AREA`); a status other than designated; a boundary mostly outside its `ISO3`; a missing or placeholder name.
 
 ## J. Tasks
@@ -274,11 +275,11 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
 - [x] [Task 06 — Multi-parcel sites](../archive/tasks/task-06-multi-parcel-sites.md) — naturewatch-app
   - *Goal:* Decide each of the 74 multi-parcel sites, keep apart or merge, and record it in `match_status` so no `wdpa_site_id` row stays `proposed`. Add `merge_wdpa_site` for the merges, and `place_merged_into` so a merged place's address opens its kept place. Write the user's criteria into record 20. The boundary checks, eligibility, and review queue move to Deferred (decided 11 November 2026).
 - [ ] [Task 07 — Stats](../tasks/task-07-stats.md) — both repos
-  - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_run_issues`, `stat_selections`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Point the analysis scripts and the places recipe at them, the recipe at the current boundaries of published places. Rebuild the places PMTiles, so the 64 merged parcels draw as their kept places. The pipeline stays paused.
+  - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Move `place_crops_percent` to the selection. Rename the analysis `facts/` to `stats/`, and point it and the places recipe at the new tables, the recipe at the current boundaries of published places. The pipeline stays paused. `stat_run_issues` and the places PMTiles rebuild are moved out (decided 11 November 2026).
 - [ ] Task 08 — Frontend and cleanup — naturewatch-app
   - *Goal:* Move the frontend to the generic reads. Drop the wrappers, `facts`, and `places.geom`.
 - [ ] Task 09 — Recognitions — both repos
-  - *Goal:* Investigate the designations. Import `DESIG_TYPE`. Add recognition types, `place_relationships`, and the admin overlap function. Add a recognitions PMTiles recipe.
+  - *Goal:* Investigate the designations. Import `DESIG_TYPE`. Add recognition types, `place_relationships`, and the admin overlap function. Add a recognitions PMTiles recipe. Rebuild the places PMTiles from the current boundaries of published conservation areas, so the 64 merged parcels draw as their kept places, and decide the stale South Africa rollback copy in `places/protected-areas/v1/` (moved from task 07).
 - [ ] Task 10 — Profiles, roles, audit — naturewatch-app
   - *Goal:* Add `profiles`, `user_roles`, `has_role()`, contributor policies, and `audit_log`. Together with Molding Places.
 - [ ] Task 11 — Images — naturewatch-app
