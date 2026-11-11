@@ -55,4 +55,43 @@ describe('Place view', () => {
     expect(link.text()).toContain('Protected Planet');
     expect(loadPilotPlace).toHaveBeenCalledWith(placeId);
   });
+
+  it('moves the address of a merged place to the place it was merged into', async () => {
+    const mergedId = '22222222-2222-2222-2222-222222222222';
+    vi.mocked(loadPilotPlace).mockResolvedValue({
+      status: 'ok',
+      place: {
+        id: placeId,
+        name: 'Gobiin ikh',
+        designation: 'Strictly Protected Area',
+        iso3: 'MNG',
+        areaKm2: 63884.6,
+        siteId: '798',
+        releaseMonth: '2026-10-01',
+        sourceName: 'World Database on Protected and Conserved Areas',
+        citation: 'UNEP-WCMC and IUCN (2026)',
+        croplandKm2: null,
+        percent: null,
+      },
+    });
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'Home', component: { template: '<div />' } },
+        { path: '/places', name: 'Places', component: { template: '<div />' } },
+        { path: '/places/:id', name: 'Place', component: PlaceView },
+      ],
+    });
+    await router.push(`/places/${mergedId}`);
+
+    const wrapper = mount(PlaceView, {
+      global: { plugins: [router] },
+    });
+    await flushPromises();
+
+    expect(loadPilotPlace).toHaveBeenCalledWith(mergedId);
+    expect(wrapper.text()).toContain('Gobiin ikh');
+    expect(router.currentRoute.value.params.id).toBe(placeId);
+  });
 });

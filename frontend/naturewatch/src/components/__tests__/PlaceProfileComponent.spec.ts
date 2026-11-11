@@ -133,6 +133,27 @@ describe('Place profile', () => {
     expect(wrapper.emitted('close')).toHaveLength(1);
   });
 
+  it('says when a merged place opened the place it was merged into', async () => {
+    const mergedId = '33333333-3333-3333-3333-333333333333';
+    vi.mocked(loadPilotPlace).mockResolvedValue({
+      status: 'ok',
+      place: kruger,
+    });
+    const wrapper = mount(PlaceProfileComponent, {
+      props: { placeId: mergedId },
+    });
+    await flushPromises();
+
+    expect(loadPilotPlace).toHaveBeenCalledWith(mergedId);
+    expect(wrapper.get('h2').text()).toBe('Kruger National Park');
+    expect(wrapper.emitted('moved')).toEqual([[placeId]]);
+  });
+
+  it('does not say moved for the place asked for', async () => {
+    const wrapper = await mountProfile(kruger);
+    expect(wrapper.emitted('moved')).toBeUndefined();
+  });
+
   it('says the place store is not configured', async () => {
     vi.mocked(loadPilotPlace).mockResolvedValue({ status: 'unconfigured' });
     const wrapper = mount(PlaceProfileComponent, {

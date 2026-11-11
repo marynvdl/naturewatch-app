@@ -184,7 +184,7 @@ Each stage is its own migration and pull request. Take a backup or check point-i
 
 ### Backfill rules
 
-- **Sites.** A Place is one WDPCA parcel ([record 20](../database/decisions.md#20-a-conservation-area-place-is-one-wdpca-parcel)). *Task 05 first merged the 186 parcels of the 74 multi-parcel sites into 74 places, as record 19 then said. Task 05a undid it with `unmerge_wdpa_site_parcels()`. Every parcel is a published place with its own SITE_PID and current boundary again. The 74 site unions are kept as superseded versions. Each of the 74 sites' `wdpa_site_id` rows is `proposed`, on its largest parcel, until a person decides in the review queue of task 06.* These are the sites waiting for a decision, read-only:
+- **Sites.** A Place is one WDPCA parcel ([record 20](../database/decisions.md#20-a-conservation-area-place-is-one-wdpca-parcel)). *Task 05 first merged the 186 parcels of the 74 multi-parcel sites into 74 places, as record 19 then said. Task 05a undid it with `unmerge_wdpa_site_parcels()`. Every parcel is a published place with its own SITE_PID and current boundary again. The 74 site unions are kept as superseded versions. Each of the 74 sites' `wdpa_site_id` rows was `proposed`, on its largest parcel, until a person decided. Task 06 recorded the user's decisions of 11 November 2026: 39 sites kept apart and 35 merged, so 64 places became `merged` (`20261117110000_wdpa_site_decisions.sql`). The criteria are in [record 20](../database/decisions.md#20-a-conservation-area-place-is-one-wdpca-parcel).* The query that listed the sites waiting for a decision, read-only:
 
   ```sql
   select site.source_record_id as site_id, array_agg(places.name order by places.name) as places
@@ -205,7 +205,7 @@ Each stage is its own migration and pull request. Take a backup or check point-i
 - **Details.** `designation`, `iucn_category`, `iso3`, and `realm` move to `conservation_area_details`. The missing WDPCA fields stay null until the next import.
 - **Types.** Every current place becomes type `conservation_area`, `publication_status = 'published'`.
 - **Stats.** Each `facts` row becomes three `place_stats` rows (`crops_area`, `crops_percent`, `valid_coverage`). They belong to one run for Batch job `facts-cropland-2024-v1-20261022180517` on 22 October 2026, against the version 1 boundary. The South Africa geometry check passed on 10 November 2026, so the run is not retracted. Then add a `stat_selections` row for crops 2024.
-- **QC.** Run the four starting checks in batches. Boundaries that pass become `eligible`. Flagged ones, such as the Canadian record with over a hundred small parts, stay published, with `qc_status = 'flagged'` and `stats_eligibility = 'pending'`, until reviewed.
+- **QC.** Run the four starting checks in batches. Boundaries that pass become `eligible`. Flagged ones, such as the Canadian record with over a hundred small parts, stay published, with `qc_status = 'flagged'` and `stats_eligibility = 'pending'`, until reviewed. *Deferred by task 06 to the parcel that resumes Stats. On 11 November 2026, with example thresholds, 3,885 current boundaries had more than 10 parts, 603 more than 100, 2,809 more than 10 holes, and 198 more than 100,000 vertices.*
 - **Timestamps.** Use the known dates: 31 October 2026 for the global import, 22 October 2026 for the facts run. Otherwise use the migration time, and say so in the migration.
 
 ### Compatibility
@@ -245,7 +245,12 @@ Supported by the design, not built in this work:
 - Metadata edit requests: `place_edit_requests`.
 - The importer's writes for the reconciliation classes other than `unchanged` and `reshaped` (task 05b): draft places for `new` and `new_in_known_site`, `proposed` boundaries for `very_different`, `proposed` mappings for a `missing` record's split or join candidates, and a flag for the place. With the first release or review that needs them.
 - Importing `STATUS`, `STATUS_YR`, `GOV_TYPE`, and `PA_DEF`. `DESIG_TYPE` comes in task 09.
-- More review queue checks, after task 06: likely recognitions and likely duplicates (task 09); reported area far from mapped area (`REP_AREA` against `GIS_AREA`); a status other than designated; a boundary mostly outside its `ISO3`; a missing or placeholder name.
+- Boundary quality and Stats eligibility, with the parcel that resumes Stats, their first reader: the four starting checks (`geometry_valid`, `small_components`, `holes`, `vertex_count`), `boundary_checks`, `qc_status`, the `stats_eligibility` columns and `set_stats_eligibility`, `stats_eligible_boundaries`, and the review of flagged boundaries. The thresholds are set against real Stats runs. Moved out of task 06 on 11 November 2026.
+- The derived admin review queue over every check's findings and source matches, with the reviewers' stored decisions. With Molding Places, after task 10.
+- `reconcile` comparing a merged place with the union of its parcel records, and keeping a merged place's name and details on upload. Until then a merged place stops `upload`. With the next import.
+- A function to undo a merge. Each merged parcel's superseded boundary keeps its SITE_PID. With the first unmerge.
+- The reconcile report suggesting a decision for a new multi-parcel site from the criteria in record 20. With the next release that has new multi-parcel sites.
+- More review queue checks, with the boundary quality work: likely recognitions and likely duplicates (task 09); reported area far from mapped area (`REP_AREA` against `GIS_AREA`); a status other than designated; a boundary mostly outside its `ISO3`; a missing or placeholder name.
 
 ## J. Tasks
 
@@ -266,10 +271,10 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Follow-up:* `/places` timed out after task 05a. That was not caused by the task: 12,824 names were stored in TOAST beside the large `places.geom`, and the name sort read them again on every comparison. `20261115100000_places_name_storage.sql` keeps `places.name` in the row.
 - [x] [Task 05b — Generic reads and reconciliation](../archive/tasks/task-05b-generic-reads-recon.md) — naturewatch-app
   - *Goal:* Add the generic `place_*` reads and temporary wrappers. Move the importer's writes to parcel boundaries in `place_boundaries`. Add the reconciliation report: it matches each record on SITE_PID and classifies it as in record 4 of decisions.md, and refuses to write unless every record matches cleanly.
-- [ ] Task 06 — Boundary QC and review queue — both repos
-  - *Goal:* Add the boundary checks and the eligibility columns, RPC, and view. Its task file designs one derived admin queue over every check's findings, with the reviewers' stored decisions. The queue starts with the multi-parcel sites (the `proposed` `wdpa_site_id` rows), `small_components`, `holes`, and vertex count. Run the checks and review the flagged records. The merge function comes with the first merge.
+- [ ] [Task 06 — Multi-parcel sites](../tasks/task-06-multi-parcel-sites.md) — naturewatch-app
+  - *Goal:* Decide each of the 74 multi-parcel sites, keep apart or merge, and record it in `match_status` so no `wdpa_site_id` row stays `proposed`. Add `merge_wdpa_site` for the merges, and `place_merged_into` so a merged place's address opens its kept place. Write the user's criteria into record 20. The boundary checks, eligibility, and review queue move to Deferred (decided 11 November 2026).
 - [ ] Task 07 — Stats — both repos
-  - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_run_issues`, `stat_selections`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Point the analysis scripts and the places recipe at them. The pipeline stays paused.
+  - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_run_issues`, `stat_selections`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Point the analysis scripts and the places recipe at them, the recipe at the current boundaries of published places. Rebuild the places PMTiles, so the 64 merged parcels draw as their kept places. The pipeline stays paused.
 - [ ] Task 08 — Frontend and cleanup — naturewatch-app
   - *Goal:* Move the frontend to the generic reads. Drop the wrappers, `facts`, and `places.geom`.
 - [ ] Task 09 — Recognitions — both repos

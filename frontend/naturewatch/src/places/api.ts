@@ -286,7 +286,8 @@ export async function loadPilotPlaceFilterStats(): Promise<PlaceFilterStatsResul
 }
 
 /**
- * One protected area and its cropland fact for the 2024 sprout.
+ * One protected area and its cropland fact for the 2024 sprout. A place that was
+ * merged into another opens the place it was merged into, whose id differs.
  * @param id - `places.id`.
  * @returns The place, or why it could not be opened.
  */
@@ -295,7 +296,7 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
 
-  const { data: place, error } = await supabase
+  let { data: place, error } = await supabase
     .from('protected_areas')
     .select(
       'id, name, designation, iso3, area_km2, site_id, release_month, source_name, citation'
@@ -303,12 +304,29 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
     .eq('id', id)
     .maybeSingle();
   if (error) return { status: 'error' };
-  if (!place) return { status: 'missing' };
+  if (!place) {
+    const { data: keptId, error: mergedError } = await supabase.rpc(
+      'place_merged_into',
+      { p_id: id }
+    );
+    if (mergedError) return { status: 'error' };
+    if (typeof keptId !== 'string' || keptId === id)
+      return { status: 'missing' };
+    ({ data: place, error } = await supabase
+      .from('protected_areas')
+      .select(
+        'id, name, designation, iso3, area_km2, site_id, release_month, source_name, citation'
+      )
+      .eq('id', keptId)
+      .maybeSingle());
+    if (error) return { status: 'error' };
+    if (!place) return { status: 'missing' };
+  }
 
   const { data: fact, error: factError } = await supabase
     .from('facts')
     .select('area_km2, percent')
-    .eq('place_id', id)
+    .eq('place_id', place.id)
     .eq('sprout_id', CROPLAND_SPROUT_ID)
     .eq('method_id', CROPLAND_METHOD_ID)
     .maybeSingle();
