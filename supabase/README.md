@@ -1,12 +1,12 @@
 # Records
 
-`sources`, `source_releases`, `licences`, `place_categories`, `place_types`, `places`, `place_boundaries`, `conservation_area_details`, `place_source_ids`, and `facts` are the Sooty Earth place store. A place is a whole WDPCA site. `place_boundaries` holds its boundary versions, and one at most is current. `places.geom` and `place_boundaries.geom` are not granted to `anon` or `authenticated`. `places.geom`, `places.area_km2`, and the bbox columns on `places` stay until Database Honing task 08, because the analysis scripts still read them. The reads below use the current boundary. The FastAPI service does not read these tables.
+`sources`, `source_releases`, `licences`, `place_categories`, `place_types`, `places`, `place_boundaries`, `conservation_area_details`, `place_source_ids`, and `facts` are the Sooty Earth place store. A place is one WDPCA parcel. `place_boundaries` holds its boundary versions, and one at most is current. `places.geom` and `place_boundaries.geom` are not granted to `anon` or `authenticated`. `places.geom`, `places.area_km2`, and the bbox columns on `places` stay until Database Honing task 08, because the analysis scripts still read them. The reads below use the current boundary. The FastAPI service does not read these tables.
 
 The map draws protected-area boundaries from the published PMTiles archive. The app has no polygon download.
 
 The October 2026 WDPCA release is pinned in `supabase/migrations/20261021120000_records.sql` and `supabase/migrations/20261029200000_global_protected_areas.sql`: release date `2026-10-01`, the global public zip, and the SHA-256 checksum of that zip. Since `20261111100000_sources.sql` it is the `source_releases` row with `source_id` `wdpca` and `version_label` `October 2026`, and it carries the citation. `import_wdpa.py` carries the same source, version label, URL, and checksum. It downloads that URL and stops if the file is missing or the checksum differs. It does not use a local geodatabase as the source. The download stays in a work directory and is not committed. The CloudFront `/current/` file is the South Africa extract. The global October file is the object named in the pin.
 
-`site_id` in `protected_areas` is the Protected Planet id (`https://www.protectedplanet.net/<site_id>`). It is stored as `conservation_area_details.source_record_id`. A place is matched to the source through `place_source_ids`: one confirmed `wdpa_site_pid` row per parcel, and one confirmed `wdpa_site_id` row per site, pointing at the place with the largest parcel.
+`site_id` in `protected_areas` is the Protected Planet id (`https://www.protectedplanet.net/<site_id>`). It is stored as `conservation_area_details.source_record_id`. A place is matched to the source through `place_source_ids`: one confirmed `wdpa_site_pid` row per parcel, and one `wdpa_site_id` row per site, pointing at the place with the largest parcel. That row is `proposed` for a site with several parcels until a person decides whether to merge them (task 05a).
 
 The places page reads `protected_area_window`, 50 rows at a time, ordered by name. The Places list on the map reads `protected_area_window` (50 matching rows at a time, from an offset) and `protected_area_filter_stats` for the filter charts. Extent filtering uses `protected_areas_in_extent`, which accepts a bounding box and returns attributes only. Those reads return attributes, not `places.geom`. Filter charts use the database counts. The view behind those reads is `protected_areas`.
 
@@ -28,7 +28,7 @@ The fixture rolls back. It expects `places` to be empty, so run it before the im
 
 ## Boundaries
 
-`backfill_boundaries.py` copied each site's geometry from `places.geom` into `place_boundaries` (Database Honing task 05). Apply `20261113100000_place_boundaries.sql` first. `run` calls `backfill_place_boundaries()` in committed batches of 500 sites and builds the GiST index. It continues after the last committed batch when started again. It stops on an invalid geometry and names the place, without repairing it. `verify` only reads. Apply `20261113110000_boundaries_readers.sql` after `verify` passes: it merges the parcels of each site with `merge_wdpa_site_parcels()` and moves the reads to the current boundary.
+`backfill_boundaries.py` copied each site's geometry from `places.geom` into `place_boundaries` (Database Honing task 05). Apply `20261113100000_place_boundaries.sql` first. `run` calls `backfill_place_boundaries()` in committed batches of 500 sites and builds the GiST index. It continues after the last committed batch when started again. It stops on an invalid geometry and names the place, without repairing it. `verify` only reads. Apply `20261113110000_boundaries_readers.sql` after `verify` passes: it merges the parcels of each site with `merge_wdpa_site_parcels()` and moves the reads to the current boundary. `20261114100000_unmerge_wdpa_parcels.sql` undoes that merge with `unmerge_wdpa_site_parcels()` (task 05a). Each parcel gets its own current boundary, and the site unions stay as superseded versions. After it, `verify` no longer passes, because it checks the state task 05 left, and `merge_wdpa_site_parcels()` refuses to run. The hosted migration ran on 11 November 2026 on Micro compute, in 16 seconds. The database grew from 6,990 MB to 6,996 MB: 186 boundaries, 51,001 current, and 74 `proposed` site rows.
 
 ```bash
 DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
@@ -43,7 +43,7 @@ The hosted backfill ran on 10 November 2026, on Micro compute (1 GB of memory) w
 
 ## Import
 
-**Do not run `upload` until Database Honing task 05b.** It still writes `places.geom` per parcel. Since task 05 a merged parcel's SITE_PID points at its site's kept place, so `upload` would overwrite that place's geometry with one parcel, and it writes no boundary.
+**Do not run `upload` until Database Honing task 05b.** It still writes `places.geom` per parcel and writes no boundary. It would also add a confirmed `wdpa_site_id` row beside each site's `proposed` one.
 
 The script needs Python with the GDAL bindings (`osgeo`), `psycopg`, `shapely`, and `pyproj`.
 
