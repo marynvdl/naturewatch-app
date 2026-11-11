@@ -1187,5 +1187,152 @@ begin
   perform set_config('role', 'postgres', true);
 end $$;
 
+-- Task 05b: generic reads, and wrappers that return what they did before -------------
+
+\ir reads_before_05b.sql
+
+do $$
+declare
+  sorts text[] := array['size-desc', 'size-asc', 'name', 'cropland-desc', 'cropland-asc'];
+  sort_id text;
+  q record;
+  place record;
+  south_id uuid;
+  new_rows text[];
+  old_rows text[];
+begin
+  -- Each query: search, prefix, size range, crop range, extent.
+  for q in
+    select * from (values
+      ('', false, null::float8, null::float8, 0::float8, 100::float8, null::float8, null::float8, null::float8, null::float8),
+      ('park', false, null, null, 0, 100, null, null, null, null),
+      ('Twin', true, null, null, 0, 100, null, null, null, null),
+      ('', false, 20, 5000, 0, 100, null, null, null, null),
+      ('', false, null, null, 0, 50, null, null, null, null),
+      ('', false, null, null, 0, 100, 20, -35, 35, -15),
+      ('', false, null, null, 0, 100, 170, -60, -170, 60),
+      ('', false, null, null, 1, 100, 20, -35, 35, -15)
+    ) as v(search, prefix, size_min, size_max, crop_min, crop_max, w, s, e, n)
+  loop
+    foreach sort_id in array sorts loop
+      new_rows := array(
+        select row(r.*)::text from public.protected_area_window(
+          q.search, q.prefix, sort_id, q.size_min, q.size_max, q.crop_min, q.crop_max,
+          q.w, q.s, q.e, q.n, 50, 0) as r);
+      old_rows := array(
+        select row(r.*)::text from pg_temp.old_protected_area_window(
+          q.search, q.prefix, sort_id, q.size_min, q.size_max, q.crop_min, q.crop_max,
+          q.w, q.s, q.e, q.n, 50, 0) as r);
+      if new_rows is distinct from old_rows then
+        raise exception 'protected_area_window changed for % sorted %: % instead of %',
+          q, sort_id, new_rows, old_rows;
+      end if;
+      if new_rows is distinct from array(
+        select row(r.*)::text from public.place_window(
+          'conservation_area', q.search, q.prefix, sort_id, q.size_min, q.size_max,
+          q.crop_min, q.crop_max, q.w, q.s, q.e, q.n, 50, 0) as r) then
+        raise exception 'place_window differs from its wrapper for %', q;
+      end if;
+      for place in select id from public.places loop
+        if public.protected_area_rank(place.id, q.search, q.prefix, sort_id, q.size_min,
+            q.size_max, q.crop_min, q.crop_max, q.w, q.s, q.e, q.n)
+          is distinct from pg_temp.old_protected_area_rank(place.id, q.search, q.prefix,
+            sort_id, q.size_min, q.size_max, q.crop_min, q.crop_max, q.w, q.s, q.e, q.n) then
+          raise exception 'protected_area_rank changed for % in % sorted %', place.id, q, sort_id;
+        end if;
+      end loop;
+    end loop;
+    if public.protected_area_window_count(q.search, q.prefix, q.size_min, q.size_max,
+        q.crop_min, q.crop_max, q.w, q.s, q.e, q.n)
+      <> pg_temp.old_protected_area_window_count(q.search, q.prefix, q.size_min, q.size_max,
+        q.crop_min, q.crop_max, q.w, q.s, q.e, q.n) then
+      raise exception 'protected_area_window_count changed for %', q;
+    end if;
+    if q.w is not null and array(
+        select row(r.*)::text from public.protected_areas_in_extent(q.w, q.s, q.e, q.n) as r order by r.id)
+      is distinct from array(
+        select row(r.*)::text from pg_temp.old_protected_areas_in_extent(q.w, q.s, q.e, q.n) as r order by r.id) then
+      raise exception 'protected_areas_in_extent changed for %', q;
+    end if;
+    if (select array_agg(x order by x) from unnest(public.protected_area_kept_ids(
+          q.size_min, q.size_max, q.crop_min, q.crop_max)) as x)
+      is distinct from (select array_agg(x order by x) from unnest(pg_temp.old_protected_area_kept_ids(
+          q.size_min, q.size_max, q.crop_min, q.crop_max)) as x) then
+      raise exception 'protected_area_kept_ids changed for %', q;
+    end if;
+  end loop;
+
+  if exists (
+    (select * from public.protected_areas except all select * from pg_temp.old_protected_areas)
+    union all
+    (select * from pg_temp.old_protected_areas except all select * from public.protected_areas)
+  ) then
+    raise exception 'protected_areas changed';
+  end if;
+  if (select row(r.*)::text from public.protected_area_filter_stats() as r)
+    is distinct from (select row(r.*)::text from pg_temp.old_protected_area_filter_stats() as r) then
+    raise exception 'protected_area_filter_stats changed';
+  end if;
+  for place in select id from public.places loop
+    if (select row(r.*)::text from public.place_bounds(place.id) as r)
+      is distinct from (select row(r.*)::text from pg_temp.old_place_bounds(place.id) as r) then
+      raise exception 'place_bounds changed for %', place.id;
+    end if;
+  end loop;
+
+  -- place_summaries has every published place, also those the list leaves out.
+  if not exists (
+    select 1 from public.place_summaries
+    where site_pid = 'fixture-small' and area_km2 < 10
+  ) or exists (select 1 from public.listed_places where site_pid = 'fixture-small') then
+    raise exception 'place_summaries should hold the small place, and listed_places should not';
+  end if;
+  if exists (select 1 from public.place_summaries where site_pid = 'fixture-draft') then
+    raise exception 'place_summaries returned a draft place';
+  end if;
+  if exists (select 1 from public.place_window('ecoregion')) then
+    raise exception 'place_window returned a place of another type';
+  end if;
+  if (select place_count from public.place_filter_stats('ecoregion')) <> 0 then
+    raise exception 'place_filter_stats counted a place of another type';
+  end if;
+
+  -- A merged place has no summary and no bounds.
+  select id into south_id from public.places where name = 'Twin Park South';
+  update public.places
+  set publication_status = 'merged',
+    merged_into_place_id = pg_temp.fixture_id('fixture-twin-north')
+  where id = south_id;
+  if exists (select 1 from public.place_summaries where id = south_id)
+    or exists (select 1 from public.place_bounds(south_id)) then
+    raise exception 'place_summaries or place_bounds returned a merged place';
+  end if;
+  update public.places
+  set publication_status = 'published', merged_into_place_id = null
+  where id = south_id;
+
+  -- anon reads the generic functions and views, and never geometry.
+  perform set_config('role', 'anon', true);
+  if (select max(total_count) from public.place_window('conservation_area'))
+    <> (select count(*) from public.protected_areas) then
+    raise exception 'anon cannot read place_window';
+  end if;
+  perform public.place_filter_stats('conservation_area');
+  perform public.place_rank('conservation_area', south_id);
+  perform public.place_window_count('conservation_area');
+  perform public.place_kept_ids('conservation_area');
+  perform 1 from public.place_summaries;
+  perform 1 from public.place_crops_percent;
+  perform set_config('role', 'postgres', true);
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name in ('place_summaries', 'listed_places', 'place_crops_percent')
+      and udt_name = 'geometry'
+  ) then
+    raise exception 'a generic read view returns geometry';
+  end if;
+end $$;
+
 \echo records fixture ok
 rollback;
