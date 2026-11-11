@@ -39,6 +39,9 @@ C_MOVED = "MULTIPOLYGON(((22.15 -30, 22.35 -30, 22.35 -29.8, 22.15 -29.8, 22.15 
 D = "MULTIPOLYGON(((23 -30, 23.2 -30, 23.2 -29.8, 23 -29.8, 23 -30)))"
 D_WEST = "MULTIPOLYGON(((23 -30, 23.1 -30, 23.1 -29.8, 23 -29.8, 23 -30)))"
 D_EAST = "MULTIPOLYGON(((23.1 -30, 23.2 -30, 23.2 -29.8, 23.1 -29.8, 23.1 -30)))"
+E_WEST = "MULTIPOLYGON(((24 -30, 24.1 -30, 24.1 -29.8, 24 -29.8, 24 -30)))"
+E_EAST = "MULTIPOLYGON(((24.1 -30, 24.2 -30, 24.2 -29.8, 24.1 -29.8, 24.1 -30)))"
+E_NORTH = "MULTIPOLYGON(((24 -29.7, 24.2 -29.7, 24.2 -29.5, 24 -29.5, 24 -29.7)))"
 FAR = "MULTIPOLYGON(((25 -30, 25.2 -30, 25.2 -29.8, 25 -29.8, 25 -30)))"
 TINY = "MULTIPOLYGON(((26 -30, 26.001 -30, 26.001 -29.999, 26 -29.999, 26 -30)))"
 
@@ -85,7 +88,7 @@ class ReconcileLocalTest(unittest.TestCase):
         self.conn.rollback()
         self.conn.close()
 
-    def place(self, pid: str, site: str, name: str, wkt: str):
+    def place(self, pid: str, site: str, name: str, wkt: str, site_row: bool = True):
         row = self.conn.execute(
             """
             insert into public.places (name, place_type_id, publication_status, geom)
@@ -106,7 +109,8 @@ class ReconcileLocalTest(unittest.TestCase):
             """,
             (place_id, self.release, site, site),
         )
-        for kind, record in (("wdpa_site_pid", pid), ("wdpa_site_id", site)):
+        kinds = (("wdpa_site_pid", pid), ("wdpa_site_id", site)) if site_row else (("wdpa_site_pid", pid),)
+        for kind, record in kinds:
             self.conn.execute(
                 """
                 insert into public.place_source_ids (
@@ -299,6 +303,79 @@ class ReconcileLocalTest(unittest.TestCase):
             2,
         )
 
+
+    def two_parcel_site(self) -> None:
+        """Site E with two parcels and a proposed site row, as task 05a left such sites."""
+        self.ids["pid-e1"] = self.place("pid-e1", "site-e", "Park E /A/", E_WEST)
+        self.ids["pid-e2"] = self.place("pid-e2", "site-e", "Park E /B/", E_EAST, site_row=False)
+        self.conn.execute(
+            "update public.place_source_ids set match_status = 'proposed' "
+            "where id_kind = 'wdpa_site_id' and source_record_id = 'site-e'"
+        )
+
+    def test_a_kept_apart_site_is_still_a_known_site(self):
+        self.two_parcel_site()
+        self.conn.execute("select public.keep_wdpa_site_apart('site-e')")
+        self.write_file(
+            [
+                ("pid-a", "site-a", "Park A", A),
+                ("pid-b", "site-b", "Park B", B),
+                ("pid-c", "site-c", "Park C", C),
+                ("pid-d", "site-d", "Park D", D),
+                ("pid-e1", "site-e", "Park E /A/", E_WEST),
+                ("pid-e2", "site-e", "Park E /B/", E_EAST),
+                ("pid-e3", "site-e", "Park E /C/", E_NORTH),
+            ]
+        )
+        import_wdpa.reconcile(self.work)
+        rows = self.report_rows()
+        self.assertEqual(rows["pid-e1"]["class"], "unchanged")
+        self.assertEqual(rows["pid-e2"]["class"], "unchanged")
+        self.assertEqual(rows["pid-e3"]["class"], "new_in_known_site")
+        # The check after an upload counts confirmed and proposed site rows.
+        self.assertEqual(
+            self.conn.execute(
+                "select match_status from public.place_source_ids "
+                "where id_kind = 'wdpa_site_id' and source_record_id = 'site-e'"
+            ).fetchone()["match_status"],
+            "confirmed",
+        )
+
+    def test_a_merged_site_stops_upload(self):
+        self.two_parcel_site()
+        merged = self.conn.execute(
+            "select public.merge_wdpa_site('site-e', 'Park E') as n"
+        ).fetchone()["n"]
+        self.assertEqual(merged, 1)
+        self.write_file(
+            [
+                ("pid-a", "site-a", "Park A", A),
+                ("pid-b", "site-b", "Park B", B),
+                ("pid-c", "site-c", "Park C", C),
+                ("pid-d", "site-d", "Park D", D),
+                ("pid-e1", "site-e", "Park E /A/", E_WEST),
+                ("pid-e2", "site-e", "Park E /B/", E_EAST),
+            ]
+        )
+        before = self.boundaries()
+        report = import_wdpa.reconcile(self.work)
+        rows = self.report_rows()
+        self.assertFalse(report["clean"])
+        for pid in ("pid-e1", "pid-e2"):
+            self.assertEqual(rows[pid]["class"], "very_different")
+            self.assertEqual(rows[pid]["flags"], "merged_place")
+            self.assertEqual(rows[pid]["place_id"], str(self.ids["pid-e1"]))
+
+        with self.assertRaises(SystemExit) as raised:
+            import_wdpa.upload(self.work)
+        self.assertIn("refusing to load", str(raised.exception))
+        self.assertEqual(self.boundaries(), before)
+        self.assertEqual(
+            self.conn.execute(
+                "select name from public.places where id = %s", (self.ids["pid-e1"],)
+            ).fetchone()["name"],
+            "Park E",
+        )
 
 if __name__ == "__main__":
     unittest.main()

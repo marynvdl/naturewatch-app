@@ -244,13 +244,23 @@ The dependency table is in the [parcel](../parcels/database-honing.md#dependency
 
 *Decided 11 November 2026 by the user, in task 05a of the [Database Honing](../parcels/database-honing.md) parcel. It supersedes record 19.*
 
-**Decision.** One Place per WDPCA `SITE_PID`. Parcels of one `SITE_ID` become one Place only when a person decides so, through the review queue that task 06 designs. Until then the site's `wdpa_site_id` row is `proposed`, on its largest parcel. A merge keeps one place, sets the others to `merged` with `merged_into_place_id`, and points their SITE_PIDs at the kept place. The 10 km² rule applies per parcel, as at import.
+**Decision.** One Place per WDPCA `SITE_PID`. Parcels of one `SITE_ID` become one Place only when a person decides so. The decision is recorded in the site row's `match_status` (task 06). Until then the site's `wdpa_site_id` row is `proposed`, on its largest parcel. A merge keeps one place, sets the others to `merged` with `merged_into_place_id`, and points their SITE_PIDs at the kept place. The 10 km² rule applies per parcel, as at import.
 
 **Why.**
 - Merging by rule lost places worth watching on their own. Gorongosa National Park became part of its buffer zone, and the IUCN Ia cores of seven Mexican category VI sites became part of their sites.
 - A fixed rule, such as one place per designation, still decides without a person, and zoned sites with one designation stay merged.
 - Every parcel keeps its own designation, IUCN category, area, and boundary.
 - A merge is a person's decision that can be undone, as record 4 asks of every unclear match.
+
+**How a site is decided.** The user's criteria from the review of 11 November 2026, applied in this order:
+
+1. The parcels have different IUCN categories: keep apart. This holds when the review first said merge: Whitemud Watershed (III and IV), Economy River (Ib and Not Reported), and Whiteshell (II and III) stayed apart.
+2. The parcels have different designations: keep apart.
+3. The parcels are zones of one reserve, such as a core, buffer, or transition zone: keep apart, because each zone has its own conservation goals. Gadabédji keeps its three zones apart although they share a name, a designation, and a category.
+4. The parcels have the same name apart from a part suffix (` /A/`, ` /B/`, `-1`), the same designation, and the same IUCN category: merge. The merged place drops the suffix.
+5. The parcels are one management unit with one designation, under different names: merge, and name the unit (Iberá National Park, Iberá National Reserve).
+
+The 74 decisions, each with its reason, are the worked examples in `supabase/migrations/20261117110000_wdpa_site_decisions.sql`: 35 merges and 39 keep-aparts. A site can be decided again later. 555599263 keeps an IUCN Ia core apart, and its two category VI parcels could still be merged with each other.
 
 **Alternatives.**
 - One Place per site (record 19). It merges by rule and loses parcels worth monitoring.

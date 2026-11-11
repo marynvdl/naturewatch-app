@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { loadPilotPlace, type PlaceDetail } from '@/places/api';
 import {
   formatKm2,
@@ -10,6 +10,7 @@ import {
 } from '@/places/display';
 
 const route = useRoute();
+const router = useRouter();
 const status = ref<'loading' | 'ok' | 'missing' | 'unconfigured' | 'error'>(
   'loading'
 );
@@ -19,9 +20,15 @@ const place = ref<PlaceDetail | null>(null);
 async function load() {
   status.value = 'loading';
   place.value = null;
-  const result = await loadPilotPlace(String(route.params.id));
+  const id = String(route.params.id);
+  const result = await loadPilotPlace(id);
   status.value = result.status;
-  if (result.status === 'ok') place.value = result.place;
+  if (result.status !== 'ok') return;
+  place.value = result.place;
+  // A merged place opens the place it was merged into, under that place's address.
+  if (result.place.id !== id) {
+    router.replace({ name: 'Place', params: { id: result.place.id } });
+  }
 }
 
 onMounted(load);

@@ -1334,5 +1334,164 @@ begin
   end if;
 end $$;
 
+-- Task 06: keep a site's parcels apart, or merge them ------------------------------
+
+select pg_temp.fixture_place(
+  'fixture-zone-core', 'fixture-zone-site', 'Zoned Park Core', 'Ia', 'MEX',
+  'MULTIPOLYGON(((-100 20, -99.9 20, -99.9 20.1, -100 20.1, -100 20)))'
+);
+select pg_temp.fixture_place(
+  'fixture-zone-buffer', 'fixture-zone-site', 'Zoned Park', 'VI', 'MEX',
+  'MULTIPOLYGON(((-99.9 20, -99.7 20, -99.7 20.2, -99.9 20.2, -99.9 20)))',
+  p_backfill => false
+);
+-- The backfill gives a boundary per site row. The second parcel gets its own shape,
+-- as task 05a gave each parcel.
+insert into public.place_boundaries (
+  place_id, version_number, geom, source_id, source_release_id, source_record_id,
+  source_url, review_status, is_current
+)
+select places.id, 1, places.geom, 'wdpca', details.source_release_id, 'fixture-zone-buffer',
+  'https://www.protectedplanet.net/fixture-zone-site', 'approved', true
+from public.places
+join public.conservation_area_details as details on details.place_id = places.id
+where places.id = pg_temp.fixture_id('fixture-zone-buffer');
+
+do $$
+declare
+  north_id uuid := pg_temp.fixture_id('fixture-twin-north');
+  south_id uuid;
+  core_id uuid := pg_temp.fixture_id('fixture-zone-core');
+  buffer_id uuid := pg_temp.fixture_id('fixture-zone-buffer');
+  union_geom extensions.geometry;
+begin
+  select id into south_id from public.places where name = 'Twin Park South';
+
+  if has_function_privilege('anon', 'public.merge_wdpa_site(text, text)', 'execute')
+    or has_function_privilege('authenticated', 'public.merge_wdpa_site(text, text)', 'execute')
+    or has_function_privilege('anon', 'public.keep_wdpa_site_apart(text)', 'execute')
+    or has_function_privilege('authenticated', 'public.keep_wdpa_site_apart(text)', 'execute') then
+    raise exception 'anon or authenticated can decide a site';
+  end if;
+  if not has_function_privilege('anon', 'public.place_merged_into(uuid)', 'execute') then
+    raise exception 'anon cannot ask where a place was merged';
+  end if;
+
+  -- The zoned site's row is on its larger parcel and proposed, as task 05a left it.
+  update public.place_source_ids
+  set place_id = buffer_id, match_status = 'proposed'
+  where id_kind = 'wdpa_site_id' and source_record_id = 'fixture-zone-site';
+
+  -- Refusals: one parcel, and a row that is not proposed.
+  begin
+    perform public.keep_wdpa_site_apart('fixture-pilot-site');
+    raise exception 'a single-parcel site was kept apart';
+  exception when check_violation then null;
+  end;
+  begin
+    perform public.merge_wdpa_site('fixture-pilot-site');
+    raise exception 'a single-parcel site was merged';
+  exception when check_violation then null;
+  end;
+  update public.place_source_ids set match_status = 'retired'
+  where id_kind = 'wdpa_site_id' and source_record_id = 'fixture-zone-site';
+  begin
+    perform public.merge_wdpa_site('fixture-zone-site');
+    raise exception 'a site with a retired row was merged';
+  exception when check_violation then null;
+  end;
+  begin
+    perform public.keep_wdpa_site_apart('fixture-zone-site');
+    raise exception 'a site with a retired row was kept apart';
+  exception when check_violation then null;
+  end;
+  update public.place_source_ids set match_status = 'proposed'
+  where id_kind = 'wdpa_site_id' and source_record_id = 'fixture-zone-site';
+
+  -- Keep apart.
+  perform public.keep_wdpa_site_apart('fixture-zone-site');
+  if (
+    select match_status from public.place_source_ids
+    where id_kind = 'wdpa_site_id' and source_record_id = 'fixture-zone-site'
+      and place_id = buffer_id
+  ) is distinct from 'confirmed' then
+    raise exception 'keeping apart did not confirm the site row on its place';
+  end if;
+  if (select count(*) from public.protected_areas where id in (core_id, buffer_id)) <> 2 then
+    raise exception 'a kept-apart parcel is not listed';
+  end if;
+  begin
+    perform public.keep_wdpa_site_apart('fixture-zone-site');
+    raise exception 'a confirmed site was kept apart twice';
+  exception when check_violation then null;
+  end;
+
+  -- Merge.
+  select extensions.st_union(geom) into union_geom
+  from public.place_boundaries
+  where place_id in (north_id, south_id) and is_current;
+  if public.merge_wdpa_site('fixture-twin-site', 'Twin Park') <> 1 then
+    raise exception 'the merge did not merge exactly one place';
+  end if;
+  if (select name from public.places where id = north_id) is distinct from 'Twin Park' then
+    raise exception 'the kept place was not renamed';
+  end if;
+  if not exists (
+    select 1 from public.place_boundaries
+    where place_id = north_id and is_current and review_status = 'approved'
+      and source_record_id = 'fixture-twin-site'
+      and version_number = 3
+      and extensions.st_equals(geom, union_geom)
+  ) then
+    raise exception 'the kept place''s current boundary is not the union';
+  end if;
+  if exists (select 1 from public.place_boundaries where place_id = south_id and is_current)
+    or not exists (
+      select 1 from public.place_boundaries
+      where place_id = south_id and not is_current and superseded_at is not null
+        and source_record_id = 'fixture-twin-south'
+    ) then
+    raise exception 'the merged parcel kept a current boundary, or lost its own';
+  end if;
+  if (select publication_status from public.places where id = south_id) is distinct from 'merged'
+    or (select merged_into_place_id from public.places where id = south_id) is distinct from north_id then
+    raise exception 'the parcel was not merged into the kept place';
+  end if;
+  if pg_temp.fixture_id('fixture-twin-south') is distinct from north_id then
+    raise exception 'the merged SITE_PID does not point at the kept place';
+  end if;
+  if (
+    select match_status from public.place_source_ids
+    where id_kind = 'wdpa_site_id' and source_record_id = 'fixture-twin-site'
+  ) is distinct from 'confirmed' then
+    raise exception 'the merged site row is not confirmed';
+  end if;
+  if exists (
+    select 1 from public.places
+    where publication_status = 'published'
+      and (select count(*) from public.place_boundaries as b
+           where b.place_id = places.id and b.is_current) <> 1
+  ) then
+    raise exception 'a published place does not have exactly one current boundary';
+  end if;
+
+  if exists (select 1 from public.protected_areas where id = south_id)
+    or exists (select 1 from public.place_bounds(south_id))
+    or abs(
+      (select area_km2 from public.protected_areas where id = north_id)
+      - extensions.st_area(union_geom::extensions.geography, true) / 1e6
+    ) > 1e-6 then
+    raise exception 'the reads still list the merged parcel, or not the union';
+  end if;
+
+  perform set_config('role', 'anon', true);
+  if public.place_merged_into(south_id) is distinct from north_id
+    or public.place_merged_into(north_id) is not null
+    or public.place_merged_into(gen_random_uuid()) is not null then
+    raise exception 'place_merged_into does not resolve a merged place, and only that';
+  end if;
+  perform set_config('role', 'postgres', true);
+end $$;
+
 \echo records fixture ok
 rollback;

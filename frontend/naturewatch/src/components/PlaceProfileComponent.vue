@@ -24,9 +24,11 @@ const props = withDefaults(
   { name: undefined, photos: () => [] }
 );
 
-defineEmits<{
+const emit = defineEmits<{
   close: [];
   zoom: [];
+  /** The place was merged into another. Its id is the one shown. */
+  moved: [id: string];
 }>();
 
 type TabId = 'overview' | 'landscape' | 'species';
@@ -62,7 +64,9 @@ async function load(id: string) {
   const result = await loadPilotPlace(id);
   if (id !== props.placeId) return;
   status.value = result.status;
-  if (result.status === 'ok') place.value = result.place;
+  if (result.status !== 'ok') return;
+  place.value = result.place;
+  if (result.place.id !== id) emit('moved', result.place.id);
 }
 
 watch(() => props.placeId, load, { immediate: true });

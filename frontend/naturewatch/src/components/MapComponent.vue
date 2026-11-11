@@ -755,6 +755,10 @@ function addSourceAndLayer(
             :place-id="placesStore.selectedId"
             @close="placesStore.clearSelection()"
             @zoom="zoomToSelectedPlace"
+            @moved="
+              id =>
+                placesStore.selectPlace(id, placesStore.selectedFrom ?? 'map')
+            "
           />
           <!-- Toggle basemap labels -->
           <div class="basemap-button">
