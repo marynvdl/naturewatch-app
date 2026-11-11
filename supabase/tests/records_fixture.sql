@@ -56,7 +56,7 @@ begin
   end if;
   if not exists (
     select 1
-    from public.fact_methods
+    from public.stat_methods
     where id = 'area-weighted-spheroid-v1'
       and summary like '%WGS84%'
       and summary like '%kept in both%'
@@ -268,15 +268,15 @@ begin
       'public.source_releases'::regclass,
       'public.licences'::regclass,
       'public.facts'::regclass,
-      'public.fact_methods'::regclass
+      'public.stat_methods'::regclass
     )
       and not relrowsecurity
   ) then
-    raise exception 'row level security is not enabled on sources, source_releases, licences, facts, or fact_methods';
+    raise exception 'row level security is not enabled on sources, source_releases, licences, facts, or stat_methods';
   end if;
 
   if to_regclass('public.source_releases') is null
-    or (select count(*) from public.sources) <> 1
+    or (select count(*) from public.sources) <> 2  -- WDPCA, and GLAD cropland since task 07
     or (select count(*) from public.licences) <> 1
     or not exists (
       select 1 from public.licences
@@ -310,7 +310,7 @@ begin
     from information_schema.columns
     where table_schema = 'public'
       and table_name in (
-        'sources', 'source_releases', 'licences', 'places', 'facts', 'fact_methods',
+        'sources', 'source_releases', 'licences', 'places', 'facts', 'stat_methods',
         'place_categories', 'place_types', 'conservation_area_details', 'place_source_ids'
       )
       and column_name in ('created_at', 'updated_at')
@@ -332,7 +332,7 @@ begin
         'public.licences'::regclass,
         'public.places'::regclass,
         'public.facts'::regclass,
-        'public.fact_methods'::regclass,
+        'public.stat_methods'::regclass,
         'public.place_categories'::regclass,
         'public.place_types'::regclass,
         'public.conservation_area_details'::regclass,
@@ -403,11 +403,11 @@ begin
     or has_table_privilege('authenticated', 'public.source_releases', 'UPDATE')
     or has_table_privilege('authenticated', 'public.licences', 'UPDATE')
     or has_table_privilege('anon', 'public.facts', 'INSERT')
-    or has_table_privilege('anon', 'public.fact_methods', 'INSERT')
+    or has_table_privilege('anon', 'public.stat_methods', 'INSERT')
     or has_table_privilege('authenticated', 'public.sources', 'INSERT')
     or has_table_privilege('authenticated', 'public.facts', 'INSERT')
-    or has_table_privilege('authenticated', 'public.fact_methods', 'INSERT') then
-    raise exception 'anon or authenticated can write sources, source_releases, licences, facts, or fact_methods';
+    or has_table_privilege('authenticated', 'public.stat_methods', 'INSERT') then
+    raise exception 'anon or authenticated can write sources, source_releases, licences, facts, or stat_methods';
   end if;
 
   insert into public.facts (
@@ -442,6 +442,11 @@ begin
     when foreign_key_violation then
       null;
   end;
+
+  -- Task 07: the cropland fact becomes three place_stats, which the reads below use.
+  if public.backfill_place_stats_from_facts() <> 3 then
+    raise exception 'the backfill did not store the pilot fact as three place_stats';
+  end if;
 
   -- Task 04: types, details, and source ids ----------------------------------
 
@@ -682,7 +687,7 @@ begin
         null;
     end;
 
-    if (select count(*) from public.sources) <> 1
+    if (select count(*) from public.sources) <> 2
       or (select count(*) from public.source_releases) <> 1
       or (select count(*) from public.licences) <> 1 then
       raise exception '% cannot read sources, source_releases, and licences', role_name;
@@ -708,9 +713,9 @@ begin
     end if;
     if (
       select id
-      from public.fact_methods
+      from public.stat_methods
     ) <> 'area-weighted-spheroid-v1' then
-      raise exception '% could not read fact_methods', role_name;
+      raise exception '% could not read stat_methods', role_name;
     end if;
 
     begin
@@ -1490,6 +1495,212 @@ begin
     or public.place_merged_into(gen_random_uuid()) is not null then
     raise exception 'place_merged_into does not resolve a merged place, and only that';
   end if;
+  perform set_config('role', 'postgres', true);
+end $$;
+
+-- Task 07: stats --------------------------------------------------------------------
+
+do $$
+declare
+  pilot uuid := pg_temp.fixture_id('fixture-pilot');
+  other uuid;
+  run_id uuid;
+  later_run uuid;
+  old_run uuid;
+  current_boundary uuid;
+  shown double precision;
+  role_name text;
+begin
+  if exists (
+    select 1 from pg_class
+    where oid in (
+      'public.stats'::regclass, 'public.sprouts'::regclass, 'public.stat_runs'::regclass,
+      'public.place_stats'::regclass, 'public.stat_selections'::regclass
+    )
+      and not relrowsecurity
+  ) then
+    raise exception 'row level security is not enabled on a stats table';
+  end if;
+  if to_regclass('public.fact_methods') is not null
+    or to_regclass('public.stat_run_issues') is not null then
+    raise exception 'fact_methods still exists, or stat_run_issues was added';
+  end if;
+  if has_table_privilege('service_role', 'public.place_stats', 'UPDATE')
+    or has_table_privilege('service_role', 'public.place_stats', 'DELETE')
+    or not has_table_privilege('service_role', 'public.place_stats', 'INSERT') then
+    raise exception 'service_role can change place_stats, or cannot add to it';
+  end if;
+
+  if (select count(*) from public.stats) <> 3
+    or (select count(*) from public.stat_selections
+        where sprout_id = 'cropland-2024-v1' and period_start = date '2024-01-01') <> 3
+    or (select source_id from public.sprouts where id = 'cropland-2024-v1')
+       <> 'glad-annual-cropland' then
+    raise exception 'the stats, the selections, or the sprout source are not as the backfill wrote them';
+  end if;
+
+  select id into current_boundary
+  from public.place_boundaries where place_id = pilot and is_current;
+  select stat_run_id into run_id
+  from public.place_stats where place_id = pilot limit 1;
+
+  if (select count(*) from public.place_stats where place_id = pilot) <> 3
+    or exists (
+      select 1 from public.place_stats where place_id = pilot and boundary_id <> current_boundary
+    )
+    or (select status from public.stat_runs where id = run_id) <> 'succeeded'
+    or (select boundary_count from public.stat_runs where id = run_id) <> 1 then
+    raise exception 'the pilot fact is not three place_stats of one succeeded run on its current boundary';
+  end if;
+
+  if (select percent from public.place_crops_percent where place_id = pilot)
+     is distinct from (select percent from public.facts where place_id = pilot) then
+    raise exception 'place_crops_percent does not return the fact''s percent';
+  end if;
+
+  begin
+    perform public.backfill_place_stats_from_facts();
+    raise exception 'the backfill ran twice';
+  exception
+    when raise_exception then
+      if sqlerrm <> 'the 22 October 2026 run is already stored' then
+        raise;
+      end if;
+  end;
+
+  -- A boundary of another place is refused.
+  select id into other from public.places
+  where id <> pilot and publication_status = 'published' limit 1;
+  begin
+    insert into public.place_stats (
+      stat_run_id, sprout_id, stat_method_id, place_id, boundary_id, stat_id,
+      period_start, period_end, value, calculated_at
+    )
+    select run_id, 'cropland-2024-v1', 'area-weighted-spheroid-v1', other, current_boundary,
+      'crops_area', date '2024-01-01', date '2024-12-31', 1, now();
+    raise exception 'a place_stats row was stored on another place''s boundary';
+  exception
+    when raise_exception then
+      if sqlerrm not like 'boundary % is not a boundary of place %' then
+        raise;
+      end if;
+  end;
+
+  -- A run cannot be retracted without a reason, or finish while running.
+  begin
+    update public.stat_runs set status = 'retracted' where id = run_id;
+    raise exception 'a run was retracted without a reason';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  -- A later run of the selected sprout and method replaces the value.
+  insert into public.stat_runs (
+    sprout_id, stat_method_id, selection, boundary_count, status, started_at, finished_at
+  ) values (
+    'cropland-2024-v1', 'area-weighted-spheroid-v1', '{}', 1, 'partial', now(), now()
+  ) returning id into later_run;
+  insert into public.place_stats (
+    stat_run_id, sprout_id, stat_method_id, place_id, boundary_id, stat_id,
+    period_start, period_end, value, calculated_at
+  ) values (
+    later_run, 'cropland-2024-v1', 'area-weighted-spheroid-v1', pilot, current_boundary,
+    'crops_percent', date '2024-01-01', date '2024-12-31', 42, now()
+  );
+  if (select percent from public.place_crops_percent where place_id = pilot) <> 42 then
+    raise exception 'the latest calculated_at of a partial run was not preferred';
+  end if;
+
+  -- A failed run is left out, and so is a retracted one.
+  update public.stat_runs set status = 'failed' where id = later_run;
+  if (select percent from public.place_crops_percent where place_id = pilot)
+     is distinct from (select percent from public.facts where place_id = pilot) then
+    raise exception 'a failed run was preferred';
+  end if;
+  update public.stat_runs
+  set status = 'retracted', retracted_reason = 'fixture'
+  where id = later_run;
+  if (select percent from public.place_crops_percent where place_id = pilot)
+     is distinct from (select percent from public.facts where place_id = pilot) then
+    raise exception 'a retracted run was preferred';
+  end if;
+
+  -- A sprout that is not selected is left out.
+  insert into public.sprouts (id, title, period_start, period_end, stac_href, source_id)
+  values ('cropland-2024-v9', 'fixture', date '2024-01-01', date '2024-12-31', 'x', 'glad-annual-cropland');
+  insert into public.stat_runs (
+    sprout_id, stat_method_id, selection, boundary_count, status, started_at, finished_at
+  ) values (
+    'cropland-2024-v9', 'area-weighted-spheroid-v1', '{}', 1, 'succeeded', now(), now()
+  ) returning id into old_run;
+  insert into public.place_stats (
+    stat_run_id, sprout_id, stat_method_id, place_id, boundary_id, stat_id,
+    period_start, period_end, value, calculated_at
+  ) values (
+    old_run, 'cropland-2024-v9', 'area-weighted-spheroid-v1', pilot, current_boundary,
+    'crops_percent', date '2024-01-01', date '2024-12-31', 7, now() + interval '1 day'
+  );
+  if (select count(*) from public.place_stats_preferred
+      where place_id = pilot and stat_id = 'crops_percent') <> 1
+    or (select percent from public.place_crops_percent where place_id = pilot)
+       is distinct from (select percent from public.facts where place_id = pilot) then
+    raise exception 'an unselected sprout was preferred';
+  end if;
+
+  -- After a new current boundary the place shows no value. The old rows stay.
+  update public.place_boundaries
+  set is_current = false, superseded_at = now()
+  where id = current_boundary;
+  insert into public.place_boundaries (
+    place_id, version_number, geom, source_id, review_status, is_current
+  )
+  select place_id,
+    (select max(version_number) + 1 from public.place_boundaries where place_id = pilot),
+    geom, source_id, 'approved', true
+  from public.place_boundaries where id = current_boundary;
+  if exists (select 1 from public.place_stats_preferred where place_id = pilot)
+    or (select count(*) from public.place_stats where place_id = pilot) <> 5 then
+    raise exception 'a value on a superseded boundary was preferred, or a row was lost';
+  end if;
+
+  -- Visitors read the definitions and the values, and write nothing.
+  foreach role_name in array array['anon', 'authenticated'] loop
+    perform set_config('role', role_name, true);
+    if (select count(*) from public.stats) <> 3
+      or (select count(*) from public.stat_selections) <> 3
+      or not exists (select 1 from public.sprouts)
+      or not exists (select 1 from public.stat_runs)
+      or not exists (select 1 from public.place_stats)
+      or not exists (select 1 from public.stat_methods) then
+      raise exception '% cannot read the stats tables', role_name;
+    end if;
+    perform 1 from public.place_stats_preferred;
+    begin
+      insert into public.stats (id, title, unit, description) values ('x', 'x', 'count', 'x');
+      raise exception '% inserted a stat', role_name;
+    exception
+      when insufficient_privilege then
+        null;
+    end;
+    begin
+      update public.stat_selections set sprout_id = 'cropland-2024-v9';
+      raise exception '% changed a selection', role_name;
+    exception
+      when insufficient_privilege then
+        null;
+    end;
+    perform set_config('role', 'postgres', true);
+  end loop;
+
+  perform set_config('role', 'service_role', true);
+  begin
+    update public.place_stats set value = 0 where place_id = pilot;
+    raise exception 'service_role updated a place_stats row';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
   perform set_config('role', 'postgres', true);
 end $$;
 
