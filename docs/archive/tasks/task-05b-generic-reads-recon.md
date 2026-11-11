@@ -1,12 +1,12 @@
 # Task 05b — Generic reads and reconciliation
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repository: naturewatch-app. Start only after task 05a has merged into `develop` (pull request #400) and its follow-up `20261115100000_places_name_storage.sql` (pull request #401, merged 11 November 2026).
 
 ## Goal
 
-Add generic `place_*` reads that take a place type, and turn the existing `protected_area*` functions and the `protected_areas` view into thin wrappers over them. Move the importer's writes from `places.geom` to `place_boundaries`. Add a reconciliation report: before writing anything, the importer matches each record on SITE_PID, classifies it as in record 4 of [decisions.md](../database/decisions.md), and refuses to write unless every record matches cleanly.
+Add generic `place_*` reads that take a place type, and turn the existing `protected_area*` functions and the `protected_areas` view into thin wrappers over them. Move the importer's writes from `places.geom` to `place_boundaries`. Add a reconciliation report: before writing anything, the importer matches each record on SITE_PID, classifies it as in record 4 of [decisions.md](../../database/decisions.md), and refuses to write unless every record matches cleanly.
 
 Decided 11 November 2026 by the user:
 
