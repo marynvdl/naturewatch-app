@@ -259,7 +259,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Add `place_categories`, `place_types`, `conservation_area_details`, `place_source_ids`, `publication_status`, `merged_into_place_id`. Backfill. Replace the enum.
 - [x] [Task 05 — Boundaries](../archive/tasks/task-05-boundaries.md) — naturewatch-app
   - *Goal:* Add `place_boundaries`, copy the geometry in batches, and verify. Merge the parcels of each multi-parcel site into one place, as in the backfill rule **Sites**. Switch the existing functions to it.
-- [ ] [Task 05a — Places cleanup](../tasks/task-05a-places-cleanup.md) — naturewatch-app
+- [x] [Task 05a — Places cleanup](../archive/tasks/task-05a-places-cleanup.md) — naturewatch-app
   - *Goal:* Make every stored WDPCA parcel its own place again, undoing task 05's merge of the 74 sites. Mark each multi-parcel site's `wdpa_site_id` as `proposed` until a person decides. Supersede record 19 of decisions.md. The review queue is designed in task 06.
 - [ ] Task 05b — Generic reads and reconciliation — naturewatch-app
   - *Goal:* Add the generic `place_*` reads and temporary wrappers. Move the importer's writes to parcel boundaries in `place_boundaries`. Add the reconciliation report: it matches each record on SITE_PID and classifies it as in record 4 of decisions.md, and refuses to write unless every record matches cleanly.

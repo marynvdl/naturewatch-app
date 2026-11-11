@@ -1,12 +1,12 @@
 # Task 05a — Places cleanup
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repository: naturewatch-app. Start only after task 05 has merged into `develop` (pull request #397, merged 10 November 2026).
 
 ## Goal
 
-Make every stored WDPCA parcel its own Place again, by undoing task 05's merge of 186 places into 74 sites. Mark each multi-parcel site as undecided, so a person can later decide whether its parcels become one Place. Supersede record 19 of [decisions.md](../database/decisions.md) with a new record. Apply it to the hosted database after approval.
+Make every stored WDPCA parcel its own Place again, by undoing task 05's merge of 186 places into 74 sites. Mark each multi-parcel site as undecided, so a person can later decide whether its parcels become one Place. Supersede record 19 of [decisions.md](../../database/decisions.md) with a new record. Apply it to the hosted database after approval.
 
 Decided 11 November 2026 by the user, replacing the planned "one place per designation". A fixed rule kept merging places worth watching on their own, such as Gorongosa National Park into its buffer zone and the IUCN Ia cores of the Mexican category VI sites.
 
