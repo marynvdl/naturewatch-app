@@ -266,8 +266,8 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Follow-up:* `/places` timed out after task 05a. That was not caused by the task: 12,824 names were stored in TOAST beside the large `places.geom`, and the name sort read them again on every comparison. `20261115100000_places_name_storage.sql` keeps `places.name` in the row.
 - [x] [Task 05b — Generic reads and reconciliation](../archive/tasks/task-05b-generic-reads-recon.md) — naturewatch-app
   - *Goal:* Add the generic `place_*` reads and temporary wrappers. Move the importer's writes to parcel boundaries in `place_boundaries`. Add the reconciliation report: it matches each record on SITE_PID and classifies it as in record 4 of decisions.md, and refuses to write unless every record matches cleanly.
-- [ ] Task 06 — Boundary QC and review queue — both repos
-  - *Goal:* Add the boundary checks and the eligibility columns, RPC, and view. Its task file designs one derived admin queue over every check's findings, with the reviewers' stored decisions. The queue starts with the multi-parcel sites (the `proposed` `wdpa_site_id` rows), `small_components`, `holes`, and vertex count. Run the checks and review the flagged records. The merge function comes with the first merge.
+- [ ] [Task 06 — Multi-parcel sites](../tasks/task-06-multi-parcel-sites.md) — naturewatch-app
+  - *Goal:* Decide each of the 74 multi-parcel sites, keep apart or merge, and record it in `match_status` so no `wdpa_site_id` row stays `proposed`. The merge function comes with the first merge. The boundary checks, eligibility, and review queue move to Deferred (decided 11 November 2026).
 - [ ] Task 07 — Stats — both repos
   - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_run_issues`, `stat_selections`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Point the analysis scripts and the places recipe at them. The pipeline stays paused.
 - [ ] Task 08 — Frontend and cleanup — naturewatch-app
