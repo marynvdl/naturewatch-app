@@ -33,6 +33,8 @@ If you are not at least 90% sure which direction to take, ask before doing the w
 
 Plan a task before changing code, and wait for the plan to be approved.
 
+Build for today, design for tomorrow. Add a table, column, function, or feature only when a task uses it now. Keep the design open to what is planned, and write later needs down in the parcel's Deferred section instead of building them.
+
 ## Secrets
 
 Never commit, push, or paste a key or token. That includes a service-account JSON key, a private key, an API token, a password, and the contents of a GitHub secret or `.env` file. A workflow names a secret as `${{ secrets.SECRET_NAME }}`. A service-account email and a secret's name are identifiers. If a secret value is already in the repo, do not repeat it. Tell the user so it can be rotated.
