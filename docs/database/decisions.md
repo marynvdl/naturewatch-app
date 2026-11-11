@@ -44,14 +44,14 @@ Why the database is designed as it is. The design itself is [design.md](design.m
 
 | What the import finds | What it does |
 | --- | --- |
-| The same SITE_ID, the same parcels, similar shape | Updates through a new boundary version |
-| The same SITE_ID, a very different shape | Adds the boundary as `proposed` and flags the place |
-| A new SITE_PID inside a known SITE_ID, or a known parcel gone from it | Adds the changed site boundary as `proposed` and flags the place |
-| Parcels of known sites now under one SITE_ID, or one site's parcels now under several | Proposes mappings to each. Review chooses a merge or a new place. |
-| A new SITE_ID with no candidate | Creates a `draft` place |
-| A known SITE_ID that is missing | Keeps `last_seen_release_id`, flags the place. Never withdraws it automatically. |
+| The same SITE_PID, similar shape | Updates through a new boundary version |
+| The same SITE_PID, a very different shape | Adds the boundary as `proposed` and flags the place |
+| A new SITE_PID inside a known SITE_ID | Creates a `draft` place, and marks the site's `wdpa_site_id` as `proposed` for review |
+| A known SITE_PID gone, with its area now under other SITE_PIDs (a split or a join) | Proposes mappings to each. Review chooses a merge or a new place. |
+| A new SITE_PID with no candidate | Creates a `draft` place |
+| A known SITE_PID that is missing | Keeps `last_seen_release_id`, flags the place. Never withdraws it automatically. |
 
-**Site or parcel.** A Place is the whole WDPCA site, keyed on `SITE_ID`. Record 19 has the decision and the counts behind it. Both `SITE_ID` and every `SITE_PID` are stored.
+**Site or parcel.** A Place is one WDPCA parcel, keyed on `SITE_PID`. Record 20 has the decision. Both every `SITE_PID` and each `SITE_ID` are stored. When a person has merged parcels, their SITE_PIDs all point at the kept place.
 
 **Alternatives.** Match on name or geometry alone. That is not reliable enough to run without a person.
 
@@ -219,6 +219,8 @@ The dependency table is in the [parcel](../parcels/database-honing.md#dependency
 
 ## 19. A conservation area Place is the whole WDPCA site
 
+**Superseded by [record 20](#20-a-conservation-area-place-is-one-wdpca-parcel) on 11 November 2026.** Task 05 carried it out, and task 05a undid it.
+
 *Decided 10 November 2026 by the user, in task 01 of the [Database Honing](../parcels/database-honing.md) parcel. It settles the open question in record 4.*
 
 **Decision.** One Place per WDPCA `SITE_ID`. Its parcels, one per `SITE_PID`, together form the Place's boundary. `place_source_ids` holds one `wdpa_site_id` row per Place and one `wdpa_site_pid` row per parcel, all pointing at that Place. The 10 km² rule applies to the site's total area.
@@ -237,3 +239,25 @@ The dependency table is in the [parcel](../parcels/database-honing.md#dependency
 - One designation per Place. 7 of the 74 sites mix designations across parcels. Gorongosa (`SITE_ID` 801) has a National Park parcel and a Buffer Zone parcel. The per-parcel values stay in `source_attributes`, and those Places are flagged for review.
 - Parcels under 10 km² were never imported, so a merged boundary leaves them out until the next import brings in every parcel of each site. A site whose parcels are each under 10 km², but which totals at least 10 km², is missing until then too.
 - Stats are calculated per site. A parcel-level figure needs its own calculation.
+
+## 20. A conservation area Place is one WDPCA parcel
+
+*Decided 11 November 2026 by the user, in task 05a of the [Database Honing](../parcels/database-honing.md) parcel. It supersedes record 19.*
+
+**Decision.** One Place per WDPCA `SITE_PID`. Parcels of one `SITE_ID` become one Place only when a person decides so, through the review queue that task 06 designs. Until then the site's `wdpa_site_id` row is `proposed`, on its largest parcel. A merge keeps one place, sets the others to `merged` with `merged_into_place_id`, and points their SITE_PIDs at the kept place. The 10 km² rule applies per parcel, as at import.
+
+**Why.**
+- Merging by rule lost places worth watching on their own. Gorongosa National Park became part of its buffer zone, and the IUCN Ia cores of seven Mexican category VI sites became part of their sites.
+- A fixed rule, such as one place per designation, still decides without a person, and zoned sites with one designation stay merged.
+- Every parcel keeps its own designation, IUCN category, area, and boundary.
+- A merge is a person's decision that can be undone, as record 4 asks of every unclear match.
+
+**Alternatives.**
+- One Place per site (record 19). It merges by rule and loses parcels worth monitoring.
+- One Place per site and designation. It still merges by rule, and invents an identity that matches no WDPCA id.
+
+**Cost.**
+- `SITE_PID` changes more often between releases than `SITE_ID`. Splits, joins, and renumbering go to review. On 11 November 2026 that concerns 74 of 50,889 sites.
+- Until reviewed, a site with several parcels shows as several places, such as the Mongolian /A/ and /B/ parts.
+- A site-level figure needs its own calculation on the union. Record 11 already says Stats do not add up.
+- `place_boundaries.source_record_id` holds SITE_PID. Task 05's version 1 rows hold SITE_ID, which differs for 190 single-parcel sites and for the 74 superseded site unions.

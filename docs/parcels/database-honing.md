@@ -184,14 +184,24 @@ Each stage is its own migration and pull request. Take a backup or check point-i
 
 ### Backfill rules
 
-- **Sites.** A Place is the whole WDPCA site ([record 19](../database/decisions.md#19-a-conservation-area-place-is-the-whole-wdpca-site)). For each of the 74 sites with several stored parcels, keep the place with the largest parcel. Set the other 112 to `merged`, with `merged_into_place_id` pointing at it. Flag the 7 sites whose parcels differ in designation. *Task 05 does this with `merge_wdpa_site_parcels()`, after the site boundaries are copied. The merged places' SITE_PIDs point at the kept place. The kept place's `conservation_area_details.source_attributes` lists every parcel under `parcels`, and the 7 mixed sites carry `designations_differ: true`.*
-- **Mixed designations.** Merging the 7 sites whose parcels differ in designation lost places worth monitoring on their own: Gorongosa National Park (two parcels, 4,042 km²) became part of the Gorongosa Buffer Zone (9,446 km²), named "Gorongoza". Task 05a gives each designation in those 7 sites its own place.
-- **Zoned sites.** 10 sites with one designation are zoned like Gorongosa, with a core and a buffer or outer zone stored as separate parcels. Task 05 merged them, and task 05a leaves them merged. Decide them with the buffer question: cut the core out of the buffer, or record buffers and zones as designations.
+- **Sites.** A Place is one WDPCA parcel ([record 20](../database/decisions.md#20-a-conservation-area-place-is-one-wdpca-parcel)). *Task 05 first merged the 186 parcels of the 74 multi-parcel sites into 74 places, as record 19 then said. Task 05a undid it with `unmerge_wdpa_site_parcels()`. Every parcel is a published place with its own SITE_PID and current boundary again. The 74 site unions are kept as superseded versions. Each of the 74 sites' `wdpa_site_id` rows is `proposed`, on its largest parcel, until a person decides in the review queue of task 06.* These are the sites waiting for a decision, read-only:
+
+  ```sql
+  select site.source_record_id as site_id, array_agg(places.name order by places.name) as places
+  from place_source_ids as site
+  join conservation_area_details as details
+    on details.source_id = site.source_id and details.source_record_id = site.source_record_id
+  join places on places.id = details.place_id and places.publication_status = 'published'
+  where site.id_kind = 'wdpa_site_id' and site.match_status = 'proposed'
+  group by site.source_record_id;
+  ```
+- **Mixed designations.** 7 of the 74 sites mix designations across parcels. Gorongosa National Park (two parcels, 4,042 km²) and the Gorongosa Buffer Zone (9,446 km²) are separate places again since task 05a.
+- **Zoned sites.** 10 sites with one designation are zoned like Gorongosa, with a core and a buffer or outer zone stored as separate parcels. Since task 05a each zone is its own place. The review decides whether to merge them.
   - Mexico, an IUCN Ia core inside the category VI site: Balam Kin (555783753), Balam Ku (555783754), Canoas (555783756), Ríos y Montañas de la Comarca Lagunera (555783781), Sierra de Vallejo-Río Ameca (555783785), Sierra Tecuani (555783786), Wanha' (555783790).
   - Argentina, UNESCO-MAB biosphere reserves with a "Zona núcleo" and a "Zona de amortiguamiento": Laguna de los Pozuelos (16894), San Guillermo (23).
   - Russia, UNESCO-MAB biosphere reserve with four named parts inside its 873 km² outline: Great Volzhsko-Kamsky (209777).
-- **Boundaries.** One version 1 boundary per site: the union of its parcels, made one MultiPolygon. Collecting the parcels without a union gave a valid shape for only 22 of the 74 sites on 10 November 2026, because parcels touch or overlap (14 sites overlap, by up to 4,042 km²). The union is valid for all 74 and counts an overlap once. `review_status = 'approved'`, `is_current = true`, source WDPCA October 2026, `source_record_id` = SITE_ID.
-- **Source ids.** One confirmed `wdpa_site_id` row per place, and one confirmed `wdpa_site_pid` row per parcel, pointing at the kept place. First and last seen in October 2026.
+- **Boundaries.** One version 1 boundary per site: the union of its parcels, made one MultiPolygon. Collecting the parcels without a union gave a valid shape for only 22 of the 74 sites on 10 November 2026, because parcels touch or overlap (14 sites overlap, by up to 4,042 km²). The union is valid for all 74 and counts an overlap once. `review_status = 'approved'`, `is_current = true`, source WDPCA October 2026, `source_record_id` = SITE_ID. *Task 05a superseded the 74 unions with each parcel's own shape, with `source_record_id` = SITE_PID.*
+- **Source ids.** One confirmed `wdpa_site_pid` row per parcel, on its own place, and one `wdpa_site_id` row per site, on its largest parcel. First and last seen in October 2026.
 - **Details.** `designation`, `iucn_category`, `iso3`, and `realm` move to `conservation_area_details`. The missing WDPCA fields stay null until the next import.
 - **Types.** Every current place becomes type `conservation_area`, `publication_status = 'published'`.
 - **Stats.** Each `facts` row becomes three `place_stats` rows (`crops_area`, `crops_percent`, `valid_coverage`). They belong to one run for Batch job `facts-cropland-2024-v1-20261022180517` on 22 October 2026, against the version 1 boundary. The South Africa geometry check passed on 10 November 2026, so the run is not retracted. Then add a `stat_selections` row for crops 2024.
@@ -233,6 +243,7 @@ Supported by the design, not built in this work:
 - Country and ecoregion imports.
 - Stats optimisation: its own parcel.
 - Metadata edit requests: `place_edit_requests`.
+- More review queue checks, after task 06: likely recognitions and likely duplicates (task 09); reported area far from mapped area (`REP_AREA` against `GIS_AREA`); a status other than designated; a boundary mostly outside its `ISO3`; a missing or placeholder name.
 
 ## J. Tasks
 
@@ -251,9 +262,9 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
 - [ ] [Task 05a — Places cleanup](../tasks/task-05a-places-cleanup.md) — naturewatch-app
   - *Goal:* Make every stored WDPCA parcel its own place again, undoing task 05's merge of the 74 sites. Mark each multi-parcel site's `wdpa_site_id` as `proposed` until a person decides. Supersede record 19 of decisions.md. The review queue is designed in task 06.
 - [ ] Task 05b — Generic reads and reconciliation — naturewatch-app
-  - *Goal:* Add the generic `place_*` reads and temporary wrappers. Move the importer's writes to site boundaries in `place_boundaries`. Add the reconciliation report: it classifies every record as in record 4 of decisions.md, and refuses to write unless every record matches cleanly.
-- [ ] Task 06 — Boundary QC and eligibility — both repos
-  - *Goal:* Add `boundary_checks` and the eligibility columns, RPC, and view. Run the four starting checks. Review the flagged records.
+  - *Goal:* Add the generic `place_*` reads and temporary wrappers. Move the importer's writes to parcel boundaries in `place_boundaries`. Add the reconciliation report: it matches each record on SITE_PID and classifies it as in record 4 of decisions.md, and refuses to write unless every record matches cleanly.
+- [ ] Task 06 — Boundary QC and review queue — both repos
+  - *Goal:* Add the boundary checks and the eligibility columns, RPC, and view. Its task file designs one derived admin queue over every check's findings, with the reviewers' stored decisions. The queue starts with the multi-parcel sites (the `proposed` `wdpa_site_id` rows), `small_components`, `holes`, and vertex count. Run the checks and review the flagged records. The merge function comes with the first merge.
 - [ ] Task 07 — Stats — both repos
   - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_run_issues`, `stat_selections`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Point the analysis scripts and the places recipe at them. The pipeline stays paused.
 - [ ] Task 08 — Frontend and cleanup — naturewatch-app

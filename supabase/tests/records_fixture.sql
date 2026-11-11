@@ -1077,5 +1077,115 @@ begin
   perform set_config('role', 'postgres', true);
 end $$;
 
+-- Task 05a: every parcel is its own place again -------------------------------------
+
+do $$
+declare
+  north_id uuid := pg_temp.fixture_id('fixture-twin-north');
+  south_id uuid;
+  union_id uuid;
+begin
+  select id into south_id from public.places where name = 'Twin Park South';
+  select id into union_id
+  from public.place_boundaries where place_id = north_id and is_current;
+
+  if has_function_privilege('anon', 'public.unmerge_wdpa_site_parcels()', 'execute')
+    or has_function_privilege('authenticated', 'public.unmerge_wdpa_site_parcels()', 'execute') then
+    raise exception 'anon or authenticated can run the un-merge';
+  end if;
+
+  if public.unmerge_wdpa_site_parcels() <> 1 then
+    raise exception 'the un-merge did not publish exactly one place again';
+  end if;
+  if public.unmerge_wdpa_site_parcels() <> 0 then
+    raise exception 'a second un-merge changed a place';
+  end if;
+
+  if exists (select 1 from public.places where publication_status = 'merged')
+    or exists (select 1 from public.places where id = south_id and merged_into_place_id is not null) then
+    raise exception 'a place is still merged';
+  end if;
+  if pg_temp.fixture_id('fixture-twin-south') is distinct from south_id
+    or pg_temp.fixture_id('fixture-twin-north') is distinct from north_id then
+    raise exception 'a SITE_PID does not point at its own parcel';
+  end if;
+  if (
+    select match_status from public.place_source_ids
+    where id_kind = 'wdpa_site_id' and source_record_id = 'fixture-twin-site'
+  ) is distinct from 'proposed'
+    or (
+      select match_status from public.place_source_ids
+      where id_kind = 'wdpa_site_id' and source_record_id = 'fixture-pilot-site'
+    ) is distinct from 'confirmed' then
+    raise exception 'only the multi-parcel site should be proposed';
+  end if;
+
+  if exists (
+    select 1 from public.places
+    where publication_status = 'published'
+      and (
+        select count(*) from public.place_boundaries as b
+        where b.place_id = places.id and b.is_current
+      ) <> 1
+  ) then
+    raise exception 'a published place does not have exactly one current boundary';
+  end if;
+  if not exists (
+    select 1 from public.place_boundaries as b
+    join public.places on places.id = b.place_id
+    where b.place_id = north_id and b.is_current and b.version_number = 2
+      and b.source_record_id = 'fixture-twin-north'
+      and extensions.st_equals(b.geom, places.geom)
+  ) or not exists (
+    select 1 from public.place_boundaries as b
+    join public.places on places.id = b.place_id
+    where b.place_id = south_id and b.is_current and b.version_number = 1
+      and b.source_record_id = 'fixture-twin-south'
+      and extensions.st_equals(b.geom, places.geom)
+  ) then
+    raise exception 'a parcel''s current boundary is not its own shape';
+  end if;
+  if not exists (
+    select 1 from public.place_boundaries
+    where id = union_id and not is_current and superseded_at is not null
+      and review_status = 'approved'
+  ) then
+    raise exception 'the site union was not kept as a superseded version';
+  end if;
+  if exists (
+    select 1 from public.conservation_area_details
+    where place_id = north_id
+      and (source_attributes ? 'parcels' or source_attributes ? 'designations_differ')
+  ) then
+    raise exception 'the kept place still lists the parcels';
+  end if;
+
+  begin
+    perform public.merge_wdpa_site_parcels();
+    raise exception 'the task 05 merge ran again after the un-merge';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  if (select count(*) from public.protected_areas where id in (north_id, south_id)) <> 2
+    or (select area_km2 from public.protected_areas where id = south_id)
+      is distinct from (select area_km2 from public.places where id = south_id) then
+    raise exception 'protected_areas does not list both parcels with their own area';
+  end if;
+  if not exists (select 1 from public.place_bounds(south_id)) then
+    raise exception 'place_bounds does not return the published parcel';
+  end if;
+
+  perform set_config('role', 'anon', true);
+  if not exists (select 1 from public.places where id = south_id) then
+    raise exception 'anon cannot read the published parcel';
+  end if;
+  if exists (select 1 from public.place_boundaries where id = union_id) then
+    raise exception 'anon read the superseded site union';
+  end if;
+  perform set_config('role', 'postgres', true);
+end $$;
+
 \echo records fixture ok
 rollback;

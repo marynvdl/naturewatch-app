@@ -57,7 +57,7 @@ Types: `uuid`, `text`, `timestamptz`, `date`, `double precision`, `integer`, `bo
 
 ### 4.1 Places
 
-*In place* for `place_categories`, `place_types`, `places.place_type_id`, `publication_status`, `merged_into_place_id`, `place_source_ids`, and `conservation_area_details` since task 04 (`20261112100000_types_and_details.sql`). Only the category and type `conservation_area` are stored. `places.submitted_by` and `place_source_ids.matched_by` come with `profiles` in task 10. `recognition_details` and `old_growth_details` come with their records. The WDPCA fields not yet imported (`protection_kind`, `designation_type`, `legal_status`, `status_year`, `governance_type`, `source_attributes`) stay null until the next import. Task 05 merges the parcels of each multi-parcel site into one place (`merge_wdpa_site_parcels()`).
+*In place* for `place_categories`, `place_types`, `places.place_type_id`, `publication_status`, `merged_into_place_id`, `place_source_ids`, and `conservation_area_details` since task 04 (`20261112100000_types_and_details.sql`). Only the category and type `conservation_area` are stored. `places.submitted_by` and `place_source_ids.matched_by` come with `profiles` in task 10. `recognition_details` and `old_growth_details` come with their records. The WDPCA fields not yet imported (`protection_kind`, `designation_type`, `legal_status`, `status_year`, `governance_type`, `source_attributes`) stay null until the next import. A conservation area place is one WDPCA parcel (record 20). Task 05 merged the parcels of each multi-parcel site, and task 05a undid it (`unmerge_wdpa_site_parcels()`). A `proposed` `wdpa_site_id` row marks a site whose parcels a person has not yet decided to merge or keep apart.
 
 **`place_categories`** — lookup.
 
@@ -95,7 +95,7 @@ Indexes: `(place_type_id, publication_status)`. `pg_trgm` on `name` only when se
 | `id` | uuid PK | |
 | `place_id` | uuid FK → `places` | |
 | `source_id` | text FK → `sources` | The dataset, not the release |
-| `id_kind` | text | e.g. `wdpa_site_pid`, `wdpa_site_id` |
+| `id_kind` | text | e.g. `wdpa_site_pid` (the place), `wdpa_site_id` (its site) |
 | `source_record_id` | text | |
 | `match_status` | text | CHECK in `confirmed`, `proposed`, `retired` |
 | `first_seen_release_id`, `last_seen_release_id` | uuid FK → `source_releases` | |
@@ -128,7 +128,7 @@ A trigger on each details table checks that the place's type has the matching `d
 
 ### 4.2 Boundaries and quality
 
-*In place* for `place_boundaries` since task 05 (`20261113100000_place_boundaries.sql`, `20261113110000_boundaries_readers.sql`). Each WDPCA site has one version 1 boundary, current and approved: a single parcel's geometry, or the union of a site's parcels. `qc_status`, the `stats_eligibility` columns, `boundary_checks`, and `stats_eligible_boundaries` come in task 06. `submitted_by`, `reviewed_by`, and `stats_eligibility_set_by` come with `profiles` in task 10. `approve_boundary` and `submit_boundary` come with the admin and contributor work. No separate `(place_id)` index: the version key and the unique current index both lead with `place_id`.
+*In place* for `place_boundaries` since task 05 (`20261113100000_place_boundaries.sql`, `20261113110000_boundaries_readers.sql`). Each place has one current, approved boundary: its parcel's geometry. Task 05 gave each site a version 1 boundary. Task 05a superseded the 74 site unions with each parcel's own shape, as version 2 on the kept place and version 1 on the others. `qc_status`, the `stats_eligibility` columns, `boundary_checks`, and `stats_eligible_boundaries` come in task 06. `submitted_by`, `reviewed_by`, and `stats_eligibility_set_by` come with `profiles` in task 10. `approve_boundary` and `submit_boundary` come with the admin and contributor work. No separate `(place_id)` index: the version key and the unique current index both lead with `place_id`.
 
 **`place_boundaries`**
 
