@@ -42,7 +42,7 @@ Task 02 dropped `pilot_place_map` and `sync_pilot_place_map`, and added `created
 
 ### Weaknesses (verified)
 
-1. **Identity is tied to one release.** `places` is unique on `(source_release_id, source_id)`. A November WDPCA release would get a new `sources` row, so every place would get a new id. PMTiles ids and facts would break. *Since task 04 a place's WDPCA ids are stored in `place_source_ids`, and the importer matches on them. Task 05b adds the reconciliation report.*
+1. **Identity is tied to one release.** `places` is unique on `(source_release_id, source_id)`. A November WDPCA release would get a new `sources` row, so every place would get a new id. PMTiles ids and facts would break. *Since task 04 a place's WDPCA ids are stored in `place_source_ids`, and the importer matches on them. Since task 05b the importer writes a reconciliation report first and writes only when every record matches a stored SITE_PID cleanly.*
 2. **Identity and boundary are one row.** A corrected boundary can only overwrite the old one. There is no history. *Fixed by task 05: boundaries are versions in `place_boundaries`.*
 3. **Facts are not reproducible.** `facts` has no boundary reference, no run, no timestamp. The upsert in `naturewatch-analysis/facts/cropland.py` overwrites on `(place_id, sprout_id, method_id)`. `sprout_id` is free text with no foreign key.
 4. **The crops ids are hard-coded** in the SQL functions (`20261030100000_protected_areas.sql`), in `frontend/naturewatch/src/places/display.ts:4`, and in `cookbook/recipes/places-protected-areas.yaml` in the analysis repo.
@@ -54,7 +54,7 @@ Task 02 dropped `pilot_place_map` and `sync_pilot_place_map`, and added `created
 10. **`pilot_place_map` is dead weight.** The app stopped reading it. Its trigger still fires on every `places` insert or update. *Fixed by task 02.*
 11. **A stale read in the analysis repo.** `facts/cropland.py` selects `from public.pilot_places`, which was renamed to `protected_areas` on 30 October. The next run would fail. *Fixed by task 02: it reads `protected_areas` for South Africa.*
 12. **Default grants.** Postgres grants `execute` on every new function to `public`, and Supabase's default privileges grant new tables and functions in `public` to `anon` and `authenticated`. The existing migrations revoke correctly. Every new migration must do the same.
-13. **The importer's upsert overwrites geometry.** `on conflict … do update set … geom = excluded.geom`.
+13. **The importer's upsert overwrites geometry.** `on conflict … do update set … geom = excluded.geom`. *Fixed by task 05b: a changed shape becomes a new boundary version, and the importer no longer writes `places.geom`.*
 
 ### Who depends on the schema
 
@@ -243,6 +243,8 @@ Supported by the design, not built in this work:
 - Country and ecoregion imports.
 - Stats optimisation: its own parcel.
 - Metadata edit requests: `place_edit_requests`.
+- The importer's writes for the reconciliation classes other than `unchanged` and `reshaped` (task 05b): draft places for `new` and `new_in_known_site`, `proposed` boundaries for `very_different`, `proposed` mappings for a `missing` record's split or join candidates, and a flag for the place. With the first release or review that needs them.
+- Importing `STATUS`, `STATUS_YR`, `GOV_TYPE`, and `PA_DEF`. `DESIG_TYPE` comes in task 09.
 - More review queue checks, after task 06: likely recognitions and likely duplicates (task 09); reported area far from mapped area (`REP_AREA` against `GIS_AREA`); a status other than designated; a boundary mostly outside its `ISO3`; a missing or placeholder name.
 
 ## J. Tasks
@@ -262,7 +264,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
 - [x] [Task 05a — Places cleanup](../archive/tasks/task-05a-places-cleanup.md) — naturewatch-app
   - *Goal:* Make every stored WDPCA parcel its own place again, undoing task 05's merge of the 74 sites. Mark each multi-parcel site's `wdpa_site_id` as `proposed` until a person decides. Supersede record 19 of decisions.md. The review queue is designed in task 06.
   - *Follow-up:* `/places` timed out after task 05a. That was not caused by the task: 12,824 names were stored in TOAST beside the large `places.geom`, and the name sort read them again on every comparison. `20261115100000_places_name_storage.sql` keeps `places.name` in the row.
-- [ ] Task 05b — Generic reads and reconciliation — naturewatch-app
+- [x] [Task 05b — Generic reads and reconciliation](../archive/tasks/task-05b-generic-reads-recon.md) — naturewatch-app
   - *Goal:* Add the generic `place_*` reads and temporary wrappers. Move the importer's writes to parcel boundaries in `place_boundaries`. Add the reconciliation report: it matches each record on SITE_PID and classifies it as in record 4 of decisions.md, and refuses to write unless every record matches cleanly.
 - [ ] Task 06 — Boundary QC and review queue — both repos
   - *Goal:* Add the boundary checks and the eligibility columns, RPC, and view. Its task file designs one derived admin queue over every check's findings, with the reviewers' stored decisions. The queue starts with the multi-parcel sites (the `proposed` `wdpa_site_id` rows), `small_components`, `holes`, and vertex count. Run the checks and review the flagged records. The merge function comes with the first merge.

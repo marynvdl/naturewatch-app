@@ -134,36 +134,97 @@ class ImportWdpaTest(unittest.TestCase):
         self.assertIn("ids.id_kind = 'wdpa_site_pid'", sql)
         self.assertIn("ids.match_status = 'confirmed'", sql)
         self.assertIn("/ 1e6 >= 10", sql)
-        self.assertIn("'conservation_area', 'published'", import_wdpa.INSERT_PLACES)
+        self.assertIn("boundary.is_current", sql)
+        self.assertNotIn("gen_random_uuid", sql)
 
     def test_the_importer_writes_no_old_places_column(self):
         source = MODULE_PATH.read_text()
         for old in ("place_type,", "'protected_area'", "on conflict (source_release_id, source_id)"):
             self.assertNotIn(old, source)
-        self.assertIn("string_to_array(iso3, ';')", import_wdpa.UPSERT_DETAILS)
+        self.assertIn("string_to_array(batch_place.iso3, ';')", import_wdpa.UPDATE_DETAILS)
 
-    def test_each_site_points_at_its_largest_parcel(self):
-        sql = import_wdpa.UPSERT_SITE_IDS
-        self.assertIn("distinct on (details.source_record_id)", sql)
-        self.assertIn("order by details.source_record_id, places.area_km2 desc, places.id", sql)
+    def test_site_rows_are_only_marked_seen(self):
+        sql = import_wdpa.UPDATE_SITE_IDS
+        self.assertTrue(sql.lstrip().startswith("update public.place_source_ids"))
+        self.assertIn("match_status in ('confirmed', 'proposed')", sql)
         self.assertIn("'wdpa_site_id'", sql)
 
-    def test_write_batch_writes_places_before_their_details_and_ids(self):
+    def test_the_importer_never_writes_places_geom_or_a_place(self):
+        source = MODULE_PATH.read_text()
+        self.assertNotIn("insert into public.places", source)
+        self.assertNotIn("set name = batch_place.name, geom", source)
+        self.assertIn("set name = batch_place.name\n", import_wdpa.UPDATE_PLACES)
+        self.assertIn("insert into public.place_boundaries", import_wdpa.INSERT_BOUNDARIES)
+        self.assertIn("'approved', now(), true", import_wdpa.INSERT_BOUNDARIES)
+        self.assertIn("not batch_place.same_shape", import_wdpa.SUPERSEDE_BOUNDARIES)
+
+    def test_write_batch_refuses_a_record_without_a_stored_place(self):
         cursor = mock.MagicMock()
+        cursor.fetchone.return_value = {"copied": 3, "matched": 1, "small": 1}
+        with self.assertRaises(SystemExit) as raised:
+            import_wdpa.write_batch(cursor, "release-id")
+        self.assertIn("reconcile", str(raised.exception))
+        statements = [call.args[0] for call in cursor.execute.call_args_list]
+        self.assertEqual(statements, [import_wdpa.MATCH_BATCH, import_wdpa.COUNT_BATCH])
+
+    def test_the_report_is_clean_only_for_unchanged_and_reshaped_records(self):
+        source = {"source_id": "wdpca", "version_label": "October 2026"}
+        manifest = {"rows_sha256": "abc"}
+
+        def row(site_pid, klass, flags=(), candidates=()):
+            return {
+                "site_pid": site_pid,
+                "site_id": "1",
+                "class": klass,
+                "place_id": None,
+                "iou": None,
+                "flags": list(flags),
+                "candidates": list(candidates),
+            }
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch("builtins.print"):
+            work = Path(tmp)
+            report = import_wdpa.write_report(
+                work, [row("a", "unchanged"), row("b", "reshaped")], source, manifest
+            )
+            self.assertTrue(report["clean"])
+            report = import_wdpa.write_report(
+                work, [row("a", "unchanged", flags=["site_id_changed"])], source, manifest
+            )
+            self.assertFalse(report["clean"])
+            report = import_wdpa.write_report(
+                work,
+                [row("a", "unchanged"), row("c", "missing", candidates=["d"]), row("d", "new")],
+                source,
+                manifest,
+            )
+            self.assertFalse(report["clean"])
+            self.assertEqual(report["counts"], {"missing": 1, "new": 1, "unchanged": 1})
+            self.assertEqual(report["split_or_join"], 1)
+            lines = (work / import_wdpa.REPORT_CSV).read_text().splitlines()
+            self.assertEqual(lines[0], ",".join(import_wdpa.REPORT_COLUMNS))
+            self.assertIn("c,1,missing,,,,d", lines)
+            self.assertFalse(json.loads((work / import_wdpa.REPORT_JSON).read_text())["clean"])
+
+    def test_write_batch_supersedes_before_it_adds_a_boundary(self):
+        cursor = mock.MagicMock()
+        cursor.fetchone.return_value = {"copied": 3, "matched": 2, "small": 1}
         import_wdpa.write_batch(cursor, "release-id")
         statements = [call.args[0] for call in cursor.execute.call_args_list]
         self.assertEqual(
             statements,
             [
                 import_wdpa.MATCH_BATCH,
-                import_wdpa.INSERT_PLACES,
+                import_wdpa.COUNT_BATCH,
                 import_wdpa.UPDATE_PLACES,
-                import_wdpa.UPSERT_DETAILS,
-                import_wdpa.UPSERT_PARCEL_IDS,
+                import_wdpa.SUPERSEDE_BOUNDARIES,
+                import_wdpa.INSERT_BOUNDARIES,
+                import_wdpa.UPDATE_DETAILS,
+                import_wdpa.UPDATE_PARCEL_IDS,
                 "truncate batch_place",
             ],
         )
-        self.assertEqual(cursor.execute.call_args_list[3].args[1], {"release": "release-id"})
+        self.assertEqual(cursor.execute.call_args_list[4].args[1], {"release": "release-id"})
 
     def test_upload_refuses_an_old_places_load(self):
         conn, _ = self._source_connection({"present": True})

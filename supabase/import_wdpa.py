@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
-"""Load the pinned October 2026 WDPCA extract into places, in four steps.
+"""Load the pinned October 2026 WDPCA extract into places, in five steps.
 
-  build   Download and check the pinned zip, then write one filtered and
-          validated file of terrestrial polygons of about 10 km2 or more.
-          No database connection.
-  probe   Time a connection to the database and test one small COPY.
-          Writes nothing that stays.
-  upload  Write the filtered file straight into public.places in committed
-          batches. Each row is matched to a place through its confirmed
-          wdpa_site_pid row in place_source_ids. A new row gets a published
-          conservation area place, its conservation_area_details row, and its
-          wdpa_site_pid row. After the last batch, each site gets one
-          wdpa_site_id row. Rows under 10 km2 are left out. A second start
-          continues from the places already there and keeps their ids. It
-          never deletes a place. The geometry is stored once, because the
-          database disk is too small to hold a stage and the places.
-  merge   Read-only check of the result against the file (the name is kept
-          for the existing commands): counts, invalid geometry, facts.
+  build      Download and check the pinned zip, then write one filtered and
+             validated file of terrestrial polygons of about 10 km2 or more.
+             No database connection.
+  probe      Time a connection to the database and test one small COPY.
+             Writes nothing that stays.
+  reconcile  Read-only. Match each record to a stored place on its SITE_PID and
+             classify it as in decisions.md, record 4: unchanged, reshaped,
+             very_different, new_in_known_site, new, or missing, with split or
+             join candidates for a missing one. Writes reconciliation.csv and
+             reconciliation.json to the work directory.
+  upload     Run reconcile, and stop unless every record is unchanged or
+             reshaped, with no flag. Then write the file in committed batches:
+             names, details, and parcel ids, and a new current boundary version
+             in place_boundaries for a reshaped record. It never inserts or
+             deletes a place, and never writes places.geom. A second start
+             continues after the records already written.
+  merge      Read-only check of the result against the file (the name is kept
+             for the existing commands): counts, invalid boundaries, facts.
 
 `run` (the default) does build, probe, then upload. Run `merge` afterwards.
 
@@ -119,6 +121,185 @@ create temp table if not exists batch (
   wkb_hex text
 ) on commit delete rows
 """
+# The geometry as the boundaries store it.
+PARSED_GEOM = """extensions.ST_Multi(
+      extensions.ST_Force2D(
+        extensions.ST_GeomFromWKB(decode(batch.wkb_hex, 'hex'), 4326)
+      )
+    )::extensions.geometry(MultiPolygon, 4326)"""
+
+# --- reconcile ----------------------------------------------------------------
+# Intersection over union, on the spheroid, at or above which a changed shape of
+# a known SITE_PID is the same place reshaped (decisions.md, records 4 and 7).
+RESHAPED_MIN_IOU = 0.95
+CLEAN_CLASSES = ("unchanged", "reshaped")
+REPORT_CSV = "reconciliation.csv"
+REPORT_JSON = "reconciliation.json"
+REPORT_COLUMNS = ("site_pid", "site_id", "class", "place_id", "iou", "flags", "candidates")
+
+CREATE_RECON = """
+create temp table recon (
+  site_pid text primary key,
+  site_id text,
+  place_id uuid,
+  class text,
+  iou double precision,
+  flags text[] not null default '{}',
+  candidates text[] not null default '{}'
+)
+"""
+# Only new records keep their geometry, to find split and join candidates.
+CREATE_RECON_NEW = """
+create temp table recon_new (
+  site_pid text primary key,
+  geom extensions.geometry(MultiPolygon, 4326) not null
+)
+"""
+# Classify one copied batch. A record under 10 km2 with an unknown SITE_PID is
+# left out, as the upload leaves it out. A known one under 10 km2 is missing.
+# A changed shape is left unclassified here and compared one record at a time.
+RECONCILE_BATCH = f"""
+with measured as (
+  select
+    batch.source_id,
+    batch.site_id,
+    {PARSED_GEOM} as geom
+  from batch
+),
+sized as (
+  select measured.*,
+    extensions.st_area(measured.geom::extensions.geography, true) / 1e6 as area_km2
+  from measured
+)
+insert into recon (site_pid, site_id, place_id, class, flags)
+select
+  sized.source_id,
+  sized.site_id,
+  ids.place_id,
+  case
+    when ids.place_id is null then
+      case when known_site.present then 'new_in_known_site' else 'new' end
+    when sized.area_km2 < 10 then 'missing'
+    when boundary.id is null then 'very_different'
+    when extensions.st_asbinary(boundary.geom) = extensions.st_asbinary(sized.geom)
+      then 'unchanged'
+  end,
+  array_remove(array[
+    case when ids.place_id is not null and sized.area_km2 < 10 then 'under_10_km2' end,
+    case when ids.place_id is not null and boundary.id is null then 'no_current_boundary' end,
+    case when ids.place_id is not null
+      and details.source_record_id is distinct from sized.site_id then 'site_id_changed' end,
+    case when parcels.n > 1 then 'merged_place' end
+  ], null)
+from sized
+left join public.place_source_ids as ids
+  on ids.source_id = 'wdpca'
+  and ids.id_kind = 'wdpa_site_pid'
+  and ids.match_status = 'confirmed'
+  and ids.source_record_id = sized.source_id
+left join public.place_boundaries as boundary
+  on boundary.place_id = ids.place_id
+  and boundary.is_current
+left join public.conservation_area_details as details on details.place_id = ids.place_id
+left join lateral (
+  select count(*) as n
+  from public.place_source_ids as other
+  where other.place_id = ids.place_id
+    and other.source_id = 'wdpca'
+    and other.id_kind = 'wdpa_site_pid'
+    and other.match_status = 'confirmed'
+) as parcels on ids.place_id is not null
+cross join lateral (
+  select exists (
+    select 1
+    from public.place_source_ids as site
+    where site.source_id = 'wdpca'
+      and site.id_kind = 'wdpa_site_id'
+      and site.match_status <> 'retired'
+      and site.source_record_id = sized.site_id
+  ) as present
+) as known_site
+where ids.place_id is not null or sized.area_km2 >= 10
+"""
+KEEP_NEW_GEOMETRY = f"""
+insert into recon_new (site_pid, geom)
+select batch.source_id, {PARSED_GEOM}
+from batch
+join recon
+  on recon.site_pid = batch.source_id
+  and recon.class in ('new', 'new_in_known_site')
+"""
+CHANGED_IN_BATCH = """
+select recon.site_pid
+from recon
+join batch on batch.source_id = recon.site_pid
+where recon.class is null
+order by recon.site_pid
+"""
+SHAPE_IOU = f"""
+select
+  case
+    when not (boundary.geom operator(extensions.&&) parsed.geom) then 0.0
+    else extensions.st_area(
+        extensions.st_intersection(boundary.geom, parsed.geom)::extensions.geography, true)
+      / nullif(extensions.st_area(
+        extensions.st_union(boundary.geom, parsed.geom)::extensions.geography, true), 0)
+  end as iou
+from batch
+join recon on recon.site_pid = batch.source_id
+join public.place_boundaries as boundary
+  on boundary.place_id = recon.place_id
+  and boundary.is_current
+cross join lateral (select {PARSED_GEOM} as geom) as parsed
+where batch.source_id = %(site_pid)s
+"""
+SET_SHAPE_CLASS = """
+update recon
+set iou = %(iou)s,
+  class = case when %(iou)s >= %(min_iou)s then 'reshaped' else 'very_different' end
+where site_pid = %(site_pid)s
+"""
+SHAPE_COMPARE_FAILED = """
+update recon
+set class = 'very_different', flags = flags || array['compare_failed']
+where site_pid = %(site_pid)s
+"""
+# A stored SITE_PID that the file does not have.
+ADD_MISSING = """
+insert into recon (site_pid, site_id, place_id, class)
+select ids.source_record_id, details.source_record_id, ids.place_id, 'missing'
+from public.place_source_ids as ids
+left join public.conservation_area_details as details on details.place_id = ids.place_id
+where ids.source_id = 'wdpca'
+  and ids.id_kind = 'wdpa_site_pid'
+  and ids.match_status = 'confirmed'
+  and not exists (select 1 from recon where recon.site_pid = ids.source_record_id)
+"""
+# New records that overlap a missing record's current boundary: a split or a join.
+SPLIT_OR_JOIN = """
+update recon
+set candidates = found.site_pids
+from (
+  select missing.site_pid, array_agg(new.site_pid order by new.site_pid) as site_pids
+  from recon as missing
+  join public.place_boundaries as boundary
+    on boundary.place_id = missing.place_id
+    and boundary.is_current
+  join recon_new as new
+    on new.geom operator(extensions.&&) boundary.geom
+    and extensions.st_intersects(new.geom, boundary.geom)
+  where missing.class = 'missing'
+  group by missing.site_pid
+) as found
+where recon.site_pid = found.site_pid
+"""
+REPORT_ROWS = """
+select site_pid, site_id, class, place_id::text as place_id, iou, flags, candidates
+from recon
+order by class, site_pid
+"""
+
+# --- upload -------------------------------------------------------------------
 CREATE_BATCH_PLACE = """
 create temp table if not exists batch_place (
   source_id text,
@@ -130,103 +311,127 @@ create temp table if not exists batch_place (
   realm text,
   geom extensions.geometry(MultiPolygon, 4326),
   place_id uuid,
-  is_new boolean
+  boundary_id uuid,
+  next_version integer,
+  same_shape boolean
 ) on commit delete rows
 """
-# Match each staged row to its place through the confirmed SITE_PID row. A row
-# with no match gets a new id here, so the statements below can refer to it.
-MATCH_BATCH = """
+# Match each staged row to its place and current boundary through the confirmed
+# SITE_PID row. reconcile has already refused a file with any other record, so
+# every row of 10 km2 or more matches. write_batch checks that it did.
+MATCH_BATCH = f"""
 insert into batch_place (
   source_id, site_id, name, designation, iucn_category, iso3, realm, geom,
-  place_id, is_new
+  place_id, boundary_id, next_version, same_shape
 )
 select
   parsed.source_id, parsed.site_id, parsed.name, parsed.designation,
   parsed.iucn_category, parsed.iso3, parsed.realm, parsed.geom,
-  coalesce(ids.place_id, gen_random_uuid()),
-  ids.place_id is null
+  ids.place_id,
+  boundary.id,
+  (
+    select max(version.version_number) + 1
+    from public.place_boundaries as version
+    where version.place_id = ids.place_id
+  ),
+  extensions.st_asbinary(boundary.geom) = extensions.st_asbinary(parsed.geom)
 from (
   select
-    source_id, site_id, name, designation, iucn_category, iso3, realm,
-    extensions.ST_Multi(
-      extensions.ST_Force2D(
-        extensions.ST_GeomFromWKB(decode(wkb_hex, 'hex'), 4326)
-      )
-    )::extensions.geometry(MultiPolygon, 4326) as geom
+    batch.source_id, batch.site_id, batch.name, batch.designation,
+    batch.iucn_category, batch.iso3, batch.realm,
+    {PARSED_GEOM} as geom
   from batch
 ) as parsed
-left join public.place_source_ids as ids
+join public.place_source_ids as ids
   on ids.source_id = 'wdpca'
   and ids.id_kind = 'wdpa_site_pid'
   and ids.match_status = 'confirmed'
   and ids.source_record_id = parsed.source_id
+join public.place_boundaries as boundary
+  on boundary.place_id = ids.place_id
+  and boundary.is_current
 where extensions.st_area(parsed.geom::extensions.geography, true) / 1e6 >= 10
 """
-INSERT_PLACES = """
-insert into public.places (id, name, place_type_id, publication_status, geom)
-select place_id, name, 'conservation_area', 'published', geom
-from batch_place
-where is_new
+COUNT_BATCH = """
+select
+  (select count(*) from batch) as copied,
+  (select count(*) from batch_place) as matched,
+  (select count(*) from batch
+   where extensions.st_area(
+     extensions.ST_GeomFromWKB(decode(batch.wkb_hex, 'hex'), 4326)::extensions.geography,
+     true) / 1e6 < 10) as small
 """
 UPDATE_PLACES = """
 update public.places
-set name = batch_place.name, geom = batch_place.geom
+set name = batch_place.name
 from batch_place
-where not batch_place.is_new
-  and places.id = batch_place.place_id
+where places.id = batch_place.place_id
+  and places.name is distinct from batch_place.name
 """
-UPSERT_DETAILS = """
-insert into public.conservation_area_details (
-  place_id, designation, iucn_category, iso3, realm,
-  source_id, source_release_id, source_record_id, source_url
+# A changed shape becomes the next version. The old one is superseded first,
+# because a place has one current boundary.
+SUPERSEDE_BOUNDARIES = """
+update public.place_boundaries
+set is_current = false, superseded_at = now()
+from batch_place
+where place_boundaries.id = batch_place.boundary_id
+  and not batch_place.same_shape
+"""
+INSERT_BOUNDARIES = """
+insert into public.place_boundaries (
+  place_id, version_number, geom, source_id, source_release_id, source_record_id,
+  source_url, review_status, reviewed_at, is_current
 )
 select
-  place_id, designation, iucn_category, string_to_array(iso3, ';'), realm,
-  'wdpca', %(release)s, site_id, 'https://www.protectedplanet.net/' || site_id
+  place_id, next_version, geom, 'wdpca', %(release)s, source_id,
+  'https://www.protectedplanet.net/' || site_id, 'approved', now(), true
 from batch_place
-on conflict (place_id) do update
+where not same_shape
+"""
+UPDATE_DETAILS = """
+update public.conservation_area_details as details
 set
-  designation = excluded.designation,
-  iucn_category = excluded.iucn_category,
-  iso3 = excluded.iso3,
-  realm = excluded.realm,
-  source_release_id = excluded.source_release_id,
-  source_record_id = excluded.source_record_id,
-  source_url = excluded.source_url
-"""
-UPSERT_PARCEL_IDS = """
-insert into public.place_source_ids (
-  place_id, source_id, id_kind, source_record_id, match_status,
-  first_seen_release_id, last_seen_release_id
-)
-select place_id, 'wdpca', 'wdpa_site_pid', source_id, 'confirmed', %(release)s, %(release)s
+  designation = batch_place.designation,
+  iucn_category = batch_place.iucn_category,
+  iso3 = string_to_array(batch_place.iso3, ';'),
+  realm = batch_place.realm,
+  source_release_id = %(release)s,
+  source_record_id = batch_place.site_id,
+  source_url = 'https://www.protectedplanet.net/' || batch_place.site_id
 from batch_place
-on conflict (source_id, id_kind, source_record_id) where match_status = 'confirmed'
-do update set last_seen_release_id = excluded.last_seen_release_id
+where details.place_id = batch_place.place_id
 """
-# One row per site, pointing at the place with the largest parcel. A site that
-# already has one keeps its place.
-UPSERT_SITE_IDS = """
-insert into public.place_source_ids (
-  place_id, source_id, id_kind, source_record_id, match_status,
-  first_seen_release_id, last_seen_release_id
-)
-select distinct on (details.source_record_id)
-  details.place_id, 'wdpca', 'wdpa_site_id', details.source_record_id, 'confirmed',
-  %(release)s, %(release)s
-from public.conservation_area_details as details
-join public.places on places.id = details.place_id
-where details.source_id = 'wdpca'
-  and details.source_release_id = %(release)s
-order by details.source_record_id, places.area_km2 desc, places.id
-on conflict (source_id, id_kind, source_record_id) where match_status = 'confirmed'
-do update set last_seen_release_id = excluded.last_seen_release_id
+UPDATE_PARCEL_IDS = """
+update public.place_source_ids as ids
+set last_seen_release_id = %(release)s
+from batch_place
+where ids.source_id = 'wdpca'
+  and ids.id_kind = 'wdpa_site_pid'
+  and ids.match_status = 'confirmed'
+  and ids.source_record_id = batch_place.source_id
 """
-# The SITE_PIDs stored for a release, with their place.
+# A site row of any match status is only marked as seen. The importer never adds
+# one beside a proposed row: a site's rows change through review.
+UPDATE_SITE_IDS = """
+update public.place_source_ids as site
+set last_seen_release_id = %(release)s
+where site.source_id = 'wdpca'
+  and site.id_kind = 'wdpa_site_id'
+  and site.match_status in ('confirmed', 'proposed')
+  and site.source_record_id in (
+    select details.source_record_id
+    from public.conservation_area_details as details
+    where details.source_id = 'wdpca'
+      and details.source_release_id = %(release)s
+  )
+"""
+# The SITE_PIDs stored for a release, with their place and current area.
 STORED_PARCELS = """
-select ids.source_record_id as source_id, places.id, places.area_km2
+select ids.source_record_id as source_id, ids.place_id as id, boundary.area_km2
 from public.place_source_ids as ids
-join public.places on places.id = ids.place_id
+join public.place_boundaries as boundary
+  on boundary.place_id = ids.place_id
+  and boundary.is_current
 where ids.source_id = 'wdpca'
   and ids.id_kind = 'wdpa_site_pid'
   and ids.match_status = 'confirmed'
@@ -248,6 +453,8 @@ def main() -> None:
     elif command == "probe":
         default_seconds = os.environ.get("WDPA_PROBE_SECONDS", "120")
         probe(work, int(sys.argv[2]) if len(sys.argv) > 2 else int(default_seconds))
+    elif command == "reconcile":
+        reconcile(work)
     elif command == "upload":
         upload(work)
     elif command == "merge":
@@ -258,7 +465,9 @@ def main() -> None:
         upload(work)
         print("upload finished. Check the stage, then run: merge", flush=True)
     else:
-        raise SystemExit(f"unknown command {command!r}: build, probe, upload, merge, run")
+        raise SystemExit(
+            f"unknown command {command!r}: build, probe, reconcile, upload, merge, run"
+        )
 
 
 def work_dir() -> Path:
@@ -700,6 +909,154 @@ def probe(work: Path, seconds: int = 120) -> None:
     conn.close()
 
 
+# --- reconcile ---------------------------------------------------------------
+
+
+def reconcile(work: Path) -> dict:
+    """Read-only: classify every record of the filtered file against the stored
+    places (decisions.md, record 4), and write the report to the work directory.
+
+    Temp tables only. The whole file's geometry is never held: each batch is
+    classified and dropped, and only new records keep theirs.
+    """
+    import psycopg
+
+    manifest = read_manifest(work)
+    attempts = 0
+    while True:
+        conn = open_connection()
+        try:
+            report = reconcile_pass(conn, work, manifest)
+            break
+        except (psycopg.OperationalError, psycopg.InterfaceError) as exc:
+            attempts += 1
+            print(
+                f"reconcile connection lost ({attempts} of {UPLOAD_ATTEMPTS}): "
+                f"{first_line(exc)}. Starting the pass again.",
+                flush=True,
+            )
+            if attempts >= UPLOAD_ATTEMPTS:
+                raise SystemExit("reconcile stopped: the connection kept failing") from None
+            time.sleep(30)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return report
+
+
+def reconcile_pass(conn, work: Path, manifest: dict) -> dict:
+    source = fetch_source(conn)
+    with conn.cursor() as cur:
+        cur.execute("drop table if exists recon, recon_new")
+        cur.execute(CREATE_RECON)
+        cur.execute(CREATE_RECON_NEW)
+        cur.execute(CREATE_BATCH)
+    conn.commit()
+
+    batch: list[list[str]] = []
+    batch_size = 0
+    seen = 0
+
+    def flush() -> None:
+        nonlocal batch_size, seen
+        if not batch:
+            return
+        with conn.cursor() as cur:
+            copy_rows(cur, batch)
+            cur.execute(RECONCILE_BATCH)
+            cur.execute(KEEP_NEW_GEOMETRY)
+            cur.execute(CHANGED_IN_BATCH)
+            changed = [row["site_pid"] for row in cur.fetchall()]
+            for site_pid in changed:
+                compare_shape(conn, cur, site_pid)
+            cur.execute("truncate batch")
+        conn.commit()
+        seen += len(batch)
+        batch.clear()
+        batch_size = 0
+        if seen % (BATCH_ROWS * 200) < BATCH_ROWS:
+            print(f"compared: {seen} of {manifest['kept']}", flush=True)
+
+    for row in read_rows(work):
+        batch.append(row)
+        batch_size += len(row[-1])
+        if len(batch) >= BATCH_ROWS or batch_size >= BATCH_BYTES:
+            flush()
+    flush()
+
+    with conn.cursor() as cur:
+        cur.execute(ADD_MISSING)
+        cur.execute(SPLIT_OR_JOIN)
+        cur.execute(REPORT_ROWS)
+        rows = cur.fetchall()
+    conn.commit()
+    return write_report(work, rows, source, manifest)
+
+
+def compare_shape(conn, cur, site_pid: str) -> None:
+    """Intersection over union of one changed shape with its current boundary.
+    A comparison PostGIS cannot make leaves the record very different."""
+    import psycopg
+
+    try:
+        with conn.transaction():
+            cur.execute(SHAPE_IOU, {"site_pid": site_pid})
+            iou = cur.fetchone()["iou"]
+    except psycopg.errors.InternalError:
+        cur.execute(SHAPE_COMPARE_FAILED, {"site_pid": site_pid})
+        return
+    cur.execute(
+        SET_SHAPE_CLASS,
+        {"site_pid": site_pid, "iou": iou or 0.0, "min_iou": RESHAPED_MIN_IOU},
+    )
+
+
+def write_report(work: Path, rows: list[dict], source: dict, manifest: dict) -> dict:
+    counts: dict[str, int] = {}
+    flagged = 0
+    for row in rows:
+        counts[row["class"]] = counts.get(row["class"], 0) + 1
+        if row["flags"]:
+            flagged += 1
+    split_or_join = sum(1 for row in rows if row["candidates"])
+    clean = flagged == 0 and all(name in CLEAN_CLASSES for name in counts)
+    with (work / REPORT_CSV).open("w", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(REPORT_COLUMNS)
+        for row in rows:
+            writer.writerow(
+                [
+                    row["site_pid"],
+                    row["site_id"] or "",
+                    row["class"],
+                    row["place_id"] or "",
+                    "" if row["iou"] is None else f"{row['iou']:.6f}",
+                    ";".join(row["flags"]),
+                    ";".join(row["candidates"]),
+                ]
+            )
+    report = {
+        "source": source["source_id"],
+        "release": source["version_label"],
+        "rows_sha256": manifest["rows_sha256"],
+        "reshaped_min_iou": RESHAPED_MIN_IOU,
+        "written_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "counts": dict(sorted(counts.items())),
+        "flagged": flagged,
+        "split_or_join": split_or_join,
+        "clean": clean,
+    }
+    (work / REPORT_JSON).write_text(json.dumps(report, indent=2) + "\n")
+    for name, count in report["counts"].items():
+        print(f"{name}: {count}", flush=True)
+    print(f"flagged: {flagged}", flush=True)
+    print(f"missing with split or join candidates: {split_or_join}", flush=True)
+    print(f"clean: {'yes' if clean else 'no'}. Report: {work / REPORT_CSV}", flush=True)
+    return report
+
+
 # --- upload ------------------------------------------------------------------
 
 
@@ -713,6 +1070,12 @@ def upload(work: Path) -> None:
     import psycopg
 
     manifest = read_manifest(work)
+    report = reconcile(work)
+    if not report["clean"]:
+        raise SystemExit(
+            "refusing to load: not every record matches a stored place cleanly. "
+            f"See {work / REPORT_CSV}"
+        )
     conn = open_connection()
     attempts = 0
     while True:
@@ -746,19 +1109,9 @@ def upload(work: Path) -> None:
 
 
 def prepare_stage(conn, work: Path) -> set[str]:
+    """Create the batch tables and return the SITE_PIDs already written for this
+    release. reconcile has already refused a file that misses a stored SITE_PID."""
     source = fetch_source(conn)
-    with conn.cursor() as cur:
-        cur.execute("set search_path to public, extensions")
-        cur.execute(STORED_PARCELS, (source["id"],))
-        stored = {row["source_id"] for row in cur.fetchall()}
-    conn.commit()
-    in_file = {row[0] for row in read_rows(work)}
-    missing = sorted(stored - in_file)
-    if missing:
-        raise SystemExit(
-            f"refusing to load: {len(missing)} stored places are not in the filtered "
-            f"file: {', '.join(missing[:20])}"
-        )
     refuse_leftover_stage(conn)
     with conn.cursor() as cur:
         cur.execute(CREATE_BATCH)
@@ -799,6 +1152,7 @@ def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
         with conn.cursor() as cur:
             copy_rows(cur, batch)
             write_batch(cur, source["id"])
+            cur.execute("truncate batch")
         conn.commit()
         total += len(batch)
         staged.update(row[0] for row in batch)
@@ -818,18 +1172,27 @@ def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
             flush()
     flush()
     with conn.cursor() as cur:
-        cur.execute(UPSERT_SITE_IDS, {"release": source["id"]})
+        cur.execute(UPDATE_SITE_IDS, {"release": source["id"]})
     conn.commit()
     return total
 
 
 def write_batch(cur, release) -> None:
-    """Write one copied batch into places, its details, and its parcel ids."""
+    """Write one copied batch: names, a new boundary version for a changed shape,
+    details, and parcel ids. It never inserts a place or writes places.geom."""
     cur.execute(MATCH_BATCH)
-    cur.execute(INSERT_PLACES)
+    cur.execute(COUNT_BATCH)
+    counts = cur.fetchone()
+    if counts["matched"] != counts["copied"] - counts["small"]:
+        raise SystemExit(
+            "refusing to write: a record of 10 km2 or more has no stored place "
+            "with a current boundary. Run reconcile."
+        )
     cur.execute(UPDATE_PLACES)
-    cur.execute(UPSERT_DETAILS, {"release": release})
-    cur.execute(UPSERT_PARCEL_IDS, {"release": release})
+    cur.execute(SUPERSEDE_BOUNDARIES)
+    cur.execute(INSERT_BOUNDARIES, {"release": release})
+    cur.execute(UPDATE_DETAILS, {"release": release})
+    cur.execute(UPDATE_PARCEL_IDS, {"release": release})
     cur.execute("truncate batch_place")
 
 
@@ -876,7 +1239,8 @@ def fetch_source(conn) -> dict:
 
 
 def merge(work: Path) -> None:
-    """Read-only check of public.places against the filtered file."""
+    """Read-only check of the stored parcels and their current boundaries
+    against the filtered file."""
     manifest = read_manifest(work)
     conn = open_connection()
     source = fetch_source(conn)
@@ -890,14 +1254,16 @@ def merge(work: Path) -> None:
         cur.execute(
             """
             select ids.source_record_id as source_id,
-              extensions.ST_IsValidReason(places.geom) as reason
+              extensions.ST_IsValidReason(boundary.geom) as reason
             from public.place_source_ids as ids
-            join public.places on places.id = ids.place_id
+            join public.place_boundaries as boundary
+              on boundary.place_id = ids.place_id
+              and boundary.is_current
             where ids.source_id = 'wdpca'
               and ids.id_kind = 'wdpa_site_pid'
               and ids.match_status = 'confirmed'
               and ids.last_seen_release_id = %s
-              and not extensions.ST_IsValid(places.geom)
+              and not extensions.ST_IsValid(boundary.geom)
             order by ids.source_record_id
             """,
             (release,),
@@ -912,7 +1278,7 @@ def merge(work: Path) -> None:
               (select count(*)
                from public.place_source_ids
                where source_id = 'wdpca' and id_kind = 'wdpa_site_id'
-                 and match_status = 'confirmed'
+                 and match_status in ('confirmed', 'proposed')
                  and last_seen_release_id = %(release)s) as site_ids
             """,
             {"release": release},

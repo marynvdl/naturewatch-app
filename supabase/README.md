@@ -8,7 +8,7 @@ The October 2026 WDPCA release is pinned in `supabase/migrations/20261021120000_
 
 `site_id` in `protected_areas` is the Protected Planet id (`https://www.protectedplanet.net/<site_id>`). It is stored as `conservation_area_details.source_record_id`. A place is matched to the source through `place_source_ids`: one confirmed `wdpa_site_pid` row per parcel, and one `wdpa_site_id` row per site, pointing at the place with the largest parcel. That row is `proposed` for a site with several parcels until a person decides whether to merge them (task 05a).
 
-The places page reads `protected_area_window`, 50 rows at a time, ordered by name. The Places list on the map reads `protected_area_window` (50 matching rows at a time, from an offset) and `protected_area_filter_stats` for the filter charts. Extent filtering uses `protected_areas_in_extent`, which accepts a bounding box and returns attributes only. Those reads return attributes, not `places.geom`. Filter charts use the database counts. The view behind those reads is `protected_areas`.
+The generic reads take a place type (`20261116100000_generic_place_reads.sql`, task 05b). `place_summaries` is every published place with its current boundary's area and box, the boundary's source, and its conservation area details. `listed_places` is what the list and the map show: `place_summaries`, with a conservation area only when it is terrestrial and at least 10 km². `place_crops_percent` is the only place the crops sprout and method are written. The functions `place_window`, `place_window_count`, `place_rank`, `place_kept_ids`, `place_filter_stats`, `place_matched`, and `places_in_extent` read them, and `place_bounds` returns the box of any published place. The old names, `protected_areas` and the `protected_area*` functions, are wrappers over them for `conservation_area` until the frontend moves in task 08. The places page and the Places list on the map read those wrappers. None of these reads return geometry. `records_fixture.sql` checks that each wrapper returns what the read path before task 05b returned (`supabase/tests/reads_before_05b.sql`). The hosted migration ran on 11 November 2026. As `anon`, the first 50 ids for the size, name, cropland, search, and extent cases, the filter stats, and a place's rank were the same before and after. The default list read took about 0.5 s and the filter stats about 0.47 s, as before.
 
 Every table here has row-level security on. `anon` and `authenticated` can select rows and cannot insert, update, or delete. They see only `published` places, the details and source ids of published places, and the current boundary of a published place, without its geometry. `service_role` keeps select, insert, update, and delete on every table here. `places.geom` stays ungranted.
 
@@ -43,8 +43,6 @@ The hosted backfill ran on 10 November 2026, on Micro compute (1 GB of memory) w
 
 ## Import
 
-**Do not run `upload` until Database Honing task 05b.** It still writes `places.geom` per parcel and writes no boundary. It would also add a confirmed `wdpa_site_id` row beside each site's `proposed` one.
-
 The script needs Python with the GDAL bindings (`osgeo`), `psycopg`, `shapely`, and `pyproj`.
 
 ```bash
@@ -52,14 +50,23 @@ python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -r supabase/requirements.txt
 ```
 
-Follow this procedure for this release and for the next places import. It has four steps. Only `upload` changes `places`.
+Follow this procedure for this release and for the next places import. It has five steps. Only `upload` changes the database.
 
 1. `build` downloads the pinned zip, checks its checksum, and reads the geodatabase. It keeps terrestrial polygons whose area can reach 10 km², checks each one is valid, and writes `filtered.tsv.gz` and `manifest.json` to the work directory. It then removes the extracted geodatabase to free space. It makes no database connection. The manifest records the counts and a checksum of the file. Review those counts before anything is uploaded.
 2. `probe` times a connection to the database for two minutes and tests one small `COPY`. Nothing stays in the database. Run it before a long upload, and run it alone to test a connection.
-3. `upload` copies `filtered.tsv.gz` into `places` in committed batches of 50 rows or 4 MB. Each row is matched to a place through its confirmed `wdpa_site_pid` row. A new row gets a `published` place of type `conservation_area`, its `conservation_area_details` row, and its `wdpa_site_pid` row. After the last batch, each site gets one `wdpa_site_id` row. It leaves out a polygon whose calculated area is under 10 km². It stops if the file no longer matches its manifest, and refuses to start if a stored place is not in the file. A dropped connection reconnects and continues, and the retry count resets whenever a batch committed. A second start skips the places already stored, so a stored place keeps its id and its cropland facts. It never deletes a place. It writes the geometry once, with no stage table. A stage plus `places` holds the geometry twice, which does not fit a small database disk (8 GB when this was written, with the global load about 3.4 GB). If an older `places_load` exists, `upload` refuses to start. Its rows have the `places` columns from before task 04.
-4. `merge` only reads. It compares the stored parcels with the file and prints the counts, the site count, any invalid geometry, and the facts count. It also fails if a site has no `wdpa_site_id` row. It fails if a stored place is not in the file, is under 10 km², or is invalid, or if fewer places are stored than the file has with `GIS_AREA >= 10`.
+3. `reconcile` only reads. It copies the file in the same batches into temp tables and matches each record to a stored place on its SITE_PID, as record 4 of [decisions.md](../docs/database/decisions.md) says. Each record gets one class:
+   - `unchanged`: a known SITE_PID whose current boundary is byte-identical.
+   - `reshaped`: a known SITE_PID whose shape changed, with an intersection over union on the spheroid of at least 0.95 (`RESHAPED_MIN_IOU` in the script).
+   - `very_different`: a known SITE_PID whose shape changed more than that.
+   - `new_in_known_site`: an unknown SITE_PID whose SITE_ID is stored.
+   - `new`: an unknown SITE_PID and SITE_ID.
+   - `missing`: a stored SITE_PID that the file does not have, or that is now under 10 km². When `new` records overlap its current boundary, their SITE_PIDs are listed as split or join candidates.
 
-`run`, the default, does `build`, a 30 second `probe`, and `upload`. Run `merge` afterwards. The map shows the places stored so far while `upload` runs.
+   A record can also carry flags: `site_id_changed`, `merged_place` (its place holds several SITE_PIDs), `no_current_boundary`, `under_10_km2`, or `compare_failed` (PostGIS could not compare the shapes). An unknown SITE_PID under 10 km² is left out, as `upload` leaves it out. Only the geometries of new records are kept, for the split and join check. The report is `reconciliation.csv` (one row per record: SITE_PID, SITE_ID, class, place id, intersection over union, flags, candidates) and `reconciliation.json` (the counts, the release, the file checksum, and whether it is clean) in the work directory.
+4. `upload` runs `reconcile` first. It writes nothing unless every record is `unchanged` or `reshaped` and none has a flag. The writes for the other classes (draft places, `proposed` boundaries and mappings) are not built yet. Then it copies the file in committed batches of 50 rows or 4 MB. For each record it updates the place's name, its `conservation_area_details`, and `last_seen_release_id` on its `wdpa_site_pid` row. A `reshaped` record gets the next boundary version in `place_boundaries`, `approved` and current, with the release, its SITE_PID, and the Protected Planet page. The old version is superseded in the same transaction. After the last batch, each site's `wdpa_site_id` row, `confirmed` or `proposed`, gets `last_seen_release_id`. It never adds one. It never inserts or deletes a place, and it never writes `places.geom`, which stays as it was until task 08 drops it. It stops if the file no longer matches its manifest. A dropped connection reconnects and continues, and the retry count resets whenever a batch committed. A second start skips the records already marked as seen for the release. If an older `places_load` exists, `upload` refuses to start. Its rows have the `places` columns from before task 04.
+5. `merge` only reads. It compares the stored parcels with the file and prints the counts, the site count, any invalid current boundary, and the facts count. It also fails if a site has no `wdpa_site_id` row. It fails if a stored place is not in the file, is under 10 km², or is invalid, or if fewer places are stored than the file has with `GIS_AREA >= 10`.
+
+`run`, the default, does `build`, a 30 second `probe`, and `upload`. Run `reconcile` on its own to see the report without writing. Run `merge` afterwards.
 
 ```bash
 export WDPA_WORK_DIR=/tmp/wdpa-work
@@ -75,10 +82,10 @@ The script prints the count of terrestrial polygons, the count with `GIS_AREA >=
 select count(*) from protected_areas;
 ```
 
-Check the checksum refusal and the area filter locally, without a download of the real file:
+Check the checksum refusal, the area filter, and the reconciliation locally, without a download of the real file. `test_reconcile_local.py` needs the local database after `supabase db reset`, with no places. It runs in one transaction and rolls back. It is skipped when the database is not running.
 
 ```bash
-.venv/bin/python -m unittest supabase/tests/test_import_wdpa.py
+.venv/bin/python -m unittest supabase/tests/test_import_wdpa.py supabase/tests/test_reconcile_local.py
 ```
 
 ## Hosted import
