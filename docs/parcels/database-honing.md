@@ -274,7 +274,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Add the generic `place_*` reads and temporary wrappers. Move the importer's writes to parcel boundaries in `place_boundaries`. Add the reconciliation report: it matches each record on SITE_PID and classifies it as in record 4 of decisions.md, and refuses to write unless every record matches cleanly.
 - [x] [Task 06 — Multi-parcel sites](../archive/tasks/task-06-multi-parcel-sites.md) — naturewatch-app
   - *Goal:* Decide each of the 74 multi-parcel sites, keep apart or merge, and record it in `match_status` so no `wdpa_site_id` row stays `proposed`. Add `merge_wdpa_site` for the merges, and `place_merged_into` so a merged place's address opens its kept place. Write the user's criteria into record 20. The boundary checks, eligibility, and review queue move to Deferred (decided 11 November 2026).
-- [ ] [Task 07 — Stats](../tasks/task-07-stats.md) — both repos
+- [x] [Task 07 — Stats](../archive/tasks/task-07-stats.md) — both repos
   - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Move `place_crops_percent` to the selection. Rename the analysis `facts/` to `stats/`, and point it and the places recipe at the new tables, the recipe at the current boundaries of published places. The pipeline stays paused. `stat_run_issues` and the places PMTiles rebuild are moved out (decided 11 November 2026).
 - [ ] Task 08 — Frontend and cleanup — naturewatch-app
   - *Goal:* Move the frontend to the generic reads. Drop the wrappers, `facts`, and `places.geom`.
