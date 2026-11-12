@@ -3,16 +3,16 @@ name: Test Suite and Deployment
 # Tests run on pull requests and on pushes to develop and main (which deploy).
 # A feature branch is tested once its pull request is open, or by hand from the
 # Actions tab ("Run workflow").
-# Changes that only touch docs or Markdown skip the suite. If test_suite is ever
-# made a required check, docs-only pull requests would wait on it forever, so
-# paths-ignore would have to go.
+# "Test suite" is a required check on develop, so every pull request runs it,
+# docs-only ones included; skipping it would leave the pull request waiting
+# forever. A push to develop or main that only touches docs or Markdown skips
+# the suite and the deploy.
 on:
   push:
     branches: [develop, main]
     paths-ignore: ['docs/**', '**/*.md']
   pull_request:
     branches: [develop, main]
-    paths-ignore: ['docs/**', '**/*.md']
   workflow_dispatch:
 
 # A newer push to the same branch or pull request cancels the older run.
