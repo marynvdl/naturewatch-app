@@ -276,7 +276,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Decide each of the 74 multi-parcel sites, keep apart or merge, and record it in `match_status` so no `wdpa_site_id` row stays `proposed`. Add `merge_wdpa_site` for the merges, and `place_merged_into` so a merged place's address opens its kept place. Write the user's criteria into record 20. The boundary checks, eligibility, and review queue move to Deferred (decided 11 November 2026).
 - [x] [Task 07 — Stats](../archive/tasks/task-07-stats.md) — both repos
   - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Move `place_crops_percent` to the selection. Rename the analysis `facts/` to `stats/`, and point it and the places recipe at the new tables, the recipe at the current boundaries of published places. The pipeline stays paused. `stat_run_issues` and the places PMTiles rebuild are moved out (decided 11 November 2026).
-- [ ] Task 08 — Frontend and cleanup — naturewatch-app
+- [ ] [Task 08 — Frontend and cleanup](../tasks/task-08-frontend-and-cleanup.md) — naturewatch-app
   - *Goal:* Move the frontend to the generic reads. Drop the wrappers, `facts`, and `places.geom`.
 - [ ] Task 09 — Recognitions — both repos
   - *Goal:* Investigate the designations. Import `DESIG_TYPE`. Add recognition types, `place_relationships`, and the admin overlap function. Add a recognitions PMTiles recipe. Rebuild the places PMTiles from the current boundaries of published conservation areas, so the 64 merged parcels draw as their kept places, and decide the stale South Africa rollback copy in `places/protected-areas/v1/` (moved from task 07).
