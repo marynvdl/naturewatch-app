@@ -32,6 +32,8 @@ DATABASE_URL=... .venv/bin/python supabase/derive_recognises.py confirm 0.5
 
 `derive` runs `place_overlaps()` in the database. On Micro compute it ran the hosted database out of memory, and Postgres restarted, on a Natura 2000 site of 862,145 vertices whose box overlaps 53 parks (12 November 2026). For the hosted database use `compute` and `load`. `compute` only reads the database: the published places, their current boundary ids, and their SITE_PIDs. It takes each place's shape from the filtered file of the import (a merged place is the union of its parcels), projects it to EPSG:6933, which is equal area, and writes the same links to `derive_recognises_links.tsv` in the work directory, one recognition at a time. A second start continues. It also writes a 3.5 GB shapes file there, which can be deleted after the run. `load` inserts the file in one transaction, and skips a link whose boundary is no longer current or whose pair already has an active row. Coverages from `compute` can differ from `place_overlaps()` by a fraction of a percent.
 
+On 12 November 2026 `derive` inserted 1,162 hosted links for 875 recognitions before the restart. `compute` ran on a 16 GB workstation in 4 minutes, with a peak of 1.5 GB, and wrote 14,765 links. For the 875 recognitions done in the database it found the same 1,162 pairs, with coverages within 0.0002. `load` inserted the other 13,603, and the table holds 5 MB. The user chose to confirm at 75%: 8,015 links were confirmed (World Heritage 524, Ramsar 793, UNESCO-MAB 1,526, Natura 2000 4,062, Emerald 909, Other regional 201), and 6,750 stay `proposed`. 1,023 of the UNESCO-MAB links are from Nilgiri, over Indian Reserve Forest records that cover its area 5.6 times over.
+
 ## Local database
 
 ```bash
