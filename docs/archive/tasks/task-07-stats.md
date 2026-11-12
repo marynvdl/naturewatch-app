@@ -1,6 +1,6 @@
 # Task 07 — Stats
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repository: both. naturewatch-app holds the migrations and the docs. naturewatch-analysis points the stats script and the places script at the new tables. Start only after task 06 has merged into `develop` (pull request #404).
 
