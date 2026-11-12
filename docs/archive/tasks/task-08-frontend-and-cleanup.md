@@ -1,6 +1,6 @@
 # Task 08 — Frontend and cleanup
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repository: naturewatch-app. Start only after task 07 has merged into `develop` (pull request #406, merged 12 November 2026).
 
