@@ -15,10 +15,10 @@
              reshaped, with no flag. Then write the file in committed batches:
              names, details, and parcel ids, and a new current boundary version
              in place_boundaries for a reshaped record. It never inserts or
-             deletes a place, and never writes places.geom. A second start
-             continues after the records already written.
+             deletes a place. A second start continues after the records
+             already written.
   merge      Read-only check of the result against the file (the name is kept
-             for the existing commands): counts, invalid boundaries, facts.
+             for the existing commands): counts, invalid boundaries, place_stats.
 
 `run` (the default) does build, probe, then upload. Run `merge` afterwards.
 
@@ -1179,7 +1179,7 @@ def send_rows(conn, work: Path, staged: set[str], expected: int) -> int:
 
 def write_batch(cur, release) -> None:
     """Write one copied batch: names, a new boundary version for a changed shape,
-    details, and parcel ids. It never inserts a place or writes places.geom."""
+    details, and parcel ids. It never inserts a place."""
     cur.execute(MATCH_BATCH)
     cur.execute(COUNT_BATCH)
     counts = cur.fetchone()
@@ -1284,8 +1284,8 @@ def merge(work: Path) -> None:
             {"release": release},
         )
         site_counts = cur.fetchone()
-        cur.execute("select count(*) as n from public.facts")
-        facts = int(cur.fetchone()["n"])
+        cur.execute("select count(*) as n from public.place_stats")
+        place_stats = int(cur.fetchone()["n"])
         cur.execute("select to_regclass('public.places_load') is not null as present")
         stage_left = bool(cur.fetchone()["present"])
     conn.rollback()
@@ -1314,7 +1314,7 @@ def merge(work: Path) -> None:
     print(f"stored areas of 10 km2 or more: {len(stored)}", flush=True)
     print(f"in the file but not stored (should be under 10 km2): {len(absent)}", flush=True)
     print(f"sites: {site_counts['sites']}", flush=True)
-    print(f"facts: {facts}", flush=True)
+    print(f"place_stats: {place_stats}", flush=True)
     if len(stored) < manifest["gis_area_ge_10"]:
         problems.append("fewer places stored than polygons with GIS_AREA >= 10")
     if problems:

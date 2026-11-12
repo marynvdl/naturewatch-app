@@ -128,7 +128,7 @@ A trigger on each details table checks that the place's type has the matching `d
 
 ### 4.2 Boundaries and quality
 
-*In place* for `place_boundaries` since task 05 (`20261113100000_place_boundaries.sql`, `20261113110000_boundaries_readers.sql`). Each place has one current, approved boundary: its parcel's geometry. Task 05 gave each site a version 1 boundary. Task 05a superseded the 74 site unions with each parcel's own shape, as version 2 on the kept place and version 1 on the others. `qc_status`, the `stats_eligibility` columns, `set_stats_eligibility`, `boundary_checks`, and `stats_eligible_boundaries` come with the parcel that resumes Stats, which is their first reader. Task 06 deferred them on 11 November 2026. `submitted_by`, `reviewed_by`, and `stats_eligibility_set_by` come with `profiles` in task 10. `approve_boundary` and `submit_boundary` come with the admin and contributor work. No separate `(place_id)` index: the version key and the unique current index both lead with `place_id`.
+*In place* for `place_boundaries` since task 05 (`20261113100000_place_boundaries.sql`, `20261113110000_boundaries_readers.sql`). Each place has one current, approved boundary: its parcel's geometry. Task 05 gave each site a version 1 boundary. Task 05a superseded the 74 site unions with each parcel's own shape, as version 2 on the kept place and version 1 on the others. `qc_status`, the `stats_eligibility` columns, `set_stats_eligibility`, `boundary_checks`, and `stats_eligible_boundaries` come with the parcel that resumes Stats, which is their first reader. Task 06 deferred them on 11 November 2026. `submitted_by`, `reviewed_by`, and `stats_eligibility_set_by` come with `profiles` in task 10. `approve_boundary` and `submit_boundary` come with the admin and contributor work. No separate `(place_id)` index: the version key and the unique current index both lead with `place_id`. The contract step is *done* since task 08 (`20261119100000_drop_old_reads.sql`): `places.geom`, `places.area_km2`, the bbox columns on `places`, their trigger and index, and the one-off backfill and merge functions of tasks 05 and 05a are dropped. `places` holds no geometry.
 
 **`place_boundaries`**
 
@@ -255,7 +255,7 @@ Examples: a WDPCA boundary fills all four. A boundary from a paper has a publica
 
 ### 4.4 Stats
 
-*In place* since task 07 (`20261118100000_stats.sql`, `20261118110000_stats_backfill.sql`) for `stats`, `stat_methods`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. The 941 cropland facts are 2,823 `place_stats` rows of one run, on each place's version 1 boundary. `place_stats` is append-only by grant: `service_role` can select and insert only. A trigger refuses a boundary of another place. `stat_run_issues` comes with the parcel that resumes Stats, its first writer. `stat_selections.selected_by` comes with `profiles` in task 10. `facts` stays until the frontend moves in task 08.
+*In place* since task 07 (`20261118100000_stats.sql`, `20261118110000_stats_backfill.sql`) for `stats`, `stat_methods`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. The 941 cropland facts are 2,823 `place_stats` rows of one run, on each place's version 1 boundary. `place_stats` is append-only by grant: `service_role` can select and insert only. A trigger refuses a boundary of another place. `stat_run_issues` comes with the parcel that resumes Stats, its first writer. `stat_selections.selected_by` comes with `profiles` in task 10. Task 08 dropped `facts` and `backfill_place_stats_from_facts()` after checking every fact was stored as the same three `place_stats`. The place profile reads `place_stats_preferred`.
 
 **`stats`** — what is measured.
 
@@ -686,16 +686,16 @@ Public read policies:
 
 Contributors submit boundaries through `submit_boundary(place_id, geojson)`, not a table insert. PostGIS does not read GeoJSON on insert. The RPC limits size, runs the technical check, and returns only an id.
 
-### Frontend calls today and their targets
+### Frontend calls and their targets
 
-| Call in `places/api.ts` | Target |
+| Call in `places/api.ts` until task 08 | Target since task 08 |
 | --- | --- |
 | `from('protected_areas')` | `place_summaries` view: places with their current boundary's `area_km2` and bbox, details, and release |
 | `from('facts')` | `place_stats_preferred` |
-| `rpc('protected_area_window')`, `protected_area_rank`, `protected_area_filter_stats` | `place_window`, `place_rank`, `place_filter_stats`, with a place type parameter |
+| `rpc('protected_area_window')`, `protected_area_rank`, `protected_area_window_count`, `protected_area_filter_stats` | `place_window`, `place_rank`, `place_window_count`, `place_filter_stats`, with the place type `conservation_area` |
 | `rpc('place_bounds')` | `place_bounds`, reading the current boundary's bbox |
 
-*In place* since task 05b (`20261116100000_generic_place_reads.sql`) for `place_summaries`, `place_window`, `place_rank`, `place_filter_stats`, and `place_bounds`, together with `place_window_count`, `place_kept_ids`, `place_matched`, and `places_in_extent`. `listed_places` holds the conservation area list rule (terrestrial, at least 10 km²). `place_crops_percent` reads `place_stats_preferred` for `crops_percent` since task 07, so no sprout or method id is written in SQL. The old names stay only as wrappers until the frontend moves in task 08, then they are dropped.
+*In place* since task 05b (`20261116100000_generic_place_reads.sql`) for `place_summaries`, `place_window`, `place_rank`, `place_filter_stats`, and `place_bounds`, together with `place_window_count`, `place_kept_ids`, `place_matched`, and `places_in_extent`. `listed_places` holds the conservation area list rule (terrestrial, at least 10 km²). `place_crops_percent` reads `place_stats_preferred` for `crops_percent` since task 07, so no sprout or method id is written in SQL. The old names were wrappers until the frontend moved in task 08, which dropped them (`20261119100000_drop_old_reads.sql`).
 
 ## 7. Naming
 

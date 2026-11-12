@@ -91,12 +91,11 @@ class ReconcileLocalTest(unittest.TestCase):
     def place(self, pid: str, site: str, name: str, wkt: str, site_row: bool = True):
         row = self.conn.execute(
             """
-            insert into public.places (name, place_type_id, publication_status, geom)
-            values (%s, 'conservation_area', 'published',
-              extensions.ST_GeomFromText(%s, 4326)::extensions.geometry(MultiPolygon, 4326))
+            insert into public.places (name, place_type_id, publication_status)
+            values (%s, 'conservation_area', 'published')
             returning id
             """,
-            (name, wkt),
+            (name,),
         ).fetchone()
         place_id = row["id"]
         self.conn.execute(
@@ -126,11 +125,11 @@ class ReconcileLocalTest(unittest.TestCase):
               place_id, version_number, geom, source_id, source_release_id,
               source_record_id, source_url, review_status, is_current
             )
-            select %s, 1, places.geom, 'wdpca', %s, %s,
-              'https://www.protectedplanet.net/' || %s, 'approved', true
-            from public.places where places.id = %s
+            values (%s, 1,
+              extensions.ST_GeomFromText(%s, 4326)::extensions.geometry(MultiPolygon, 4326),
+              'wdpca', %s, %s, 'https://www.protectedplanet.net/' || %s, 'approved', true)
             """,
-            (place_id, self.release, pid, site, place_id),
+            (place_id, wkt, self.release, pid, site),
         )
         return place_id
 
@@ -267,11 +266,11 @@ class ReconcileLocalTest(unittest.TestCase):
             "select name from public.places where id = %s", (self.ids["pid-a"],)
         ).fetchone()
         self.assertEqual(names["name"], "Park A renamed")
-        # places.geom keeps the shape it had: only the boundary changed.
+        # The superseded version keeps the shape it had.
         self.assertTrue(
             self.conn.execute(
-                "select extensions.ST_Equals(places.geom, extensions.ST_GeomFromText(%s, 4326)) as same "
-                "from public.places where id = %s",
+                "select extensions.ST_Equals(geom, extensions.ST_GeomFromText(%s, 4326)) as same "
+                "from public.place_boundaries where place_id = %s and version_number = 1",
                 (B, self.ids["pid-b"]),
             ).fetchone()["same"]
         )
