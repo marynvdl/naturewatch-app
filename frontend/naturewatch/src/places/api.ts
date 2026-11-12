@@ -1,7 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
-  CROPLAND_METHOD_ID,
-  CROPLAND_SPROUT_ID,
   type FigureRange,
   type LngLatBounds,
   type PlaceSort,
@@ -12,13 +10,22 @@ export const PLACE_LIST_LIMIT = 50;
 
 /**
  * Published protected-area boundaries. Each feature carries `id` (`places.id`),
- * `area_km2`, and `cropland_percent` when a fact exists.
+ * `area_km2`, and `cropland_percent` when a figure is stored.
  */
 export const PLACE_TILES_URL =
   'https://storage.googleapis.com/nature-watch-tiles/places/protected-areas/v1/places.pmtiles';
 
 /** Vector layer inside the places archive. */
 export const PLACE_TILE_LAYER = 'places';
+
+/** Place type the list, the filters, and the profile read. */
+export const PLACE_TYPE = 'conservation_area';
+
+/** Period of the cropland figures the profile shows. */
+export const CROPLAND_PERIOD_START = '2024-01-01';
+
+const PLACE_COLUMNS =
+  'id, name, designation, iso3, area_km2, site_id, release_month, source_name, citation';
 
 /** A card on the places list. */
 export interface PlaceSummary {
@@ -27,11 +34,11 @@ export interface PlaceSummary {
   designation: string | null;
   iso3: string | null;
   area_km2: number | null;
-  /** Stored cropland percent, or null when no fact is stored. */
+  /** Stored cropland percent, or null when none is stored. */
   cropland_percent: number | null;
 }
 
-/** A protected area and its stored cropland figure, when one exists. */
+/** A published place and its stored cropland figures, when they exist. */
 export interface PlaceDetail {
   id: string;
   name: string;
@@ -121,7 +128,7 @@ const PLACE_ID =
 let client: SupabaseClient | null | undefined;
 
 /**
- * Browser client for place attributes and facts.
+ * Browser client for place attributes and stats.
  * Returns null when the URL or anon key is not set. The service-role key is never used.
  * @returns The shared client, or null.
  */
@@ -140,10 +147,11 @@ export function placesClient(): SupabaseClient | null {
 /**
  * Arguments shared by the list window and the filter count.
  * @param query - Search, filters, and optional extent.
- * @returns Named arguments for `protected_area_matched` filters.
+ * @returns Named arguments for the `place_matched` filters.
  */
 function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
   return {
+    p_place_type: PLACE_TYPE,
     p_search: query.search.trim(),
     p_search_prefix: query.searchPrefix,
     p_size_min: query.sizeMin,
@@ -188,7 +196,7 @@ export async function loadPilotPlaceWindow(
 ): Promise<PlaceWindowResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
-  const call = supabase.rpc('protected_area_window', {
+  const call = supabase.rpc('place_window', {
     ...matchedArgs(query),
     p_sort: query.sort,
     p_limit: PLACE_LIST_LIMIT,
@@ -227,7 +235,7 @@ export async function loadPilotPlaceRank(
   if (!PLACE_ID.test(id)) return { status: 'ok', rank: null };
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
-  const call = supabase.rpc('protected_area_rank', {
+  const call = supabase.rpc('place_rank', {
     ...matchedArgs(query),
     p_sort: query.sort,
     p_id: id,
@@ -248,7 +256,7 @@ export async function loadPilotPlaceWindowCount(
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase.rpc(
-    'protected_area_window_count',
+    'place_window_count',
     matchedArgs(query)
   );
   if (error || data === null) return { status: 'error' };
@@ -262,7 +270,9 @@ export async function loadPilotPlaceWindowCount(
 export async function loadPilotPlaceFilterStats(): Promise<PlaceFilterStatsResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
-  const { data, error } = await supabase.rpc('protected_area_filter_stats');
+  const { data, error } = await supabase.rpc('place_filter_stats', {
+    p_place_type: PLACE_TYPE,
+  });
   if (error || !data?.[0]) return { status: 'error' };
   const row = data[0] as {
     place_count: number | string;
@@ -286,7 +296,7 @@ export async function loadPilotPlaceFilterStats(): Promise<PlaceFilterStatsResul
 }
 
 /**
- * One protected area and its cropland fact for the 2024 sprout. A place that was
+ * One published place and its preferred 2024 cropland figures. A place that was
  * merged into another opens the place it was merged into, whose id differs.
  * @param id - `places.id`.
  * @returns The place, or why it could not be opened.
@@ -297,10 +307,8 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
   if (!supabase) return { status: 'unconfigured' };
 
   let { data: place, error } = await supabase
-    .from('protected_areas')
-    .select(
-      'id, name, designation, iso3, area_km2, site_id, release_month, source_name, citation'
-    )
+    .from('place_summaries')
+    .select(PLACE_COLUMNS)
     .eq('id', id)
     .maybeSingle();
   if (error) return { status: 'error' };
@@ -313,24 +321,25 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
     if (typeof keptId !== 'string' || keptId === id)
       return { status: 'missing' };
     ({ data: place, error } = await supabase
-      .from('protected_areas')
-      .select(
-        'id, name, designation, iso3, area_km2, site_id, release_month, source_name, citation'
-      )
+      .from('place_summaries')
+      .select(PLACE_COLUMNS)
       .eq('id', keptId)
       .maybeSingle());
     if (error) return { status: 'error' };
     if (!place) return { status: 'missing' };
   }
 
-  const { data: fact, error: factError } = await supabase
-    .from('facts')
-    .select('area_km2, percent')
+  const { data: stats, error: statsError } = await supabase
+    .from('place_stats_preferred')
+    .select('stat_id, value')
     .eq('place_id', place.id)
-    .eq('sprout_id', CROPLAND_SPROUT_ID)
-    .eq('method_id', CROPLAND_METHOD_ID)
-    .maybeSingle();
-  if (factError) return { status: 'error' };
+    .eq('period_start', CROPLAND_PERIOD_START)
+    .in('stat_id', ['crops_area', 'crops_percent']);
+  if (statsError) return { status: 'error' };
+  const value = (statId: string): number | null =>
+    (stats as { stat_id: string; value: number }[] | null)?.find(
+      row => row.stat_id === statId
+    )?.value ?? null;
 
   return {
     status: 'ok',
@@ -344,8 +353,8 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
       releaseMonth: place.release_month,
       sourceName: place.source_name,
       citation: place.citation,
-      croplandKm2: fact?.area_km2 ?? null,
-      percent: fact?.percent ?? null,
+      croplandKm2: value('crops_area'),
+      percent: value('crops_percent'),
     },
   };
 }
@@ -385,8 +394,9 @@ export async function loadPlaceRelease(): Promise<PlaceReleaseResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase
-    .from('protected_areas')
+    .from('place_summaries')
     .select('release_month')
+    .eq('place_type_id', PLACE_TYPE)
     .limit(1)
     .maybeSingle();
   if (error) return { status: 'error' };

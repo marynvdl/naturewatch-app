@@ -44,8 +44,8 @@ Task 02 dropped `pilot_place_map` and `sync_pilot_place_map`, and added `created
 
 1. **Identity is tied to one release.** `places` is unique on `(source_release_id, source_id)`. A November WDPCA release would get a new `sources` row, so every place would get a new id. PMTiles ids and facts would break. *Since task 04 a place's WDPCA ids are stored in `place_source_ids`, and the importer matches on them. Since task 05b the importer writes a reconciliation report first and writes only when every record matches a stored SITE_PID cleanly.*
 2. **Identity and boundary are one row.** A corrected boundary can only overwrite the old one. There is no history. *Fixed by task 05: boundaries are versions in `place_boundaries`.*
-3. **Facts are not reproducible.** `facts` has no boundary reference, no run, no timestamp. The upsert in `naturewatch-analysis/facts/cropland.py` overwrites on `(place_id, sprout_id, method_id)`. `sprout_id` is free text with no foreign key.
-4. **The crops ids are hard-coded** in the SQL functions (`20261030100000_protected_areas.sql`), in `frontend/naturewatch/src/places/display.ts:4`, and in `cookbook/recipes/places-protected-areas.yaml` in the analysis repo.
+3. **Facts are not reproducible.** `facts` has no boundary reference, no run, no timestamp. The upsert in `naturewatch-analysis/facts/cropland.py` overwrites on `(place_id, sprout_id, method_id)`. `sprout_id` is free text with no foreign key. *Fixed by tasks 07 and 08: stats are `place_stats` rows of a run on a boundary version, and `facts` is dropped.*
+4. **The crops ids are hard-coded** in the SQL functions (`20261030100000_protected_areas.sql`), in `frontend/naturewatch/src/places/display.ts:4`, and in `cookbook/recipes/places-protected-areas.yaml` in the analysis repo. *Fixed by task 07 in SQL and the recipe, and by task 08 in the frontend: the ids are in `stat_selections` only.*
 5. **`place_type` is an enum** (`wild_space`, `protected_area`, `ecoregion`, `country`, `river_catchment`). It does not match the planned hierarchy. Enum values cannot easily be removed. *Fixed by task 04.*
 6. **`sources` is a release, not a source.** There is no dataset, licence, citation, or publication level. *Fixed by task 03.*
 7. **WDPCA attributes are missing.** `DESIG_TYPE`, `STATUS`, `STATUS_YR`, `GOV_TYPE`, and `PA_DEF` are not imported. World Heritage Sites, Ramsar sites, and other international designations can only be found by their `designation` text.
@@ -178,7 +178,7 @@ Work in expand and contract steps:
 2. **Backfill.** Fill them in batches, in committed transactions, on Large compute. Never one long transaction.
 3. **Verify.** Row counts match. `st_equals` on a sample. Every place has exactly one current boundary.
 4. **Switch readers.** Functions and pipelines read the new tables. Temporary wrappers keep the old function names.
-5. **Contract.** Only after the frontend has moved: set `places.geom` to null in batches, drop the column, then `vacuum full places` in a short window. The table is small by then.
+5. **Contract.** Only after the frontend has moved: drop the column, then `vacuum full places` in a short window. The table is small by then. *Done in task 08 without nulling `places.geom` in batches first: a dropped column is only hidden, and `vacuum full` rewrites the table without its values. `vacuum full` cannot run inside a transaction, so it ran by hand after the migration.*
 
 Each stage is its own migration and pull request. Take a backup or check point-in-time recovery first. Before the contract step, a stage can be reversed by a script that drops the new objects. After it, by restoring the backup.
 
@@ -210,7 +210,7 @@ Each stage is its own migration and pull request. Take a backup or check point-i
 
 ### Compatibility
 
-- **Frontend.** It keeps working through the existing function names, wrapped over the new tables, until stage 8 moves it to the generic reads. The wrappers are then dropped. The database is not shaped around the current frontend.
+- **Frontend.** It kept working through the existing function names, wrapped over the new tables, until task 08 moved it to the generic reads and dropped the wrappers. The database is not shaped around the current frontend.
 - **PMTiles.** Feature ids are `places.id` and do not change. The places recipe reads the current boundary instead of `places.geom`. A merged place resolves through `merged_into_place_id`.
 - **Stats Pipeline.** Paused throughout. It resumes against `stats_eligible_boundaries` and the new stats tables.
 

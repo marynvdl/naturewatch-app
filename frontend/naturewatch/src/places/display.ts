@@ -1,11 +1,5 @@
 import { COUNTRY_NAMES } from './countryNames';
 
-/** Sprout whose stored cropland figures the place page shows. */
-export const CROPLAND_SPROUT_ID = 'cropland-2024-v1';
-
-/** Formula used for those stored figures. */
-export const CROPLAND_METHOD_ID = 'area-weighted-spheroid-v1';
-
 /** Shown wherever a protected area is named. */
 export const PROTECTED_AREA_ATTRIBUTION =
   'UNEP-WCMC and IUCN. World Database on Protected and Conserved Areas.';
@@ -25,7 +19,7 @@ export function formatKm2(km2: number): string {
 /**
  * Place area for the profile tag and the list card.
  * Whole square kilometres, or two decimal places below 100 km².
- * @param km2 - `protected_areas.area_km2`.
+ * @param km2 - `place_summaries.area_km2`.
  * @returns The number, with thousands separators.
  */
 export function formatAreaTag(km2: number): string {
