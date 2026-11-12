@@ -244,7 +244,11 @@ Supported by the design, not built in this work:
 - Stats optimisation: its own parcel.
 - Metadata edit requests: `place_edit_requests`.
 - The importer's writes for the reconciliation classes other than `unchanged` and `reshaped` (task 05b): draft places for `new` and `new_in_known_site`, `proposed` boundaries for `very_different`, `proposed` mappings for a `missing` record's split or join candidates, and a flag for the place. With the first release or review that needs them.
-- Importing `STATUS`, `STATUS_YR`, `GOV_TYPE`, and `PA_DEF`. `DESIG_TYPE` comes in task 09.
+- Importing `STATUS`, `STATUS_YR`, `GOV_TYPE`, and `PA_DEF`. `DESIG_TYPE` and `INT_CRIT` came in task 09. `recognition_details.inscribed_on` comes with `STATUS_YR`.
+- Review of the derived `recognises` links left `proposed` below the confirmation share (task 09), with the admin overlap screen.
+- Links between recognitions, such as a World Heritage Site over a Ramsar site, and between conservation areas. Task 09 derives only recognition to conservation area.
+- `place_overlaps()` on large shapes. On Micro compute one call over a Natura 2000 site of 862,145 vertices and 53 candidate parks ran the hosted database out of memory and restarted it (12 November 2026). 59 recognitions and 139 conservation areas have more than 100,000 vertices. Cut both shapes into pieces (`ST_Subdivide`) before intersecting, or cap the vertices it accepts, before the admin overlap screen calls it.
+- A recognition designation that a later release adds or spells differently stays a conservation area until `recognition_type_for_designation()` is extended. With the next import.
 - Boundary quality and Stats eligibility, with the parcel that resumes Stats, their first reader: the four starting checks (`geometry_valid`, `small_components`, `holes`, `vertex_count`), `boundary_checks`, `qc_status`, the `stats_eligibility` columns and `set_stats_eligibility`, `stats_eligible_boundaries`, and the review of flagged boundaries. The thresholds are set against real Stats runs. Moved out of task 06 on 11 November 2026.
 - The derived admin review queue over every check's findings and source matches, with the reviewers' stored decisions. With Molding Places, after task 10.
 - `reconcile` comparing a merged place with the union of its parcel records, and keeping a merged place's name and details on upload. Until then a merged place stops `upload`. With the next import.
@@ -278,8 +282,10 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Move `place_crops_percent` to the selection. Rename the analysis `facts/` to `stats/`, and point it and the places recipe at the new tables, the recipe at the current boundaries of published places. The pipeline stays paused. `stat_run_issues` and the places PMTiles rebuild are moved out (decided 11 November 2026).
 - [x] [Task 08 — Frontend and cleanup](../archive/tasks/task-08-frontend-and-cleanup.md) — naturewatch-app
   - *Goal:* Move the frontend to the generic reads. Drop the wrappers, `facts`, and `places.geom`.
-- [ ] Task 09 — Recognitions — both repos
-  - *Goal:* Investigate the designations. Import `DESIG_TYPE`. Add recognition types, `place_relationships`, and the admin overlap function. Add a recognitions PMTiles recipe. Rebuild the places PMTiles from the current boundaries of published conservation areas, so the 64 merged parcels draw as their kept places, and decide the stale South Africa rollback copy in `places/protected-areas/v1/` (moved from task 07).
+- [x] [Task 09 — Recognitions](../archive/tasks/task-09-recognitions.md) — both repos
+  - *Goal:* Move the 32 designations the user grouped as recognitions (record 21) into six recognition types with `recognition_details`. Import `DESIG_TYPE` and `INT_CRIT`. Add `place_relationships`, `place_overlaps`, and derived `recognises` links, confirmed above a share the user picks. Publish a recognitions PMTiles archive, rebuild the places archive from the current boundaries of published conservation areas, and remove the stale South Africa rollback copy.
+- [ ] Task 09b — Recognitions on the map and profile — naturewatch-app
+  - *Goal:* Draw recognitions from their archive as an outline layer with its own toggle. Give World Heritage, Ramsar, and UNESCO-MAB their own Places buttons. Show a park's confirmed recognitions as badges under its title, each opening the recognition's profile. Decided 12 November 2026.
 - [ ] Task 10 — Profiles, roles, audit — naturewatch-app
   - *Goal:* Add `profiles`, `user_roles`, `has_role()`, contributor policies, and `audit_log`. Together with Molding Places.
 - [ ] Task 11 — Images — naturewatch-app
