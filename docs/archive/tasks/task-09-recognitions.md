@@ -1,6 +1,6 @@
 # Task 09 — Recognitions
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repositories: naturewatch-app and naturewatch-analysis. Start only after task 08 has merged into `develop` (pull request #409, merged 12 November 2026; hosted results in #410).
 

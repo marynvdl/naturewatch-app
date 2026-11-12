@@ -282,7 +282,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Move `place_crops_percent` to the selection. Rename the analysis `facts/` to `stats/`, and point it and the places recipe at the new tables, the recipe at the current boundaries of published places. The pipeline stays paused. `stat_run_issues` and the places PMTiles rebuild are moved out (decided 11 November 2026).
 - [x] [Task 08 — Frontend and cleanup](../archive/tasks/task-08-frontend-and-cleanup.md) — naturewatch-app
   - *Goal:* Move the frontend to the generic reads. Drop the wrappers, `facts`, and `places.geom`.
-- [ ] [Task 09 — Recognitions](../tasks/task-09-recognitions.md) — both repos
+- [x] [Task 09 — Recognitions](../archive/tasks/task-09-recognitions.md) — both repos
   - *Goal:* Move the 32 designations the user grouped as recognitions (record 21) into six recognition types with `recognition_details`. Import `DESIG_TYPE` and `INT_CRIT`. Add `place_relationships`, `place_overlaps`, and derived `recognises` links, confirmed above a share the user picks. Publish a recognitions PMTiles archive, rebuild the places archive from the current boundaries of published conservation areas, and remove the stale South Africa rollback copy.
 - [ ] Task 09b — Recognitions on the map and profile — naturewatch-app
   - *Goal:* Draw recognitions from their archive as an outline layer with its own toggle. Give World Heritage, Ramsar, and UNESCO-MAB their own Places buttons. Show a park's confirmed recognitions as badges under its title, each opening the recognition's profile. Decided 12 November 2026.
