@@ -220,6 +220,7 @@ class ImportWdpaTest(unittest.TestCase):
                 import_wdpa.SUPERSEDE_BOUNDARIES,
                 import_wdpa.INSERT_BOUNDARIES,
                 import_wdpa.UPDATE_DETAILS,
+                import_wdpa.UPDATE_RECOGNITION_DETAILS,
                 import_wdpa.UPDATE_PARCEL_IDS,
                 "truncate batch_place",
             ],
@@ -344,6 +345,7 @@ class ImportWdpaTest(unittest.TestCase):
                     {
                         "pin_sha256": import_wdpa.PINNED_SHA256,
                         "rows_sha256": digest,
+                        "columns": list(import_wdpa.COLUMNS),
                         "kept": 1,
                     }
                 )
@@ -353,6 +355,58 @@ class ImportWdpaTest(unittest.TestCase):
             with self.assertRaises(SystemExit) as raised:
                 import_wdpa.read_manifest(work)
             self.assertIn("manifest checksum", str(raised.exception))
+
+    def test_a_filtered_file_with_older_columns_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            (work / import_wdpa.FILTERED_NAME).write_text("a\t1\n")
+            digest = import_wdpa.file_sha256(work / import_wdpa.FILTERED_NAME)
+            (work / import_wdpa.MANIFEST_NAME).write_text(
+                json.dumps(
+                    {"pin_sha256": import_wdpa.PINNED_SHA256, "rows_sha256": digest, "kept": 1}
+                )
+            )
+            with self.assertRaises(SystemExit) as raised:
+                import_wdpa.read_manifest(work)
+            self.assertIn("older columns", str(raised.exception))
+
+    def test_the_geometry_stays_the_last_column(self):
+        self.assertEqual(import_wdpa.COLUMNS[-1], "wkb_hex")
+        self.assertIn("designation_type", import_wdpa.COLUMNS)
+        self.assertIn("criteria", import_wdpa.COLUMNS)
+        for name in ("DESIG_TYPE", "INT_CRIT"):
+            self.assertIn(name, import_wdpa.REQUIRED_FIELDS)
+
+    def test_designation_types_are_stored_as_the_check_allows(self):
+        self.assertEqual(
+            set(import_wdpa.DESIGNATION_TYPES.values()),
+            {"national", "regional", "international", "not_applicable"},
+        )
+
+    def test_attribute_row_reads_site_pid_type_and_criteria(self):
+        row = ["pid", "site", "Name", "Ramsar", "", "ZAF", "Terrestrial", "international", "", "0101"]
+        self.assertEqual(import_wdpa.attribute_row(row), ["pid", "international", None])
+        row[8] = "(i)(ii)"
+        self.assertEqual(import_wdpa.attribute_row(row), ["pid", "international", "(i)(ii)"])
+
+    def test_attributes_writes_only_the_two_columns_by_the_lowest_site_pid(self):
+        conservation = import_wdpa.UPDATE_CONSERVATION_ATTRIBUTES
+        recognition = import_wdpa.UPDATE_RECOGNITION_ATTRIBUTES
+        self.assertIn("set designation_type = matched.designation_type\n", conservation)
+        self.assertIn(
+            "set designation_type = matched.designation_type, criteria = matched.criteria\n",
+            recognition,
+        )
+        for sql in (conservation, recognition):
+            self.assertIn("min(own.source_record_id)", sql)
+            self.assertIn("is distinct from", sql)
+
+    def test_upload_updates_recognition_details_and_their_site_rows(self):
+        sql = import_wdpa.UPDATE_RECOGNITION_DETAILS
+        self.assertTrue(sql.lstrip().startswith("update public.recognition_details"))
+        self.assertIn("criteria = batch_place.criteria", sql)
+        self.assertIn("public.recognition_details", import_wdpa.UPDATE_SITE_IDS)
+        self.assertIn("designation_type = batch_place.designation_type", import_wdpa.UPDATE_DETAILS)
 
     def test_no_step_deletes_a_stored_place(self):
         source = MODULE_PATH.read_text()

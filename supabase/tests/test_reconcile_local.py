@@ -133,21 +133,34 @@ class ReconcileLocalTest(unittest.TestCase):
         )
         return place_id
 
-    def write_file(self, records: list[tuple[str, str, str, str]]) -> None:
+    def write_file(
+        self,
+        records: list[tuple[str, str, str, str]],
+        attributes: dict[str, tuple[str, str]] | None = None,
+    ) -> None:
         rows = []
         for pid, site, name, wkt in records:
+            designation_type, criteria = (attributes or {}).get(pid, ("national", ""))
             wkb = self.conn.execute(
                 "select encode(extensions.ST_AsBinary(extensions.ST_GeomFromText(%s, 4326)), 'hex') as h",
                 (wkt,),
             ).fetchone()["h"]
-            rows.append([pid, site, name, "National Park", "II", "ZAF", "Terrestrial", wkb])
+            rows.append(
+                [pid, site, name, "National Park", "II", "ZAF", "Terrestrial",
+                 designation_type, criteria, wkb]
+            )
         path = self.work / import_wdpa.FILTERED_NAME
         with gzip.open(path, "wt", newline="") as handle:
             csv.writer(handle, delimiter="\t", lineterminator="\n").writerows(rows)
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         (self.work / import_wdpa.MANIFEST_NAME).write_text(
             json.dumps(
-                {"pin_sha256": import_wdpa.PINNED_SHA256, "rows_sha256": digest, "kept": len(rows)}
+                {
+                    "pin_sha256": import_wdpa.PINNED_SHA256,
+                    "rows_sha256": digest,
+                    "columns": list(import_wdpa.COLUMNS),
+                    "kept": len(rows),
+                }
             )
         )
 
@@ -375,6 +388,115 @@ class ReconcileLocalTest(unittest.TestCase):
             ).fetchone()["name"],
             "Park E",
         )
+
+    def make_recognition(self, pid: str) -> None:
+        place_id = self.ids[pid]
+        self.conn.execute(
+            "update public.places set place_type_id = 'world_heritage_site' where id = %s",
+            (place_id,),
+        )
+        self.conn.execute(
+            """
+            insert into public.recognition_details (
+              place_id, designation, iso3, realm, source_id, source_release_id, source_record_id
+            )
+            select place_id, 'World Heritage Site (natural or mixed)', iso3, realm,
+              source_id, source_release_id, source_record_id
+            from public.conservation_area_details where place_id = %s
+            """,
+            (place_id,),
+        )
+        self.conn.execute(
+            "delete from public.conservation_area_details where place_id = %s", (place_id,)
+        )
+
+    def test_attributes_sets_designation_type_and_criteria_only(self):
+        self.make_recognition("pid-d")
+        before = self.conn.execute(
+            "select place_id, designation, iucn_category, iso3, realm, source_release_id "
+            "from public.conservation_area_details order by place_id"
+        ).fetchall()
+        self.write_file(
+            [
+                ("pid-a", "site-a", "Renamed in the file", A),
+                ("pid-b", "site-b", "Park B", B),
+                ("pid-d", "site-d", "Park D", D),
+            ],
+            {"pid-b": ("regional", ""), "pid-d": ("international", "(vii)(ix)")},
+        )
+        result = import_wdpa.attributes(self.work)
+        self.assertEqual(
+            result["changed"], {"conservation_area_details": 2, "recognition_details": 1}
+        )
+        self.assertEqual(result["not_found"], ["pid-c"])
+        types = {
+            row["place_id"]: row["designation_type"]
+            for row in self.conn.execute(
+                "select place_id, designation_type from public.conservation_area_details"
+            ).fetchall()
+        }
+        self.assertEqual(types[self.ids["pid-a"]], "national")
+        self.assertEqual(types[self.ids["pid-b"]], "regional")
+        self.assertIsNone(types[self.ids["pid-c"]])
+        recognition = self.conn.execute(
+            "select designation_type, criteria from public.recognition_details where place_id = %s",
+            (self.ids["pid-d"],),
+        ).fetchone()
+        self.assertEqual(recognition, {"designation_type": "international", "criteria": "(vii)(ix)"})
+        # Nothing else changed: not a name, not another details column.
+        self.assertEqual(
+            self.conn.execute(
+                "select name from public.places where id = %s", (self.ids["pid-a"],)
+            ).fetchone()["name"],
+            "Park A",
+        )
+        after = self.conn.execute(
+            "select place_id, designation, iucn_category, iso3, realm, source_release_id "
+            "from public.conservation_area_details order by place_id"
+        ).fetchall()
+        self.assertEqual(after, before)
+        # A second run changes nothing.
+        again = import_wdpa.attributes(self.work)
+        self.assertEqual(
+            again["changed"], {"conservation_area_details": 0, "recognition_details": 0}
+        )
+
+    def test_upload_writes_recognition_details(self):
+        self.make_recognition("pid-d")
+        self.conn.execute(
+            "update public.place_source_ids set last_seen_release_id = null"
+        )
+        self.write_file(
+            [
+                ("pid-a", "site-a", "Park A", A),
+                ("pid-b", "site-b", "Park B", B),
+                ("pid-c", "site-c", "Park C", C),
+                ("pid-d", "site-d", "Park D", D),
+            ],
+            {"pid-d": ("international", "(x)")},
+        )
+        import_wdpa.upload(self.work)
+        row = self.conn.execute(
+            "select designation_type, criteria, designation, source_release_id "
+            "from public.recognition_details where place_id = %s",
+            (self.ids["pid-d"],),
+        ).fetchone()
+        self.assertEqual(row["designation_type"], "international")
+        self.assertEqual(row["criteria"], "(x)")
+        self.assertEqual(row["designation"], "National Park")
+        self.assertEqual(row["source_release_id"], self.release)
+        self.assertFalse(
+            self.conn.execute(
+                "select exists (select 1 from public.conservation_area_details where place_id = %s) as e",
+                (self.ids["pid-d"],),
+            ).fetchone()["e"]
+        )
+        site = self.conn.execute(
+            "select last_seen_release_id from public.place_source_ids "
+            "where id_kind = 'wdpa_site_id' and source_record_id = 'site-d'"
+        ).fetchone()
+        self.assertEqual(site["last_seen_release_id"], self.release)
+
 
 if __name__ == "__main__":
     unittest.main()

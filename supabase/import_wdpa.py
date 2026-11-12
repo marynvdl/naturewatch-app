@@ -19,6 +19,10 @@
              already written.
   merge      Read-only check of the result against the file (the name is kept
              for the existing commands): counts, invalid boundaries, place_stats.
+  attributes Build if needed, then set designation_type (WDPCA DESIG_TYPE) on
+             both details tables, and criteria (INT_CRIT) on recognition_details,
+             for places already stored. Writes nothing else. Reports the rows
+             changed and the stored places the file does not have.
 
 `run` (the default) does build, probe, then upload. Run `merge` afterwards.
 
@@ -81,6 +85,8 @@ REQUIRED_FIELDS = (
     "NAME",
     "NAME_ENG",
     "DESIG_ENG",
+    "DESIG_TYPE",
+    "INT_CRIT",
     "IUCN_CAT",
     "REALM",
     "ISO3",
@@ -88,6 +94,13 @@ REQUIRED_FIELDS = (
 )
 # 112 km is longer than one degree anywhere on Earth, so a polygon whose
 # planar area is below this cannot reach 10 km².
+# WDPCA DESIG_TYPE as the details tables store it.
+DESIGNATION_TYPES = {
+    "National": "national",
+    "Regional": "regional",
+    "International": "international",
+    "Not Applicable": "not_applicable",
+}
 TOO_SMALL_DEGREE_AREA = 10.0 / (112.0 * 112.0)
 BATCH_ROWS = 50
 # A few polygons are very large. Send a batch early when it reaches this size.
@@ -106,6 +119,8 @@ COLUMNS = (
     "iucn_category",
     "iso3",
     "realm",
+    "designation_type",
+    "criteria",
     "wkb_hex",
 )
 COPY_BATCH = f"copy batch ({', '.join(COLUMNS)}) from stdin"
@@ -118,6 +133,8 @@ create temp table if not exists batch (
   iucn_category text,
   iso3 text,
   realm text,
+  designation_type text,
+  criteria text,
   wkb_hex text
 ) on commit delete rows
 """
@@ -132,6 +149,12 @@ PARSED_GEOM = """extensions.ST_Multi(
 # Intersection over union, on the spheroid, at or above which a changed shape of
 # a known SITE_PID is the same place reshaped (decisions.md, records 4 and 7).
 RESHAPED_MIN_IOU = 0.95
+# The stored SITE_ID of each place, from whichever details table it has.
+DETAILS_SITE_IDS = """(
+  select place_id, source_record_id from public.conservation_area_details
+  union all
+  select place_id, source_record_id from public.recognition_details
+)"""
 CLEAN_CLASSES = ("unchanged", "reshaped")
 REPORT_CSV = "reconciliation.csv"
 REPORT_JSON = "reconciliation.json"
@@ -200,7 +223,7 @@ left join public.place_source_ids as ids
 left join public.place_boundaries as boundary
   on boundary.place_id = ids.place_id
   and boundary.is_current
-left join public.conservation_area_details as details on details.place_id = ids.place_id
+left join {DETAILS_SITE_IDS} as details on details.place_id = ids.place_id
 left join lateral (
   select count(*) as n
   from public.place_source_ids as other
@@ -265,11 +288,11 @@ set class = 'very_different', flags = flags || array['compare_failed']
 where site_pid = %(site_pid)s
 """
 # A stored SITE_PID that the file does not have.
-ADD_MISSING = """
+ADD_MISSING = f"""
 insert into recon (site_pid, site_id, place_id, class)
 select ids.source_record_id, details.source_record_id, ids.place_id, 'missing'
 from public.place_source_ids as ids
-left join public.conservation_area_details as details on details.place_id = ids.place_id
+left join {DETAILS_SITE_IDS} as details on details.place_id = ids.place_id
 where ids.source_id = 'wdpca'
   and ids.id_kind = 'wdpa_site_pid'
   and ids.match_status = 'confirmed'
@@ -309,6 +332,8 @@ create temp table if not exists batch_place (
   iucn_category text,
   iso3 text,
   realm text,
+  designation_type text,
+  criteria text,
   geom extensions.geometry(MultiPolygon, 4326),
   place_id uuid,
   boundary_id uuid,
@@ -321,12 +346,14 @@ create temp table if not exists batch_place (
 # every row of 10 km2 or more matches. write_batch checks that it did.
 MATCH_BATCH = f"""
 insert into batch_place (
-  source_id, site_id, name, designation, iucn_category, iso3, realm, geom,
+  source_id, site_id, name, designation, iucn_category, iso3, realm,
+  designation_type, criteria, geom,
   place_id, boundary_id, next_version, same_shape
 )
 select
   parsed.source_id, parsed.site_id, parsed.name, parsed.designation,
-  parsed.iucn_category, parsed.iso3, parsed.realm, parsed.geom,
+  parsed.iucn_category, parsed.iso3, parsed.realm,
+  parsed.designation_type, parsed.criteria, parsed.geom,
   ids.place_id,
   boundary.id,
   (
@@ -339,6 +366,7 @@ from (
   select
     batch.source_id, batch.site_id, batch.name, batch.designation,
     batch.iucn_category, batch.iso3, batch.realm,
+    batch.designation_type, batch.criteria,
     {PARSED_GEOM} as geom
   from batch
 ) as parsed
@@ -388,11 +416,28 @@ select
 from batch_place
 where not same_shape
 """
+# A place has conservation area details or recognition details, never both. Which
+# kind a place is does not change on import (decisions.md, record 21).
 UPDATE_DETAILS = """
 update public.conservation_area_details as details
 set
   designation = batch_place.designation,
+  designation_type = batch_place.designation_type,
   iucn_category = batch_place.iucn_category,
+  iso3 = string_to_array(batch_place.iso3, ';'),
+  realm = batch_place.realm,
+  source_release_id = %(release)s,
+  source_record_id = batch_place.site_id,
+  source_url = 'https://www.protectedplanet.net/' || batch_place.site_id
+from batch_place
+where details.place_id = batch_place.place_id
+"""
+UPDATE_RECOGNITION_DETAILS = """
+update public.recognition_details as details
+set
+  designation = batch_place.designation,
+  designation_type = batch_place.designation_type,
+  criteria = batch_place.criteria,
   iso3 = string_to_array(batch_place.iso3, ';'),
   realm = batch_place.realm,
   source_release_id = %(release)s,
@@ -423,8 +468,73 @@ where site.source_id = 'wdpca'
     from public.conservation_area_details as details
     where details.source_id = 'wdpca'
       and details.source_release_id = %(release)s
+    union
+    select details.source_record_id
+    from public.recognition_details as details
+    where details.source_id = 'wdpca'
+      and details.source_release_id = %(release)s
   )
 """
+# --- attributes ---------------------------------------------------------------
+# DESIG_TYPE and INT_CRIT only, for places already stored. A merged place holds
+# several SITE_PIDs and takes the values of its lowest, as place_summaries does.
+ATTRIBUTE_ROWS = 5000
+CREATE_ATTRIBUTE_BATCH = """
+create temp table if not exists attribute_batch (
+  site_pid text primary key,
+  designation_type text,
+  criteria text
+) on commit delete rows
+"""
+COPY_ATTRIBUTE_BATCH = "copy attribute_batch (site_pid, designation_type, criteria) from stdin"
+ATTRIBUTE_MATCH = """
+select ids.place_id, batch.designation_type, batch.criteria
+from attribute_batch as batch
+join public.place_source_ids as ids
+  on ids.source_id = 'wdpca'
+  and ids.id_kind = 'wdpa_site_pid'
+  and ids.match_status = 'confirmed'
+  and ids.source_record_id = batch.site_pid
+where ids.source_record_id = (
+  select min(own.source_record_id)
+  from public.place_source_ids as own
+  where own.place_id = ids.place_id
+    and own.source_id = 'wdpca'
+    and own.id_kind = 'wdpa_site_pid'
+    and own.match_status = 'confirmed'
+)
+"""
+UPDATE_CONSERVATION_ATTRIBUTES = f"""
+update public.conservation_area_details as details
+set designation_type = matched.designation_type
+from ({ATTRIBUTE_MATCH}) as matched
+where details.place_id = matched.place_id
+  and details.designation_type is distinct from matched.designation_type
+"""
+UPDATE_RECOGNITION_ATTRIBUTES = f"""
+update public.recognition_details as details
+set designation_type = matched.designation_type, criteria = matched.criteria
+from ({ATTRIBUTE_MATCH}) as matched
+where details.place_id = matched.place_id
+  and (
+    details.designation_type is distinct from matched.designation_type
+    or details.criteria is distinct from matched.criteria
+  )
+"""
+# Each place with details, by its lowest confirmed SITE_PID.
+STORED_PRIMARY_PIDS = """
+select min(ids.source_record_id) as site_pid
+from public.place_source_ids as ids
+where ids.source_id = 'wdpca'
+  and ids.id_kind = 'wdpa_site_pid'
+  and ids.match_status = 'confirmed'
+  and (
+    exists (select 1 from public.conservation_area_details as d where d.place_id = ids.place_id)
+    or exists (select 1 from public.recognition_details as d where d.place_id = ids.place_id)
+  )
+group by ids.place_id
+"""
+
 # The SITE_PIDs stored for a release, with their place and current area.
 STORED_PARCELS = """
 select ids.source_record_id as source_id, ids.place_id as id, boundary.area_km2
@@ -459,6 +569,9 @@ def main() -> None:
         upload(work)
     elif command == "merge":
         merge(work)
+    elif command == "attributes":
+        build(work)
+        attributes(work)
     elif command == "run":
         build(work)
         probe(work, 30)
@@ -466,7 +579,8 @@ def main() -> None:
         print("upload finished. Check the stage, then run: merge", flush=True)
     else:
         raise SystemExit(
-            f"unknown command {command!r}: build, probe, reconcile, upload, merge, run"
+            f"unknown command {command!r}: "
+            "build, probe, reconcile, upload, merge, attributes, run"
         )
 
 
@@ -483,9 +597,11 @@ def build(work: Path) -> dict:
     manifest_path = work / MANIFEST_NAME
     filtered = work / FILTERED_NAME
     if manifest_path.exists() and filtered.exists():
-        manifest = read_manifest(work)
-        print(f"filtered file already built: {manifest['kept']} polygons", flush=True)
-        return manifest
+        if json.loads(manifest_path.read_text()).get("columns") == list(COLUMNS):
+            manifest = read_manifest(work)
+            print(f"filtered file already built: {manifest['kept']} polygons", flush=True)
+            return manifest
+        print("filtered file has older columns: building it again", flush=True)
 
     zip_path = work / "wdpa.zip"
     if zip_path.exists() and file_sha256(zip_path) == PINNED_SHA256:
@@ -513,6 +629,7 @@ def build(work: Path) -> dict:
     manifest = {
         "pin_sha256": PINNED_SHA256,
         "rows_sha256": digest,
+        "columns": list(COLUMNS),
         "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         **stats,
     }
@@ -623,6 +740,13 @@ def filter_feature(feature, ogr, seen: set[str], problems: list[str], stats: dic
     if not geometry.IsValid():
         problems.append(f"invalid geometry {source_id}: not valid")
         return None
+    designation_type = text(feature, "DESIG_TYPE")
+    if designation_type not in DESIGNATION_TYPES:
+        problems.append(f"{source_id}: DESIG_TYPE {designation_type!r} is outside the WDPA set")
+        return None
+    criteria = text(feature, "INT_CRIT")
+    if criteria in ("Not Applicable", "Not Reported"):
+        criteria = None
     if gis_area is not None and gis_area >= 10:
         stats["kept_gis_area_ge_10"] += 1
     return [
@@ -633,6 +757,8 @@ def filter_feature(feature, ogr, seen: set[str], problems: list[str], stats: dic
         iucn or "",
         text(feature, "ISO3") or "",
         realm,
+        DESIGNATION_TYPES[designation_type],
+        criteria or "",
         bytes(geometry.ExportToWkb(ogr.wkbNDR)).hex(),
     ]
 
@@ -714,6 +840,8 @@ def read_manifest(work: Path) -> dict:
     manifest = json.loads(manifest_path.read_text())
     if manifest.get("pin_sha256") != PINNED_SHA256:
         raise SystemExit("filtered file was built from a different pin")
+    if manifest.get("columns") != list(COLUMNS):
+        raise SystemExit("filtered file has older columns: run build again")
     if file_sha256(filtered) != manifest.get("rows_sha256"):
         raise SystemExit("filtered file does not match its manifest checksum")
     return manifest
@@ -1192,6 +1320,7 @@ def write_batch(cur, release) -> None:
     cur.execute(SUPERSEDE_BOUNDARIES)
     cur.execute(INSERT_BOUNDARIES, {"release": release})
     cur.execute(UPDATE_DETAILS, {"release": release})
+    cur.execute(UPDATE_RECOGNITION_DETAILS, {"release": release})
     cur.execute(UPDATE_PARCEL_IDS, {"release": release})
     cur.execute("truncate batch_place")
 
@@ -1235,6 +1364,73 @@ def fetch_source(conn) -> dict:
     return row
 
 
+# --- attributes --------------------------------------------------------------
+
+
+def attribute_row(row: list[str]) -> list[str | None]:
+    """SITE_PID, designation type, and criteria from a filtered row."""
+    values = dict(zip(COLUMNS, row))
+    return [
+        values["source_id"],
+        values["designation_type"] or None,
+        values["criteria"] or None,
+    ]
+
+
+def attributes(work: Path) -> dict:
+    """Set designation_type on both details tables, and criteria on
+    recognition_details, from the filtered file. Writes nothing else."""
+    read_manifest(work)
+    conn = open_connection()
+    try:
+        fetch_source(conn)
+        result = attributes_pass(conn, work)
+    finally:
+        conn.close()
+    print(json.dumps({key: result[key] for key in ("changed", "stored")}
+                     | {"not_found": len(result["not_found"])}), flush=True)
+    for site_pid in result["not_found"][:50]:
+        print(f"not in the file: {site_pid}", flush=True)
+    return result
+
+
+def attributes_pass(conn, work: Path) -> dict:
+    """Copy the attributes in batches, commit each, and update the details rows
+    that differ."""
+    changed = {"conservation_area_details": 0, "recognition_details": 0}
+    in_file: set[str] = set()
+    batch: list[list[str | None]] = []
+
+    def flush() -> None:
+        if not batch:
+            return
+        with conn.cursor() as cur:
+            cur.execute(CREATE_ATTRIBUTE_BATCH)
+            with cur.copy(COPY_ATTRIBUTE_BATCH) as copy:
+                for values in batch:
+                    copy.write_row(values)
+            cur.execute(UPDATE_CONSERVATION_ATTRIBUTES)
+            changed["conservation_area_details"] += cur.rowcount
+            cur.execute(UPDATE_RECOGNITION_ATTRIBUTES)
+            changed["recognition_details"] += cur.rowcount
+            cur.execute("truncate attribute_batch")
+        conn.commit()
+        batch.clear()
+
+    for row in read_rows(work):
+        values = attribute_row(row)
+        in_file.add(values[0])
+        batch.append(values)
+        if len(batch) >= ATTRIBUTE_ROWS:
+            flush()
+            print(f"attributes read: {len(in_file)}", flush=True)
+    flush()
+    with conn.cursor() as cur:
+        cur.execute(STORED_PRIMARY_PIDS)
+        stored = {row["site_pid"] for row in cur.fetchall()}
+    return {"changed": changed, "stored": len(stored), "not_found": sorted(stored - in_file)}
+
+
 # --- check -------------------------------------------------------------------
 
 
@@ -1273,8 +1469,13 @@ def merge(work: Path) -> None:
             """
             select
               (select count(distinct source_record_id)
-               from public.conservation_area_details
-               where source_id = 'wdpca' and source_release_id = %(release)s) as sites,
+               from (
+                 select source_record_id from public.conservation_area_details
+                 where source_id = 'wdpca' and source_release_id = %(release)s
+                 union all
+                 select source_record_id from public.recognition_details
+                 where source_id = 'wdpca' and source_release_id = %(release)s
+               ) as details) as sites,
               (select count(*)
                from public.place_source_ids
                where source_id = 'wdpca' and id_kind = 'wdpa_site_id'

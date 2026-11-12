@@ -431,14 +431,14 @@ begin
     raise exception 'row level security is not enabled on a task 04 table';
   end if;
 
-  if (select count(*) from public.place_types) <> 1
+  if (select count(*) from public.place_types where place_category_id <> 'recognition') <> 1
     or not exists (
       select 1 from public.place_types
       where id = 'conservation_area'
         and place_category_id = 'conservation_area'
         and details_kind = 'conservation_area'
     ) then
-    raise exception 'place_types does not hold only conservation_area';
+    raise exception 'place_types does not hold conservation_area beside the recognitions';
   end if;
 
   if exists (
@@ -594,8 +594,8 @@ begin
       raise exception '% saw % place rows, expected the 3 published ones', role_name, readable;
     end if;
 
-    if (select count(*) from public.place_categories) <> 1
-      or (select count(*) from public.place_types) <> 1
+    if (select count(*) from public.place_categories) <> 2
+      or (select count(*) from public.place_types) <> 7
       or (select count(*) from public.conservation_area_details) <> 3
       or (select count(*) from public.place_source_ids) <> 6 then
       raise exception '% cannot read the task 04 tables, or read a draft place''s rows', role_name;
@@ -1384,6 +1384,263 @@ begin
   ) or to_regclass('public.places_geom_idx') is not null then
     raise exception 'places still has its geometry, area, box, or geometry index';
   end if;
+end $$;
+
+-- Task 09: recognitions and relationships -------------------------------------------
+-- A park, a World Heritage Site over all of it, a Ramsar site over half of it, and a
+-- draft World Heritage record that must not move. The park is 0.2 by 0.2 degrees.
+
+select pg_temp.fixture_place(
+  'fixture-rec-park', 'fixture-rec-park-site', 'Recognised Park', 'II', 'ZWE',
+  'MULTIPOLYGON(((30 -20, 30.2 -20, 30.2 -19.8, 30 -19.8, 30 -20)))'
+);
+select pg_temp.fixture_place(
+  'fixture-rec-whs', 'fixture-rec-whs-site', 'Fixture Falls', 'Not Applicable', 'ZWE;ZMB',
+  'MULTIPOLYGON(((29.9 -20.1, 30.3 -20.1, 30.3 -19.7, 29.9 -19.7, 29.9 -20.1)))'
+);
+select pg_temp.fixture_place(
+  'fixture-rec-ramsar', 'fixture-rec-ramsar-site', 'Fixture Wetland', 'Not Applicable', 'ZWE',
+  'MULTIPOLYGON(((30.1 -20, 30.3 -20, 30.3 -19.8, 30.1 -19.8, 30.1 -20)))'
+);
+select pg_temp.fixture_place(
+  'fixture-rec-draft', 'fixture-rec-draft-site', 'Draft Heritage', 'Not Applicable', 'ZWE',
+  'MULTIPOLYGON(((31 -20, 31.2 -20, 31.2 -19.8, 31 -19.8, 31 -20)))',
+  'draft'
+);
+update public.conservation_area_details
+set designation = 'World Heritage Site (natural or mixed)', designation_type = 'international'
+where place_id in (pg_temp.fixture_id('fixture-rec-whs'), pg_temp.fixture_id('fixture-rec-draft'));
+update public.conservation_area_details
+set designation = 'RAMSAR Sites'
+where place_id = pg_temp.fixture_id('fixture-rec-ramsar');
+
+do $$
+declare
+  park uuid := pg_temp.fixture_id('fixture-rec-park');
+  whs uuid := pg_temp.fixture_id('fixture-rec-whs');
+  ramsar uuid := pg_temp.fixture_id('fixture-rec-ramsar');
+  draft uuid := pg_temp.fixture_id('fixture-rec-draft');
+  moved jsonb;
+  summary record;
+  overlap record;
+  whs_boundary uuid;
+  park_boundary uuid;
+  ramsar_boundary uuid;
+begin
+  if public.recognition_type_for_designation('National Park') is not null
+    or public.recognition_type_for_designation('Natura 2000 SCI') <> 'natura_2000_site'
+    or public.recognition_type_for_designation('Biosphere Reserve') <> 'other_recognition'
+    or public.recognition_type_for_designation('UNESCO-MAB Biosphere Reserve') <> 'biosphere_reserve' then
+    raise exception 'recognition_type_for_designation does not follow record 21';
+  end if;
+
+  select jsonb_object_agg(result.recognition_type, result.moved) into moved
+  from public.move_recognition_places() as result;
+  if moved is distinct from '{"ramsar_site": 1, "world_heritage_site": 1}'::jsonb then
+    raise exception 'the move returned %, expected one World Heritage and one Ramsar place', moved;
+  end if;
+  if exists (select 1 from public.move_recognition_places()) then
+    raise exception 'a second move moved places again';
+  end if;
+
+  if (select place_type_id from public.places where id = whs) <> 'world_heritage_site'
+    or (select place_type_id from public.places where id = ramsar) <> 'ramsar_site'
+    or (select place_type_id from public.places where id = park) <> 'conservation_area'
+    or (select place_type_id from public.places where id = draft) <> 'conservation_area' then
+    raise exception 'the move gave a place the wrong type';
+  end if;
+  if exists (select 1 from public.conservation_area_details where place_id in (whs, ramsar))
+    or not exists (
+      select 1 from public.recognition_details
+      where place_id = whs
+        and designation = 'World Heritage Site (natural or mixed)'
+        and designation_type = 'international'
+        and iso3 = '{ZWE,ZMB}'
+        and realm = 'Terrestrial'
+        and source_record_id = 'fixture-rec-whs-site'
+    ) then
+    raise exception 'the World Heritage details did not move whole';
+  end if;
+  if (select count(*) from public.place_boundaries where place_id = whs) <> 1
+    or (select count(*) from public.place_source_ids where place_id = whs) <> 2 then
+    raise exception 'the move changed a boundary or a source id';
+  end if;
+
+  select * into summary from public.place_summaries where id = whs;
+  if summary.designation <> 'World Heritage Site (natural or mixed)'
+    or summary.iso3 <> 'ZWE;ZMB'
+    or summary.site_id <> 'fixture-rec-whs-site'
+    or summary.realm <> 'Terrestrial'
+    or summary.iucn_category is not null then
+    raise exception 'place_summaries did not read the recognition details: %', summary;
+  end if;
+  select * into summary from public.place_summaries where id = park;
+  if summary.designation <> 'National Park' or summary.iucn_category <> 'II' then
+    raise exception 'place_summaries lost the conservation area details: %', summary;
+  end if;
+
+  begin
+    insert into public.conservation_area_details (place_id, iso3, source_id)
+    values (whs, '{ZWE}', 'wdpca');
+    raise exception 'conservation area details were stored for a recognition';
+  exception
+    when check_violation then
+      null;
+  end;
+  begin
+    insert into public.recognition_details (place_id, iso3, source_id)
+    values (park, '{ZWE}', 'wdpca');
+    raise exception 'recognition details were stored for a conservation area';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  -- The World Heritage Site covers the whole park, and the park is a quarter of it.
+  select * into overlap from public.place_overlaps(whs) where place_id = park;
+  if overlap is null
+    or abs(overlap.object_coverage - 1) > 0.001
+    or abs(overlap.subject_coverage - 0.25) > 0.01
+    or overlap.place_type_id <> 'conservation_area' then
+    raise exception 'place_overlaps(whs) returned % for the park', overlap;
+  end if;
+  -- Half the park lies under the Ramsar site, which is the same size.
+  select * into overlap from public.place_overlaps(ramsar) where place_id = park;
+  if overlap is null or abs(overlap.object_coverage - 0.5) > 0.01 then
+    raise exception 'place_overlaps(ramsar) returned % for the park', overlap;
+  end if;
+  if exists (select 1 from public.place_overlaps(park) where place_id = draft) then
+    raise exception 'place_overlaps returned a draft place';
+  end if;
+  if exists (select 1 from public.place_overlaps(pg_temp.fixture_id('fixture-pilot'))) then
+    raise exception 'place_overlaps returned a place that does not overlap';
+  end if;
+
+  select id into whs_boundary from public.place_boundaries where place_id = whs and is_current;
+  select id into park_boundary from public.place_boundaries where place_id = park and is_current;
+  select id into ramsar_boundary from public.place_boundaries where place_id = ramsar and is_current;
+
+  insert into public.place_relationships (
+    subject_place_id, relationship_type_id, object_place_id, origin, status,
+    subject_boundary_id, object_boundary_id, subject_coverage, object_coverage
+  ) values
+    (whs, 'recognises', park, 'derived', 'confirmed', whs_boundary, park_boundary, 0.25, 1),
+    (ramsar, 'recognises', park, 'derived', 'proposed', ramsar_boundary, park_boundary, 0.5, 0.5);
+
+  begin
+    insert into public.place_relationships (
+      subject_place_id, relationship_type_id, object_place_id, origin, status
+    ) values (park, 'recognises', park, 'manual', 'confirmed');
+    raise exception 'a place was linked to itself';
+  exception
+    when check_violation then
+      null;
+  end;
+  begin
+    insert into public.place_relationships (
+      subject_place_id, relationship_type_id, object_place_id, origin, status
+    ) values (park, 'recognises', whs, 'manual', 'proposed');
+    raise exception 'the reverse of an active recognises link was stored';
+  exception
+    when check_violation then
+      null;
+  end;
+  begin
+    insert into public.place_relationships (
+      subject_place_id, relationship_type_id, object_place_id, origin, status
+    ) values (whs, 'recognises', park, 'manual', 'proposed');
+    raise exception 'a second active recognises link was stored';
+  exception
+    when unique_violation then
+      null;
+  end;
+  begin
+    insert into public.place_relationships (
+      subject_place_id, relationship_type_id, object_place_id, origin, status, object_coverage
+    ) values (whs, 'located_in', park, 'manual', 'proposed', 0.5);
+    raise exception 'a manual link stored a coverage';
+  exception
+    when check_violation then
+      null;
+  end;
+  begin
+    insert into public.place_relationships (
+      subject_place_id, relationship_type_id, object_place_id, origin, status
+    ) values (whs, 'located_in', park, 'derived', 'proposed');
+    raise exception 'a derived link was stored without its boundaries';
+  exception
+    when check_violation then
+      null;
+  end;
+  begin
+    insert into public.place_relationships (
+      subject_place_id, relationship_type_id, object_place_id, origin, status
+    ) values (greatest(whs, park), 'overlaps', least(whs, park), 'manual', 'proposed');
+    raise exception 'an overlaps link was stored with the larger id as its subject';
+  exception
+    when check_violation then
+      null;
+  end;
+end $$;
+
+do $$
+declare
+  role_name text;
+  visible int;
+begin
+  foreach role_name in array array['anon', 'authenticated'] loop
+    perform set_config('role', role_name, true);
+    select count(*) into visible from public.place_relationships;
+    if visible <> 1 then
+      raise exception '% saw % relationships, expected the 1 confirmed one', role_name, visible;
+    end if;
+    if not exists (
+      select 1 from public.recognition_details
+      where place_id = pg_temp.fixture_id('fixture-rec-whs')
+    ) or (select count(*) from public.place_relationship_types) <> 4 then
+      raise exception '% cannot read recognition details or relationship types', role_name;
+    end if;
+    if exists (
+      select 1 from public.place_window(
+        'conservation_area', 'Fixture Falls', false, 'size-desc',
+        null, null, 0, 100, null, null, null, null, 50
+      )
+    ) or not exists (
+      select 1 from public.place_window(
+        'world_heritage_site', '', false, 'size-desc',
+        null, null, 0, 100, null, null, null, null, 50
+      )
+    ) then
+      raise exception '% saw a recognition in the conservation area list, or not in its own', role_name;
+    end if;
+    begin
+      perform 1 from public.place_overlaps(pg_temp.fixture_id('fixture-rec-whs'));
+      raise exception '% ran place_overlaps', role_name;
+    exception
+      when insufficient_privilege then
+        null;
+    end;
+    begin
+      perform 1 from public.move_recognition_places();
+      raise exception '% ran move_recognition_places', role_name;
+    exception
+      when insufficient_privilege then
+        null;
+    end;
+    begin
+      insert into public.place_relationships (
+        subject_place_id, relationship_type_id, object_place_id, origin, status
+      ) values (
+        pg_temp.fixture_id('fixture-rec-ramsar'), 'located_in',
+        pg_temp.fixture_id('fixture-rec-park'), 'manual', 'proposed'
+      );
+      raise exception '% inserted a relationship', role_name;
+    exception
+      when insufficient_privilege then
+        null;
+    end;
+    perform set_config('role', 'postgres', true);
+  end loop;
 end $$;
 
 \echo records fixture ok

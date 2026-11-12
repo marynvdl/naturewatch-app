@@ -271,3 +271,35 @@ The 74 decisions, each with its reason, are the worked examples in `supabase/mig
 - Until reviewed, a site with several parcels shows as several places, such as the Mongolian /A/ and /B/ parts.
 - A site-level figure needs its own calculation on the union. Record 11 already says Stats do not add up.
 - `place_boundaries.source_record_id` holds SITE_PID. Task 05's version 1 rows hold SITE_ID, which differs for 190 single-parcel sites and for the 74 superseded site unions.
+
+## 21. Which WDPCA designations are recognitions
+
+*Decided 12 November 2026 by the user, in task 09 of the [Database Honing](../parcels/database-honing.md) parcel, from a review page of all 980 stored designations with their WDPCA `DESIG_TYPE` and how much they overlap other designations.*
+
+**Decision.** 32 designations are recognitions, in six place types. Every other designation is a conservation area. Grouping is by the stored designation text, WDPCA `DESIG_ENG`.
+
+| Type | Designations |
+| --- | --- |
+| `world_heritage_site` | World Heritage Site (natural or mixed) |
+| `ramsar_site` | Wetland of International Importance (Ramsar Site), and the national-coded RAMSAR Sites, RAMSAR Wetland, RAMSAR |
+| `biosphere_reserve` | UNESCO-MAB Biosphere Reserve |
+| `natura_2000_site` | Special Areas of Conservation (Habitats Directive), Special Protection Area (Birds Directive), Site of Community Importance (Habitats Directive), and the national-coded Natura 2000 SCI, Natura 2000 SPA, Natura 2000, ZPS - Natura 2000, ZSC - Natura 2000 |
+| `emerald_site` | Emerald Network, Emerald Sites |
+| `other_recognition` | ASEAN Heritage Park, Specially Protected Area (Cartagena Convention), Marine Protected Area (OSPAR), and the nationally designated biosphere reserves and their zones |
+
+On 12 November 2026 that was 11,480 of 50,937 published places: 207, 1,087, 220, 8,770, 1,029, and 167. `recognition_type_for_designation()` in `20261120110000_recognition_places.sql` is the list.
+
+**Why.**
+- These designations are statements about land that other designations already protect, or protect in part. Natura 2000 parcels mostly lie on each other: the median Special Protection Area lies 84% inside a Special Area of Conservation. About half of World Heritage and Ramsar sites lie at least half inside one park.
+- In the conservation area list they counted the same ground twice and pushed parks out of the largest-first list.
+- `DESIG_TYPE` alone does not separate them. Some countries code a Natura 2000 or Ramsar listing as National, and a nationally designated biosphere reserve is National too.
+- The nationally designated biosphere reserves stay apart from UNESCO-MAB, because not every one is a UNESCO listing.
+
+**Alternatives.**
+- By `DESIG_TYPE`, international and regional only. It misses the national-coded copies of the same schemes.
+- Only World Heritage and Ramsar. It leaves Natura 2000, the largest overlap, in the list.
+- None yet, with `DESIG_TYPE` as a tag. The parks list keeps the double counting.
+
+**Cost.**
+- A designation text that a later release adds or spells differently stays a conservation area until the list is extended.
+- The Protected areas list no longer shows recognitions. They come back as their own layer and Places buttons in task 09b.

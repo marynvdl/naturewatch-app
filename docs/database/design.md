@@ -57,7 +57,7 @@ Types: `uuid`, `text`, `timestamptz`, `date`, `double precision`, `integer`, `bo
 
 ### 4.1 Places
 
-*In place* for `place_categories`, `place_types`, `places.place_type_id`, `publication_status`, `merged_into_place_id`, `place_source_ids`, and `conservation_area_details` since task 04 (`20261112100000_types_and_details.sql`). Only the category and type `conservation_area` are stored. `places.submitted_by` and `place_source_ids.matched_by` come with `profiles` in task 10. `recognition_details` and `old_growth_details` come with their records. The WDPCA fields not yet imported (`protection_kind`, `designation_type`, `legal_status`, `status_year`, `governance_type`, `source_attributes`) stay null until the next import. A conservation area place is one WDPCA parcel (record 20). Task 05 merged the parcels of each multi-parcel site, and task 05a undid it (`unmerge_wdpa_site_parcels()`). A `proposed` `wdpa_site_id` row marks a site whose parcels a person has not yet decided to merge or keep apart. Since task 06 (`20261117100000_merge_wdpa_site.sql`) a person decides with `keep_wdpa_site_apart(site_id)` or `merge_wdpa_site(site_id, name)`. Both confirm the site row. On a site with several published places, a confirmed `wdpa_site_id` means a person kept them apart. `merge_wdpa_site` keeps the place holding the site row, gives it the union of the parcels as its next boundary version, and sets the others to `merged`. `place_merged_into(id)` returns the published place a merged place went to, so its old address still opens. The 74 sites were decided on 11 November 2026 (`20261117110000_wdpa_site_decisions.sql`). There is no unmerge function yet. Each merged parcel's superseded boundary keeps its SITE_PID. The importer's reconciliation report (record 4) is *in place* since task 05b (`supabase/import_wdpa.py reconcile`). The importer writes only when every record is `unchanged` or `reshaped`. Its writes for the other classes come with the first release or review that needs them.
+*In place* for `place_categories`, `place_types`, `places.place_type_id`, `publication_status`, `merged_into_place_id`, `place_source_ids`, and `conservation_area_details` since task 04 (`20261112100000_types_and_details.sql`). Since task 09 (`20261120100000_recognitions.sql`, `20261120110000_recognition_places.sql`) the category `recognition` and its six types, `world_heritage_site`, `ramsar_site`, `biosphere_reserve`, `natura_2000_site`, `emerald_site`, and `other_recognition`, and `recognition_details` are *in place*. Which WDPCA designations are recognitions is record 21. `recognition_type_for_designation()` is the only place that list is written, and `move_recognition_places()` moved those places out of the conservation areas, keeping their ids, boundaries, source ids, and stats. `places.submitted_by` and `place_source_ids.matched_by` come with `profiles` in task 10. `old_growth_details` comes with its records. `designation_type` is set from WDPCA `DESIG_TYPE`, and `recognition_details.criteria` from `INT_CRIT`, by `import_wdpa.py attributes` (task 09). The WDPCA fields not yet imported (`protection_kind`, `legal_status`, `status_year`, `governance_type`, `source_attributes`) stay null until the next import. A conservation area place is one WDPCA parcel (record 20). Task 05 merged the parcels of each multi-parcel site, and task 05a undid it (`unmerge_wdpa_site_parcels()`). A `proposed` `wdpa_site_id` row marks a site whose parcels a person has not yet decided to merge or keep apart. Since task 06 (`20261117100000_merge_wdpa_site.sql`) a person decides with `keep_wdpa_site_apart(site_id)` or `merge_wdpa_site(site_id, name)`. Both confirm the site row. On a site with several published places, a confirmed `wdpa_site_id` means a person kept them apart. `merge_wdpa_site` keeps the place holding the site row, gives it the union of the parcels as its next boundary version, and sets the others to `merged`. `place_merged_into(id)` returns the published place a merged place went to, so its old address still opens. The 74 sites were decided on 11 November 2026 (`20261117110000_wdpa_site_decisions.sql`). There is no unmerge function yet. Each merged parcel's superseded boundary keeps its SITE_PID. The importer's reconciliation report (record 4) is *in place* since task 05b (`supabase/import_wdpa.py reconcile`). The importer writes only when every record is `unchanged` or `reshaped`. Its writes for the other classes come with the first release or review that needs them.
 
 **`place_categories`** — lookup.
 
@@ -120,7 +120,19 @@ Unique: `(source_id, id_kind, source_record_id) where match_status = 'confirmed'
 | `source_id`, `source_release_id` | | Provenance (see 4.3) |
 | `source_attributes` | jsonb | The raw source row, unvalidated |
 
-**`recognition_details`**: `place_id` PK, `scheme` (e.g. `world_heritage`, `ramsar`), `inscribed_on`, `criteria`, provenance columns.
+**`recognition_details`** — one row per recognition.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `place_id` | uuid PK, FK → `places` | |
+| `designation` | text | WDPCA `DESIG_ENG` |
+| `designation_type` | text | CHECK as on `conservation_area_details`. From WDPCA `DESIG_TYPE`. |
+| `criteria` | text, null | WDPCA `INT_CRIT`, for example the World Heritage criteria |
+| `iso3` | text[] | |
+| `realm` | text | |
+| `source_id`, `source_release_id`, `source_record_id`, `source_url`, `source_attributes` | | Provenance, as on `conservation_area_details` |
+
+The place type says the scheme, so there is no `scheme` column. `inscribed_on` comes with WDPCA `STATUS_YR`. A place has conservation area details or recognition details, never both.
 
 **`old_growth_details`**: `place_id` PK, `delineation_method`, `assessed_on`, `methodology_version`, provenance columns. The source can be a publication.
 
@@ -353,6 +365,8 @@ Move the selection to a new sprout only once its run covers the eligible boundar
 
 ### 4.5 Relationships
 
+*In place* since task 09 (`20261120100000_recognitions.sql`) for `place_relationship_types`, `place_relationships`, and `place_overlaps(place_id)`. `created_by` and `reviewed_by` come with `profiles` in task 10. `object_coverage` was added beside `subject_coverage`: for `recognises` it is the share of the park inside the recognition, which decides whether a derived link is confirmed. `supabase/derive_recognises.py` writes the derived `recognises` links. Only links between a recognition and a conservation area are derived.
+
 **`place_relationship_types`**: `id` text PK, `label`, `inverse_label`, `is_symmetric`.
 
 | `id` | Meaning | Symmetric |
@@ -374,6 +388,7 @@ Move the selection to a new sprout only once its run covers the eligible boundar
 | `status` | text | CHECK in `proposed`, `confirmed`, `rejected` |
 | `subject_boundary_id`, `object_boundary_id` | uuid, null | For derived rows: the versions used |
 | `subject_coverage` | double precision, null | Derived rows only: the share of the subject's area inside the object |
+| `object_coverage` | double precision, null | Derived rows only: the share of the object's area inside the subject |
 | `source_id`, `source_release_id` | | Provenance |
 | `created_by`, `reviewed_by` | uuid FK → `profiles`, null | |
 | `retired_at` | timestamptz, null | |
@@ -381,7 +396,8 @@ Move the selection to a new sprout only once its run covers the eligible boundar
 Constraints:
 
 - `check (subject_place_id <> object_place_id)`
-- `check (subject_coverage is null or origin = 'derived')`
+- `check ((subject_coverage is null and object_coverage is null) or origin = 'derived')`
+- a derived row records both boundary versions
 - unique index `(subject_place_id, relationship_type_id, object_place_id) where retired_at is null`
 - for symmetric types, a trigger requires `subject_place_id < object_place_id`, so "A overlaps B" and "B overlaps A" cannot both exist
 - for asymmetric types, a trigger refuses the reverse of an active row
@@ -397,7 +413,7 @@ Examples:
 
 **No relationship means stats can be added up.** Places in the same country can overlap or leave gaps. A total across places is its own calculation on a spatial union, or a stat of the parent's own boundary.
 
-Spatial overlap is found on demand by an admin-only function using the GiST index. It is not stored. A reviewer's decision is stored: `confirmed` keeps the link, `rejected` stops it being suggested again.
+Spatial overlap is found on demand by an admin-only function, `place_overlaps(place_id)`, using the GiST index. It returns each overlapping published place with the shared area and both coverages. It is not stored. A reviewer's decision is stored: `confirmed` keeps the link, `rejected` stops it being suggested again.
 
 ### 4.6 People, images, audit
 
@@ -507,7 +523,8 @@ erDiagram
   }
   recognition_details {
     uuid place_id PK
-    text scheme
+    text designation
+    text criteria
   }
   old_growth_details {
     uuid place_id PK
@@ -628,6 +645,7 @@ erDiagram
     text origin
     text status
     float subject_coverage
+    float object_coverage
   }
   place_relationship_types {
     text id PK
@@ -695,7 +713,7 @@ Contributors submit boundaries through `submit_boundary(place_id, geojson)`, not
 | `rpc('protected_area_window')`, `protected_area_rank`, `protected_area_window_count`, `protected_area_filter_stats` | `place_window`, `place_rank`, `place_window_count`, `place_filter_stats`, with the place type `conservation_area` |
 | `rpc('place_bounds')` | `place_bounds`, reading the current boundary's bbox |
 
-*In place* since task 05b (`20261116100000_generic_place_reads.sql`) for `place_summaries`, `place_window`, `place_rank`, `place_filter_stats`, and `place_bounds`, together with `place_window_count`, `place_kept_ids`, `place_matched`, and `places_in_extent`. `listed_places` holds the conservation area list rule (terrestrial, at least 10 km²). `place_crops_percent` reads `place_stats_preferred` for `crops_percent` since task 07, so no sprout or method id is written in SQL. The old names were wrappers until the frontend moved in task 08, which dropped them (`20261119100000_drop_old_reads.sql`).
+*In place* since task 05b (`20261116100000_generic_place_reads.sql`) for `place_summaries`, `place_window`, `place_rank`, `place_filter_stats`, and `place_bounds`, together with `place_window_count`, `place_kept_ids`, `place_matched`, and `places_in_extent`. `listed_places` holds the conservation area list rule (terrestrial, at least 10 km²). Since task 09 `place_summaries` reads the designation, countries, realm, and site id from whichever details table a place has, so a recognition's profile has them too. `place_crops_percent` reads `place_stats_preferred` for `crops_percent` since task 07, so no sprout or method id is written in SQL. The old names were wrappers until the frontend moved in task 08, which dropped them (`20261119100000_drop_old_reads.sql`).
 
 ## 7. Naming
 
