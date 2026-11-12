@@ -278,7 +278,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Move `place_crops_percent` to the selection. Rename the analysis `facts/` to `stats/`, and point it and the places recipe at the new tables, the recipe at the current boundaries of published places. The pipeline stays paused. `stat_run_issues` and the places PMTiles rebuild are moved out (decided 11 November 2026).
 - [x] [Task 08 — Frontend and cleanup](../archive/tasks/task-08-frontend-and-cleanup.md) — naturewatch-app
   - *Goal:* Move the frontend to the generic reads. Drop the wrappers, `facts`, and `places.geom`.
-- [ ] Task 09 — Recognitions — both repos
+- [ ] [Task 09 — Recognitions](../tasks/task-09-recognitions.md) — both repos
   - *Goal:* Investigate the designations. Import `DESIG_TYPE`. Add recognition types, `place_relationships`, and the admin overlap function. Add a recognitions PMTiles recipe. Rebuild the places PMTiles from the current boundaries of published conservation areas, so the 64 merged parcels draw as their kept places, and decide the stale South Africa rollback copy in `places/protected-areas/v1/` (moved from task 07).
 - [ ] Task 10 — Profiles, roles, audit — naturewatch-app
   - *Goal:* Add `profiles`, `user_roles`, `has_role()`, contributor policies, and `audit_log`. Together with Molding Places.
