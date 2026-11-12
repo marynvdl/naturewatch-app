@@ -28,6 +28,8 @@ _local.loader.exec_module(test_reconcile_local)
 # A park 0.2 degrees square, a World Heritage Site over all of it, a Ramsar site
 # over 60% of it, a Natura 2000 site that only touches its edge, and a park far away.
 PARK = "MULTIPOLYGON(((30 -20, 30.2 -20, 30.2 -19.8, 30 -19.8, 30 -20)))"
+PARK_WEST = "MULTIPOLYGON(((30 -20, 30.1 -20, 30.1 -19.8, 30 -19.8, 30 -20)))"
+PARK_EAST = "MULTIPOLYGON(((30.1 -20, 30.2 -20, 30.2 -19.8, 30.1 -19.8, 30.1 -20)))"
 WHS = "MULTIPOLYGON(((29.9 -20.1, 30.3 -20.1, 30.3 -19.7, 29.9 -19.7, 29.9 -20.1)))"
 RAMSAR = "MULTIPOLYGON(((30.08 -20, 30.3 -20, 30.3 -19.8, 30.08 -19.8, 30.08 -20)))"
 TOUCHING = "MULTIPOLYGON(((30.2 -20, 30.4 -20, 30.4 -19.8, 30.2 -19.8, 30.2 -20)))"
@@ -47,7 +49,7 @@ class DeriveRecognisesLocalTest(unittest.TestCase):
         self.stack.enter_context(mock.patch.object(self.conn, "commit", lambda: None))
         self.stack.enter_context(mock.patch("builtins.print"))
         self.work = Path(self.stack.enter_context(tempfile.TemporaryDirectory()))
-        self.park = self.place("Park", "conservation_area", PARK)
+        self.park = self.place("Park", "conservation_area", PARK, ("pid-park-west", "pid-park-east"))
         self.far = self.place("Far Park", "conservation_area", FAR)
         self.whs = self.place("Falls", "world_heritage_site", WHS)
         self.ramsar = self.place("Wetland", "ramsar_site", RAMSAR)
@@ -58,12 +60,22 @@ class DeriveRecognisesLocalTest(unittest.TestCase):
         self.conn.rollback()
         self.conn.close()
 
-    def place(self, name: str, place_type: str, wkt: str) -> str:
+    def place(self, name: str, place_type: str, wkt: str, pids: tuple[str, ...] = ()) -> str:
         place_id = self.conn.execute(
             "insert into public.places (name, place_type_id, publication_status) "
             "values (%s, %s, 'published') returning id::text as id",
             (name, place_type),
         ).fetchone()["id"]
+        for pid in pids or (f"pid-{name}",):
+            self.conn.execute(
+                """
+                insert into public.place_source_ids (
+                  place_id, source_id, id_kind, source_record_id, match_status,
+                  first_seen_release_id, last_seen_release_id
+                ) values (%s, 'wdpca', 'wdpa_site_pid', %s, 'confirmed', %s, %s)
+                """,
+                (place_id, pid, self.release, self.release),
+            )
         self.conn.execute(
             """
             insert into public.place_boundaries (
@@ -113,6 +125,46 @@ class DeriveRecognisesLocalTest(unittest.TestCase):
         self.assertEqual(counts["world_heritage_site"]["at_90"], 1)
         self.assertEqual(counts["ramsar_site"]["at_50"], 1)
         self.assertEqual(counts["ramsar_site"]["at_75"], 0)
+
+    def test_compute_and_load_match_derive(self):
+        # The park is stored as a merged place of two parcels; its shape is their union.
+        test_reconcile_local.ReconcileLocalTest.write_file(self, [
+            ("pid-park-west", "s1", "Park", PARK_WEST),
+            ("pid-park-east", "s1", "Park", PARK_EAST),
+            ("pid-Far Park", "s2", "Far Park", FAR),
+            ("pid-Falls", "s3", "Falls", WHS),
+            ("pid-Wetland", "s4", "Wetland", RAMSAR),
+            ("pid-Edge", "s5", "Edge", TOUCHING),
+        ])
+        places = derive_recognises.fetch_places(self.conn)
+        self.assertEqual(sorted(places[self.park]["pids"]), ["pid-park-east", "pid-park-west"])
+        self.assertEqual(len(places), 5)
+        result = derive_recognises.compute(places, self.work)
+        self.assertEqual((result["links_written"], result["failed"], result["missing_site_pids"]), (2, 0, 0))
+        # A rerun finds every recognition done.
+        self.assertEqual(derive_recognises.compute(places, self.work)["links_written"], 0)
+
+        self.assertEqual(derive_recognises.load(self.conn, self.work)["inserted"], 2)
+        links = self.links()
+        self.assertEqual(set(links), {self.whs, self.ramsar})
+        for link in links.values():
+            self.assertEqual(link["object"], self.park)
+            self.assertEqual((link["origin"], link["status"]), ("derived", "proposed"))
+            self.assertTrue(link["has_boundaries"])
+        self.assertAlmostEqual(links[self.whs]["object_coverage"], 1, places=3)
+        self.assertAlmostEqual(links[self.whs]["subject_coverage"], 0.25, places=2)
+        self.assertAlmostEqual(links[self.ramsar]["object_coverage"], 0.6, places=2)
+
+        # Loading again, or after derive, adds nothing.
+        self.assertEqual(derive_recognises.load(self.conn, self.work)["inserted"], 0)
+        self.assertEqual(derive_recognises.derive(self.conn, self.work)["inserted"], 0)
+
+    def test_load_skips_a_link_whose_boundary_is_no_longer_current(self):
+        stale = "00000000-0000-0000-0000-000000000000"
+        (self.work / derive_recognises.LINKS_NAME).write_text(
+            f"{self.whs}\t{self.park}\t{stale}\t{stale}\t1\t0.25\t1\n"
+        )
+        self.assertEqual(derive_recognises.load(self.conn, self.work), {"in_file": 1, "inserted": 0, "skipped": 1})
 
     def test_confirm_sets_only_links_at_or_above_the_share(self):
         derive_recognises.derive(self.conn, self.work)

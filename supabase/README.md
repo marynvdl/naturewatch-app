@@ -22,11 +22,15 @@ Since Database Honing task 09 (`20261120100000_recognitions.sql`, `2026112011000
 
 ```bash
 WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/derive_recognises.py derive
+WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/derive_recognises.py compute
+WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/derive_recognises.py load
 DATABASE_URL=... .venv/bin/python supabase/derive_recognises.py counts
 DATABASE_URL=... .venv/bin/python supabase/derive_recognises.py confirm 0.5
 ```
 
 `derive` inserts a `derived`, `proposed` `recognises` row from each published recognition to each published conservation area it overlaps, when the shared area is at least 1% of either place. It commits every 25 recognitions and keeps a progress file in the work directory, so a second start continues. `counts` prints, per recognition type, how many links cover at least 25%, 50%, 75%, and 90% of the park. `confirm` sets `confirmed` on derived links at or above the share given, and changes nothing else.
+
+`derive` runs `place_overlaps()` in the database. On Micro compute it ran the hosted database out of memory, and Postgres restarted, on a Natura 2000 site of 862,145 vertices whose box overlaps 53 parks (12 November 2026). For the hosted database use `compute` and `load`. `compute` only reads the database: the published places, their current boundary ids, and their SITE_PIDs. It takes each place's shape from the filtered file of the import (a merged place is the union of its parcels), projects it to EPSG:6933, which is equal area, and writes the same links to `derive_recognises_links.tsv` in the work directory, one recognition at a time. A second start continues. It also writes a 3.5 GB shapes file there, which can be deleted after the run. `load` inserts the file in one transaction, and skips a link whose boundary is no longer current or whose pair already has an active row. Coverages from `compute` can differ from `place_overlaps()` by a fraction of a percent.
 
 ## Local database
 
