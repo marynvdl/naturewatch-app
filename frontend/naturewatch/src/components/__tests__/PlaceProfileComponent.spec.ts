@@ -3,7 +3,9 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
 import {
+  curatePlace,
   loadPilotPlace,
+  loadPlaceCuration,
   loadPlaceRecognitions,
   loadRecognisedPlaces,
   type PlaceDetail,
@@ -11,8 +13,15 @@ import {
 import { PHOTOS_NONE } from '@/places/photos';
 import useAuthStore from '@/store/AuthStore';
 
-vi.mock('@/places/api', () => ({
+vi.mock('@/places/api', async importOriginal => ({
   PLACE_TYPE: 'conservation_area',
+  applyCuration: (await importOriginal<typeof import('@/places/api')>())
+    .applyCuration,
+  curatePlace: vi.fn(),
+  loadDesignations: vi
+    .fn()
+    .mockResolvedValue(['National Park', 'Nature Reserve', 'Game Reserve']),
+  loadPlaceCuration: vi.fn(),
   loadPilotPlace: vi.fn(),
   loadPlaceRecognitions: vi.fn(),
   loadRecognisedPlaces: vi.fn(),
@@ -34,6 +43,13 @@ const kruger: PlaceDetail = {
     'UNEP-WCMC and IUCN (2026), Protected Planet: The World Database on Protected and Conserved Areas (WDPCA) [On-line], October 2026, Cambridge, UK: UNEP-WCMC and IUCN. Available at: www.protectedplanet.net.',
   croplandKm2: 11.455618,
   percent: 0.0598,
+  tagline: null,
+  description: null,
+  source: {
+    name: 'Kruger National Park',
+    designation: 'National Park',
+    iso3: 'ZAF',
+  },
 };
 
 /**
@@ -73,6 +89,195 @@ describe('Place profile', () => {
     vi.mocked(loadPlaceRecognitions).mockResolvedValue({
       status: 'ok',
       recognitions: [],
+    });
+    vi.mocked(loadPlaceCuration).mockResolvedValue({
+      status: 'ok',
+      curation: null,
+    });
+  });
+
+  it('shows the tagline under the title and the description in Overview', async () => {
+    const wrapper = await mountProfile({
+      ...kruger,
+      tagline: 'Where the lowveld meets the Lebombo.',
+      description: 'First paragraph.\n\nSecond\nline.',
+    });
+    expect(wrapper.get('.place-tagline').text()).toBe(
+      'Where the lowveld meets the Lebombo.'
+    );
+    const paragraphs = wrapper.findAll('.place-description p');
+    expect(paragraphs.map(item => item.text())).toEqual([
+      'First paragraph.',
+      'Second\nline.',
+    ]);
+    expect(wrapper.find('.edit-field-pencil').exists()).toBe(false);
+  });
+
+  it('shows no tagline or description when none is curated', async () => {
+    const wrapper = await mountProfile(kruger);
+    expect(wrapper.find('.place-tagline').exists()).toBe(false);
+    expect(wrapper.find('.place-description').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('No tagline yet');
+  });
+
+  it('shows no pencils to an admin in view mode', async () => {
+    const auth = useAuthStore();
+    auth.isAdmin = true;
+    const wrapper = await mountProfile(kruger);
+    expect(wrapper.find('.edit-field-pencil').exists()).toBe(false);
+    expect(loadPlaceCuration).not.toHaveBeenCalled();
+  });
+
+  describe('in edit mode', () => {
+    beforeEach(() => {
+      const auth = useAuthStore();
+      auth.isAdmin = true;
+      auth.editMode = true;
+    });
+
+    /** The edit field with this label. */
+    function field(
+      wrapper: Awaited<ReturnType<typeof mountProfile>>,
+      label: string
+    ) {
+      return wrapper.get(`[data-field="${label}"]`);
+    }
+
+    it('shows a pencil on each of the five fields', async () => {
+      const wrapper = await mountProfile(kruger);
+      expect(loadPlaceCuration).toHaveBeenCalledWith(placeId);
+      const labels = wrapper
+        .findAll('.edit-field-pencil')
+        .map(item => item.attributes('aria-label'));
+      expect(labels).toEqual([
+        'Edit display name',
+        'Edit tagline',
+        'Edit description',
+        'Edit designation',
+        'Edit countries',
+      ]);
+    });
+
+    it('saves a tagline and shows it', async () => {
+      vi.mocked(curatePlace).mockResolvedValue({
+        status: 'ok',
+        curation: {
+          display_name: null,
+          tagline: 'A new line.',
+          description: null,
+          designation: null,
+          iso3: null,
+        },
+      });
+      const wrapper = await mountProfile(kruger);
+      await field(wrapper, 'Tagline')
+        .get('.edit-field-pencil')
+        .trigger('click');
+      await field(wrapper, 'Tagline').get('input').setValue('A new line.');
+      await field(wrapper, 'Tagline').get('form').trigger('submit');
+      await flushPromises();
+      expect(curatePlace).toHaveBeenCalledWith(placeId, {
+        tagline: 'A new line.',
+      });
+      expect(field(wrapper, 'Tagline').find('form').exists()).toBe(false);
+      expect(wrapper.get('.place-tagline').text()).toBe('A new line.');
+    });
+
+    it('keeps the field open with the error when a save fails', async () => {
+      vi.mocked(curatePlace).mockResolvedValue({
+        status: 'error',
+        message: 'Only an admin can curate a place.',
+      });
+      const wrapper = await mountProfile(kruger);
+      await field(wrapper, 'Designation')
+        .get('.edit-field-pencil')
+        .trigger('click');
+      await field(wrapper, 'Designation').get('input').setValue('Reserve');
+      await flushPromises();
+      // Suggestions open while typing. New text is still allowed.
+      expect(field(wrapper, 'Designation').text()).toContain('Nature Reserve');
+      await field(wrapper, 'Designation').get('form').trigger('submit');
+      await flushPromises();
+      expect(field(wrapper, 'Designation').get('[role="alert"]').text()).toBe(
+        'Only an admin can curate a place.'
+      );
+    });
+
+    it('cancels without saving', async () => {
+      const wrapper = await mountProfile(kruger);
+      await field(wrapper, 'Display name')
+        .get('.edit-field-pencil')
+        .trigger('click');
+      expect(
+        (
+          field(wrapper, 'Display name').get('input')
+            .element as HTMLInputElement
+        ).value
+      ).toBe('Kruger National Park');
+      expect(field(wrapper, 'Display name').text()).toContain(
+        'Source: Kruger National Park'
+      );
+      const cancel = field(wrapper, 'Display name')
+        .findAll('button')
+        .find(item => item.text() === 'Cancel');
+      await cancel?.trigger('click');
+      expect(curatePlace).not.toHaveBeenCalled();
+      expect(wrapper.get('h2').text()).toBe('Kruger National Park');
+    });
+
+    it('resets a curated name to the source', async () => {
+      vi.mocked(loadPlaceCuration).mockResolvedValue({
+        status: 'ok',
+        curation: {
+          display_name: 'Kruger',
+          tagline: null,
+          description: null,
+          designation: null,
+          iso3: null,
+        },
+      });
+      vi.mocked(curatePlace).mockResolvedValue({
+        status: 'ok',
+        curation: null,
+      });
+      const wrapper = await mountProfile({ ...kruger, name: 'Kruger' });
+      await field(wrapper, 'Display name')
+        .get('.edit-field-pencil')
+        .trigger('click');
+      const reset = field(wrapper, 'Display name')
+        .findAll('button')
+        .find(item => item.text() === 'Reset to source');
+      await reset?.trigger('click');
+      await flushPromises();
+      expect(curatePlace).toHaveBeenCalledWith(placeId, { display_name: null });
+      expect(wrapper.get('h2').text()).toBe('Kruger National Park');
+    });
+
+    it('saves countries as codes', async () => {
+      vi.mocked(curatePlace).mockResolvedValue({
+        status: 'ok',
+        curation: {
+          display_name: null,
+          tagline: null,
+          description: null,
+          designation: null,
+          iso3: [],
+        },
+      });
+      const wrapper = await mountProfile({
+        ...kruger,
+        iso3: 'LSO;ZAF',
+        source: { ...kruger.source, iso3: 'LSO;ZAF' },
+      });
+      await field(wrapper, 'Countries')
+        .get('.edit-field-pencil')
+        .trigger('click');
+      await field(wrapper, 'Countries')
+        .get('button[aria-label="Remove Lesotho"]')
+        .trigger('click');
+      await field(wrapper, 'Countries').get('form').trigger('submit');
+      await flushPromises();
+      expect(curatePlace).toHaveBeenCalledWith(placeId, { iso3: ['ZAF'] });
     });
   });
 

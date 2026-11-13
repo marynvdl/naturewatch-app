@@ -28,6 +28,9 @@ describe('Place view', () => {
           'UNEP-WCMC and IUCN (2026), Protected Planet: The World Database on Protected and Conserved Areas (WDPCA) [On-line], October 2026, Cambridge, UK: UNEP-WCMC and IUCN. Available at: www.protectedplanet.net.',
         croplandKm2: 11.455618,
         percent: 0.0598,
+        tagline: null,
+        description: null,
+        source: { name: 'x', designation: null, iso3: null },
       },
     });
 
@@ -74,6 +77,9 @@ describe('Place view', () => {
         citation: 'UNEP-WCMC and IUCN (2026)',
         croplandKm2: null,
         percent: null,
+        tagline: null,
+        description: null,
+        source: { name: 'x', designation: null, iso3: null },
       },
     });
 

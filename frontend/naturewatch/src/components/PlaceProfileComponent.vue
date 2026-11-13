@@ -2,6 +2,9 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ChevronRight, LocateFixed, X } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
+import PlaceEditField, {
+  type CuratedValue,
+} from '@/components/PlaceEditField.vue';
 import PlacePhotos from '@/components/PlacePhotos.vue';
 import {
   SegmentedControl,
@@ -10,9 +13,14 @@ import {
 import useAuthStore from '@/store/AuthStore';
 import {
   PLACE_TYPE,
+  applyCuration,
+  curatePlace,
+  loadDesignations,
   loadPilotPlace,
+  loadPlaceCuration,
   loadPlaceRecognitions,
   loadRecognisedPlaces,
+  type PlaceCuration,
   type PlaceDetail,
   type PlaceRecognition,
   type PlaceSummary,
@@ -77,6 +85,12 @@ const recognisedStatus = ref<'loading' | 'ok' | 'error'>('loading');
 const RECOGNISED_STEP = 20;
 const recognisedShown = ref(RECOGNISED_STEP);
 const activeTab = ref<TabId>('overview');
+/** Curated values of the place, read in edit mode. */
+const curation = ref<PlaceCuration | null>(null);
+const curationStatus = ref<'idle' | 'loading' | 'ok' | 'error'>('idle');
+const editing = computed(
+  () => auth.isAdmin && auth.editMode && curationStatus.value === 'ok'
+);
 const tabButtons = ref<HTMLButtonElement[]>([]);
 
 const title = computed(() => place.value?.name ?? props.name ?? '');
@@ -99,6 +113,64 @@ const hasCropland = computed(
   () => place.value?.croplandKm2 != null && place.value?.percent != null
 );
 const source = computed(() => place.value?.citation ?? '');
+/** The description, one paragraph per blank-line block. */
+const paragraphs = computed(() =>
+  (place.value?.description ?? '')
+    .split(/\n\s*\n/)
+    .map(text => text.trim())
+    .filter(Boolean)
+);
+const sourceCountries = computed(() =>
+  place.value?.source.iso3 ? place.value.source.iso3.split(';') : []
+);
+const sourceCountryNames = computed(
+  () => countryNames(place.value?.source.iso3 ?? null).join(', ') || null
+);
+
+/** Read the curated values when an admin is in edit mode. */
+async function loadCuration() {
+  const id = place.value?.id;
+  if (!id || !auth.isAdmin || !auth.editMode) return;
+  curationStatus.value = 'loading';
+  const result = await loadPlaceCuration(id);
+  if (place.value?.id !== id) return;
+  if (result.status !== 'ok') {
+    curationStatus.value = 'error';
+    return;
+  }
+  curation.value = result.curation;
+  curationStatus.value = 'ok';
+}
+
+watch(
+  () => [place.value?.id, auth.isAdmin, auth.editMode],
+  () => {
+    if (curationStatus.value !== 'ok' || !auth.editMode) void loadCuration();
+  }
+);
+
+/**
+ * Save one curated field, or reset it with null.
+ * @returns An error message, or null when saved.
+ */
+async function saveField(
+  field: keyof PlaceCuration,
+  value: CuratedValue
+): Promise<string | null> {
+  const current = place.value;
+  if (!current) return 'The place is not loaded.';
+  const blank = Array.isArray(value) ? value.length === 0 : !value?.trim();
+  const result = await curatePlace(current.id, {
+    [field]: blank ? null : value,
+  });
+  if (result.status === 'unconfigured')
+    return 'The place store is not configured.';
+  if (result.status === 'error') return result.message;
+  if (place.value?.id !== current.id) return null;
+  curation.value = result.curation;
+  place.value = applyCuration(place.value, result.curation);
+  return null;
+}
 
 /** Load the stored record for the selected place. */
 async function load(id: string) {
@@ -109,11 +181,14 @@ async function load(id: string) {
   recognisedStatus.value = 'loading';
   recognisedShown.value = RECOGNISED_STEP;
   activeTab.value = 'overview';
+  curation.value = null;
+  curationStatus.value = 'idle';
   const result = await loadPilotPlace(id);
   if (id !== props.placeId) return;
   status.value = result.status;
   if (result.status !== 'ok') return;
   place.value = result.place;
+  void loadCuration();
   if (result.place.id !== id) {
     emit('moved', result.place.id);
     return;
@@ -184,7 +259,31 @@ function onTabKey(event: KeyboardEvent, index: number) {
         <SegmentedControlItem value="view">View</SegmentedControlItem>
         <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
       </SegmentedControl>
-      <h2 class="place-title panel-heading">{{ title }}</h2>
+      <p v-if="auth.editMode && curationStatus === 'error'" class="place-note">
+        The curated values could not be read, so editing is off.
+      </p>
+      <PlaceEditField
+        :editable="editing"
+        label="Display name"
+        :curated="curation?.display_name ?? null"
+        :source="place?.source.name ?? null"
+        :start="place?.source.name ?? null"
+        :save="value => saveField('display_name', value)"
+      >
+        <h2 class="place-title panel-heading">{{ title }}</h2>
+      </PlaceEditField>
+      <PlaceEditField
+        v-if="place && (editing || place.tagline)"
+        :editable="editing"
+        label="Tagline"
+        :curated="curation?.tagline ?? null"
+        :source="null"
+        :max-length="120"
+        :save="value => saveField('tagline', value)"
+      >
+        <p v-if="place.tagline" class="place-tagline">{{ place.tagline }}</p>
+        <p v-else class="place-note">No tagline yet.</p>
+      </PlaceEditField>
       <ul
         v-if="recognitions.length"
         class="place-recognitions"
@@ -269,26 +368,65 @@ function onTabKey(event: KeyboardEvent, index: number) {
           :aria-labelledby="`place-tab-${activeTab}`"
         >
           <template v-if="activeTab === 'overview'">
+            <PlaceEditField
+              v-if="editing || paragraphs.length"
+              :editable="editing"
+              label="Description"
+              kind="text"
+              :curated="curation?.description ?? null"
+              :source="null"
+              :max-length="2000"
+              :save="value => saveField('description', value)"
+            >
+              <div v-if="paragraphs.length" class="place-description">
+                <p v-for="(text, index) in paragraphs" :key="index">
+                  {{ text }}
+                </p>
+              </div>
+              <p v-else class="place-note">No description yet.</p>
+            </PlaceEditField>
             <dl class="place-facts">
-              <div v-if="place.designation">
-                <dt>Designation</dt>
-                <dd>{{ place.designation }}</dd>
-              </div>
-              <div v-if="countries.length">
-                <dt>{{ countries.length > 1 ? 'Countries' : 'Country' }}</dt>
-                <dd>
-                  <ul class="place-countries">
-                    <li
-                      v-for="countryLabel in countries"
-                      :key="countryLabel"
-                      class="place-country"
-                    >
-                      {{ countryLabel }}
-                    </li>
-                  </ul>
-                </dd>
-              </div>
-              <div v-if="place.areaKm2 != null">
+              <PlaceEditField
+                v-if="editing || place.designation"
+                :editable="editing"
+                label="Designation"
+                :curated="curation?.designation ?? null"
+                :source="place.source.designation"
+                :start="place.source.designation"
+                :suggest="loadDesignations"
+                :save="value => saveField('designation', value)"
+              >
+                <div class="place-fact">
+                  <dt>Designation</dt>
+                  <dd>{{ place.designation ?? 'None' }}</dd>
+                </div>
+              </PlaceEditField>
+              <PlaceEditField
+                v-if="editing || countries.length"
+                :editable="editing"
+                label="Countries"
+                kind="countries"
+                :curated="curation?.iso3 ?? null"
+                :source="sourceCountryNames"
+                :start="sourceCountries"
+                :save="value => saveField('iso3', value)"
+              >
+                <div class="place-fact">
+                  <dt>{{ countries.length > 1 ? 'Countries' : 'Country' }}</dt>
+                  <dd>
+                    <ul class="place-countries">
+                      <li
+                        v-for="countryLabel in countries"
+                        :key="countryLabel"
+                        class="place-country"
+                      >
+                        {{ countryLabel }}
+                      </li>
+                    </ul>
+                  </dd>
+                </div>
+              </PlaceEditField>
+              <div v-if="place.areaKm2 != null" class="place-fact">
                 <dt>Area</dt>
                 <dd>{{ formatKm2(place.areaKm2) }} km²</dd>
               </div>
@@ -351,11 +489,11 @@ function onTabKey(event: KeyboardEvent, index: number) {
           <template v-else-if="activeTab === 'landscape'">
             <p class="map-section">Cropland, 2024</p>
             <dl v-if="hasCropland" class="place-facts">
-              <div>
+              <div class="place-fact">
                 <dt>Cropland area</dt>
                 <dd>{{ formatKm2(place.croplandKm2 as number) }} km²</dd>
               </div>
-              <div>
+              <div class="place-fact">
                 <dt>Share of the place</dt>
                 <dd>{{ formatPercent(place.percent as number) }}%</dd>
               </div>
@@ -422,6 +560,27 @@ function onTabKey(event: KeyboardEvent, index: number) {
 
 .place-mode {
   align-self: flex-start;
+}
+
+.place-tagline {
+  margin: -8px 0 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--foreground);
+}
+
+.place-description {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--foreground);
+}
+
+.place-description p {
+  margin: 0;
+  white-space: pre-line;
 }
 
 .place-title {
@@ -619,17 +778,21 @@ function onTabKey(event: KeyboardEvent, index: number) {
   margin: 0;
 }
 
-.place-facts div {
+.place-fact {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   padding: 10px 0;
-  border-top: 1px solid var(--border);
   font-size: 13px;
 }
 
-.place-facts div:first-child {
-  border-top: 0;
+/* A row is a fact, or a fact wrapped in its edit field. */
+.place-facts > * + * {
+  border-top: 1px solid var(--border);
+}
+
+.place-facts > .place-fact:first-child,
+.place-facts > :first-child .place-fact {
   padding-top: 0;
 }
 

@@ -417,9 +417,11 @@ Spatial overlap is found on demand by an admin-only function, `place_overlaps(pl
 
 ### 4.6 People, images, audit
 
-*Proposed.* [Molding Places](../parcels/molding-places.md) adds these tables, each with the task whose screen uses it first: `place_curations` in task 02, `images` and `place_images` in task 04, and `place_tagline_suggestions` in task 06. Only admins sign in at first. Contributor policies come with contributors.
+*Proposed.* [Molding Places](../parcels/molding-places.md) adds these tables, each with the task whose screen uses it first: `images` and `place_images` in task 04, and `place_tagline_suggestions` in task 06. Only admins sign in at first. Contributor policies come with contributors.
 
-*In place* since Molding Places task 01 (`20261121100000_people_and_audit.sql`) for `profiles`, `user_roles`, `has_role()`, and `audit_log`. A trigger on `auth.users` creates each profile. A signed-in user reads only their own profile and roles, and only an admin reads `audit_log`. Roles are granted by the owner with a one-off statement, so no email or user id is in a migration. `audit_row(key columns…)` is the one trigger function for audited tables. It is on `user_roles` so far. `actor` is null for statements the owner or a pipeline runs.
+*In place* since Molding Places task 01 (`20261121100000_people_and_audit.sql`) for `profiles`, `user_roles`, `has_role()`, and `audit_log`. A trigger on `auth.users` creates each profile. A signed-in user reads only their own profile and roles, and only an admin reads `audit_log`. Roles are granted by the owner with a one-off statement, so no email or user id is in a migration. `audit_row(key columns…)` is the one trigger function for audited tables. It is on `user_roles` and `place_curations` so far. `actor` is null for statements the owner or a pipeline runs.
+
+*In place* since Molding Places task 02 (`20261122100000_place_curations.sql`) for `place_curations`, with `updated_at` too. Admins write it only through `curate_place(place_id, values jsonb)`: the keys of `values` are the fields to change, and a null or blank value resets one. The row is deleted once every value is null. `place_designations()` lists the designations published places show, with their counts, for edit mode to suggest. CHECKs keep the tagline to one line of at most 120 characters, the description to at most 2,000, and `iso3` to three-letter codes. Visitors read the rows of published places.
 
 **`profiles`**: `id` uuid PK, FK → `auth.users` `on delete cascade`, `display_name`. References to a profile from review columns use `on delete set null`, so a deleted account leaves "former user".
 
@@ -719,7 +721,7 @@ Rules:
 - **`geom` is never granted** to `anon` or `authenticated`. Grants on `place_boundaries` list the other columns. Map shapes come from PMTiles. `place_bounds` reads the bbox columns.
 - **Every table**: enable RLS, `revoke all … from public, anon, authenticated`, then grant what is needed. Supabase grants new objects in `public` to `anon` and `authenticated` by default.
 - **Every function**: `revoke execute … from public`, then grant to the roles that need it. Postgres grants new functions to `public`.
-- **Privileged RPCs** (`approve_boundary`, `set_stats_eligibility`, `confirm_source_match`, `review_overlap`, `review_place_image`, `submit_boundary`): `security definer`, `set search_path = ''`, check `has_role()` inside, execute granted to `authenticated` only.
+- **Privileged RPCs** (`curate_place`, `approve_boundary`, `set_stats_eligibility`, `confirm_source_match`, `review_overlap`, `review_place_image`, `submit_boundary`): `security definer`, `set search_path = ''`, check `has_role()` inside, execute granted to `authenticated` only.
 - **Views** use `security_invoker = true`. Supabase's linter flags views that run as their owner. The tables under each view need their own public policy.
 - **Policies** wrap `auth.uid()` as `(select auth.uid())` so it runs once per query. Columns used in policies are indexed.
 

@@ -36,7 +36,7 @@ export const PLACE_TYPE = 'conservation_area';
 export const CROPLAND_PERIOD_START = '2024-01-01';
 
 const PLACE_COLUMNS =
-  'id, name, place_type_id, designation, iso3, area_km2, site_id, release_month, source_name, citation';
+  'id, name, place_type_id, designation, iso3, area_km2, site_id, release_month, source_name, citation, tagline, description, source_place_name, source_designation, source_iso3';
 
 /** A card on the places list. */
 export interface PlaceSummary {
@@ -67,7 +67,36 @@ export interface PlaceDetail {
   citation: string;
   croplandKm2: number | null;
   percent: number | null;
+  /** Curated one-line fact, or null. */
+  tagline: string | null;
+  /** Curated plain-text description, or null. */
+  description: string | null;
+  /** What the source says, shown beside a curated value in edit mode. */
+  source: PlaceSourceValues;
 }
+
+/** The source values that curated values override. */
+export interface PlaceSourceValues {
+  name: string;
+  designation: string | null;
+  /** Country codes joined by `;`, as in `iso3`. */
+  iso3: string | null;
+}
+
+/** Fields an admin curates. Null resets a field to the source value. */
+export interface PlaceCuration {
+  display_name: string | null;
+  tagline: string | null;
+  description: string | null;
+  designation: string | null;
+  iso3: string[] | null;
+}
+
+/** Result of saving curated values. `curation` is null once every field is reset. */
+export type CuratePlaceResult =
+  | { status: 'ok'; curation: PlaceCuration | null }
+  | { status: 'unconfigured' }
+  | { status: 'error'; message: string };
 
 /** Search, sort, filters, and optional map view for the list window. */
 export interface PlaceWindowQuery {
@@ -261,12 +290,14 @@ export async function loadPlaceSearchWindow(
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const prefix = query.search.trim().replace(/[\\%_]/g, match => `\\${match}`);
+  // Quoted, so a comma or bracket in the search does not split the `or` filter.
+  const pattern = `"${`${prefix}%`.replace(/["\\]/g, match => `\\${match}`)}"`;
   let call = supabase
     .from('listed_places')
     .select('id, name, designation, iso3, area_km2, place_type_id', {
       count: 'exact',
     })
-    .ilike('name', `${prefix}%`);
+    .or(`name.ilike.${pattern},source_place_name.ilike.${pattern}`);
   if (query.sizeMin !== null) call = call.gte('area_km2', query.sizeMin);
   if (query.sizeMax !== null) call = call.lte('area_km2', query.sizeMax);
   if (query.sort === 'name') call = call.order('name');
@@ -433,7 +464,109 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
       citation: place.citation,
       croplandKm2: value('crops_area'),
       percent: value('crops_percent'),
+      tagline: place.tagline,
+      description: place.description,
+      source: {
+        name: place.source_place_name,
+        designation: place.source_designation,
+        iso3: place.source_iso3,
+      },
     },
+  };
+}
+
+/**
+ * Set or reset curated fields of one place. Admins only: the database checks the role.
+ * @param id - `places.id`.
+ * @param values - Only the fields to change. Null or blank resets a field.
+ * @returns The stored curated values, or why they could not be saved.
+ */
+export async function curatePlace(
+  id: string,
+  values: Partial<PlaceCuration>
+): Promise<CuratePlaceResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('curate_place', {
+    p_place_id: id,
+    p_values: values,
+  });
+  if (error) return { status: 'error', message: error.message };
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | (PlaceCuration & { place_id: string | null })
+    | null;
+  if (!row || !row.place_id) return { status: 'ok', curation: null };
+  return {
+    status: 'ok',
+    curation: {
+      display_name: row.display_name,
+      tagline: row.tagline,
+      description: row.description,
+      designation: row.designation,
+      iso3: row.iso3,
+    },
+  };
+}
+
+let designations: Promise<string[]> | null = null;
+
+/**
+ * Designations published places show, most used first, for edit mode to suggest.
+ * Read once. A failed read is tried again next time.
+ * @returns The designations, or an empty list when they could not be read.
+ */
+export function loadDesignations(): Promise<string[]> {
+  if (designations) return designations;
+  const supabase = placesClient();
+  if (!supabase) return Promise.resolve([]);
+  const read = (async () => {
+    const { data, error } = await supabase.rpc('place_designations');
+    if (error || !Array.isArray(data)) {
+      designations = null;
+      return [];
+    }
+    return (data as { designation: string }[]).map(row => row.designation);
+  })();
+  designations = read;
+  return read;
+}
+
+/**
+ * The curated values stored for one place, for edit mode.
+ * @param id - `places.id`.
+ * @returns The values, null when none are stored, or why they could not be read.
+ */
+export async function loadPlaceCuration(
+  id: string
+): Promise<CuratePlaceResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase
+    .from('place_curations')
+    .select('display_name, tagline, description, designation, iso3')
+    .eq('place_id', id)
+    .maybeSingle();
+  if (error) return { status: 'error', message: error.message };
+  return { status: 'ok', curation: (data as PlaceCuration | null) ?? null };
+}
+
+/**
+ * The place as shown once curated values are applied over its source values.
+ * @param place - The place as loaded.
+ * @param curation - The stored curated values, or null when none are set.
+ * @returns The place with its shown values replaced.
+ */
+export function applyCuration(
+  place: PlaceDetail,
+  curation: PlaceCuration | null
+): PlaceDetail {
+  return {
+    ...place,
+    name: curation?.display_name ?? place.source.name,
+    designation: curation?.designation ?? place.source.designation,
+    iso3: curation?.iso3?.join(';') ?? place.source.iso3,
+    tagline: curation?.tagline ?? null,
+    description: curation?.description ?? null,
   };
 }
 
