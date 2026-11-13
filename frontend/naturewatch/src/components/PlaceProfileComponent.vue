@@ -1,12 +1,24 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { LocateFixed, X } from '@lucide/vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { ChevronRight, LocateFixed, X } from '@lucide/vue';
+import PlaceCard from '@/components/PlaceCard.vue';
 import PlacePhotos from '@/components/PlacePhotos.vue';
-import { loadPilotPlace, type PlaceDetail } from '@/places/api';
+import {
+  PLACE_TYPE,
+  loadPilotPlace,
+  loadPlaceRecognitions,
+  loadRecognisedPlaces,
+  type PlaceDetail,
+  type PlaceRecognition,
+  type PlaceSummary,
+} from '@/places/api';
 import {
   CROPLAND_NOT_CALCULATED,
+  RECOGNITION_LABEL,
+  recognitionColour,
   SPECIES_NOTHING_YET,
   countryName,
+  countryNames,
   formatAreaTag,
   formatKm2,
   formatPercent,
@@ -29,28 +41,48 @@ const emit = defineEmits<{
   zoom: [];
   /** The place was merged into another. Its id is the one shown. */
   moved: [id: string];
+  /** A recognition badge or a recognised place was chosen. Open it. */
+  open: [id: string];
+  /** The conservation areas the open Areas tab lists, or null when it is closed. */
+  areas: [ids: string[] | null];
+  /** The pointer or focus entered or left a card on the Areas tab. */
+  highlight: [id: string, on: boolean];
 }>();
 
-type TabId = 'overview' | 'landscape' | 'species';
-
-const tabs: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'landscape', label: 'Landscape' },
-  { id: 'species', label: 'Species' },
-];
+type TabId = 'overview' | 'areas' | 'landscape' | 'species';
 
 const status = ref<'loading' | 'ok' | 'missing' | 'unconfigured' | 'error'>(
   'loading'
 );
 const place = ref<PlaceDetail | null>(null);
+/** Confirmed recognitions of the place. A recognition has none. */
+const recognitions = ref<PlaceRecognition[]>([]);
+/** Conservation areas a recognition recognises, largest first. */
+const recognised = ref<PlaceSummary[]>([]);
+/** Whether the conservation areas of a recognition have been read. */
+const recognisedStatus = ref<'loading' | 'ok' | 'error'>('loading');
+/** Cards shown at once on a recognition's Conservation areas tab. */
+const RECOGNISED_STEP = 20;
+const recognisedShown = ref(RECOGNISED_STEP);
 const activeTab = ref<TabId>('overview');
 const tabButtons = ref<HTMLButtonElement[]>([]);
 
 const title = computed(() => place.value?.name ?? props.name ?? '');
 const country = computed(() => countryName(place.value?.iso3 ?? null));
+const countries = computed(() => countryNames(place.value?.iso3 ?? null));
 const subtitle = computed(() =>
   [country.value, place.value?.designation].filter(Boolean).join(' · ')
 );
+const isRecognition = computed(
+  () => !!place.value && place.value.placeTypeId !== PLACE_TYPE
+);
+/** A recognition has a tab for the conservation areas it recognises. */
+const tabs = computed<{ id: TabId; label: string }[]>(() => [
+  { id: 'overview', label: 'Overview' },
+  ...(isRecognition.value ? [{ id: 'areas' as const, label: 'Areas' }] : []),
+  { id: 'landscape', label: 'Landscape' },
+  { id: 'species', label: 'Species' },
+]);
 const hasCropland = computed(
   () => place.value?.croplandKm2 != null && place.value?.percent != null
 );
@@ -60,16 +92,44 @@ const source = computed(() => place.value?.citation ?? '');
 async function load(id: string) {
   status.value = 'loading';
   place.value = null;
+  recognitions.value = [];
+  recognised.value = [];
+  recognisedStatus.value = 'loading';
+  recognisedShown.value = RECOGNISED_STEP;
   activeTab.value = 'overview';
   const result = await loadPilotPlace(id);
   if (id !== props.placeId) return;
   status.value = result.status;
   if (result.status !== 'ok') return;
   place.value = result.place;
-  if (result.place.id !== id) emit('moved', result.place.id);
+  if (result.place.id !== id) {
+    emit('moved', result.place.id);
+    return;
+  }
+  if (result.place.placeTypeId === PLACE_TYPE) {
+    const read = await loadPlaceRecognitions(id);
+    if (id !== props.placeId || read.status !== 'ok') return;
+    recognitions.value = read.recognitions;
+    return;
+  }
+  const read = await loadRecognisedPlaces(id);
+  if (id !== props.placeId) return;
+  recognisedStatus.value = read.status === 'ok' ? 'ok' : 'error';
+  if (read.status === 'ok') recognised.value = read.places;
 }
 
 watch(() => props.placeId, load, { immediate: true });
+
+/** Tell the map which conservation areas the Areas tab lists. */
+watch(
+  () =>
+    activeTab.value === 'areas' && recognisedStatus.value === 'ok'
+      ? recognised.value.map(item => item.id)
+      : null,
+  ids => emit('areas', ids)
+);
+
+onBeforeUnmount(() => emit('areas', null));
 
 /** Move between tabs with the arrow keys. */
 function onTabKey(event: KeyboardEvent, index: number) {
@@ -77,14 +137,18 @@ function onTabKey(event: KeyboardEvent, index: number) {
     event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
   if (!step) return;
   event.preventDefault();
-  const next = (index + step + tabs.length) % tabs.length;
-  activeTab.value = tabs[next].id;
+  const next = (index + step + tabs.value.length) % tabs.value.length;
+  activeTab.value = tabs.value[next].id;
   tabButtons.value[next]?.focus();
 }
 </script>
 
 <template>
-  <section class="place-profile" aria-label="Place">
+  <section
+    class="place-profile"
+    :class="{ 'is-list-tab': activeTab === 'areas' }"
+    aria-label="Place"
+  >
     <PlacePhotos :photos="photos" :place-name="title" />
     <button
       type="button"
@@ -97,6 +161,36 @@ function onTabKey(event: KeyboardEvent, index: number) {
 
     <div class="place-body">
       <h2 class="place-title panel-heading">{{ title }}</h2>
+      <ul
+        v-if="recognitions.length"
+        class="place-recognitions"
+        aria-label="Recognised as"
+      >
+        <li v-for="recognition in recognitions" :key="recognition.id">
+          <button
+            type="button"
+            class="place-recognition"
+            :title="recognition.name"
+            :aria-label="`${RECOGNITION_LABEL[recognition.placeTypeId] ?? 'Recognition'}: ${recognition.name}`"
+            @click="$emit('open', recognition.id)"
+          >
+            <span
+              class="place-recognition-dot"
+              :style="{
+                backgroundColor: recognitionColour(recognition.placeTypeId),
+              }"
+              aria-hidden="true"
+            />
+            {{ RECOGNITION_LABEL[recognition.placeTypeId] ?? 'Recognition' }}
+            <ChevronRight
+              class="place-recognition-go"
+              :size="12"
+              :stroke-width="2.25"
+              aria-hidden="true"
+            />
+          </button>
+        </li>
+      </ul>
       <div class="place-meta">
         <p class="place-subtitle">{{ subtitle }}</p>
         <p v-if="place?.areaKm2 != null" class="place-area">
@@ -156,15 +250,78 @@ function onTabKey(event: KeyboardEvent, index: number) {
                 <dt>Designation</dt>
                 <dd>{{ place.designation }}</dd>
               </div>
-              <div v-if="country">
-                <dt>Country</dt>
-                <dd>{{ country }}</dd>
+              <div v-if="countries.length">
+                <dt>{{ countries.length > 1 ? 'Countries' : 'Country' }}</dt>
+                <dd>
+                  <ul class="place-countries">
+                    <li
+                      v-for="countryLabel in countries"
+                      :key="countryLabel"
+                      class="place-country"
+                    >
+                      {{ countryLabel }}
+                    </li>
+                  </ul>
+                </dd>
               </div>
               <div v-if="place.areaKm2 != null">
                 <dt>Area</dt>
                 <dd>{{ formatKm2(place.areaKm2) }} km²</dd>
               </div>
             </dl>
+          </template>
+
+          <template v-else-if="activeTab === 'areas'">
+            <p v-if="recognisedStatus === 'loading'" class="place-note">
+              Loading conservation areas.
+            </p>
+            <p v-else-if="recognisedStatus === 'error'" class="place-note">
+              The conservation areas could not be loaded.
+            </p>
+            <p v-else-if="recognised.length === 0" class="place-note">
+              No conservation area lies at least 75% inside this recognition.
+            </p>
+            <template v-else>
+              <p class="place-recognised-count map-section">
+                {{ recognised.length.toLocaleString('en-GB') }}
+                {{
+                  recognised.length === 1
+                    ? 'conservation area'
+                    : 'conservation areas'
+                }}
+                at least 75% inside
+              </p>
+              <ul class="place-recognised" aria-label="Conservation areas">
+                <li
+                  v-for="item in recognised.slice(0, recognisedShown)"
+                  :key="item.id"
+                >
+                  <PlaceCard
+                    :name="item.name"
+                    :iso3="item.iso3"
+                    :area-km2="item.area_km2"
+                    @click="$emit('open', item.id)"
+                    @highlight="on => $emit('highlight', item.id, on)"
+                  />
+                </li>
+                <li v-if="recognisedShown < recognised.length">
+                  <button
+                    type="button"
+                    class="place-recognised-more map-control"
+                    @click="recognisedShown += RECOGNISED_STEP"
+                  >
+                    Show
+                    {{
+                      Math.min(
+                        RECOGNISED_STEP,
+                        recognised.length - recognisedShown
+                      )
+                    }}
+                    more
+                  </button>
+                </li>
+              </ul>
+            </template>
           </template>
 
           <template v-else-if="activeTab === 'landscape'">
@@ -245,12 +402,120 @@ function onTabKey(event: KeyboardEvent, index: number) {
   overflow-wrap: anywhere;
 }
 
+.place-recognitions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-recognition {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.place-recognition:hover {
+  background: var(--muted, #ece9e0);
+}
+
+.place-recognition:focus-visible {
+  outline: 2px solid var(--foreground, #24312c);
+  outline-offset: 2px;
+}
+
+.place-recognition-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
 .place-meta {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-top: -6px;
+}
+
+.place-countries {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-country {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.place-recognised-count {
+  margin: 0;
+}
+
+.place-recognised {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+}
+
+.place-recognised-more {
+  cursor: pointer;
+}
+
+.place-recognition-go {
+  margin-left: -2px;
+  color: var(--muted-foreground);
+}
+
+/*
+ * On the Conservation areas tab only the list scrolls. The header, the tabs,
+ * and the source line stay where they are. A narrow screen scrolls as one.
+ */
+@media (min-width: 721px) {
+  .place-profile.is-list-tab {
+    overflow: hidden;
+  }
+
+  .place-profile.is-list-tab .place-body,
+  .place-profile.is-list-tab .place-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .place-profile.is-list-tab .place-recognised {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
 }
 
 .place-subtitle {
@@ -266,7 +531,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
   flex: none;
   margin: 0;
   padding: 5px 10px;
-  border-radius: var(--map-control-radius);
+  border-radius: 999px;
   background: var(--on);
   color: var(--on-foreground);
   font-size: 14px;
@@ -294,6 +559,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
 }
 
 .place-tab {
+  white-space: nowrap;
   margin: 0 0 -1px;
   padding: 0 0 10px;
   border: 0;

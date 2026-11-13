@@ -1,11 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
-import { loadPilotPlace, type PlaceDetail } from '@/places/api';
+import {
+  loadPilotPlace,
+  loadPlaceRecognitions,
+  loadRecognisedPlaces,
+  type PlaceDetail,
+} from '@/places/api';
 import { PHOTOS_NONE } from '@/places/photos';
 
 vi.mock('@/places/api', () => ({
+  PLACE_TYPE: 'conservation_area',
   loadPilotPlace: vi.fn(),
+  loadPlaceRecognitions: vi.fn(),
+  loadRecognisedPlaces: vi.fn(),
 }));
 
 const placeId = '22222222-2222-2222-2222-222222222222';
@@ -13,6 +21,7 @@ const placeId = '22222222-2222-2222-2222-222222222222';
 const kruger: PlaceDetail = {
   id: placeId,
   name: 'Kruger National Park',
+  placeTypeId: 'conservation_area',
   designation: 'National Park',
   iso3: 'ZAF',
   areaKm2: 19485.2,
@@ -58,6 +67,122 @@ async function openTab(
 describe('Place profile', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(loadPlaceRecognitions).mockResolvedValue({
+      status: 'ok',
+      recognitions: [],
+    });
+  });
+
+  it('shows confirmed recognitions as badges that open them', async () => {
+    const heritageId = '66666666-6666-6666-6666-666666666666';
+    vi.mocked(loadPlaceRecognitions).mockResolvedValue({
+      status: 'ok',
+      recognitions: [
+        {
+          id: heritageId,
+          name: 'Kruger to Canyons',
+          placeTypeId: 'biosphere_reserve',
+        },
+        {
+          id: '55555555-5555-5555-5555-555555555555',
+          name: 'Nylsvley Nature Reserve',
+          placeTypeId: 'ramsar_site',
+        },
+      ],
+    });
+    const wrapper = await mountProfile(kruger);
+
+    expect(loadPlaceRecognitions).toHaveBeenCalledWith(placeId);
+    const badges = wrapper.findAll('.place-recognition');
+    expect(badges.map(badge => badge.text())).toEqual(['UNESCO-MAB', 'Ramsar']);
+    expect(badges[0].attributes('title')).toBe('Kruger to Canyons');
+    expect(badges[1].attributes('aria-label')).toBe(
+      'Ramsar: Nylsvley Nature Reserve'
+    );
+    expect(loadRecognisedPlaces).not.toHaveBeenCalled();
+    expect(
+      badges[0].get('.place-recognition-dot').attributes('style')
+    ).toContain('background-color: rgb(122, 74, 156)');
+    await badges[0].trigger('click');
+    expect(wrapper.emitted('open')).toEqual([[heritageId]]);
+  });
+
+  it('shows each country of a transboundary place as a tag', async () => {
+    const wrapper = await mountProfile({ ...kruger, iso3: 'LSO;ZAF' });
+    // Tags in the Overview table, not under the title
+    const tags = wrapper.findAll('[role="tabpanel"] .place-country');
+    expect(tags.map(tag => tag.text())).toEqual(['Lesotho', 'South Africa']);
+    expect(wrapper.get('[role="tabpanel"]').text()).toContain('Countries');
+    expect(wrapper.findAll('.place-meta .place-country')).toHaveLength(0);
+  });
+
+  it('lists the conservation areas a recognition recognises as cards', async () => {
+    const parks = Array.from({ length: 23 }, (_, index) => ({
+      id: `00000000-0000-0000-0000-${String(index).padStart(12, '0')}`,
+      name: `Park ${index + 1}`,
+      designation: 'Nature Reserve',
+      iso3: 'ZAF',
+      area_km2: 1000 - index,
+      cropland_percent: null,
+    }));
+    vi.mocked(loadRecognisedPlaces).mockResolvedValue({
+      status: 'ok',
+      places: parks,
+    });
+    const wrapper = await mountProfile({
+      ...kruger,
+      placeTypeId: 'world_heritage_site',
+      name: 'Maloti-Drakensberg Park',
+    });
+
+    expect(loadPlaceRecognitions).not.toHaveBeenCalled();
+    expect(loadRecognisedPlaces).toHaveBeenCalledWith(placeId);
+    expect(wrapper.find('.place-recognitions').exists()).toBe(false);
+    expect(wrapper.find('.place-recognised').exists()).toBe(false);
+    const tabs = wrapper.findAll('[role="tab"]').map(tab => tab.text());
+    expect(tabs).toEqual(['Overview', 'Areas', 'Landscape', 'Species']);
+    await openTab(wrapper, 'Areas');
+    expect(wrapper.get('.place-profile').classes()).toContain('is-list-tab');
+    expect(wrapper.get('.place-recognised-count').text()).toBe(
+      '23 conservation areas at least 75% inside'
+    );
+    const section = wrapper.get('.place-recognised');
+    expect(section.findAll('.place-result')).toHaveLength(20);
+    expect(section.find('.place-thumb').exists()).toBe(true);
+
+    await section.get('.place-recognised-more').trigger('click');
+    expect(section.findAll('.place-result')).toHaveLength(23);
+    expect(section.find('.place-recognised-more').exists()).toBe(false);
+
+    await section.findAll('.place-result')[0].trigger('click');
+    expect(wrapper.emitted('open')).toEqual([[parks[0].id]]);
+    // The map draws the listed areas only while the tab is open
+    expect(wrapper.emitted('areas')?.at(-1)).toEqual([
+      parks.map(park => park.id),
+    ]);
+    await openTab(wrapper, 'Overview');
+    expect(wrapper.emitted('areas')?.at(-1)).toEqual([null]);
+    wrapper.unmount();
+  });
+
+  it('shows no badges for a place without recognitions', async () => {
+    const wrapper = await mountProfile(kruger);
+    expect(wrapper.find('.place-recognitions').exists()).toBe(false);
+  });
+
+  it('says when no conservation area is linked to a recognition', async () => {
+    vi.mocked(loadRecognisedPlaces).mockResolvedValue({
+      status: 'ok',
+      places: [],
+    });
+    const wrapper = await mountProfile({
+      ...kruger,
+      placeTypeId: 'ramsar_site',
+    });
+    await openTab(wrapper, 'Areas');
+    expect(wrapper.get('[role="tabpanel"]').text()).toBe(
+      'No conservation area lies at least 75% inside this recognition.'
+    );
   });
 
   it('shows the stored name, country, designation, area, and source', async () => {
@@ -68,6 +193,9 @@ describe('Place profile', () => {
     expect(wrapper.get('.place-subtitle').text()).toBe(
       'South Africa · National Park'
     );
+    expect(wrapper.findAll('.place-country').map(tag => tag.text())).toEqual([
+      'South Africa',
+    ]);
     expect(wrapper.get('.place-area').text()).toBe('19,485 km²');
     const tabs = wrapper.findAll('[role="tab"]').map(tab => tab.text());
     expect(tabs).toEqual(['Overview', 'Landscape', 'Species']);

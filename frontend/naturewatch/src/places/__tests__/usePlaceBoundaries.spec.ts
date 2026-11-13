@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { shallowRef } from 'vue';
 import {
   PLACE_TILES_URL,
+  RECOGNITION_TILES_URL,
   loadPlaceBounds,
   loadPlaceRelease,
 } from '@/places/api';
@@ -41,8 +42,17 @@ class FakeMap {
   easeTo = vi.fn();
   setFilter = vi.fn();
   setPaintProperty = vi.fn();
+  setLayoutProperty = vi.fn();
+  /** False while tiles load, as Mapbox reports it. */
+  tilesLoaded = true;
+  /** The style itself, which is all a layer change needs. */
+  style = { _loaded: true };
   isStyleLoaded() {
-    return true;
+    return this.tilesLoaded;
+  }
+  once(type: string, handler: Handler) {
+    this.handlers.push({ type, handler });
+    return this;
   }
   getStyle() {
     return { layers: [], imports: [{}] };
@@ -98,7 +108,7 @@ class FakeMap {
 const outsideWindow = '33333333-3333-3333-3333-333333333333';
 
 /**
- * Mount the overlay on a fake map and show Protected Areas.
+ * Mount the overlay on a fake map and show Conservation areas.
  * @returns The map and the store.
  */
 async function drawPlaces() {
@@ -217,6 +227,180 @@ describe('place boundaries from tiles', () => {
       'line-color',
       '#f4f1e8'
     );
+  });
+
+  it('draws recognition outlines only while a recognition type is listed', async () => {
+    const { map, store } = await drawPlaces();
+
+    expect(map.getSource('recognitions-tiles')).toEqual({
+      type: 'vector',
+      url: RECOGNITION_TILES_URL,
+    });
+    expect(map.getLayer('recognitions-line')).toMatchObject({
+      'source-layer': 'recognitions',
+    });
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'recognitions-line',
+      'visibility',
+      'none'
+    );
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'places-fill',
+      'visibility',
+      'visible'
+    );
+
+    map.setLayoutProperty.mockClear();
+    store.listType = 'ramsar_site';
+    store.applyFilter([100, null], [5, 50]);
+    await flushPromises();
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'places-fill',
+      'visibility',
+      'none'
+    );
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'recognitions-line',
+      'visibility',
+      'visible'
+    );
+    // Size only: the recognitions archive has no cropland field
+    expect(map.setFilter).toHaveBeenLastCalledWith('recognitions-line', [
+      'all',
+      ['==', ['get', 'place_type_id'], 'ramsar_site'],
+      ['all', ['>=', ['to-number', ['get', 'area_km2'], -1], 100]],
+    ]);
+  });
+
+  it('opens a clicked recognition and highlights it from its archive', async () => {
+    const { map, store } = await drawPlaces();
+    store.listType = 'world_heritage_site';
+    await flushPromises();
+
+    map.fire('click', 'recognitions-fill', {
+      features: [{ properties: { id: outsideWindow } }],
+    });
+    expect(store.selectedId).toBe(outsideWindow);
+    await flushPromises();
+    expect(map.setFilter).toHaveBeenCalledWith('recognitions-select-line', [
+      '==',
+      ['get', 'id'],
+      outsideWindow,
+    ]);
+  });
+
+  it('colours recognitions by group and lightens them on satellite', async () => {
+    const { map } = await drawPlaces();
+    const colour = [
+      'match',
+      ['get', 'place_type_id'],
+      'world_heritage_site',
+      '#a8730f',
+      'ramsar_site',
+      '#1f6f9a',
+      'biosphere_reserve',
+      '#7a4a9c',
+      '#7d7a72',
+    ];
+    expect(map.getLayer('recognitions-line')).toMatchObject({
+      paint: { 'line-color': colour },
+    });
+    expect(map.getLayer('recognitions-fill')).toMatchObject({
+      paint: { 'fill-opacity': 0 },
+    });
+
+    useBasemapStore().toggleBasemap();
+    await flushPromises();
+    expect(map.setPaintProperty).toHaveBeenCalledWith(
+      'recognitions-line',
+      'line-color',
+      [
+        'match',
+        ['get', 'place_type_id'],
+        'world_heritage_site',
+        '#f2c14e',
+        'ramsar_site',
+        '#8fd3f4',
+        'biosphere_reserve',
+        '#d9b3f5',
+        '#d8d5cc',
+      ]
+    );
+  });
+
+  it('removes the boundaries even while tiles are still loading', async () => {
+    const { map, store } = await drawPlaces();
+    map.tilesLoaded = false;
+
+    store.toggle();
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeUndefined();
+    expect(map.getSource('recognitions-tiles')).toBeUndefined();
+  });
+
+  it('waits for the map to be idle when the style is not loaded', async () => {
+    const { map, store } = await drawPlaces();
+    map.tilesLoaded = false;
+    map.style._loaded = false;
+
+    store.toggle();
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeDefined();
+    map.fire('idle', undefined, {});
+    expect(map.getSource('places-tiles')).toBeUndefined();
+  });
+
+  it('draws the conservation areas of an open Areas tab', async () => {
+    const { map, store } = await drawPlaces();
+    store.listType = 'world_heritage_site';
+    store.toggle();
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeUndefined();
+
+    map.setLayoutProperty.mockClear();
+    store.shownAreaIds = [outsideWindow];
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeDefined();
+    expect(map.setFilter).toHaveBeenCalledWith('places-fill', [
+      'in',
+      ['get', 'id'],
+      ['literal', [outsideWindow]],
+    ]);
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'places-fill',
+      'visibility',
+      'visible'
+    );
+
+    store.shownAreaIds = null;
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeUndefined();
+  });
+
+  it('outlines the place of a hovered card from either archive', async () => {
+    const { map, store } = await drawPlaces();
+    expect(map.getLayer('places-hover-line')).toBeDefined();
+    expect(map.getLayer('recognitions-hover-line')).toBeDefined();
+
+    store.hoverPlace(outsideWindow, true);
+    await flushPromises();
+    const filter = ['==', ['get', 'id'], outsideWindow];
+    expect(map.setFilter).toHaveBeenCalledWith('places-hover-line', filter);
+    expect(map.setFilter).toHaveBeenCalledWith(
+      'recognitions-hover-line',
+      filter
+    );
+    // Hovering does not move the map
+    expect(map.fitBounds).not.toHaveBeenCalled();
+    expect(map.easeTo).not.toHaveBeenCalled();
+
+    store.hoverPlace(outsideWindow, false);
+    await flushPromises();
+    expect(map.setFilter).toHaveBeenLastCalledWith('recognitions-hover-line', [
+      '==',
+      ['get', 'id'],
+      '',
+    ]);
   });
 
   it('reports a failed tile read', async () => {

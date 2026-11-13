@@ -3,6 +3,7 @@ import {
   SIZE_STEPS,
   binCounts,
   countryName,
+  countryNames,
   sizeFraction,
   filterPlaces,
   formatAreaTag,
@@ -132,7 +133,10 @@ describe('place figures', () => {
     expect(countryName('ZAF')).toBe('South Africa');
     expect(countryName('BWA')).toBe('Botswana');
     expect(countryName('TZA')).toBe('Tanzania');
-    expect(countryName('ZAF;BWA')).toBe('ZAF;BWA');
+    expect(countryName('ZAF;BWA')).toBe('South Africa, Botswana');
+    expect(countryNames('LSO;ZAF')).toEqual(['Lesotho', 'South Africa']);
+    expect(countryNames('ZAF; ZZZ')).toEqual(['South Africa', 'ZZZ']);
+    expect(countryNames(null)).toEqual([]);
     expect(countryName('ZZZ')).toBe('ZZZ');
     expect(countryName(null)).toBe('');
   });

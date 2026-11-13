@@ -5,6 +5,7 @@ import {
   CROPLAND_FULL,
   PROTECTED_AREA_ATTRIBUTION,
   formatReleaseMonth,
+  isRecognitionButtonType,
   placeTileFilter,
   type FigureRange,
   type LngLatBounds,
@@ -24,6 +25,32 @@ const usePlacesStore = defineStore('places', () => {
   const notice = ref('');
   const selectedId = ref<string | null>(null);
   const selectedFrom = ref<'list' | 'map' | null>(null);
+  /**
+   * Stored place type the list shows and the map draws: `conservation_area`,
+   * one of the recognition button types, or null.
+   */
+  const listType = ref<string | null>(null);
+  /**
+   * Conservation areas a recognition's Areas tab lists. The map draws them
+   * while the tab is open. Null otherwise.
+   */
+  const shownAreaIds = ref<string[] | null>(null);
+  /** The place whose card the pointer or focus is on, outlined on the map. */
+  const hoveredId = ref<string | null>(null);
+
+  /**
+   * Outline a place while its card is hovered.
+   * @param id - The place.
+   * @param on - Whether the pointer entered or left the card.
+   */
+  function hoverPlace(id: string, on: boolean) {
+    if (on) hoveredId.value = id;
+    else if (hoveredId.value === id) hoveredId.value = null;
+  }
+  /** Whether a recognition type is listed, so the tools are size only. */
+  const listingRecognitions = computed(() =>
+    isRecognitionButtonType(listType.value)
+  );
   /** Applied size filter, in km². */
   const sizeKept = ref<SizeBounds>([null, null]);
   /** Applied cropland filter, in percent. */
@@ -39,7 +66,10 @@ const usePlacesStore = defineStore('places', () => {
   );
   /** Tile filter for the applied size and cropland ranges. */
   const tileFilter = computed(() =>
-    placeTileFilter(sizeKept.value, croplandKept.value)
+    placeTileFilter(
+      sizeKept.value,
+      listingRecognitions.value ? CROPLAND_FULL : croplandKept.value
+    )
   );
 
   /**
@@ -63,6 +93,7 @@ const usePlacesStore = defineStore('places', () => {
    * @param source - Where the click happened. The list is the default.
    */
   function selectPlace(id: string, source: 'list' | 'map' = 'list') {
+    hoveredId.value = null;
     if (selectedId.value === id) {
       selectedId.value = null;
       selectedFrom.value = null;
@@ -74,6 +105,7 @@ const usePlacesStore = defineStore('places', () => {
 
   /** Close the place column. */
   function clearSelection() {
+    hoveredId.value = null;
     selectedId.value = null;
     selectedFrom.value = null;
   }
@@ -93,7 +125,7 @@ const usePlacesStore = defineStore('places', () => {
     }
     const month = result.status === 'ok' ? result.releaseMonth : null;
     notice.value = month
-      ? `Protected areas: WDPCA, ${formatReleaseMonth(month)}. ${PROTECTED_AREA_ATTRIBUTION}`
+      ? `Conservation areas: WDPCA, ${formatReleaseMonth(month)}. ${PROTECTED_AREA_ATTRIBUTION}`
       : PROTECTED_AREA_ATTRIBUTION;
     if (status.value === 'loading') status.value = 'ready';
   }
@@ -110,6 +142,11 @@ const usePlacesStore = defineStore('places', () => {
     notice,
     selectedId,
     selectedFrom,
+    listType,
+    shownAreaIds,
+    hoveredId,
+    hoverPlace,
+    listingRecognitions,
     sizeKept,
     croplandKept,
     viewBounds,

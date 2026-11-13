@@ -9,7 +9,7 @@ import {
 export const PLACE_LIST_LIMIT = 50;
 
 /**
- * Published protected-area boundaries. Each feature carries `id` (`places.id`),
+ * Published conservation-area boundaries. Each feature carries `id` (`places.id`),
  * `area_km2`, and `cropland_percent` when a figure is stored.
  */
 export const PLACE_TILES_URL =
@@ -18,14 +18,24 @@ export const PLACE_TILES_URL =
 /** Vector layer inside the places archive. */
 export const PLACE_TILE_LAYER = 'places';
 
-/** Place type the list, the filters, and the profile read. */
+/**
+ * Published recognition boundaries. Each feature carries `id` (`places.id`),
+ * `area_km2`, and `place_type_id`.
+ */
+export const RECOGNITION_TILES_URL =
+  'https://storage.googleapis.com/nature-watch-tiles/places/recognitions/v1/recognitions.pmtiles';
+
+/** Vector layer inside the recognitions archive. */
+export const RECOGNITION_TILE_LAYER = 'recognitions';
+
+/** Place type of the conservation areas: the default list and the release notice. */
 export const PLACE_TYPE = 'conservation_area';
 
 /** Period of the cropland figures the profile shows. */
 export const CROPLAND_PERIOD_START = '2024-01-01';
 
 const PLACE_COLUMNS =
-  'id, name, designation, iso3, area_km2, site_id, release_month, source_name, citation';
+  'id, name, place_type_id, designation, iso3, area_km2, site_id, release_month, source_name, citation';
 
 /** A card on the places list. */
 export interface PlaceSummary {
@@ -36,12 +46,16 @@ export interface PlaceSummary {
   area_km2: number | null;
   /** Stored cropland percent, or null when none is stored. */
   cropland_percent: number | null;
+  /** `place_types.id`. Set by the search across every type. */
+  place_type_id?: string;
 }
 
 /** A published place and its stored cropland figures, when they exist. */
 export interface PlaceDetail {
   id: string;
   name: string;
+  /** `place_types.id`, such as `conservation_area` or `ramsar_site`. */
+  placeTypeId: string;
   designation: string | null;
   iso3: string | null;
   areaKm2: number | null;
@@ -66,6 +80,8 @@ export interface PlaceWindowQuery {
   extent: LngLatBounds | null;
   /** Skip this many matching rows. Used to load the next 50. */
   offset?: number;
+  /** Stored place type to list. Conservation areas when left out. */
+  placeType?: string;
 }
 
 /** Result of loading the capped list. */
@@ -106,6 +122,25 @@ type WindowRow = PlaceSummary & { total_count: number | string };
 export type PlaceLoadResult =
   | { status: 'ok'; place: PlaceDetail }
   | { status: 'missing' }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/** A recognition of a place, shown as a badge on its profile. */
+export interface PlaceRecognition {
+  id: string;
+  name: string;
+  placeTypeId: string;
+}
+
+/** Result of reading a place's confirmed recognitions. */
+export type PlaceRecognitionsResult =
+  | { status: 'ok'; recognitions: PlaceRecognition[] }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/** Result of reading the places a recognition recognises. */
+export type RecognisedPlacesResult =
+  | { status: 'ok'; places: PlaceSummary[] }
   | { status: 'unconfigured' }
   | { status: 'error' };
 
@@ -151,7 +186,7 @@ export function placesClient(): SupabaseClient | null {
  */
 function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
   return {
-    p_place_type: PLACE_TYPE,
+    p_place_type: query.placeType ?? PLACE_TYPE,
     p_search: query.search.trim(),
     p_search_prefix: query.searchPrefix,
     p_size_min: query.sizeMin,
@@ -221,6 +256,55 @@ export async function loadPilotPlaceWindow(
 }
 
 /**
+ * At most 50 listed places of every type whose names start with the search,
+ * plus how many match. Used while no place type is selected. The size filter
+ * applies. Cropland and the map view do not, as they are not shared by every
+ * type; a cropland order falls back to largest first.
+ * @param query - Search, sort, size filter, and offset.
+ * @param signal - Cancels the request when a newer one replaces it.
+ * @returns The window, or why it could not be loaded.
+ */
+export async function loadPlaceSearchWindow(
+  query: PlaceWindowQuery,
+  signal?: AbortSignal
+): Promise<PlaceWindowResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const prefix = query.search.trim().replace(/[\\%_]/g, match => `\\${match}`);
+  let call = supabase
+    .from('listed_places')
+    .select('id, name, designation, iso3, area_km2, place_type_id', {
+      count: 'exact',
+    })
+    .ilike('name', `${prefix}%`);
+  if (query.sizeMin !== null) call = call.gte('area_km2', query.sizeMin);
+  if (query.sizeMax !== null) call = call.lte('area_km2', query.sizeMax);
+  if (query.sort === 'name') call = call.order('name');
+  else
+    call = call
+      .order('area_km2', {
+        ascending: query.sort === 'size-asc',
+        nullsFirst: false,
+      })
+      .order('name');
+  const offset = query.offset ?? 0;
+  call = call.range(offset, offset + PLACE_LIST_LIMIT - 1);
+  const { data, error, count } = await (signal
+    ? call.abortSignal(signal)
+    : call);
+  if (error || !data) return { status: 'error' };
+  return {
+    status: 'ok',
+    total: count ?? data.length,
+    places: (
+      data as (Omit<PlaceSummary, 'cropland_percent'> & {
+        place_type_id: string;
+      })[]
+    ).map(row => ({ ...row, cropland_percent: null })),
+  };
+}
+
+/**
  * Where one place sits in the list for the current query.
  * @param query - Search, sort, filters, and optional map extent.
  * @param id - `places.id`.
@@ -265,13 +349,16 @@ export async function loadPilotPlaceWindowCount(
 
 /**
  * Size range and histogram counts for the filter charts.
+ * @param placeType - Stored place type. Conservation areas when left out.
  * @returns The stored distribution, or why it could not be loaded.
  */
-export async function loadPilotPlaceFilterStats(): Promise<PlaceFilterStatsResult> {
+export async function loadPilotPlaceFilterStats(
+  placeType: string = PLACE_TYPE
+): Promise<PlaceFilterStatsResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase.rpc('place_filter_stats', {
-    p_place_type: PLACE_TYPE,
+    p_place_type: placeType,
   });
   if (error || !data?.[0]) return { status: 'error' };
   const row = data[0] as {
@@ -346,6 +433,7 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
     place: {
       id: place.id,
       name: place.name,
+      placeTypeId: place.place_type_id,
       designation: place.designation,
       iso3: place.iso3,
       areaKm2: place.area_km2,
@@ -357,6 +445,129 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
       percent: value('crops_percent'),
     },
   };
+}
+
+/** Badge order: the three with their own buttons, then the regional ones. */
+const RECOGNITION_ORDER = [
+  'world_heritage_site',
+  'ramsar_site',
+  'biosphere_reserve',
+  'natura_2000_site',
+  'emerald_site',
+  'other_recognition',
+];
+
+/**
+ * The published recognitions with a confirmed `recognises` link to a place,
+ * ordered by type and then name. A recognition itself has none.
+ * @param id - `places.id` of the recognised place.
+ * @returns The recognitions, or why they could not be read.
+ */
+export async function loadPlaceRecognitions(
+  id: string
+): Promise<PlaceRecognitionsResult> {
+  if (!PLACE_ID.test(id)) return { status: 'ok', recognitions: [] };
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data: links, error } = await supabase
+    .from('place_relationships')
+    .select('subject_place_id')
+    .eq('object_place_id', id)
+    .eq('relationship_type_id', 'recognises')
+    .eq('status', 'confirmed');
+  if (error) return { status: 'error' };
+  const ids = [
+    ...new Set(
+      ((links as { subject_place_id: string }[] | null) ?? []).map(
+        link => link.subject_place_id
+      )
+    ),
+  ];
+  if (ids.length === 0) return { status: 'ok', recognitions: [] };
+  const { data: rows, error: rowsError } = await supabase
+    .from('place_summaries')
+    .select('id, name, place_type_id')
+    .in('id', ids);
+  if (rowsError) return { status: 'error' };
+  const rank = (type: string) => {
+    const index = RECOGNITION_ORDER.indexOf(type);
+    return index === -1 ? RECOGNITION_ORDER.length : index;
+  };
+  const recognitions = (
+    (rows as { id: string; name: string; place_type_id: string }[] | null) ?? []
+  )
+    .map(row => ({
+      id: row.id,
+      name: row.name,
+      placeTypeId: row.place_type_id,
+    }))
+    .sort(
+      (a, b) =>
+        rank(a.placeTypeId) - rank(b.placeTypeId) ||
+        a.name.localeCompare(b.name)
+    );
+  return { status: 'ok', recognitions };
+}
+
+/** Ids per `place_summaries` read, so the request address stays short. */
+const RECOGNISED_CHUNK = 150;
+
+/** Rows per `place_relationships` read, the API's row limit. */
+const LINK_PAGE = 1000;
+
+/**
+ * The published places a recognition has a confirmed `recognises` link to,
+ * largest first. One UNESCO-MAB site has over a thousand, so the summaries
+ * are read in chunks.
+ * @param id - `places.id` of the recognition.
+ * @returns The places, or why they could not be read.
+ */
+export async function loadRecognisedPlaces(
+  id: string
+): Promise<RecognisedPlacesResult> {
+  if (!PLACE_ID.test(id)) return { status: 'ok', places: [] };
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  // The API returns at most 1,000 rows per request, so read the links in pages
+  const linked: string[] = [];
+  for (let from = 0; ; from += LINK_PAGE) {
+    const { data: links, error } = await supabase
+      .from('place_relationships')
+      .select('object_place_id')
+      .eq('subject_place_id', id)
+      .eq('relationship_type_id', 'recognises')
+      .eq('status', 'confirmed')
+      .order('object_place_id')
+      .range(from, from + LINK_PAGE - 1);
+    if (error) return { status: 'error' };
+    const page = (links as { object_place_id: string }[] | null) ?? [];
+    linked.push(...page.map(link => link.object_place_id));
+    if (page.length < LINK_PAGE) break;
+  }
+  const ids = [...new Set(linked)];
+  const chunks: string[][] = [];
+  for (let start = 0; start < ids.length; start += RECOGNISED_CHUNK)
+    chunks.push(ids.slice(start, start + RECOGNISED_CHUNK));
+  const reads = await Promise.all(
+    chunks.map(chunk =>
+      supabase
+        .from('place_summaries')
+        .select('id, name, designation, iso3, area_km2')
+        .in('id', chunk)
+    )
+  );
+  if (reads.some(read => read.error)) return { status: 'error' };
+  const places = reads
+    .flatMap(
+      read =>
+        (read.data as Omit<PlaceSummary, 'cropland_percent'>[] | null) ?? []
+    )
+    .map(row => ({ ...row, cropland_percent: null }))
+    .sort(
+      (a, b) =>
+        (b.area_km2 ?? -1) - (a.area_km2 ?? -1) || a.name.localeCompare(b.name)
+    );
+  return { status: 'ok', places };
 }
 
 /**
@@ -387,7 +598,7 @@ export async function loadPlaceBounds(id: string): Promise<PlaceBoundsResult> {
 }
 
 /**
- * WDPCA release month of the stored protected areas, for the map notice.
+ * WDPCA release month of the stored conservation areas, for the map notice.
  * @returns The month, or why it could not be read.
  */
 export async function loadPlaceRelease(): Promise<PlaceReleaseResult> {

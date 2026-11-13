@@ -17,6 +17,7 @@ describe('Place view', () => {
       place: {
         id: placeId,
         name: 'Kruger National Park',
+        placeTypeId: 'conservation_area',
         designation: 'National Park',
         iso3: 'ZAF',
         areaKm2: 19485.2,
@@ -63,6 +64,7 @@ describe('Place view', () => {
       place: {
         id: placeId,
         name: 'Gobiin ikh',
+        placeTypeId: 'conservation_area',
         designation: 'Strictly Protected Area',
         iso3: 'MNG',
         areaKm2: 63884.6,

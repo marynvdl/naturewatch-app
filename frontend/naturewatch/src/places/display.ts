@@ -1,6 +1,6 @@
 import { COUNTRY_NAMES } from './countryNames';
 
-/** Shown wherever a protected area is named. */
+/** Shown wherever a conservation area is named. */
 export const PROTECTED_AREA_ATTRIBUTION =
   'UNEP-WCMC and IUCN. World Database on Protected and Conserved Areas.';
 
@@ -33,15 +33,30 @@ export function formatAreaTag(km2: number): string {
 const ISO3_CODE = /^[A-Z]{3}$/;
 
 /**
- * English country name for a stored ISO 3166 alpha-3 code.
- * A transboundary string, such as `ZAF;BWA`, is returned as stored.
+ * English country name for a stored ISO 3166 alpha-3 code. A transboundary
+ * place, such as `ZAF;BWA`, reads as its names joined by commas.
  * @param iso3 - `places.iso3`.
- * @returns The name, or the stored value when it is not one known code.
+ * @returns The names, with an unknown code kept as stored.
  */
 export function countryName(iso3: string | null): string {
   if (!iso3) return '';
-  if (!ISO3_CODE.test(iso3)) return iso3;
-  return COUNTRY_NAMES[iso3] ?? iso3;
+  if (ISO3_CODE.test(iso3)) return COUNTRY_NAMES[iso3] ?? iso3;
+  return countryNames(iso3).join(', ');
+}
+
+/**
+ * English names of every country in a stored code list. A transboundary place
+ * stores its codes joined by semicolons, such as `ZAF;LSO`.
+ * @param iso3 - `place_summaries.iso3`.
+ * @returns One name per code, in stored order. An unknown code stays as stored.
+ */
+export function countryNames(iso3: string | null): string[] {
+  if (!iso3) return [];
+  return iso3
+    .split(';')
+    .map(code => code.trim())
+    .filter(Boolean)
+    .map(code => COUNTRY_NAMES[code] ?? code);
 }
 
 /** Landscape tab, when no cropland fact is stored for the place. */
@@ -271,6 +286,69 @@ export function binCounts(fractions: number[], bins: number): number[] {
 }
 
 /** West, south, east, north. */
+/** Recognition types with their own Places button, in button order. */
+export const RECOGNITION_BUTTONS = [
+  { id: 'world_heritage_site', label: 'World Heritage' },
+  { id: 'ramsar_site', label: 'Ramsar' },
+  { id: 'biosphere_reserve', label: 'UNESCO-MAB' },
+] as const;
+
+/** A recognition type with its own Places button. */
+export type RecognitionButtonType = (typeof RECOGNITION_BUTTONS)[number]['id'];
+
+/**
+ * Whether a stored place type is one of the recognition buttons.
+ * @param type - `place_types.id`.
+ * @returns True for World Heritage, Ramsar, and UNESCO-MAB.
+ */
+export function isRecognitionButtonType(
+  type: string | null
+): type is RecognitionButtonType {
+  return RECOGNITION_BUTTONS.some(button => button.id === type);
+}
+
+/** Badge label of each recognition type. */
+export const RECOGNITION_LABEL: Record<string, string> = {
+  world_heritage_site: 'World Heritage',
+  ramsar_site: 'Ramsar',
+  biosphere_reserve: 'UNESCO-MAB',
+  natura_2000_site: 'Natura 2000',
+  emerald_site: 'Emerald',
+  other_recognition: 'Regional',
+};
+
+/**
+ * Outline colour of each recognition group. Natura 2000, Emerald, and other
+ * regional recognitions share `other`.
+ */
+export const RECOGNITION_COLOUR = {
+  monochrome: {
+    world_heritage_site: '#a8730f',
+    ramsar_site: '#1f6f9a',
+    biosphere_reserve: '#7a4a9c',
+    other: '#7d7a72',
+  },
+  satellite: {
+    world_heritage_site: '#f2c14e',
+    ramsar_site: '#8fd3f4',
+    biosphere_reserve: '#d9b3f5',
+    other: '#d8d5cc',
+  },
+} as const;
+
+/**
+ * The colour of a recognition type on one basemap.
+ * @param type - `place_types.id`.
+ * @param satellite - Whether the satellite basemap is shown.
+ * @returns A hex colour.
+ */
+export function recognitionColour(type: string, satellite = false): string {
+  const colours = satellite
+    ? RECOGNITION_COLOUR.satellite
+    : RECOGNITION_COLOUR.monochrome;
+  return isRecognitionButtonType(type) ? colours[type] : colours.other;
+}
+
 export type LngLatBounds = [number, number, number, number];
 
 /** A Mapbox filter expression, kept loose so this file needs no Mapbox types. */

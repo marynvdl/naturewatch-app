@@ -755,6 +755,9 @@ function addSourceAndLayer(
             :place-id="placesStore.selectedId"
             @close="placesStore.clearSelection()"
             @zoom="zoomToSelectedPlace"
+            @open="id => placesStore.selectPlace(id, 'list')"
+            @areas="ids => (placesStore.shownAreaIds = ids)"
+            @highlight="(id, on) => placesStore.hoverPlace(id, on)"
             @moved="
               id =>
                 placesStore.selectPlace(id, placesStore.selectedFrom ?? 'map')

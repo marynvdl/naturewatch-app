@@ -30,7 +30,7 @@ watch(query, loadPlaces);
   <div class="places">
     <h1>Places</h1>
     <p class="intro">
-      Terrestrial protected areas of at least 10 km².
+      Terrestrial conservation areas of at least 10 km².
       <router-link :to="{ name: 'Home' }">Back to the map</router-link>
     </p>
 
