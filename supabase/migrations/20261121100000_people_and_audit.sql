@@ -31,6 +31,9 @@ create trigger create_profile
 after insert on auth.users
 for each row execute function public.create_profile();
 
+-- Users invited before this migration get their profile here.
+insert into public.profiles (id) select id from auth.users;
+
 -- Roles -------------------------------------------------------------------------------
 
 create table public.user_roles (
