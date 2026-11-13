@@ -35,7 +35,7 @@ export const PLACE_TYPE = 'conservation_area';
 export const CROPLAND_PERIOD_START = '2024-01-01';
 
 const PLACE_COLUMNS =
-  'id, name, designation, iso3, area_km2, site_id, release_month, source_name, citation';
+  'id, name, place_type_id, designation, iso3, area_km2, site_id, release_month, source_name, citation';
 
 /** A card on the places list. */
 export interface PlaceSummary {
@@ -52,6 +52,8 @@ export interface PlaceSummary {
 export interface PlaceDetail {
   id: string;
   name: string;
+  /** `place_types.id`, such as `conservation_area` or `ramsar_site`. */
+  placeTypeId: string;
   designation: string | null;
   iso3: string | null;
   areaKm2: number | null;
@@ -131,6 +133,12 @@ export interface PlaceRecognition {
 /** Result of reading a place's confirmed recognitions. */
 export type PlaceRecognitionsResult =
   | { status: 'ok'; recognitions: PlaceRecognition[] }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/** Result of reading the places a recognition recognises. */
+export type RecognisedPlacesResult =
+  | { status: 'ok'; places: PlaceSummary[] }
   | { status: 'unconfigured' }
   | { status: 'error' };
 
@@ -374,6 +382,7 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
     place: {
       id: place.id,
       name: place.name,
+      placeTypeId: place.place_type_id,
       designation: place.designation,
       iso3: place.iso3,
       areaKm2: place.area_km2,
@@ -447,6 +456,61 @@ export async function loadPlaceRecognitions(
         a.name.localeCompare(b.name)
     );
   return { status: 'ok', recognitions };
+}
+
+/** Ids per `place_summaries` read, so the request address stays short. */
+const RECOGNISED_CHUNK = 150;
+
+/**
+ * The published places a recognition has a confirmed `recognises` link to,
+ * largest first. One UNESCO-MAB site has over a thousand, so the summaries
+ * are read in chunks.
+ * @param id - `places.id` of the recognition.
+ * @returns The places, or why they could not be read.
+ */
+export async function loadRecognisedPlaces(
+  id: string
+): Promise<RecognisedPlacesResult> {
+  if (!PLACE_ID.test(id)) return { status: 'ok', places: [] };
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data: links, error } = await supabase
+    .from('place_relationships')
+    .select('object_place_id')
+    .eq('subject_place_id', id)
+    .eq('relationship_type_id', 'recognises')
+    .eq('status', 'confirmed');
+  if (error) return { status: 'error' };
+  const ids = [
+    ...new Set(
+      ((links as { object_place_id: string }[] | null) ?? []).map(
+        link => link.object_place_id
+      )
+    ),
+  ];
+  const chunks: string[][] = [];
+  for (let start = 0; start < ids.length; start += RECOGNISED_CHUNK)
+    chunks.push(ids.slice(start, start + RECOGNISED_CHUNK));
+  const reads = await Promise.all(
+    chunks.map(chunk =>
+      supabase
+        .from('place_summaries')
+        .select('id, name, designation, iso3, area_km2')
+        .in('id', chunk)
+    )
+  );
+  if (reads.some(read => read.error)) return { status: 'error' };
+  const places = reads
+    .flatMap(
+      read =>
+        (read.data as Omit<PlaceSummary, 'cropland_percent'>[] | null) ?? []
+    )
+    .map(row => ({ ...row, cropland_percent: null }))
+    .sort(
+      (a, b) =>
+        (b.area_km2 ?? -1) - (a.area_km2 ?? -1) || a.name.localeCompare(b.name)
+    );
+  return { status: 'ok', places };
 }
 
 /**

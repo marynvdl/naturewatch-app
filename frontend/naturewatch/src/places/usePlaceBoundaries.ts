@@ -538,8 +538,24 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
 
   /** Draw once the style can accept layers. */
   function drawWhenReady(mapInstance: mapboxgl.Map) {
-    if (!mapInstance.isStyleLoaded()) return;
-    syncPlaceOverlay(mapInstance);
+    whenStyleReady(mapInstance, () => syncPlaceOverlay(mapInstance));
+  }
+
+  /**
+   * Run a change to the overlay now, or once the map is idle. `isStyleLoaded`
+   * is also false while tiles load, so a change made then must not be dropped.
+   * Layers can be changed as soon as the style itself has loaded.
+   * @param mapInstance - The map.
+   * @param change - The change to make.
+   */
+  function whenStyleReady(mapInstance: mapboxgl.Map, change: () => void) {
+    const style = (mapInstance as unknown as { style?: { _loaded?: boolean } })
+      .style;
+    if (mapInstance.isStyleLoaded() || style?._loaded === true) {
+      change();
+      return;
+    }
+    mapInstance.once('idle', change);
   }
 
   watch(
@@ -570,7 +586,8 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     () => basemapStore.currentBasemap.title,
     () => {
       const mapInstance = readMap();
-      if (mapInstance?.isStyleLoaded()) applyBasemapPaint(mapInstance);
+      if (mapInstance)
+        whenStyleReady(mapInstance, () => applyBasemapPaint(mapInstance));
     }
   );
 
@@ -578,7 +595,8 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     () => [placesStore.tileFilter, placesStore.listType] as const,
     () => {
       const mapInstance = readMap();
-      if (mapInstance?.isStyleLoaded()) applyKeptFilter(mapInstance);
+      if (mapInstance)
+        whenStyleReady(mapInstance, () => applyKeptFilter(mapInstance));
     }
   );
 

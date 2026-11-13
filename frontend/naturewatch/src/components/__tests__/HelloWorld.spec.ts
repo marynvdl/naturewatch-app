@@ -8,6 +8,9 @@ vi.mock('mapbox-gl', () => {
     on() {
       return this;
     }
+    once() {
+      return this;
+    }
     off() {
       return this;
     }

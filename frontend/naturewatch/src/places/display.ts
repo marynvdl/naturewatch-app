@@ -33,15 +33,30 @@ export function formatAreaTag(km2: number): string {
 const ISO3_CODE = /^[A-Z]{3}$/;
 
 /**
- * English country name for a stored ISO 3166 alpha-3 code.
- * A transboundary string, such as `ZAF;BWA`, is returned as stored.
+ * English country name for a stored ISO 3166 alpha-3 code. A transboundary
+ * place, such as `ZAF;BWA`, reads as its names joined by commas.
  * @param iso3 - `places.iso3`.
- * @returns The name, or the stored value when it is not one known code.
+ * @returns The names, with an unknown code kept as stored.
  */
 export function countryName(iso3: string | null): string {
   if (!iso3) return '';
-  if (!ISO3_CODE.test(iso3)) return iso3;
-  return COUNTRY_NAMES[iso3] ?? iso3;
+  if (ISO3_CODE.test(iso3)) return COUNTRY_NAMES[iso3] ?? iso3;
+  return countryNames(iso3).join(', ');
+}
+
+/**
+ * English names of every country in a stored code list. A transboundary place
+ * stores its codes joined by semicolons, such as `ZAF;LSO`.
+ * @param iso3 - `place_summaries.iso3`.
+ * @returns One name per code, in stored order. An unknown code stays as stored.
+ */
+export function countryNames(iso3: string | null): string[] {
+  if (!iso3) return [];
+  return iso3
+    .split(';')
+    .map(code => code.trim())
+    .filter(Boolean)
+    .map(code => COUNTRY_NAMES[code] ?? code);
 }
 
 /** Landscape tab, when no cropland fact is stored for the place. */
@@ -291,6 +306,16 @@ export function isRecognitionButtonType(
 ): type is RecognitionButtonType {
   return RECOGNITION_BUTTONS.some(button => button.id === type);
 }
+
+/** Badge label of each recognition type. */
+export const RECOGNITION_LABEL: Record<string, string> = {
+  world_heritage_site: 'World Heritage',
+  ramsar_site: 'Ramsar',
+  biosphere_reserve: 'UNESCO-MAB',
+  natura_2000_site: 'Natura 2000',
+  emerald_site: 'Emerald',
+  other_recognition: 'Regional',
+};
 
 /**
  * Outline colour of each recognition group. Natura 2000, Emerald, and other

@@ -43,8 +43,16 @@ class FakeMap {
   setFilter = vi.fn();
   setPaintProperty = vi.fn();
   setLayoutProperty = vi.fn();
+  /** False while tiles load, as Mapbox reports it. */
+  tilesLoaded = true;
+  /** The style itself, which is all a layer change needs. */
+  style = { _loaded: true };
   isStyleLoaded() {
-    return true;
+    return this.tilesLoaded;
+  }
+  once(type: string, handler: Handler) {
+    this.handlers.push({ type, handler });
+    return this;
   }
   getStyle() {
     return { layers: [], imports: [{}] };
@@ -318,6 +326,28 @@ describe('place boundaries from tiles', () => {
         '#d8d5cc',
       ]
     );
+  });
+
+  it('removes the boundaries even while tiles are still loading', async () => {
+    const { map, store } = await drawPlaces();
+    map.tilesLoaded = false;
+
+    store.toggle();
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeUndefined();
+    expect(map.getSource('recognitions-tiles')).toBeUndefined();
+  });
+
+  it('waits for the map to be idle when the style is not loaded', async () => {
+    const { map, store } = await drawPlaces();
+    map.tilesLoaded = false;
+    map.style._loaded = false;
+
+    store.toggle();
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeDefined();
+    map.fire('idle', undefined, {});
+    expect(map.getSource('places-tiles')).toBeUndefined();
   });
 
   it('reports a failed tile read', async () => {

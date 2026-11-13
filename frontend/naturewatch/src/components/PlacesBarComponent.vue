@@ -3,11 +3,11 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import {
   ArrowDownUp,
   Check,
-  Image,
   Scan,
   Search,
   SlidersHorizontal,
 } from '@lucide/vue';
+import PlaceCard from '@/components/PlaceCard.vue';
 import PlacesFilterDialog from '@/components/PlacesFilterDialog.vue';
 import {
   Popover,
@@ -24,9 +24,9 @@ import {
   PLACE_TYPE,
 } from '@/places/api';
 import {
+  CROPLAND_FULL,
   RECOGNITION_BUTTONS,
-  countryName,
-  formatAreaTag,
+  isRecognitionButtonType,
   type RecognitionButtonType,
   type FigureRange,
   type PlaceSort,
@@ -35,39 +35,44 @@ import usePlacesStore from '@/store/PlacesStore';
 
 const placesStore = usePlacesStore();
 
-type PlaceTypeId = 'protected_area' | 'recognition' | 'ecoregion' | 'country';
+type PlaceTypeId =
+  | 'protected_area'
+  | 'ecoregion'
+  | 'country'
+  | RecognitionButtonType;
 
-const placeTypes: { id: PlaceTypeId; label: string }[] = [
+const mainTypes: { id: PlaceTypeId; label: string }[] = [
   { id: 'protected_area', label: 'Protected areas' },
-  { id: 'recognition', label: 'Recognitions' },
   { id: 'ecoregion', label: 'Ecoregions' },
   { id: 'country', label: 'Countries' },
 ];
 
+/** Whether More… has added the recognition buttons. */
+const showMore = ref(false);
+const placeTypes = computed(() =>
+  showMore.value ? [...mainTypes, ...RECOGNITION_BUTTONS] : mainTypes
+);
+
 const placeType = ref<PlaceTypeId | null>(null);
-/** The recognition button selected in the second row. */
-const recognitionType = ref<RecognitionButtonType | null>(null);
 /** The stored place type listed and drawn, or null when none is. */
 const listedType = computed<string | null>(() => {
   if (placeType.value === 'protected_area') return PLACE_TYPE;
-  if (placeType.value === 'recognition') return recognitionType.value;
+  if (isRecognitionButtonType(placeType.value)) return placeType.value;
   return null;
 });
-/** The listed type the size and cropland filter was last applied to. */
-let filteredType: string | null = null;
 
 watch(
   listedType,
   type => {
     placesStore.listType = type;
-    if (type === null) return;
-    // The filter ranges belong to one type, so a new type starts unfiltered
-    if (filteredType !== null && filteredType !== type) {
-      placesStore.clearFilter();
-      if (placesStore.listingRecognitions && sort.value.startsWith('cropland'))
-        sort.value = 'size-desc';
-    }
-    filteredType = type;
+    if (!placesStore.listingRecognitions) return;
+    // Only the size filter applies to recognitions. It stays; cropland is cleared.
+    if (
+      placesStore.croplandKept[0] !== CROPLAND_FULL[0] ||
+      placesStore.croplandKept[1] !== CROPLAND_FULL[1]
+    )
+      placesStore.applyFilter(placesStore.sizeKept, CROPLAND_FULL);
+    if (sort.value.startsWith('cropland')) sort.value = 'size-desc';
   },
   { flush: 'sync' }
 );
@@ -425,7 +430,6 @@ watch(
 /** Return to the panel with no list and no drawn boundaries. */
 function clearPlaces() {
   placeType.value = null;
-  recognitionType.value = null;
   listInView.value = false;
   placesStore.clearSelection();
   hideBoundaries();
@@ -433,8 +437,8 @@ function clearPlaces() {
 
 /**
  * Select a place type, or clear it when that type is already selected.
- * Protected areas draws the stored boundaries. Recognitions shows its own
- * buttons and draws nothing until one is chosen. The other types have none.
+ * Protected areas draws the stored boundaries, and a recognition type its
+ * outlines. The other types have none.
  */
 function selectPlaceType(type: PlaceTypeId) {
   if (placeType.value === type) {
@@ -442,28 +446,19 @@ function selectPlaceType(type: PlaceTypeId) {
     return;
   }
   placeType.value = type;
-  recognitionType.value = null;
   placesStore.clearSelection();
-  if (type === 'protected_area') {
+  if (type === 'protected_area' || isRecognitionButtonType(type)) {
     showBoundaries();
     return;
   }
   hideBoundaries();
 }
 
-/**
- * List and draw one recognition type, or clear it when it is already selected.
- * @param type - The recognition type.
- */
-function selectRecognitionType(type: RecognitionButtonType) {
-  placesStore.clearSelection();
-  if (recognitionType.value === type) {
-    recognitionType.value = null;
-    hideBoundaries();
-    return;
-  }
-  recognitionType.value = type;
-  showBoundaries();
+/** Show or hide the recognition buttons. Less clears a selected one. */
+function toggleMore() {
+  showMore.value = !showMore.value;
+  if (!showMore.value && isRecognitionButtonType(placeType.value))
+    clearPlaces();
 }
 
 watch(
@@ -537,30 +532,20 @@ watch(
           v-for="type in placeTypes"
           :key="type.id"
           type="button"
-          class="place-type map-control"
+          class="place-type map-control map-pill"
           :class="{ 'is-on': placeType === type.id }"
           :aria-pressed="placeType === type.id"
           @click="selectPlaceType(type.id)"
         >
           {{ type.label }}
         </button>
-      </div>
-      <div
-        v-if="placeType === 'recognition'"
-        class="places-types places-subtypes"
-        role="group"
-        aria-label="Recognition types"
-      >
         <button
-          v-for="type in RECOGNITION_BUTTONS"
-          :key="type.id"
           type="button"
-          class="place-type map-control"
-          :class="{ 'is-on': recognitionType === type.id }"
-          :aria-pressed="recognitionType === type.id"
-          @click="selectRecognitionType(type.id)"
+          class="place-type-more"
+          :aria-expanded="showMore"
+          @click="toggleMore"
         >
-          {{ type.label }}
+          {{ showMore ? 'Less' : 'More…' }}
         </button>
       </div>
       <template v-if="placeType || searchingAll">
@@ -592,7 +577,7 @@ watch(
               <PopoverTrigger as-child>
                 <button
                   type="button"
-                  class="places-tool map-control"
+                  class="places-tool map-control map-pill"
                   :aria-label="`Sort places, ${sortLabel}`"
                 >
                   <ArrowDownUp :size="16" aria-hidden="true" />
@@ -626,7 +611,7 @@ watch(
             <button
               ref="filterButton"
               type="button"
-              class="places-tool places-filter-toggle map-control"
+              class="places-tool places-filter-toggle map-control map-pill"
               :class="{ 'is-on': placesStore.filtering }"
               aria-haspopup="dialog"
               @click="filterOpen = true"
@@ -636,7 +621,7 @@ watch(
             </button>
             <button
               type="button"
-              class="places-tool places-extent-toggle map-control"
+              class="places-tool places-extent-toggle map-control map-pill"
               :class="{ 'is-on': listInView }"
               :aria-pressed="listInView"
               aria-label="Limit list to the map view"
@@ -660,10 +645,7 @@ watch(
             :size-only="placesStore.listingRecognitions"
           />
         </div>
-        <div
-          v-if="placeType && placeType !== 'recognition' && !showProtected"
-          class="places-list"
-        >
+        <div v-if="placeType && !showProtected" class="places-list">
           <p class="places-status">{{ nothingStored }}</p>
         </div>
         <div
@@ -692,29 +674,13 @@ watch(
               <span class="place-number" aria-hidden="true">
                 {{ windowStart + index + 1 }}
               </span>
-              <button
-                type="button"
-                class="place-result"
-                :aria-current="
-                  placesStore.selectedId === place.id ? 'true' : undefined
-                "
+              <PlaceCard
+                :name="place.name"
+                :iso3="place.iso3"
+                :area-km2="place.area_km2"
+                :current="placesStore.selectedId === place.id"
                 @click="chooseResult(place.id)"
-              >
-                <span class="place-thumb" aria-hidden="true">
-                  <Image :size="20" :stroke-width="1.25" />
-                </span>
-                <span class="place-card-text">
-                  <span class="place-card-name" :title="place.name">
-                    {{ place.name }}
-                  </span>
-                  <span v-if="place.iso3" class="place-card-meta">
-                    {{ countryName(place.iso3) }}
-                  </span>
-                  <span v-if="place.area_km2 != null" class="place-card-area">
-                    {{ formatAreaTag(place.area_km2) }} km²
-                  </span>
-                </span>
-              </button>
+              />
             </li>
           </ul>
           <div
@@ -829,6 +795,33 @@ watch(
 
 .place-type {
   white-space: nowrap;
+}
+
+/* A text link, so it does not read as another place type. */
+.place-type-more {
+  height: 32px;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.place-type-more:hover {
+  color: var(--foreground);
+  text-decoration-color: currentColor;
+}
+
+.place-type-more:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .places-status {
@@ -960,84 +953,5 @@ watch(
   font-variant-numeric: tabular-nums;
   text-align: right;
   color: var(--muted-foreground);
-}
-
-/* One height for every card. It fits a name over three lines. */
-.place-result {
-  display: flex;
-  align-items: stretch;
-  gap: 12px;
-  width: 100%;
-  height: 112px;
-  margin: 0;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--map-control-radius);
-  background: var(--background);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.place-result:hover {
-  background: var(--accent);
-}
-
-.place-result[aria-current='true'] {
-  border-color: var(--foreground);
-  background: var(--accent);
-}
-
-.place-result:focus-visible {
-  outline: 2px solid var(--foreground);
-  outline-offset: 2px;
-}
-
-.place-thumb {
-  display: grid;
-  flex: none;
-  align-self: center;
-  width: 76px;
-  height: 76px;
-  place-items: center;
-  border-radius: 6px;
-  background: linear-gradient(150deg, #eef0ee, #dfe3df);
-  color: #a3aba6;
-}
-
-.place-card-text {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-width: 0;
-}
-
-.place-card-name {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-
-.place-card-meta {
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
-
-.place-card-area {
-  margin-top: auto;
-  padding: 1px 6px;
-  border-radius: 6px;
-  background: var(--on);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
 }
 </style>

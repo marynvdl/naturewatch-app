@@ -47,6 +47,7 @@ const rows: Record<string, Record<string, unknown>> = {
 
 // Confirmed recognises links, as anon sees them: recognition -> park.
 const links = [
+  { subject_place_id: ramsarId, object_place_id: croppedId },
   { subject_place_id: natura2000Id, object_place_id: keptId },
   { subject_place_id: ramsarId, object_place_id: keptId },
   { subject_place_id: heritageId, object_place_id: keptId },
@@ -78,18 +79,24 @@ function from(table: string) {
   let key: string | undefined;
   if (table === 'place_relationships') {
     let object: unknown;
+    let subject: unknown;
     const linkBuilder = {
       select: () => linkBuilder,
       eq: (column: string, value: string) => {
         linkFilters.push([column, value]);
         if (column === 'object_place_id') object = value;
+        if (column === 'subject_place_id') subject = value;
         return linkBuilder;
       },
       then: (resolve: (value: unknown) => void) =>
         resolve({
-          data: links
-            .filter(link => link.object_place_id === object)
-            .map(link => ({ subject_place_id: link.subject_place_id })),
+          data: subject
+            ? links
+                .filter(link => link.subject_place_id === subject)
+                .map(link => ({ object_place_id: link.object_place_id }))
+            : links
+                .filter(link => link.object_place_id === object)
+                .map(link => ({ subject_place_id: link.subject_place_id })),
           error: null,
         }),
     };
@@ -218,7 +225,30 @@ describe('loadPlaceRecognitions', () => {
 
   it('returns none for a place without links', async () => {
     const { loadPlaceRecognitions } = await import('@/places/api');
-    const result = await loadPlaceRecognitions(croppedId);
+    const result = await loadPlaceRecognitions(heritageId);
     expect(result).toEqual({ status: 'ok', recognitions: [] });
+  });
+});
+
+describe('loadRecognisedPlaces', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'http://localhost');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test');
+    linkFilters.length = 0;
+  });
+
+  it('reads the parks a recognition recognises, largest first', async () => {
+    const { loadRecognisedPlaces } = await import('@/places/api');
+    const result = await loadRecognisedPlaces(ramsarId);
+    expect(linkFilters).toEqual(
+      expect.arrayContaining([
+        ['subject_place_id', ramsarId],
+        ['relationship_type_id', 'recognises'],
+        ['status', 'confirmed'],
+      ])
+    );
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.places.map(place => place.id)).toEqual([keptId, croppedId]);
   });
 });

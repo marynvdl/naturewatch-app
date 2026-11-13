@@ -234,6 +234,15 @@ select:not(:disabled),
   outline-offset: 2px;
 }
 
+/* Smaller, fully rounded buttons for the Places panel and the place profile. */
+.map-control.map-pill {
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
 .map-control.is-on {
   background: var(--foreground);
   border-color: var(--foreground);

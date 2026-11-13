@@ -1,18 +1,24 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { LocateFixed, X } from '@lucide/vue';
+import PlaceCard from '@/components/PlaceCard.vue';
 import PlacePhotos from '@/components/PlacePhotos.vue';
 import {
+  PLACE_TYPE,
   loadPilotPlace,
   loadPlaceRecognitions,
+  loadRecognisedPlaces,
   type PlaceDetail,
   type PlaceRecognition,
+  type PlaceSummary,
 } from '@/places/api';
 import {
   CROPLAND_NOT_CALCULATED,
+  RECOGNITION_LABEL,
   recognitionColour,
   SPECIES_NOTHING_YET,
   countryName,
+  countryNames,
   formatAreaTag,
   formatKm2,
   formatPercent,
@@ -35,7 +41,7 @@ const emit = defineEmits<{
   zoom: [];
   /** The place was merged into another. Its id is the one shown. */
   moved: [id: string];
-  /** A recognition badge was chosen. Open that recognition. */
+  /** A recognition badge or a recognised place was chosen. Open it. */
   open: [id: string];
 }>();
 
@@ -53,13 +59,19 @@ const status = ref<'loading' | 'ok' | 'missing' | 'unconfigured' | 'error'>(
 const place = ref<PlaceDetail | null>(null);
 /** Confirmed recognitions of the place. A recognition has none. */
 const recognitions = ref<PlaceRecognition[]>([]);
+/** Protected areas a recognition recognises, largest first. */
+const recognised = ref<PlaceSummary[]>([]);
+/** Cards shown at once on a recognition's Overview. */
+const RECOGNISED_STEP = 20;
+const recognisedShown = ref(RECOGNISED_STEP);
 const activeTab = ref<TabId>('overview');
 const tabButtons = ref<HTMLButtonElement[]>([]);
 
 const title = computed(() => place.value?.name ?? props.name ?? '');
 const country = computed(() => countryName(place.value?.iso3 ?? null));
-const subtitle = computed(() =>
-  [country.value, place.value?.designation].filter(Boolean).join(' · ')
+const countries = computed(() => countryNames(place.value?.iso3 ?? null));
+const isRecognition = computed(
+  () => !!place.value && place.value.placeTypeId !== PLACE_TYPE
 );
 const hasCropland = computed(
   () => place.value?.croplandKm2 != null && place.value?.percent != null
@@ -71,6 +83,8 @@ async function load(id: string) {
   status.value = 'loading';
   place.value = null;
   recognitions.value = [];
+  recognised.value = [];
+  recognisedShown.value = RECOGNISED_STEP;
   activeTab.value = 'overview';
   const result = await loadPilotPlace(id);
   if (id !== props.placeId) return;
@@ -81,9 +95,15 @@ async function load(id: string) {
     emit('moved', result.place.id);
     return;
   }
-  const recognised = await loadPlaceRecognitions(id);
-  if (id !== props.placeId || recognised.status !== 'ok') return;
-  recognitions.value = recognised.recognitions;
+  if (result.place.placeTypeId === PLACE_TYPE) {
+    const read = await loadPlaceRecognitions(id);
+    if (id !== props.placeId || read.status !== 'ok') return;
+    recognitions.value = read.recognitions;
+    return;
+  }
+  const read = await loadRecognisedPlaces(id);
+  if (id !== props.placeId || read.status !== 'ok') return;
+  recognised.value = read.places;
 }
 
 watch(() => props.placeId, load, { immediate: true });
@@ -123,6 +143,8 @@ function onTabKey(event: KeyboardEvent, index: number) {
           <button
             type="button"
             class="place-recognition"
+            :title="recognition.name"
+            :aria-label="`${RECOGNITION_LABEL[recognition.placeTypeId] ?? 'Recognition'}: ${recognition.name}`"
             @click="$emit('open', recognition.id)"
           >
             <span
@@ -132,12 +154,29 @@ function onTabKey(event: KeyboardEvent, index: number) {
               }"
               aria-hidden="true"
             />
-            {{ recognition.name }}
+            {{ RECOGNITION_LABEL[recognition.placeTypeId] ?? 'Recognition' }}
           </button>
         </li>
       </ul>
       <div class="place-meta">
-        <p class="place-subtitle">{{ subtitle }}</p>
+        <div class="place-meta-text">
+          <ul
+            v-if="countries.length"
+            class="place-countries"
+            aria-label="Countries"
+          >
+            <li
+              v-for="countryLabel in countries"
+              :key="countryLabel"
+              class="place-country"
+            >
+              {{ countryLabel }}
+            </li>
+          </ul>
+          <p v-if="place?.designation" class="place-subtitle">
+            {{ place.designation }}
+          </p>
+        </div>
         <p v-if="place?.areaKm2 != null" class="place-area">
           {{ formatAreaTag(place.areaKm2) }} km²
         </p>
@@ -145,7 +184,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
 
       <button
         type="button"
-        class="place-zoom map-control"
+        class="place-zoom map-control map-pill"
         @click="$emit('zoom')"
       >
         <LocateFixed :size="16" aria-hidden="true" />
@@ -196,7 +235,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
                 <dd>{{ place.designation }}</dd>
               </div>
               <div v-if="country">
-                <dt>Country</dt>
+                <dt>{{ countries.length > 1 ? 'Countries' : 'Country' }}</dt>
                 <dd>{{ country }}</dd>
               </div>
               <div v-if="place.areaKm2 != null">
@@ -204,6 +243,40 @@ function onTabKey(event: KeyboardEvent, index: number) {
                 <dd>{{ formatKm2(place.areaKm2) }} km²</dd>
               </div>
             </dl>
+            <section
+              v-if="isRecognition && recognised.length"
+              class="place-recognised"
+              aria-labelledby="place-recognised-title"
+            >
+              <h3 id="place-recognised-title" class="map-section">
+                Protected areas inside, {{ recognised.length }}
+              </h3>
+              <ul>
+                <li
+                  v-for="item in recognised.slice(0, recognisedShown)"
+                  :key="item.id"
+                >
+                  <PlaceCard
+                    :name="item.name"
+                    :iso3="item.iso3"
+                    :area-km2="item.area_km2"
+                    @click="$emit('open', item.id)"
+                  />
+                </li>
+              </ul>
+              <button
+                v-if="recognisedShown < recognised.length"
+                type="button"
+                class="place-recognised-more map-control map-pill"
+                @click="recognisedShown += RECOGNISED_STEP"
+              >
+                Show
+                {{
+                  Math.min(RECOGNISED_STEP, recognised.length - recognisedShown)
+                }}
+                more
+              </button>
+            </section>
           </template>
 
           <template v-else-if="activeTab === 'landscape'">
@@ -301,7 +374,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
   margin: 0;
   padding: 4px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--map-control-radius);
+  border-radius: 999px;
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -335,10 +408,56 @@ function onTabKey(event: KeyboardEvent, index: number) {
   margin-top: -6px;
 }
 
+.place-meta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding-top: 3px;
+}
+
+.place-countries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-country {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.place-recognised {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.place-recognised ul {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-recognised-more {
+  align-self: flex-start;
+  cursor: pointer;
+}
+
 .place-subtitle {
   min-width: 0;
   margin: 0;
-  padding-top: 5px;
   font-size: 13px;
   line-height: 1.4;
   color: var(--muted-foreground);
@@ -348,7 +467,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
   flex: none;
   margin: 0;
   padding: 5px 10px;
-  border-radius: var(--map-control-radius);
+  border-radius: 999px;
   background: var(--on);
   color: var(--on-foreground);
   font-size: 14px;

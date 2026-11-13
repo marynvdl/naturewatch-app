@@ -229,10 +229,19 @@ describe('Places panel', () => {
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
-  it('shows recognition buttons that list and draw one type, size only', async () => {
+  it('adds recognition buttons with More… and keeps the size filter', async () => {
     const wrapper = mountPlaces();
     const store = usePlacesStore();
     await flushPromises();
+
+    const labels = () =>
+      wrapper.findAll('.places-types button').map(button => button.text());
+    expect(labels()).toEqual([
+      'Protected areas',
+      'Ecoregions',
+      'Countries',
+      'More…',
+    ]);
 
     await typeButton(wrapper, 'Protected areas').trigger('click');
     await flushPromises();
@@ -240,14 +249,21 @@ describe('Places panel', () => {
     store.applyFilter([2000, null], [1, 50]);
     await flushPromises();
 
-    await typeButton(wrapper, 'Recognitions').trigger('click');
-    await flushPromises();
-    expect(wrapper.find('[aria-label="Recognition types"]').exists()).toBe(
-      true
+    await wrapper.get('.place-type-more').trigger('click');
+    expect(labels()).toEqual([
+      'Protected areas',
+      'Ecoregions',
+      'Countries',
+      'World Heritage',
+      'Ramsar',
+      'UNESCO-MAB',
+      'Less',
+    ]);
+    expect(wrapper.get('.place-type-more').classes()).not.toContain(
+      'map-control'
     );
-    expect(wrapper.findAll('button.place-result')).toHaveLength(0);
-    expect(store.visible).toBe(false);
-    expect(store.listType).toBeNull();
+    // More… only shows the buttons; Protected areas stays listed
+    expect(store.listType).toBe('conservation_area');
 
     vi.mocked(loadPilotPlaceWindow).mockClear();
     await typeButton(wrapper, 'Ramsar').trigger('click');
@@ -255,35 +271,45 @@ describe('Places panel', () => {
     expect(store.visible).toBe(true);
     expect(store.listType).toBe('ramsar_site');
     expect(store.listingRecognitions).toBe(true);
-    // A new type starts unfiltered
-    expect(store.filtering).toBe(false);
+    // The size filter stays; cropland does not apply to recognitions
+    expect(store.sizeKept).toEqual([2000, null]);
+    expect(store.croplandKept).toEqual([0, 100]);
     expect(loadPilotPlaceFilterStats).toHaveBeenLastCalledWith('ramsar_site');
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
       expect.objectContaining({
         placeType: 'ramsar_site',
+        sizeMin: 2000,
         cropMin: 0,
         cropMax: 100,
       }),
       expect.any(AbortSignal)
     );
-    expect(wrapper.findAll('button.place-result').length).toBeGreaterThan(0);
 
-    await typeButton(wrapper, 'Ramsar').trigger('click');
+    await typeButton(wrapper, 'Protected areas').trigger('click');
     await flushPromises();
-    expect(store.visible).toBe(false);
+    expect(store.sizeKept).toEqual([2000, null]);
+
+    await typeButton(wrapper, 'UNESCO-MAB').trigger('click');
+    await flushPromises();
+    expect(store.listType).toBe('biosphere_reserve');
+
+    // Less hides the buttons and clears a selected recognition type
+    await wrapper.get('.place-type-more').trigger('click');
+    await flushPromises();
+    expect(labels()).toEqual([
+      'Protected areas',
+      'Ecoregions',
+      'Countries',
+      'More…',
+    ]);
     expect(store.listType).toBeNull();
-
-    await typeButton(wrapper, 'Recognitions').trigger('click');
-    await flushPromises();
-    expect(wrapper.find('[aria-label="Recognition types"]').exists()).toBe(
-      false
-    );
+    expect(store.visible).toBe(false);
   });
 
   it('offers no cropland sorts for a recognition list', async () => {
     const wrapper = mountPlaces(true);
     await flushPromises();
-    await typeButton(wrapper, 'Recognitions').trigger('click');
+    await wrapper.get('.place-type-more').trigger('click');
     await typeButton(wrapper, 'World Heritage').trigger('click');
     await flushPromises();
 
