@@ -9,7 +9,7 @@ import {
 export const PLACE_LIST_LIMIT = 50;
 
 /**
- * Published protected-area boundaries. Each feature carries `id` (`places.id`),
+ * Published conservation-area boundaries. Each feature carries `id` (`places.id`),
  * `area_km2`, and `cropland_percent` when a figure is stored.
  */
 export const PLACE_TILES_URL =
@@ -28,7 +28,7 @@ export const RECOGNITION_TILES_URL =
 /** Vector layer inside the recognitions archive. */
 export const RECOGNITION_TILE_LAYER = 'recognitions';
 
-/** Place type of the protected areas: the default list and the release notice. */
+/** Place type of the conservation areas: the default list and the release notice. */
 export const PLACE_TYPE = 'conservation_area';
 
 /** Period of the cropland figures the profile shows. */
@@ -78,7 +78,7 @@ export interface PlaceWindowQuery {
   extent: LngLatBounds | null;
   /** Skip this many matching rows. Used to load the next 50. */
   offset?: number;
-  /** Stored place type to list. Protected areas when left out. */
+  /** Stored place type to list. Conservation areas when left out. */
   placeType?: string;
 }
 
@@ -298,7 +298,7 @@ export async function loadPilotPlaceWindowCount(
 
 /**
  * Size range and histogram counts for the filter charts.
- * @param placeType - Stored place type. Protected areas when left out.
+ * @param placeType - Stored place type. Conservation areas when left out.
  * @returns The stored distribution, or why it could not be loaded.
  */
 export async function loadPilotPlaceFilterStats(
@@ -461,6 +461,9 @@ export async function loadPlaceRecognitions(
 /** Ids per `place_summaries` read, so the request address stays short. */
 const RECOGNISED_CHUNK = 150;
 
+/** Rows per `place_relationships` read, the API's row limit. */
+const LINK_PAGE = 1000;
+
 /**
  * The published places a recognition has a confirmed `recognises` link to,
  * largest first. One UNESCO-MAB site has over a thousand, so the summaries
@@ -474,20 +477,23 @@ export async function loadRecognisedPlaces(
   if (!PLACE_ID.test(id)) return { status: 'ok', places: [] };
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
-  const { data: links, error } = await supabase
-    .from('place_relationships')
-    .select('object_place_id')
-    .eq('subject_place_id', id)
-    .eq('relationship_type_id', 'recognises')
-    .eq('status', 'confirmed');
-  if (error) return { status: 'error' };
-  const ids = [
-    ...new Set(
-      ((links as { object_place_id: string }[] | null) ?? []).map(
-        link => link.object_place_id
-      )
-    ),
-  ];
+  // The API returns at most 1,000 rows per request, so read the links in pages
+  const linked: string[] = [];
+  for (let from = 0; ; from += LINK_PAGE) {
+    const { data: links, error } = await supabase
+      .from('place_relationships')
+      .select('object_place_id')
+      .eq('subject_place_id', id)
+      .eq('relationship_type_id', 'recognises')
+      .eq('status', 'confirmed')
+      .order('object_place_id')
+      .range(from, from + LINK_PAGE - 1);
+    if (error) return { status: 'error' };
+    const page = (links as { object_place_id: string }[] | null) ?? [];
+    linked.push(...page.map(link => link.object_place_id));
+    if (page.length < LINK_PAGE) break;
+  }
+  const ids = [...new Set(linked)];
   const chunks: string[][] = [];
   for (let start = 0; start < ids.length; start += RECOGNISED_CHUNK)
     chunks.push(ids.slice(start, start + RECOGNISED_CHUNK));
@@ -541,7 +547,7 @@ export async function loadPlaceBounds(id: string): Promise<PlaceBoundsResult> {
 }
 
 /**
- * WDPCA release month of the stored protected areas, for the map notice.
+ * WDPCA release month of the stored conservation areas, for the map notice.
  * @returns The month, or why it could not be read.
  */
 export async function loadPlaceRelease(): Promise<PlaceReleaseResult> {

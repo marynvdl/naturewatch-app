@@ -106,7 +106,7 @@ const usePlacesStore = defineStore('places', () => {
     }
     const month = result.status === 'ok' ? result.releaseMonth : null;
     notice.value = month
-      ? `Protected areas: WDPCA, ${formatReleaseMonth(month)}. ${PROTECTED_AREA_ATTRIBUTION}`
+      ? `Conservation areas: WDPCA, ${formatReleaseMonth(month)}. ${PROTECTED_AREA_ATTRIBUTION}`
       : PROTECTED_AREA_ATTRIBUTION;
     if (status.value === 'loading') status.value = 'ready';
   }

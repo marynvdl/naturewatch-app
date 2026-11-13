@@ -253,7 +253,7 @@ function apply() {
           {{
             sizeOnly
               ? 'Keep the places within a size range. The list and the map follow.'
-              : 'Keep the protected areas within a size and cropland range. The list and the map follow.'
+              : 'Keep the conservation areas within a size and cropland range. The list and the map follow.'
           }}
         </DialogDescription>
         <div class="filter-body">

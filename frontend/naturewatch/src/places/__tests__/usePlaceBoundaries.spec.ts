@@ -108,7 +108,7 @@ class FakeMap {
 const outsideWindow = '33333333-3333-3333-3333-333333333333';
 
 /**
- * Mount the overlay on a fake map and show Protected Areas.
+ * Mount the overlay on a fake map and show Conservation areas.
  * @returns The map and the store.
  */
 async function drawPlaces() {

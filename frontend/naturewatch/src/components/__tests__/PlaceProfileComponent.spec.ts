@@ -109,16 +109,14 @@ describe('Place profile', () => {
 
   it('shows each country of a transboundary place as a tag', async () => {
     const wrapper = await mountProfile({ ...kruger, iso3: 'LSO;ZAF' });
-    expect(wrapper.findAll('.place-country').map(tag => tag.text())).toEqual([
-      'Lesotho',
-      'South Africa',
-    ]);
-    expect(wrapper.get('[role="tabpanel"]').text()).toContain(
-      'CountriesLesotho, South Africa'
-    );
+    // Tags in the Overview table, not under the title
+    const tags = wrapper.findAll('[role="tabpanel"] .place-country');
+    expect(tags.map(tag => tag.text())).toEqual(['Lesotho', 'South Africa']);
+    expect(wrapper.get('[role="tabpanel"]').text()).toContain('Countries');
+    expect(wrapper.findAll('.place-meta .place-country')).toHaveLength(0);
   });
 
-  it('lists the protected areas a recognition recognises as cards', async () => {
+  it('lists the conservation areas a recognition recognises as cards', async () => {
     const parks = Array.from({ length: 23 }, (_, index) => ({
       id: `00000000-0000-0000-0000-${String(index).padStart(12, '0')}`,
       name: `Park ${index + 1}`,
@@ -140,8 +138,15 @@ describe('Place profile', () => {
     expect(loadPlaceRecognitions).not.toHaveBeenCalled();
     expect(loadRecognisedPlaces).toHaveBeenCalledWith(placeId);
     expect(wrapper.find('.place-recognitions').exists()).toBe(false);
+    expect(wrapper.find('.place-recognised').exists()).toBe(false);
+    const tabs = wrapper.findAll('[role="tab"]').map(tab => tab.text());
+    expect(tabs).toEqual(['Overview', 'Areas', 'Landscape', 'Species']);
+    await openTab(wrapper, 'Areas');
+    expect(wrapper.get('.place-profile').classes()).toContain('is-list-tab');
+    expect(wrapper.get('.place-recognised-count').text()).toBe(
+      '23 conservation areas at least 75% inside'
+    );
     const section = wrapper.get('.place-recognised');
-    expect(section.get('h3').text()).toBe('Protected areas inside, 23');
     expect(section.findAll('.place-result')).toHaveLength(20);
     expect(section.find('.place-thumb').exists()).toBe(true);
 
@@ -158,15 +163,32 @@ describe('Place profile', () => {
     expect(wrapper.find('.place-recognitions').exists()).toBe(false);
   });
 
+  it('says when no conservation area is linked to a recognition', async () => {
+    vi.mocked(loadRecognisedPlaces).mockResolvedValue({
+      status: 'ok',
+      places: [],
+    });
+    const wrapper = await mountProfile({
+      ...kruger,
+      placeTypeId: 'ramsar_site',
+    });
+    await openTab(wrapper, 'Areas');
+    expect(wrapper.get('[role="tabpanel"]').text()).toBe(
+      'No conservation area lies at least 75% inside this recognition.'
+    );
+  });
+
   it('shows the stored name, country, designation, area, and source', async () => {
     const wrapper = await mountProfile(kruger);
 
     expect(loadPilotPlace).toHaveBeenCalledWith(placeId);
     expect(wrapper.get('h2').text()).toBe('Kruger National Park');
+    expect(wrapper.get('.place-subtitle').text()).toBe(
+      'South Africa · National Park'
+    );
     expect(wrapper.findAll('.place-country').map(tag => tag.text())).toEqual([
       'South Africa',
     ]);
-    expect(wrapper.get('.place-subtitle').text()).toBe('National Park');
     expect(wrapper.get('.place-area').text()).toBe('19,485 km²');
     const tabs = wrapper.findAll('[role="tab"]').map(tab => tab.text());
     expect(tabs).toEqual(['Overview', 'Landscape', 'Species']);

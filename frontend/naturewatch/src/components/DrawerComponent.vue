@@ -316,7 +316,7 @@ function onOpacity(title: string, value: unknown) {
   display: grid;
   grid-template-columns: max-content 20px;
   column-gap: 6px;
-  row-gap: 8px;
+  row-gap: 6px;
   align-items: center;
 }
 

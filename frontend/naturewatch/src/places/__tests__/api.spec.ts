@@ -82,6 +82,8 @@ function from(table: string) {
     let subject: unknown;
     const linkBuilder = {
       select: () => linkBuilder,
+      order: () => linkBuilder,
+      range: () => linkBuilder,
       eq: (column: string, value: string) => {
         linkFilters.push([column, value]);
         if (column === 'object_place_id') object = value;

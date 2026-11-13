@@ -138,7 +138,7 @@ interface PlaceMap {
 }
 
 /**
- * Draw the protected-area boundaries, highlight a selection, and frame it.
+ * Draw the conservation-area boundaries, highlight a selection, and frame it.
  * A boundary click does not open the places list.
  * @param getMap - The Mapbox map, once MapComponent has created it.
  * @returns A control that fits the map to the selected place.
@@ -187,7 +187,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   }
 
   /**
-   * Hide the boundaries the size and cropland filter leaves out. Protected
+   * Hide the boundaries the size and cropland filter leaves out. Conservation
    * areas draw unless a recognition type is listed. Recognitions draw only
    * while one of their types is listed. A selected place's outline always draws.
    * @param mapInstance - The map.
@@ -437,7 +437,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       placesStore.status = 'error';
   }
 
-  /** Draw or clear the protected-area boundaries. */
+  /** Draw or clear the conservation-area boundaries. */
   function syncPlaceOverlay(mapInstance: mapboxgl.Map) {
     if (!placesStore.visible) {
       removePlaceOverlay(mapInstance);

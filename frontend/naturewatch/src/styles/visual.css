@@ -214,17 +214,18 @@ select:not(:disabled),
   color: var(--map-section);
 }
 
+/* The standard button: a small, fully rounded pill. */
 .map-control {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 36px;
+  gap: 6px;
+  height: 32px;
   padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: var(--map-control-radius);
+  border-radius: 999px;
   background: var(--background);
   color: var(--map-control-text);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
   box-shadow: none;
 }
@@ -232,15 +233,6 @@ select:not(:disabled),
 .map-control:focus-visible {
   outline: 2px solid var(--foreground);
   outline-offset: 2px;
-}
-
-/* Smaller, fully rounded buttons for the Places panel and the place profile. */
-.map-control.map-pill {
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  font-size: 13px;
 }
 
 .map-control.is-on {
@@ -257,7 +249,7 @@ select:not(:disabled),
 
 .map-control.map-icon {
   display: grid;
-  width: 36px;
+  width: 32px;
   padding: 0;
   place-items: center;
 }

@@ -42,7 +42,7 @@ type PlaceTypeId =
   | RecognitionButtonType;
 
 const mainTypes: { id: PlaceTypeId; label: string }[] = [
-  { id: 'protected_area', label: 'Protected areas' },
+  { id: 'protected_area', label: 'Conservation areas' },
   { id: 'ecoregion', label: 'Ecoregions' },
   { id: 'country', label: 'Countries' },
 ];
@@ -168,10 +168,10 @@ const emptyMessage = computed(() =>
     : 'No places match.'
 );
 /** Whether a place type with stored places is listed. */
-const showProtected = computed(() => listedType.value !== null);
+const showList = computed(() => listedType.value !== null);
 const showTools = computed(
   () =>
-    showProtected.value &&
+    showList.value &&
     listStatus.value === 'ok' &&
     (storedCount.value > 0 || matchTotal.value > 0 || placesStore.filtering)
 );
@@ -181,7 +181,7 @@ const countText = computed(() => {
   const noun = total === 1 ? 'place' : 'places';
   return count === total ? `${total} ${noun}` : `${count} of ${total} ${noun}`;
 });
-const showNames = computed(() => showProtected.value || searchingAll.value);
+const showNames = computed(() => showList.value || searchingAll.value);
 const listExtent = computed(() =>
   listInView.value ? placesStore.viewBounds : null
 );
@@ -221,27 +221,27 @@ function listScroller(): HTMLElement | null {
     : list;
 }
 
-/** Draw the protected areas when they are hidden. */
+/** Draw the conservation areas when they are hidden. */
 function showBoundaries() {
   if (!placesStore.visible) placesStore.toggle();
 }
 
 /**
- * Choose a place from the list. The boundaries are drawn, and Protected
+ * Choose a place from the list. The boundaries are drawn, and Conservation
  * areas is switched on, so the place shows on the map even when the list came
  * from a search.
  * @param id - The stored place id.
  */
 function chooseResult(id: string) {
   if (placesStore.selectedId !== id) {
-    // The boundaries are protected areas, so that type shows as on too
+    // The boundaries are conservation areas, so that type shows as on too
     if (placeType.value === null) placeType.value = 'protected_area';
     showBoundaries();
   }
   placesStore.selectPlace(id);
 }
 
-/** Remove the protected areas when they are drawn. */
+/** Remove the conservation areas when they are drawn. */
 function hideBoundaries() {
   if (placesStore.visible) placesStore.toggle();
 }
@@ -261,7 +261,7 @@ async function ensureStats() {
 
 /** Load the names that match the current list query. */
 async function refreshList() {
-  if (!showProtected.value && !searchingAll.value) return;
+  if (!showList.value && !searchingAll.value) return;
   const request = ++listRequest;
   const signal = newListSignal();
   loadingMore.value = false;
@@ -269,7 +269,7 @@ async function refreshList() {
   moreExhausted.value = false;
   const first = listStatus.value === 'idle';
   if (first) listStatus.value = 'loading';
-  if (showProtected.value) await ensureStats();
+  if (showList.value) await ensureStats();
   const result = await loadPilotPlaceWindow(listQuery(0), signal);
   if (request !== listRequest) return;
   listStatus.value = result.status === 'ok' ? 'ok' : result.status;
@@ -413,7 +413,7 @@ watch(
       listExtent.value,
     ] as const,
   (next, previous) => {
-    if (!showProtected.value && !searchingAll.value) return;
+    if (!showList.value && !searchingAll.value) return;
     const moved =
       previous != null && next[8] === previous[8] && next[9] !== previous[9];
     const typed =
@@ -437,7 +437,7 @@ function clearPlaces() {
 
 /**
  * Select a place type, or clear it when that type is already selected.
- * Protected areas draws the stored boundaries, and a recognition type its
+ * Conservation areas draws the stored boundaries, and a recognition type its
  * outlines. The other types have none.
  */
 function selectPlaceType(type: PlaceTypeId) {
@@ -489,7 +489,7 @@ watch(
   () => [placesStore.selectedId, placesStore.selectedFrom] as const,
   async ([id, source]) => {
     if (!id || source !== 'map') return;
-    if (!showProtected.value && !searchingAll.value) return;
+    if (!showList.value && !searchingAll.value) return;
     await nextTick();
     const find = () =>
       resultsList.value?.querySelector<HTMLElement>(
@@ -532,7 +532,7 @@ watch(
           v-for="type in placeTypes"
           :key="type.id"
           type="button"
-          class="place-type map-control map-pill"
+          class="place-type map-control"
           :class="{ 'is-on': placeType === type.id }"
           :aria-pressed="placeType === type.id"
           @click="selectPlaceType(type.id)"
@@ -553,7 +553,7 @@ watch(
           Loading places.
         </p>
         <p
-          v-if="showProtected && placesStore.status === 'error'"
+          v-if="showList && placesStore.status === 'error'"
           class="places-status"
         >
           The places could not be drawn.
@@ -577,7 +577,7 @@ watch(
               <PopoverTrigger as-child>
                 <button
                   type="button"
-                  class="places-tool map-control map-pill"
+                  class="places-tool map-control"
                   :aria-label="`Sort places, ${sortLabel}`"
                 >
                   <ArrowDownUp :size="16" aria-hidden="true" />
@@ -611,7 +611,7 @@ watch(
             <button
               ref="filterButton"
               type="button"
-              class="places-tool places-filter-toggle map-control map-pill"
+              class="places-tool places-filter-toggle map-control"
               :class="{ 'is-on': placesStore.filtering }"
               aria-haspopup="dialog"
               @click="filterOpen = true"
@@ -621,7 +621,7 @@ watch(
             </button>
             <button
               type="button"
-              class="places-tool places-extent-toggle map-control map-pill"
+              class="places-tool places-extent-toggle map-control"
               :class="{ 'is-on': listInView }"
               :aria-pressed="listInView"
               aria-label="Limit list to the map view"
@@ -645,7 +645,7 @@ watch(
             :size-only="placesStore.listingRecognitions"
           />
         </div>
-        <div v-if="placeType && !showProtected" class="places-list">
+        <div v-if="placeType && !showList" class="places-list">
           <p class="places-status">{{ nothingStored }}</p>
         </div>
         <div
@@ -790,7 +790,7 @@ watch(
 .places-types {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .place-type {
@@ -870,7 +870,7 @@ watch(
   flex: none;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .places-tool-buttons {
@@ -878,7 +878,7 @@ watch(
   flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 

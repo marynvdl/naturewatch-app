@@ -1,6 +1,6 @@
 import { COUNTRY_NAMES } from './countryNames';
 
-/** Shown wherever a protected area is named. */
+/** Shown wherever a conservation area is named. */
 export const PROTECTED_AREA_ATTRIBUTION =
   'UNEP-WCMC and IUCN. World Database on Protected and Conserved Areas.';
 

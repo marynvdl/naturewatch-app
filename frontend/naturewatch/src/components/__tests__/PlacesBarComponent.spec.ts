@@ -161,15 +161,17 @@ describe('Places panel', () => {
     await flushPromises();
 
     expect(wrapper.text()).not.toContain('Addo Elephant National Park');
-    const areas = typeButton(wrapper, 'Protected areas');
+    const areas = typeButton(wrapper, 'Conservation areas');
     expect(areas.attributes('aria-pressed')).toBe('false');
     expect(loadPlaceRelease).not.toHaveBeenCalled();
 
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('Addo Elephant National Park');
     expect(wrapper.text()).toContain('Kruger National Park');
-    expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
+    expect(typeButton(wrapper, 'Conservation areas').classes()).toContain(
+      'is-on'
+    );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
       expect.objectContaining({ sort: 'size-desc' as PlaceSort, extent: null }),
@@ -205,7 +207,7 @@ describe('Places panel', () => {
     expect(wrapper.text()).not.toContain('Kruger National Park');
     expect(wrapper.find('.places-frame').classes()).not.toContain('has-detail');
     expect(typeButton(wrapper, 'Ecoregions').classes()).toContain('is-on');
-    expect(typeButton(wrapper, 'Protected areas').classes()).not.toContain(
+    expect(typeButton(wrapper, 'Conservation areas').classes()).not.toContain(
       'is-on'
     );
 
@@ -214,16 +216,16 @@ describe('Places panel', () => {
       'Well, this is awkward. We have nothing to show.'
     );
 
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('No places match.');
     expect(loadPilotPlaceWindow).toHaveBeenCalled();
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
 
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     expect(wrapper.text()).toContain('No places match.');
     expect(wrapper.text()).not.toContain('Kruger National Park');
-    expect(typeButton(wrapper, 'Protected areas').classes()).not.toContain(
+    expect(typeButton(wrapper, 'Conservation areas').classes()).not.toContain(
       'is-on'
     );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
@@ -237,13 +239,13 @@ describe('Places panel', () => {
     const labels = () =>
       wrapper.findAll('.places-types button').map(button => button.text());
     expect(labels()).toEqual([
-      'Protected areas',
+      'Conservation areas',
       'Ecoregions',
       'Countries',
       'More…',
     ]);
 
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
     expect(store.listType).toBe('conservation_area');
     store.applyFilter([2000, null], [1, 50]);
@@ -251,7 +253,7 @@ describe('Places panel', () => {
 
     await wrapper.get('.place-type-more').trigger('click');
     expect(labels()).toEqual([
-      'Protected areas',
+      'Conservation areas',
       'Ecoregions',
       'Countries',
       'World Heritage',
@@ -262,7 +264,7 @@ describe('Places panel', () => {
     expect(wrapper.get('.place-type-more').classes()).not.toContain(
       'map-control'
     );
-    // More… only shows the buttons; Protected areas stays listed
+    // More… only shows the buttons; Conservation areas stays listed
     expect(store.listType).toBe('conservation_area');
 
     vi.mocked(loadPilotPlaceWindow).mockClear();
@@ -285,7 +287,7 @@ describe('Places panel', () => {
       expect.any(AbortSignal)
     );
 
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
     expect(store.sizeKept).toEqual([2000, null]);
 
@@ -297,7 +299,7 @@ describe('Places panel', () => {
     await wrapper.get('.place-type-more').trigger('click');
     await flushPromises();
     expect(labels()).toEqual([
-      'Protected areas',
+      'Conservation areas',
       'Ecoregions',
       'Countries',
       'More…',
@@ -343,7 +345,7 @@ describe('Places panel', () => {
     });
 
     const wrapper = mountPlaces();
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
 
     const place = wrapper.get('button.place-result');
@@ -377,7 +379,7 @@ describe('Places panel', () => {
     });
 
     const wrapper = mountPlaces();
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
 
     expect(wrapper.findAll('button.place-result')).toHaveLength(50);
@@ -421,7 +423,7 @@ describe('Places panel', () => {
     });
 
     const wrapper = mountPlaces();
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
 
     expect(wrapper.findAll('button.place-result')).toHaveLength(50);
@@ -444,10 +446,10 @@ describe('Places panel', () => {
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
-  it('sorts and filters the protected areas', async () => {
+  it('sorts and filters the conservation areas', async () => {
     const wrapper = mountPlaces(true);
     const page = new DOMWrapper(document.body);
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
     const names = () =>
       wrapper.findAll('.place-card-name').map(item => item.text());
@@ -520,7 +522,7 @@ describe('Places panel', () => {
     const wrapper = mountPlaces();
     const store = usePlacesStore();
     store.viewBounds = [20, -30, 40, -20];
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
     const names = () =>
       wrapper.findAll('.place-card-name').map(item => item.text());
@@ -575,7 +577,7 @@ describe('Places panel', () => {
 
     expect(wrapper.text()).toContain('Kruger National Park');
     expect(wrapper.text()).not.toContain('Addo Elephant National Park');
-    expect(typeButton(wrapper, 'Protected areas').classes()).not.toContain(
+    expect(typeButton(wrapper, 'Conservation areas').classes()).not.toContain(
       'is-on'
     );
     expect(loadPlaceRelease).not.toHaveBeenCalled();
@@ -596,7 +598,7 @@ describe('Places panel', () => {
       global: { plugins: [pinia] },
     });
     const store = usePlacesStore(pinia);
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
 
     store.selectPlace(places[1].id);
@@ -609,7 +611,9 @@ describe('Places panel', () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find('.places-frame').classes()).not.toContain('has-detail');
-    expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
+    expect(typeButton(wrapper, 'Conservation areas').classes()).toContain(
+      'is-on'
+    );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
@@ -624,7 +628,7 @@ describe('Places panel', () => {
       global: { plugins: [pinia] },
     });
     const store = usePlacesStore(pinia);
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
 
     store.selectPlace(missingPlace.id, 'map');
@@ -653,7 +657,7 @@ describe('Places panel', () => {
       global: { plugins: [pinia] },
     });
     const store = usePlacesStore(pinia);
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
 
     store.selectPlace(missingPlace.id, 'map');
@@ -688,7 +692,9 @@ describe('Places panel', () => {
 
     expect(store.selectedId).not.toBeNull();
     expect(store.visible).toBe(true);
-    expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
+    expect(typeButton(wrapper, 'Conservation areas').classes()).toContain(
+      'is-on'
+    );
   });
 
   it('keeps the search and the place type when the profile closes', async () => {
@@ -696,7 +702,7 @@ describe('Places panel', () => {
     const wrapper = mount(PlacesBarComponent, {
       global: { plugins: [pinia] },
     });
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
     await wrapper.get('input[aria-label="Search places"]').setValue('kruger');
     await flushPromises();
@@ -709,7 +715,9 @@ describe('Places panel', () => {
     expect(
       wrapper.get('input[aria-label="Search places"]').element
     ).toHaveProperty('value', 'kruger');
-    expect(typeButton(wrapper, 'Protected areas').classes()).toContain('is-on');
+    expect(typeButton(wrapper, 'Conservation areas').classes()).toContain(
+      'is-on'
+    );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
   });
 
@@ -719,7 +727,7 @@ describe('Places panel', () => {
       global: { plugins: [pinia] },
     });
     const store = usePlacesStore(pinia);
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
 
     vi.mocked(loadPilotPlaceRank).mockResolvedValue({
@@ -765,7 +773,7 @@ describe('Places panel', () => {
     rects.mockRestore();
   });
 
-  it('says the place store is not configured after Protected areas is selected', async () => {
+  it('says the place store is not configured after Conservation areas is selected', async () => {
     vi.mocked(loadPilotPlaceWindow).mockResolvedValue({
       status: 'unconfigured',
     });
@@ -778,7 +786,7 @@ describe('Places panel', () => {
     await flushPromises();
     expect(wrapper.text()).not.toContain('The place store is not configured.');
 
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).toContain('The place store is not configured.');
@@ -792,7 +800,7 @@ describe('Places panel', () => {
     vi.mocked(loadPilotPlaceWindow).mockResolvedValue({ status: 'error' });
 
     const wrapper = mountPlaces();
-    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).toContain('The places could not be loaded.');
