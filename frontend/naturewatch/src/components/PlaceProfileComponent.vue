@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ChevronRight, LocateFixed, X } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
 import PlacePhotos from '@/components/PlacePhotos.vue';
@@ -43,6 +43,8 @@ const emit = defineEmits<{
   moved: [id: string];
   /** A recognition badge or a recognised place was chosen. Open it. */
   open: [id: string];
+  /** The conservation areas the open Areas tab lists, or null when it is closed. */
+  areas: [ids: string[] | null];
 }>();
 
 type TabId = 'overview' | 'areas' | 'landscape' | 'species';
@@ -115,6 +117,17 @@ async function load(id: string) {
 }
 
 watch(() => props.placeId, load, { immediate: true });
+
+/** Tell the map which conservation areas the Areas tab lists. */
+watch(
+  () =>
+    activeTab.value === 'areas' && recognisedStatus.value === 'ok'
+      ? recognised.value.map(item => item.id)
+      : null,
+  ids => emit('areas', ids)
+);
+
+onBeforeUnmount(() => emit('areas', null));
 
 /** Move between tabs with the arrow keys. */
 function onTabKey(event: KeyboardEvent, index: number) {

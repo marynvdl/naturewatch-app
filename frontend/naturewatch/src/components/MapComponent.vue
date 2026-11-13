@@ -756,6 +756,7 @@ function addSourceAndLayer(
             @close="placesStore.clearSelection()"
             @zoom="zoomToSelectedPlace"
             @open="id => placesStore.selectPlace(id, 'list')"
+            @areas="ids => (placesStore.shownAreaIds = ids)"
             @moved="
               id =>
                 placesStore.selectPlace(id, placesStore.selectedFrom ?? 'map')

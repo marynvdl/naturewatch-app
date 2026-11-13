@@ -156,6 +156,13 @@ describe('Place profile', () => {
 
     await section.findAll('.place-result')[0].trigger('click');
     expect(wrapper.emitted('open')).toEqual([[parks[0].id]]);
+    // The map draws the listed areas only while the tab is open
+    expect(wrapper.emitted('areas')?.at(-1)).toEqual([
+      parks.map(park => park.id),
+    ]);
+    await openTab(wrapper, 'Overview');
+    expect(wrapper.emitted('areas')?.at(-1)).toEqual([null]);
+    wrapper.unmount();
   });
 
   it('shows no badges for a place without recognitions', async () => {

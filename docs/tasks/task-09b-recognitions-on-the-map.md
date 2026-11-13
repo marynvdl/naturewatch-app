@@ -14,7 +14,7 @@ Decided 12 and 13 November 2026 by the user, the second time from a local previe
 - **Drawing.** Recognitions are never drawn while Protected areas is selected. A recognition button lists that type and draws only that type's outlines. Clicking it again clears both, as Protected areas does. There is no separate always-on recognitions toggle.
 - **Style A.** Outlines only, with no fill, a solid line, and one colour per group. Monochrome: World Heritage `#a8730f`, Ramsar `#1f6f9a`, UNESCO-MAB `#7a4a9c`, other `#7d7a72`. Satellite: `#f2c14e`, `#8fd3f4`, `#d9b3f5`, `#d8d5cc`. Width 0.8 px at zoom 3, 1.4 at 6, 2 at 9, and 2.6 at 12.
 - **Tools.** A recognition list keeps Sort, Filter, and In view, by size only. It has no cropland range and no cropland sorts. The size filter is kept across place types. Choosing a recognition type clears only the cropland range.
-- **Profile.** Badges read the recognition type (World Heritage, Ramsar, UNESCO-MAB, Natura 2000, Emerald, Regional), with the name on hover, and open that recognition. Overview shows the countries as tags. A recognition has an **Areas** tab listing the conservation areas it recognises, as list cards, largest first, 20 at a time, where only the list scrolls.
+- **Profile.** Badges read the recognition type (World Heritage, Ramsar, UNESCO-MAB, Natura 2000, Emerald, Regional), with the name on hover, and open that recognition. Overview shows the countries as tags. A recognition has an **Areas** tab listing the conservation areas it recognises, as list cards, largest first, 20 at a time, where only the list scrolls. While that tab is open, the map draws those conservation areas.
 
 ## Facts already stored
 

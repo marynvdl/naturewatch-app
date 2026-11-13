@@ -350,6 +350,33 @@ describe('place boundaries from tiles', () => {
     expect(map.getSource('places-tiles')).toBeUndefined();
   });
 
+  it('draws the conservation areas of an open Areas tab', async () => {
+    const { map, store } = await drawPlaces();
+    store.listType = 'world_heritage_site';
+    store.toggle();
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeUndefined();
+
+    map.setLayoutProperty.mockClear();
+    store.shownAreaIds = [outsideWindow];
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeDefined();
+    expect(map.setFilter).toHaveBeenCalledWith('places-fill', [
+      'in',
+      ['get', 'id'],
+      ['literal', [outsideWindow]],
+    ]);
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'places-fill',
+      'visibility',
+      'visible'
+    );
+
+    store.shownAreaIds = null;
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeUndefined();
+  });
+
   it('reports a failed tile read', async () => {
     const { map, store } = await drawPlaces();
 

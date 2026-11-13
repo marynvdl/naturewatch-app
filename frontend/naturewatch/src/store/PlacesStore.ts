@@ -30,6 +30,11 @@ const usePlacesStore = defineStore('places', () => {
    * one of the recognition button types, or null.
    */
   const listType = ref<string | null>(null);
+  /**
+   * Conservation areas a recognition's Areas tab lists. The map draws them
+   * while the tab is open. Null otherwise.
+   */
+  const shownAreaIds = ref<string[] | null>(null);
   /** Whether a recognition type is listed, so the tools are size only. */
   const listingRecognitions = computed(() =>
     isRecognitionButtonType(listType.value)
@@ -124,6 +129,7 @@ const usePlacesStore = defineStore('places', () => {
     selectedId,
     selectedFrom,
     listType,
+    shownAreaIds,
     listingRecognitions,
     sizeKept,
     croplandKept,

@@ -190,10 +190,15 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * Hide the boundaries the size and cropland filter leaves out. Conservation
    * areas draw unless a recognition type is listed. Recognitions draw only
    * while one of their types is listed. A selected place's outline always draws.
+   * While a recognition's Areas tab is open, the conservation areas it lists
+   * draw instead, whatever the list and the filter show.
    * @param mapInstance - The map.
    */
   function applyKeptFilter(mapInstance: mapboxgl.Map) {
-    const filter = keptFilter();
+    const areas = placesStore.shownAreaIds;
+    const filter: mapboxgl.FilterSpecification | null = areas
+      ? ['in', ['get', 'id'], ['literal', areas]]
+      : keptFilter();
     const recognitions = placesStore.listingRecognitions;
     [PLACE_FILL, PLACE_LINE].forEach(layer => {
       if (!mapInstance.getLayer(layer)) return;
@@ -201,7 +206,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       mapInstance.setLayoutProperty(
         layer,
         'visibility',
-        recognitions ? 'none' : 'visible'
+        areas || !recognitions ? 'visible' : 'none'
       );
     });
     [RECOGNITION_FILL, RECOGNITION_LINE].forEach(layer => {
@@ -439,7 +444,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
 
   /** Draw or clear the conservation-area boundaries. */
   function syncPlaceOverlay(mapInstance: mapboxgl.Map) {
-    if (!placesStore.visible) {
+    if (!placesStore.visible && !placesStore.shownAreaIds) {
       removePlaceOverlay(mapInstance);
       return;
     }
@@ -575,7 +580,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   );
 
   watch(
-    () => placesStore.visible,
+    () => [placesStore.visible, placesStore.shownAreaIds] as const,
     () => {
       const mapInstance = readMap();
       if (mapInstance) drawWhenReady(mapInstance);
