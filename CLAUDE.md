@@ -20,7 +20,7 @@ Write each fact once.
 
 A parcel in `docs/parcels/` lists tasks in order. Each task points at one `docs/tasks/<file>.md` in this repo, for both repos. The task file names the repo that does the work. `/task <file>` starts a task. When the task is done, its last commit on that branch ticks it in the parcel and moves the task file to `docs/archive/tasks/`.
 
-A task file is written when its task starts, as the first commit on that task's `feat/` branch in this repo, and approved before any other change. It does not get its own docs branch or pull request.
+A task file is written when its task starts, as the first commit on that task's branch in this repo, and approved before any other change. It does not get its own docs branch or pull request.
 
 - A task marked for naturewatch-app is done in this repo.
 - A task marked for naturewatch-analysis is done in `../naturewatch-analysis`, from this session. Read `../naturewatch-analysis/CLAUDE.md` first and follow it there: branch from `main`, its cost rules, one pull request into `main`. Run git there with `git -C ../naturewatch-analysis`.
@@ -42,6 +42,8 @@ Never commit, push, or paste a key or token. That includes a service-account JSO
 ## Git and releases
 
 Branch from `develop` and merge back through a pull request. `develop` is protected. Do not push commits straight to `develop` or `main`.
+
+Name a branch `<type>/<short-name>`, and a task branch `<type>/task-NN-<name>`. The types are `feat`, `fix`, `docs`, `chore`, `ci`, and `data` for work on the hosted database, the bucket, or Batch. A commit subject is `<type>: <imperative summary>`, about 72 characters at most, with a body only when the reason is not recorded elsewhere. A pull request title has the same form and names the task, for example `feat: recognitions on the map (task 09b)`. Its description follows `.github/PULL_REQUEST_TEMPLATE.md` and holds only what is not recorded elsewhere. Pull requests are squash-merged, so the title becomes the one commit on the target branch.
 
 `develop` deploys Fly app `naturewatch`. `main` deploys Fly app `naturewatch-demo` (naturewatch.space). Feature work merges into `develop` only. Do not open or merge a pull request from `develop` into `main` until a production release is explicitly requested.
 
