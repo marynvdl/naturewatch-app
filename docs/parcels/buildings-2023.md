@@ -69,7 +69,7 @@ This parcel publishes 2023 only. The plan for more years:
 
 ## Left for later
 
-- Stats for places: no building facts are sampled in this parcel. They wait for the Stats work in [Database Honing](database-honing.md).
+- Stats for places: no building facts are sampled in this parcel. They wait for the parcel that resumes Stats.
 - Overture or OpenStreetMap outlines as the source in Europe, North America and Australia, where they beat TEMPO.
 - A check for TEMPO false positives across the Sahara, beyond the two desert boxes.
 - Deleting the current Built tiles at `built/2023/`.

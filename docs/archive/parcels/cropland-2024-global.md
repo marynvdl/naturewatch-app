@@ -1,6 +1,6 @@
 # Parcel: Cropland 2024 global
 
-Archived 10 November 2026. Tasks 01 to 05 and 07 are done. The global layer shipped as the version 3 share tiles from [Cropland tiles for Safari](cropland-safari-safe-tiles.md). Tasks 06 and 08, the global cropland facts, were not done. They wait for [Database Honing](../../parcels/database-honing.md), and a later Stats parcel will take them up.
+Archived 10 November 2026. Tasks 01 to 05 and 07 are done. The global layer shipped as the version 3 share tiles from [Cropland tiles for Safari](cropland-safari-safe-tiles.md). Tasks 06 and 08, the global cropland facts, were not done. They wait for [Database Honing](database-honing.md), and a later Stats parcel will take them up.
 
 The first global run of the cropland pipelines. Version 1 stays the South Africa run and the cost baseline. This parcel publishes version 2: the global raster, one PMTiles archive, and cropland facts for the stored places. The run is the benchmark for what one global layer costs.
 

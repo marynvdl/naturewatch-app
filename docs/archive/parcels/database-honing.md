@@ -2,15 +2,17 @@
 
 A planning parcel. It reviews the Supabase schema and proposes how to improve it in small, safe stages. This parcel changes no database, migration, or production data.
 
-The proposed design is [docs/database/design.md](../database/design.md). The decisions and their alternatives are [docs/database/decisions.md](../database/decisions.md). Both stay after this parcel is archived. This file holds what belongs to the parcel: the assessment, the migration, the impact on other parts, what is deferred, and the task list.
+The proposed design is [docs/database/design.md](../../database/design.md). The decisions and their alternatives are [docs/database/decisions.md](../../database/decisions.md). Both stay after this parcel is archived. This file holds what belongs to the parcel: the assessment, the migration, the impact on other parts, what is deferred, and the task list.
 
 *Written 9 November 2026.*
+
+Archived 13 November 2026. It began as a planning parcel. Tasks 01 to 09b then carried out the migration on the hosted database. Tasks 10 and 11 were not started. Nothing would read profiles, roles, or images until there is a sign-in and an admin screen, so they moved to [Molding Places](../../parcels/molding-places.md).
 
 ## Goal
 
 Improve the existing database rather than rebuild it. Keep what works. Give Places a stable identity independent of their boundary. Make every Stat traceable to a boundary version, a sprout, a method, and a run. Add shared provenance, boundary quality control, and room for recognitions, images, and contributors.
 
-The Stats Pipeline is paused until the stages below have landed. A later parcel finds the most efficient way to calculate stats. The global cropland facts, analysis task-06 and app task-08 of [Cropland 2024 global](../archive/parcels/cropland-2024-global.md), were archived not done and wait for it.
+The Stats Pipeline is paused until the stages below have landed. A later parcel finds the most efficient way to calculate stats. The global cropland facts, analysis task-06 and app task-08 of [Cropland 2024 global](cropland-2024-global.md), were archived not done and wait for it.
 
 ## A. Current state
 
@@ -184,7 +186,7 @@ Each stage is its own migration and pull request. Take a backup or check point-i
 
 ### Backfill rules
 
-- **Sites.** A Place is one WDPCA parcel ([record 20](../database/decisions.md#20-a-conservation-area-place-is-one-wdpca-parcel)). *Task 05 first merged the 186 parcels of the 74 multi-parcel sites into 74 places, as record 19 then said. Task 05a undid it with `unmerge_wdpa_site_parcels()`. Every parcel is a published place with its own SITE_PID and current boundary again. The 74 site unions are kept as superseded versions. Each of the 74 sites' `wdpa_site_id` rows was `proposed`, on its largest parcel, until a person decided. Task 06 recorded the user's decisions of 11 November 2026: 39 sites kept apart and 35 merged, so 64 places became `merged` (`20261117110000_wdpa_site_decisions.sql`). The criteria are in [record 20](../database/decisions.md#20-a-conservation-area-place-is-one-wdpca-parcel).* The query that listed the sites waiting for a decision, read-only:
+- **Sites.** A Place is one WDPCA parcel ([record 20](../../database/decisions.md#20-a-conservation-area-place-is-one-wdpca-parcel)). *Task 05 first merged the 186 parcels of the 74 multi-parcel sites into 74 places, as record 19 then said. Task 05a undid it with `unmerge_wdpa_site_parcels()`. Every parcel is a published place with its own SITE_PID and current boundary again. The 74 site unions are kept as superseded versions. Each of the 74 sites' `wdpa_site_id` rows was `proposed`, on its largest parcel, until a person decided. Task 06 recorded the user's decisions of 11 November 2026: 39 sites kept apart and 35 merged, so 64 places became `merged` (`20261117110000_wdpa_site_decisions.sql`). The criteria are in [record 20](../../database/decisions.md#20-a-conservation-area-place-is-one-wdpca-parcel).* The query that listed the sites waiting for a decision, read-only:
 
   ```sql
   select site.source_record_id as site_id, array_agg(places.name order by places.name) as places
@@ -250,7 +252,7 @@ Supported by the design, not built in this work:
 - `place_overlaps()` on large shapes. On Micro compute one call over a Natura 2000 site of 862,145 vertices and 53 candidate parks ran the hosted database out of memory and restarted it (12 November 2026). 59 recognitions and 139 conservation areas have more than 100,000 vertices. Cut both shapes into pieces (`ST_Subdivide`) before intersecting, or cap the vertices it accepts, before the admin overlap screen calls it.
 - A recognition designation that a later release adds or spells differently stays a conservation area until `recognition_type_for_designation()` is extended. With the next import.
 - Boundary quality and Stats eligibility, with the parcel that resumes Stats, their first reader: the four starting checks (`geometry_valid`, `small_components`, `holes`, `vertex_count`), `boundary_checks`, `qc_status`, the `stats_eligibility` columns and `set_stats_eligibility`, `stats_eligible_boundaries`, and the review of flagged boundaries. The thresholds are set against real Stats runs. Moved out of task 06 on 11 November 2026.
-- The derived admin review queue over every check's findings and source matches, with the reviewers' stored decisions. With Molding Places, after task 10.
+- The derived admin review queue over every check's findings and source matches, with the reviewers' stored decisions. With [Molding Places](../../parcels/molding-places.md).
 - `reconcile` comparing a merged place with the union of its parcel records, and keeping a merged place's name and details on upload. Until then a merged place stops `upload`. With the next import.
 - A function to undo a merge. Each merged parcel's superseded boundary keeps its SITE_PID. With the first unmerge.
 - The reconcile report suggesting a decision for a new multi-parcel site from the criteria in record 20. With the next release that has new multi-parcel sites.
@@ -261,38 +263,38 @@ Supported by the design, not built in this work:
 
 Do one task at a time, in this order. Each task is one branch and one pull request. Task files are written when a task starts. A task that changes the hosted database waits for approval of its row counts, disk, and compute.
 
-- [x] [Task 01 — Verify](../archive/tasks/task-01-verify-database-assumptions.md) — naturewatch-app
+- [x] [Task 01 — Verify](../tasks/task-01-verify-database-assumptions.md) — naturewatch-app
   - *Goal:* Run the read-only queries in **To verify**. Record the results here. Write the ADR on whether a Place is a WDPCA site or a parcel.
-- [x] [Task 02 — Hygiene](../archive/tasks/task-02-database-hygiene.md) — both repos
+- [x] [Task 02 — Hygiene](../tasks/task-02-database-hygiene.md) — both repos
   - *Goal:* Drop `pilot_place_map` and its triggers. Add timestamps and `set_updated_at()`. Fix the stale `pilot_places` read in `facts/cropland.py`.
-- [x] [Task 03 — Sources](../archive/tasks/task-03-sources.md) — naturewatch-app
+- [x] [Task 03 — Sources](../tasks/task-03-sources.md) — naturewatch-app
   - *Goal:* Rename `sources` to `source_releases`, keeping ids. Add the new `sources` table and `licences`. Add citations. Update the importer.
-- [x] [Task 04 — Types and details](../archive/tasks/task-04-types-and-details.md) — naturewatch-app
+- [x] [Task 04 — Types and details](../tasks/task-04-types-and-details.md) — naturewatch-app
   - *Goal:* Add `place_categories`, `place_types`, `conservation_area_details`, `place_source_ids`, `publication_status`, `merged_into_place_id`. Backfill. Replace the enum.
-- [x] [Task 05 — Boundaries](../archive/tasks/task-05-boundaries.md) — naturewatch-app
+- [x] [Task 05 — Boundaries](../tasks/task-05-boundaries.md) — naturewatch-app
   - *Goal:* Add `place_boundaries`, copy the geometry in batches, and verify. Merge the parcels of each multi-parcel site into one place, as in the backfill rule **Sites**. Switch the existing functions to it.
-- [x] [Task 05a — Places cleanup](../archive/tasks/task-05a-places-cleanup.md) — naturewatch-app
+- [x] [Task 05a — Places cleanup](../tasks/task-05a-places-cleanup.md) — naturewatch-app
   - *Goal:* Make every stored WDPCA parcel its own place again, undoing task 05's merge of the 74 sites. Mark each multi-parcel site's `wdpa_site_id` as `proposed` until a person decides. Supersede record 19 of decisions.md. The review queue is designed in task 06.
   - *Follow-up:* `/places` timed out after task 05a. That was not caused by the task: 12,824 names were stored in TOAST beside the large `places.geom`, and the name sort read them again on every comparison. `20261115100000_places_name_storage.sql` keeps `places.name` in the row.
-- [x] [Task 05b — Generic reads and reconciliation](../archive/tasks/task-05b-generic-reads-recon.md) — naturewatch-app
+- [x] [Task 05b — Generic reads and reconciliation](../tasks/task-05b-generic-reads-recon.md) — naturewatch-app
   - *Goal:* Add the generic `place_*` reads and temporary wrappers. Move the importer's writes to parcel boundaries in `place_boundaries`. Add the reconciliation report: it matches each record on SITE_PID and classifies it as in record 4 of decisions.md, and refuses to write unless every record matches cleanly.
-- [x] [Task 06 — Multi-parcel sites](../archive/tasks/task-06-multi-parcel-sites.md) — naturewatch-app
+- [x] [Task 06 — Multi-parcel sites](../tasks/task-06-multi-parcel-sites.md) — naturewatch-app
   - *Goal:* Decide each of the 74 multi-parcel sites, keep apart or merge, and record it in `match_status` so no `wdpa_site_id` row stays `proposed`. Add `merge_wdpa_site` for the merges, and `place_merged_into` so a merged place's address opens its kept place. Write the user's criteria into record 20. The boundary checks, eligibility, and review queue move to Deferred (decided 11 November 2026).
-- [x] [Task 07 — Stats](../archive/tasks/task-07-stats.md) — both repos
+- [x] [Task 07 — Stats](../tasks/task-07-stats.md) — both repos
   - *Goal:* Add `stats`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. Rename `fact_methods` to `stat_methods`. Backfill from `facts`. Move `place_crops_percent` to the selection. Rename the analysis `facts/` to `stats/`, and point it and the places recipe at the new tables, the recipe at the current boundaries of published places. The pipeline stays paused. `stat_run_issues` and the places PMTiles rebuild are moved out (decided 11 November 2026).
-- [x] [Task 08 — Frontend and cleanup](../archive/tasks/task-08-frontend-and-cleanup.md) — naturewatch-app
+- [x] [Task 08 — Frontend and cleanup](../tasks/task-08-frontend-and-cleanup.md) — naturewatch-app
   - *Goal:* Move the frontend to the generic reads. Drop the wrappers, `facts`, and `places.geom`.
-- [x] [Task 09 — Recognitions](../archive/tasks/task-09-recognitions.md) — both repos
+- [x] [Task 09 — Recognitions](../tasks/task-09-recognitions.md) — both repos
   - *Goal:* Move the 32 designations the user grouped as recognitions (record 21) into six recognition types with `recognition_details`. Import `DESIG_TYPE` and `INT_CRIT`. Add `place_relationships`, `place_overlaps`, and derived `recognises` links, confirmed above a share the user picks. Publish a recognitions PMTiles archive, rebuild the places archive from the current boundaries of published conservation areas, and remove the stale South Africa rollback copy.
-- [x] [Task 09b — Recognitions on the map and profile](../archive/tasks/task-09b-recognitions-on-the-map.md) — naturewatch-app
+- [x] [Task 09b — Recognitions on the map and profile](../tasks/task-09b-recognitions-on-the-map.md) — naturewatch-app
   - *Goal:* Add a Recognitions button to Places that opens World Heritage, Ramsar, and UNESCO-MAB buttons, each listing its type and drawing its outlines from the recognitions archive. Show a park's confirmed recognitions as badges under its title, each opening the recognition's profile. Decided 12 November 2026; the toggle became the Recognitions button on 13 November 2026.
-- [ ] Task 10 — Profiles, roles, audit — naturewatch-app
+- [ ] Task 10 — Profiles, roles, audit — naturewatch-app — moved to [Molding Places](../../parcels/molding-places.md)
   - *Goal:* Add `profiles`, `user_roles`, `has_role()`, contributor policies, and `audit_log`. Together with Molding Places.
-- [ ] Task 11 — Images — naturewatch-app
+- [ ] Task 11 — Images — naturewatch-app — moved to [Molding Places](../../parcels/molding-places.md)
   - *Goal:* Add `images` and `place_images`, a Storage bucket, and upload policies. When Molding Places approves photographs.
 
 ## Done when
 
 - The three documents are reviewed and merged into `develop`.
-- No migration, database, or production change was made.
+- No migration, database, or production change was made by the planning documents. The migration was done in tasks 01 to 09b, each in its own pull request.
 - Every verified statement cites a file. Every assumption is marked, with the query that settles it.
