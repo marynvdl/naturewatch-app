@@ -4,6 +4,11 @@ import { ChevronRight, LocateFixed, X } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
 import PlacePhotos from '@/components/PlacePhotos.vue';
 import {
+  SegmentedControl,
+  SegmentedControlItem,
+} from '@/components/ui/segmented-control';
+import useAuthStore from '@/store/AuthStore';
+import {
   PLACE_TYPE,
   loadPilotPlace,
   loadPlaceRecognitions,
@@ -48,6 +53,13 @@ const emit = defineEmits<{
   /** The pointer or focus entered or left a card on the Areas tab. */
   highlight: [id: string, on: boolean];
 }>();
+
+/** Admins switch between viewing and editing. Visitors see no toggle. */
+const auth = useAuthStore();
+const profileMode = computed({
+  get: () => (auth.editMode ? 'edit' : 'view'),
+  set: (value: string) => auth.setEditMode(value === 'edit'),
+});
 
 type TabId = 'overview' | 'areas' | 'landscape' | 'species';
 
@@ -160,6 +172,18 @@ function onTabKey(event: KeyboardEvent, index: number) {
     </button>
 
     <div class="place-body">
+      <SegmentedControl
+        v-if="auth.isAdmin"
+        v-model="profileMode"
+        type="single"
+        variant="outline"
+        size="sm"
+        class="place-mode"
+        aria-label="Profile mode"
+      >
+        <SegmentedControlItem value="view">View</SegmentedControlItem>
+        <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
+      </SegmentedControl>
       <h2 class="place-title panel-heading">{{ title }}</h2>
       <ul
         v-if="recognitions.length"
@@ -394,6 +418,10 @@ function onTabKey(event: KeyboardEvent, index: number) {
   align-items: stretch;
   gap: 16px;
   padding: var(--map-panel-padding);
+}
+
+.place-mode {
+  align-self: flex-start;
 }
 
 .place-title {
