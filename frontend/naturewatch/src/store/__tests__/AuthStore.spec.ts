@@ -13,7 +13,7 @@ const auth = {
 const rpc = vi.fn();
 let configured = true;
 
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/plugins/supabase', () => ({
   supabaseClient: () => (configured ? { auth, rpc } : null),
 }));
 

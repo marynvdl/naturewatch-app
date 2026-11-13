@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import type { Session } from '@supabase/supabase-js';
-import { supabaseClient } from '@/lib/supabase';
+import { supabaseClient } from '@/plugins/supabase';
 
 /**
  * The signed-in session. Only admins sign in, by email magic link.

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { supabaseClient } from '@/lib/supabase';
+import { supabaseClient } from '@/plugins/supabase';
 import {
   type FigureRange,
   type LngLatBounds,
