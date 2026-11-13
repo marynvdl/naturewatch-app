@@ -58,3 +58,11 @@ Opening Places shrinks that circle, puts a close mark on the photograph, and sit
 `/places` lists stored places 50 at a time, by name. Search is part of that database query. A name opens `/places/:id` with the same figures.
 
 If the Supabase URL or anon key is missing from the build, the page and the Places panel say the place store is not configured.
+
+## Signing in
+
+Only admins sign in. There is no sign-in button on the map. An admin opens `/signin`, enters their email, and clicks **Send link**. The page says to check email whether or not the address belongs to an account. The link in the email returns to the map signed in. New accounts cannot be made from the app.
+
+While someone is signed in, an account button sits in the top right corner of the map. It opens a panel with the email, whether the account is an admin, and **Sign out**.
+
+An admin sees a **View / Edit** toggle at the top of a place profile. It starts on View, and returns to View on sign-out. Edit mode has nothing to edit yet.

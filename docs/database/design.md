@@ -417,7 +417,9 @@ Spatial overlap is found on demand by an admin-only function, `place_overlaps(pl
 
 ### 4.6 People, images, audit
 
-*Proposed.* [Molding Places](../parcels/molding-places.md) adds these tables, each with the task whose screen uses it first: `profiles`, `user_roles`, and `audit_log` in task 01, `place_curations` in task 02, `images` and `place_images` in task 04, and `place_tagline_suggestions` in task 06. Only admins sign in at first. Contributor policies come with contributors.
+*Proposed.* [Molding Places](../parcels/molding-places.md) adds these tables, each with the task whose screen uses it first: `place_curations` in task 02, `images` and `place_images` in task 04, and `place_tagline_suggestions` in task 06. Only admins sign in at first. Contributor policies come with contributors.
+
+*In place* since Molding Places task 01 (`20261121100000_people_and_audit.sql`) for `profiles`, `user_roles`, `has_role()`, and `audit_log`. A trigger on `auth.users` creates each profile. A signed-in user reads only their own profile and roles, and only an admin reads `audit_log`. Roles are granted by the owner with a one-off statement, so no email or user id is in a migration. `audit_row(key columns…)` is the one trigger function for audited tables. It is on `user_roles` so far. `actor` is null for statements the owner or a pipeline runs.
 
 **`profiles`**: `id` uuid PK, FK → `auth.users` `on delete cascade`, `display_name`. References to a profile from review columns use `on delete set null`, so a deleted account leaves "former user".
 

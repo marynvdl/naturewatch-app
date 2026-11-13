@@ -1,4 +1,5 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { supabaseClient } from '@/lib/supabase';
 import {
   type FigureRange,
   type LngLatBounds,
@@ -160,23 +161,12 @@ export type PlaceReleaseResult =
 const PLACE_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-let client: SupabaseClient | null | undefined;
-
 /**
  * Browser client for place attributes and stats.
- * Returns null when the URL or anon key is not set. The service-role key is never used.
- * @returns The shared client, or null.
+ * @returns The shared client, or null when Supabase is not configured.
  */
 export function placesClient(): SupabaseClient | null {
-  if (client !== undefined) return client;
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !key) {
-    client = null;
-    return null;
-  }
-  client = createClient(url, key);
-  return client;
+  return supabaseClient();
 }
 
 /**

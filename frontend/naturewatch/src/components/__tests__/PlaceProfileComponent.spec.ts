@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
+import { createPinia, setActivePinia } from 'pinia';
 import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
 import {
   loadPilotPlace,
@@ -8,6 +9,7 @@ import {
   type PlaceDetail,
 } from '@/places/api';
 import { PHOTOS_NONE } from '@/places/photos';
+import useAuthStore from '@/store/AuthStore';
 
 vi.mock('@/places/api', () => ({
   PLACE_TYPE: 'conservation_area',
@@ -67,6 +69,7 @@ async function openTab(
 describe('Place profile', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setActivePinia(createPinia());
     vi.mocked(loadPlaceRecognitions).mockResolvedValue({
       status: 'ok',
       recognitions: [],
@@ -163,6 +166,25 @@ describe('Place profile', () => {
     await openTab(wrapper, 'Overview');
     expect(wrapper.emitted('areas')?.at(-1)).toEqual([null]);
     wrapper.unmount();
+  });
+
+  it('shows no Edit/View toggle to a visitor', async () => {
+    const wrapper = await mountProfile(kruger);
+    expect(wrapper.find('[aria-label="Profile mode"]').exists()).toBe(false);
+  });
+
+  it('lets an admin switch the profile to edit mode', async () => {
+    const auth = useAuthStore();
+    auth.isAdmin = true;
+    const wrapper = await mountProfile(kruger);
+    const toggle = wrapper.find('[aria-label="Profile mode"]');
+    expect(toggle.exists()).toBe(true);
+    const edit = toggle
+      .findAll('button')
+      .find(button => button.text() === 'Edit');
+    if (!edit) throw new Error('Missing Edit');
+    await edit.trigger('click');
+    expect(auth.editMode).toBe(true);
   });
 
   it('shows no badges for a place without recognitions', async () => {

@@ -35,6 +35,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/PlaceView.vue'),
   },
   {
+    path: '/signin',
+    name: 'SignIn',
+    component: () => import('@/views/SignInView.vue'),
+  },
+  {
     path: '/about',
     name: 'About',
     // route level code-splitting

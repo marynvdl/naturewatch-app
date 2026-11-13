@@ -15,6 +15,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 // Stores
 import { useGlobal } from '@/store';
+import useAuthStore from '@/store/AuthStore';
 
 /** Using stores */
 const globalStore = useGlobal();
@@ -58,6 +59,7 @@ const onSnackbarChanged = async () => {
 watch(loading, async () => nextTick());
 
 onMounted(() => {
+  void useAuthStore().start();
   document.title = title;
   loading.value = false;
   const preloader = document.getElementById('preloader');

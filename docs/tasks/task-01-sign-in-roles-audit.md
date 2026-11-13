@@ -10,7 +10,7 @@ An admin can sign in by email magic link and sign out, and the app knows whether
 
 Decided 13 November 2026 by the user:
 
-- **Way in.** Visitors see no sign-in button. An admin opens `/signin` and enters an email. While someone is signed in, a small account button sits under More info at the bottom right. It opens a card with the email and **Sign out**.
+- **Way in.** Visitors see no sign-in button. An admin opens `/signin` and enters an email. While someone is signed in, a small account button sits in the top right corner of the map. It opens a panel in the Landscape and Measure style with the email, the role, and **Sign out**. It first sat beside More info, but the open Measure panel covered it there (changed 13 November 2026 by the user).
 - **Sign-up is closed.** The app asks for a link with `shouldCreateUser: false`, and sign-ups are turned off in the hosted Auth settings. Only an existing user gets a link. The user's account is created once by an invite from the Supabase dashboard, then granted `admin`.
 
 ## Facts already stored
@@ -32,12 +32,12 @@ From the code and the repository on 13 November 2026:
    - `has_role(role text)`: `security definer`, `stable`, `set search_path = ''`. True when `(select auth.uid())` has that role. Execute granted to `authenticated` only.
    - `audit_log` as in design.md §4.6, and one trigger function `audit_row()` that writes `old_values` and `new_values` as jsonb, with `actor` from `auth.uid()` (null for statements run by the owner). Add the trigger on `user_roles` only. The other tables get theirs with the task that first edits them.
    - RLS on all three tables, `revoke all … from public, anon, authenticated`. A signed-in user selects their own `profiles` row and their own `user_roles` rows. An admin selects `audit_log`. Nothing is written from the browser in this task.
-2. **Local stack.** In `supabase/config.toml`, set `site_url` and `additional_redirect_urls` to the dev server, and `enable_signup = false` for email. Inbucket shows the local magic link.
+2. **Local stack.** In `supabase/config.toml`, set `site_url` and `additional_redirect_urls` to the dev server, and `enable_signup = false` under `[auth]`. Leave it on under `[auth.email]`: there it switches the email provider itself off. Inbucket shows the local magic link.
 3. **Database tests, `supabase/tests/test_people_local.py`.** On the local stack, in the style of `test_reconcile_local.py`: a new auth user gets a profile; `has_role('admin')` is false, then true after a grant, for that user's JWT claims; `anon` cannot read the three tables; a user cannot read another user's roles; a grant and a revoke each write an `audit_log` row.
 4. **Client and store.** Move client creation into `src/lib/supabase.ts`, with `api.ts` using it unchanged. Add `src/store/AuthStore.ts`: the session from `getSession()` and `onAuthStateChange`, `isAdmin` from `rpc('has_role', { role: 'admin' })`, `editMode` (false on load and on sign-out), `signIn(email)` with `shouldCreateUser: false` and `emailRedirectTo` the current origin, and `signOut()`.
 5. **Screens.**
    - `/signin`, `SignInView.vue`: an email field and **Send link**, then "Check your email". If someone is signed in, it shows the email, **Sign out**, and a link back to the map. When the client is not configured, it says so.
-   - The account button under More info, shown only while signed in, as above.
+   - The account button in the top right corner, shown only while signed in, as above. Every existing control keeps its place.
    - In `PlaceProfileComponent.vue`, an **Edit / View** toggle in the header, shown only when `isAdmin`. It sets `editMode`.
 6. **Tests.** Add `AuthStore.spec.ts` with a mocked client, and extend `PlaceProfileComponent.spec.ts` (the toggle shows for an admin only) and the side buttons (the account button shows only while signed in). Run pytest for `supabase/tests`, the catalog suite, the component tests, `npm run type-check`, and `npm run lint`.
 7. **Browser check.** Run the `browser-check` skill on `/` and `/signin`, signed out, wide and narrow.
