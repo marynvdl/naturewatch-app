@@ -2,7 +2,7 @@
 
 Why the database is designed as it is. The design itself is [design.md](design.md). Each record states the decision, the reason, the alternatives considered, and what the choice costs. A superseded record is marked and kept.
 
-*Status of records 1 to 18: proposed, 9 November 2026, in the [Database Honing](../parcels/database-honing.md) parcel.*
+*Status of records 1 to 18: proposed, 9 November 2026, in the [Database Honing](../archive/parcels/database-honing.md) parcel.*
 
 ## 1. One `places` table for every kind of Place
 
@@ -207,7 +207,7 @@ Why the database is designed as it is. The design itself is [design.md](design.m
 - `facts` would point at boundaries;
 - boundary ids would equal place ids, which hides bugs.
 
-The dependency table is in the [parcel](../parcels/database-honing.md#dependency-analysis).
+The dependency table is in the [parcel](../archive/parcels/database-honing.md#dependency-analysis).
 
 **Cost.** A temporarily larger disk, and a longer backfill on Large compute.
 
@@ -221,7 +221,7 @@ The dependency table is in the [parcel](../parcels/database-honing.md#dependency
 
 **Superseded by [record 20](#20-a-conservation-area-place-is-one-wdpca-parcel) on 11 November 2026.** Task 05 carried it out, and task 05a undid it.
 
-*Decided 10 November 2026 by the user, in task 01 of the [Database Honing](../parcels/database-honing.md) parcel. It settles the open question in record 4.*
+*Decided 10 November 2026 by the user, in task 01 of the [Database Honing](../archive/parcels/database-honing.md) parcel. It settles the open question in record 4.*
 
 **Decision.** One Place per WDPCA `SITE_ID`. Its parcels, one per `SITE_PID`, together form the Place's boundary. `place_source_ids` holds one `wdpa_site_id` row per Place and one `wdpa_site_pid` row per parcel, all pointing at that Place. The 10 km² rule applies to the site's total area.
 
@@ -242,7 +242,7 @@ The dependency table is in the [parcel](../parcels/database-honing.md#dependency
 
 ## 20. A conservation area Place is one WDPCA parcel
 
-*Decided 11 November 2026 by the user, in task 05a of the [Database Honing](../parcels/database-honing.md) parcel. It supersedes record 19.*
+*Decided 11 November 2026 by the user, in task 05a of the [Database Honing](../archive/parcels/database-honing.md) parcel. It supersedes record 19.*
 
 **Decision.** One Place per WDPCA `SITE_PID`. Parcels of one `SITE_ID` become one Place only when a person decides so. The decision is recorded in the site row's `match_status` (task 06). Until then the site's `wdpa_site_id` row is `proposed`, on its largest parcel. A merge keeps one place, sets the others to `merged` with `merged_into_place_id`, and points their SITE_PIDs at the kept place. The 10 km² rule applies per parcel, as at import.
 
@@ -274,7 +274,7 @@ The 74 decisions, each with its reason, are the worked examples in `supabase/mig
 
 ## 21. Which WDPCA designations are recognitions
 
-*Decided 12 November 2026 by the user, in task 09 of the [Database Honing](../parcels/database-honing.md) parcel, from a review page of all 980 stored designations with their WDPCA `DESIG_TYPE` and how much they overlap other designations.*
+*Decided 12 November 2026 by the user, in task 09 of the [Database Honing](../archive/parcels/database-honing.md) parcel, from a review page of all 980 stored designations with their WDPCA `DESIG_TYPE` and how much they overlap other designations.*
 
 **Decision.** 32 designations are recognitions, in six place types. Every other designation is a conservation area. Grouping is by the stored designation text, WDPCA `DESIG_ENG`.
 
