@@ -45,6 +45,8 @@ const emit = defineEmits<{
   open: [id: string];
   /** The conservation areas the open Areas tab lists, or null when it is closed. */
   areas: [ids: string[] | null];
+  /** The pointer or focus entered or left a card on the Areas tab. */
+  highlight: [id: string, on: boolean];
 }>();
 
 type TabId = 'overview' | 'areas' | 'landscape' | 'species';
@@ -299,6 +301,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
                     :iso3="item.iso3"
                     :area-km2="item.area_km2"
                     @click="$emit('open', item.id)"
+                    @highlight="on => $emit('highlight', item.id, on)"
                   />
                 </li>
                 <li v-if="recognisedShown < recognised.length">

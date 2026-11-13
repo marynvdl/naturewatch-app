@@ -1,16 +1,27 @@
 <script setup lang="ts">
 import { Image } from '@lucide/vue';
+import { computed } from 'vue';
 import { countryName, formatAreaTag } from '@/places/display';
 
-defineProps<{
+const props = defineProps<{
   name: string;
   iso3: string | null;
   areaKm2: number | null;
   /** Marks the card as the open place. */
   current?: boolean;
+  /** A recognition type label, shown before the country. */
+  kind?: string;
 }>();
 
-defineEmits<{ click: [] }>();
+defineEmits<{
+  click: [];
+  /** The pointer or focus entered (true) or left (false) the card. */
+  highlight: [on: boolean];
+}>();
+
+const meta = computed(() =>
+  [props.kind, countryName(props.iso3)].filter(Boolean).join(' · ')
+);
 </script>
 
 <template>
@@ -19,6 +30,10 @@ defineEmits<{ click: [] }>();
     class="place-result"
     :aria-current="current ? 'true' : undefined"
     @click="$emit('click')"
+    @mouseenter="$emit('highlight', true)"
+    @mouseleave="$emit('highlight', false)"
+    @focus="$emit('highlight', true)"
+    @blur="$emit('highlight', false)"
   >
     <span class="place-thumb" aria-hidden="true">
       <Image :size="20" :stroke-width="1.25" />
@@ -27,8 +42,8 @@ defineEmits<{ click: [] }>();
       <span class="place-card-name" :title="name">
         {{ name }}
       </span>
-      <span v-if="iso3" class="place-card-meta">
-        {{ countryName(iso3) }}
+      <span v-if="meta" class="place-card-meta">
+        {{ meta }}
       </span>
       <span v-if="areaKm2 != null" class="place-card-area">
         {{ formatAreaTag(areaKm2) }} km²

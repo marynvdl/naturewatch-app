@@ -377,6 +377,32 @@ describe('place boundaries from tiles', () => {
     expect(map.getSource('places-tiles')).toBeUndefined();
   });
 
+  it('outlines the place of a hovered card from either archive', async () => {
+    const { map, store } = await drawPlaces();
+    expect(map.getLayer('places-hover-line')).toBeDefined();
+    expect(map.getLayer('recognitions-hover-line')).toBeDefined();
+
+    store.hoverPlace(outsideWindow, true);
+    await flushPromises();
+    const filter = ['==', ['get', 'id'], outsideWindow];
+    expect(map.setFilter).toHaveBeenCalledWith('places-hover-line', filter);
+    expect(map.setFilter).toHaveBeenCalledWith(
+      'recognitions-hover-line',
+      filter
+    );
+    // Hovering does not move the map
+    expect(map.fitBounds).not.toHaveBeenCalled();
+    expect(map.easeTo).not.toHaveBeenCalled();
+
+    store.hoverPlace(outsideWindow, false);
+    await flushPromises();
+    expect(map.setFilter).toHaveBeenLastCalledWith('recognitions-hover-line', [
+      '==',
+      ['get', 'id'],
+      '',
+    ]);
+  });
+
   it('reports a failed tile read', async () => {
     const { map, store } = await drawPlaces();
 

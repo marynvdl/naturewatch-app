@@ -7,6 +7,7 @@ import {
   loadPilotPlaceRank,
   loadPilotPlaceWindow,
   loadPlaceRelease,
+  loadPlaceSearchWindow,
 } from '@/places/api';
 import {
   CROPLAND_FULL,
@@ -40,6 +41,7 @@ vi.stubGlobal(
 
 vi.mock('@/places/api', () => ({
   loadPilotPlaceWindow: vi.fn(),
+  loadPlaceSearchWindow: vi.fn(),
   loadPilotPlaceWindowCount: vi.fn(),
   loadPilotPlaceFilterStats: vi.fn(),
   loadPilotPlaceRank: vi.fn(),
@@ -68,6 +70,16 @@ const places = [
 ];
 
 const sizeFull: [number, number] = [1538.284, 19485.2];
+
+const heritage = {
+  id: '44444444-4444-4444-4444-444444444444',
+  name: 'Kruger to Canyons',
+  designation: 'UNESCO-MAB Biosphere Reserve',
+  iso3: 'ZAF',
+  area_km2: 26000,
+  cropland_percent: null,
+  place_type_id: 'biosphere_reserve',
+};
 const missingPlace = {
   id: '33333333-3333-3333-3333-333333333333',
   name: 'A small reserve',
@@ -154,6 +166,17 @@ describe('Places panel', () => {
       return { status: 'ok', places: list, total: list.length };
     });
     vi.mocked(loadPlaceRelease).mockResolvedValue(drawn);
+    vi.mocked(loadPlaceSearchWindow).mockImplementation(async query => {
+      const prefix = query.search.trim().toLocaleLowerCase();
+      const list = [
+        ...places.map(place => ({
+          ...place,
+          place_type_id: 'conservation_area',
+        })),
+        heritage,
+      ].filter(place => place.name.toLocaleLowerCase().startsWith(prefix));
+      return { status: 'ok', places: list, total: list.length };
+    });
   });
 
   it('shows results and boundaries only after a place type is selected', async () => {
@@ -577,11 +600,18 @@ describe('Places panel', () => {
 
     expect(wrapper.text()).toContain('Kruger National Park');
     expect(wrapper.text()).not.toContain('Addo Elephant National Park');
+    // Every type is searched, and a recognition says which type it is
+    const cards = wrapper.findAll('button.place-result');
+    expect(cards.map(card => card.get('.place-card-meta').text())).toEqual([
+      'South Africa',
+      'UNESCO-MAB · South Africa',
+    ]);
     expect(typeButton(wrapper, 'Conservation areas').classes()).not.toContain(
       'is-on'
     );
     expect(loadPlaceRelease).not.toHaveBeenCalled();
-    expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
+    expect(loadPilotPlaceWindow).not.toHaveBeenCalled();
+    expect(loadPlaceSearchWindow).toHaveBeenCalledWith(
       expect.objectContaining({ search: 'kru', searchPrefix: true }),
       expect.any(AbortSignal)
     );
@@ -695,6 +725,41 @@ describe('Places panel', () => {
     expect(typeButton(wrapper, 'Conservation areas').classes()).toContain(
       'is-on'
     );
+  });
+
+  it('turns on a recognition type when a searched recognition is chosen', async () => {
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    const store = usePlacesStore(pinia);
+    await wrapper
+      .get('input[aria-label="Search places"]')
+      .setValue('kruger to');
+    await flushPromises();
+
+    await wrapper.get('button.place-result').trigger('click');
+    await flushPromises();
+    expect(store.selectedId).toBe(heritage.id);
+    expect(store.visible).toBe(true);
+    expect(store.listType).toBe('biosphere_reserve');
+    expect(typeButton(wrapper, 'UNESCO-MAB').classes()).toContain('is-on');
+  });
+
+  it('outlines a place on the map while its card is hovered', async () => {
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    const store = usePlacesStore(pinia);
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
+    await flushPromises();
+
+    const card = wrapper.get('button.place-result');
+    await card.trigger('mouseenter');
+    expect(store.hoveredId).toBe(places[1].id);
+    await card.trigger('mouseleave');
+    expect(store.hoveredId).toBeNull();
   });
 
   it('keeps the search and the place type when the profile closes', async () => {

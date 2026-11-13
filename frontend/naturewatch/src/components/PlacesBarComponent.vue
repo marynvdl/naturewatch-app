@@ -18,6 +18,7 @@ import {
   loadPilotPlaceFilterStats,
   loadPilotPlaceRank,
   loadPilotPlaceWindow,
+  loadPlaceSearchWindow,
   type PlaceSummary,
   type PlaceWindowQuery,
   PLACE_LIST_LIMIT,
@@ -26,6 +27,7 @@ import {
 import {
   CROPLAND_FULL,
   RECOGNITION_BUTTONS,
+  RECOGNITION_LABEL,
   isRecognitionButtonType,
   type RecognitionButtonType,
   type FigureRange,
@@ -230,15 +232,47 @@ function showBoundaries() {
  * Choose a place from the list. The boundaries are drawn, and Conservation
  * areas is switched on, so the place shows on the map even when the list came
  * from a search.
- * @param id - The stored place id.
+ * @param place - The chosen card's place.
  */
-function chooseResult(id: string) {
+function chooseResult(place: PlaceSummary) {
+  const id = place.id;
   if (placesStore.selectedId !== id) {
-    // The boundaries are conservation areas, so that type shows as on too
-    if (placeType.value === null) placeType.value = 'protected_area';
+    // A search across every type turns on the chosen place's type, when it has a button
+    if (placeType.value === null) {
+      const type = place.place_type_id ?? PLACE_TYPE;
+      if (type === PLACE_TYPE) placeType.value = 'protected_area';
+      else if (isRecognitionButtonType(type)) {
+        showMore.value = true;
+        placeType.value = type;
+      }
+    }
     showBoundaries();
   }
   placesStore.selectPlace(id);
+}
+
+/**
+ * The window for the current list: one place type, or every type while
+ * searching with no type selected.
+ * @param query - The list query.
+ * @param signal - Cancels the request when a newer one replaces it.
+ * @returns The window, or why it could not be loaded.
+ */
+function loadWindow(query: PlaceWindowQuery, signal?: AbortSignal) {
+  return searchingAll.value
+    ? loadPlaceSearchWindow(query, signal)
+    : loadPilotPlaceWindow(query, signal);
+}
+
+/**
+ * A recognition type label for a card in the search across every type.
+ * @param place - The card's place.
+ * @returns The label, or undefined for a conservation area.
+ */
+function cardKind(place: PlaceSummary): string | undefined {
+  const type = place.place_type_id;
+  if (!type || type === PLACE_TYPE) return undefined;
+  return RECOGNITION_LABEL[type];
 }
 
 /** Remove the conservation areas when they are drawn. */
@@ -270,7 +304,7 @@ async function refreshList() {
   const first = listStatus.value === 'idle';
   if (first) listStatus.value = 'loading';
   if (showList.value) await ensureStats();
-  const result = await loadPilotPlaceWindow(listQuery(0), signal);
+  const result = await loadWindow(listQuery(0), signal);
   if (request !== listRequest) return;
   listStatus.value = result.status === 'ok' ? 'ok' : result.status;
   if (result.status === 'ok') {
@@ -291,10 +325,7 @@ async function loadMore() {
   const request = listRequest;
   const offset = windowStart.value + places.value.length;
   loadingMore.value = true;
-  const result = await loadPilotPlaceWindow(
-    listQuery(offset),
-    listAbort?.signal
-  );
+  const result = await loadWindow(listQuery(offset), listAbort?.signal);
   if (request !== listRequest) return;
   loadingMore.value = false;
   if (result.status !== 'ok') return;
@@ -315,10 +346,7 @@ async function loadEarlier() {
   const request = listRequest;
   const offset = Math.max(0, windowStart.value - PLACE_LIST_LIMIT);
   loadingEarlier.value = true;
-  const result = await loadPilotPlaceWindow(
-    listQuery(offset),
-    listAbort?.signal
-  );
+  const result = await loadWindow(listQuery(offset), listAbort?.signal);
   if (request !== listRequest) return;
   loadingEarlier.value = false;
   if (result.status !== 'ok') return;
@@ -339,6 +367,8 @@ async function loadEarlier() {
  * @returns Whether the place is now in the list.
  */
 async function loadAround(id: string): Promise<boolean> {
+  // The search across every type has no rank to centre on
+  if (searchingAll.value) return false;
   const request = ++listRequest;
   const signal = newListSignal();
   const ranked = await loadPilotPlaceRank(listQuery(), id, signal);
@@ -678,8 +708,10 @@ watch(
                 :name="place.name"
                 :iso3="place.iso3"
                 :area-km2="place.area_km2"
+                :kind="cardKind(place)"
                 :current="placesStore.selectedId === place.id"
-                @click="chooseResult(place.id)"
+                @click="chooseResult(place)"
+                @highlight="on => placesStore.hoverPlace(place.id, on)"
               />
             </li>
           </ul>

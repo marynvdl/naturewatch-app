@@ -35,6 +35,18 @@ const usePlacesStore = defineStore('places', () => {
    * while the tab is open. Null otherwise.
    */
   const shownAreaIds = ref<string[] | null>(null);
+  /** The place whose card the pointer or focus is on, outlined on the map. */
+  const hoveredId = ref<string | null>(null);
+
+  /**
+   * Outline a place while its card is hovered.
+   * @param id - The place.
+   * @param on - Whether the pointer entered or left the card.
+   */
+  function hoverPlace(id: string, on: boolean) {
+    if (on) hoveredId.value = id;
+    else if (hoveredId.value === id) hoveredId.value = null;
+  }
   /** Whether a recognition type is listed, so the tools are size only. */
   const listingRecognitions = computed(() =>
     isRecognitionButtonType(listType.value)
@@ -81,6 +93,7 @@ const usePlacesStore = defineStore('places', () => {
    * @param source - Where the click happened. The list is the default.
    */
   function selectPlace(id: string, source: 'list' | 'map' = 'list') {
+    hoveredId.value = null;
     if (selectedId.value === id) {
       selectedId.value = null;
       selectedFrom.value = null;
@@ -92,6 +105,7 @@ const usePlacesStore = defineStore('places', () => {
 
   /** Close the place column. */
   function clearSelection() {
+    hoveredId.value = null;
     selectedId.value = null;
     selectedFrom.value = null;
   }
@@ -130,6 +144,8 @@ const usePlacesStore = defineStore('places', () => {
     selectedFrom,
     listType,
     shownAreaIds,
+    hoveredId,
+    hoverPlace,
     listingRecognitions,
     sizeKept,
     croplandKept,

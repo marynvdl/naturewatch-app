@@ -46,6 +46,8 @@ export interface PlaceSummary {
   area_km2: number | null;
   /** Stored cropland percent, or null when none is stored. */
   cropland_percent: number | null;
+  /** `place_types.id`. Set by the search across every type. */
+  place_type_id?: string;
 }
 
 /** A published place and its stored cropland figures, when they exist. */
@@ -250,6 +252,55 @@ export async function loadPilotPlaceWindow(
       area_km2: row.area_km2,
       cropland_percent: row.cropland_percent,
     })),
+  };
+}
+
+/**
+ * At most 50 listed places of every type whose names start with the search,
+ * plus how many match. Used while no place type is selected. The size filter
+ * applies. Cropland and the map view do not, as they are not shared by every
+ * type; a cropland order falls back to largest first.
+ * @param query - Search, sort, size filter, and offset.
+ * @param signal - Cancels the request when a newer one replaces it.
+ * @returns The window, or why it could not be loaded.
+ */
+export async function loadPlaceSearchWindow(
+  query: PlaceWindowQuery,
+  signal?: AbortSignal
+): Promise<PlaceWindowResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const prefix = query.search.trim().replace(/[\\%_]/g, match => `\\${match}`);
+  let call = supabase
+    .from('listed_places')
+    .select('id, name, designation, iso3, area_km2, place_type_id', {
+      count: 'exact',
+    })
+    .ilike('name', `${prefix}%`);
+  if (query.sizeMin !== null) call = call.gte('area_km2', query.sizeMin);
+  if (query.sizeMax !== null) call = call.lte('area_km2', query.sizeMax);
+  if (query.sort === 'name') call = call.order('name');
+  else
+    call = call
+      .order('area_km2', {
+        ascending: query.sort === 'size-asc',
+        nullsFirst: false,
+      })
+      .order('name');
+  const offset = query.offset ?? 0;
+  call = call.range(offset, offset + PLACE_LIST_LIMIT - 1);
+  const { data, error, count } = await (signal
+    ? call.abortSignal(signal)
+    : call);
+  if (error || !data) return { status: 'error' };
+  return {
+    status: 'ok',
+    total: count ?? data.length,
+    places: (
+      data as (Omit<PlaceSummary, 'cropland_percent'> & {
+        place_type_id: string;
+      })[]
+    ).map(row => ({ ...row, cropland_percent: null })),
   };
 }
 

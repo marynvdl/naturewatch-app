@@ -20,10 +20,12 @@ const PLACE_SOURCE = 'places-tiles';
 const PLACE_FILL = 'places-fill';
 const PLACE_LINE = 'places-line';
 const PLACE_SELECT_LINE = 'places-select-line';
+const PLACE_HOVER_LINE = 'places-hover-line';
 const RECOGNITION_SOURCE = 'recognitions-tiles';
 const RECOGNITION_FILL = 'recognitions-fill';
 const RECOGNITION_LINE = 'recognitions-line';
 const RECOGNITION_SELECT_LINE = 'recognitions-select-line';
+const RECOGNITION_HOVER_LINE = 'recognitions-hover-line';
 
 const PLACE_FILL_OPACITY = [
   'interpolate',
@@ -74,10 +76,12 @@ function placePaint(satellite: boolean) {
       ],
     },
     selectedLine: { 'line-color': colour.selected, 'line-width': 3 },
+    hoverLine: { 'line-color': colour.selected, 'line-width': 2.5 },
   } satisfies {
     fill: mapboxgl.FillLayer['paint'];
     line: mapboxgl.LineLayer['paint'];
     selectedLine: mapboxgl.LineLayer['paint'];
+    hoverLine: mapboxgl.LineLayer['paint'];
   };
 }
 
@@ -122,10 +126,12 @@ function recognitionPaint(satellite: boolean) {
       ],
     },
     selectedLine: { 'line-color': colour, 'line-width': 3.5 },
+    hoverLine: { 'line-color': colour, 'line-width': 3 },
   } satisfies {
     fill: mapboxgl.FillLayer['paint'];
     line: mapboxgl.LineLayer['paint'];
     selectedLine: mapboxgl.LineLayer['paint'];
+    hoverLine: mapboxgl.LineLayer['paint'];
   };
 }
 
@@ -168,6 +174,23 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   /** Filter that keeps only the selected place. */
   function selectionFilter(): mapboxgl.FilterSpecification {
     return ['==', ['get', 'id'], placesStore.selectedId ?? ''];
+  }
+
+  /** Filter that keeps only the place whose card is hovered. */
+  function hoverFilter(): mapboxgl.FilterSpecification {
+    return ['==', ['get', 'id'], placesStore.hoveredId ?? ''];
+  }
+
+  /**
+   * Outline the place whose card is hovered, from whichever archive holds it.
+   * The map does not move; a place out of view shows nothing.
+   * @param mapInstance - The map.
+   */
+  function highlightHover(mapInstance: mapboxgl.Map) {
+    [PLACE_HOVER_LINE, RECOGNITION_HOVER_LINE].forEach(layer => {
+      if (mapInstance.getLayer(layer))
+        mapInstance.setFilter(layer, hoverFilter());
+    });
   }
 
   /** Filter that keeps the places the size and cropland filter keeps. */
@@ -281,8 +304,10 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       [PLACE_FILL, paint.fill],
       [PLACE_LINE, paint.line],
       [PLACE_SELECT_LINE, paint.selectedLine],
+      [PLACE_HOVER_LINE, paint.hoverLine],
       [RECOGNITION_LINE, recognition.line],
       [RECOGNITION_SELECT_LINE, recognition.selectedLine],
+      [RECOGNITION_HOVER_LINE, recognition.hoverLine],
     ];
     layers.forEach(([layer, properties]) => {
       if (!mapInstance.getLayer(layer)) return;
@@ -404,6 +429,8 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   /** Remove the place and recognition boundaries. */
   function removePlaceOverlay(mapInstance: mapboxgl.Map) {
     [
+      RECOGNITION_HOVER_LINE,
+      PLACE_HOVER_LINE,
       RECOGNITION_SELECT_LINE,
       RECOGNITION_LINE,
       RECOGNITION_FILL,
@@ -478,14 +505,24 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         filter: selectionFilter(),
         paint: paint.selectedLine,
       };
+      const hoverLine: mapboxgl.LineLayer = {
+        id: PLACE_HOVER_LINE,
+        type: 'line',
+        source: PLACE_SOURCE,
+        'source-layer': PLACE_TILE_LAYER,
+        filter: hoverFilter(),
+        paint: paint.hoverLine,
+      };
       if (onStandard) {
         fill.slot = 'top';
         line.slot = 'top';
         selectedLine.slot = 'top';
+        hoverLine.slot = 'top';
       }
       mapInstance.addLayer(fill, onStandard ? undefined : before);
       mapInstance.addLayer(line, onStandard ? undefined : before);
       mapInstance.addLayer(selectedLine, onStandard ? undefined : before);
+      mapInstance.addLayer(hoverLine, onStandard ? undefined : before);
     }
     if (!mapInstance.getSource(RECOGNITION_SOURCE)) {
       mapInstance.addSource(RECOGNITION_SOURCE, {
@@ -517,6 +554,15 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
           filter: selectionFilter(),
           layout: { 'line-join': 'round' },
           paint: paint.selectedLine,
+        },
+        {
+          id: RECOGNITION_HOVER_LINE,
+          type: 'line',
+          source: RECOGNITION_SOURCE,
+          'source-layer': RECOGNITION_TILE_LAYER,
+          filter: hoverFilter(),
+          layout: { 'line-join': 'round' },
+          paint: paint.hoverLine,
         },
       ];
       layers.forEach(layer => {
@@ -602,6 +648,14 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       const mapInstance = readMap();
       if (mapInstance)
         whenStyleReady(mapInstance, () => applyKeptFilter(mapInstance));
+    }
+  );
+
+  watch(
+    () => placesStore.hoveredId,
+    () => {
+      const mapInstance = readMap();
+      if (mapInstance) highlightHover(mapInstance);
     }
   );
 
