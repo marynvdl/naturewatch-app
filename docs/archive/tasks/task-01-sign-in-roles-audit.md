@@ -1,6 +1,6 @@
 # Task 01 — Sign-in, roles, audit
 
-Parcel: [Molding Places](../parcels/molding-places.md)
+Parcel: [Molding Places](../../parcels/molding-places.md)
 
 Repository: naturewatch-app. This is the parcel's first task, so nothing has to merge first.
 
@@ -17,7 +17,7 @@ Decided 13 November 2026 by the user:
 
 From the code and the repository on 13 November 2026:
 
-- The tables are in [design.md §4.6](../database/design.md#46-people-images-audit), and the access rules in [§6](../database/design.md#6-access-and-row-level-security). Sign-in is Supabase Auth only ([record 15](../database/decisions.md#15-supabase-auth-profiles-and-roles)).
+- The tables are in [design.md §4.6](../../database/design.md#46-people-images-audit), and the access rules in [§6](../../database/design.md#6-access-and-row-level-security). Sign-in is Supabase Auth only ([record 15](../../database/decisions.md#15-supabase-auth-profiles-and-roles)).
 - No migration mentions `auth.users`, roles, or an audit table. The latest migration is `20261120110000_recognition_places.sql`.
 - `src/places/api.ts` creates the one Supabase client from `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, and returns none when they are blank.
 - The map has no app bar. `AppBarMenuComponent.vue` is a theme toggle that nothing uses. More info is in `SideButtonsComponent.vue`.
