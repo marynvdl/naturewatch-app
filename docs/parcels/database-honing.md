@@ -284,7 +284,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Move the frontend to the generic reads. Drop the wrappers, `facts`, and `places.geom`.
 - [x] [Task 09 — Recognitions](../archive/tasks/task-09-recognitions.md) — both repos
   - *Goal:* Move the 32 designations the user grouped as recognitions (record 21) into six recognition types with `recognition_details`. Import `DESIG_TYPE` and `INT_CRIT`. Add `place_relationships`, `place_overlaps`, and derived `recognises` links, confirmed above a share the user picks. Publish a recognitions PMTiles archive, rebuild the places archive from the current boundaries of published conservation areas, and remove the stale South Africa rollback copy.
-- [ ] [Task 09b — Recognitions on the map and profile](../tasks/task-09b-recognitions-on-the-map.md) — naturewatch-app
+- [x] [Task 09b — Recognitions on the map and profile](../archive/tasks/task-09b-recognitions-on-the-map.md) — naturewatch-app
   - *Goal:* Add a Recognitions button to Places that opens World Heritage, Ramsar, and UNESCO-MAB buttons, each listing its type and drawing its outlines from the recognitions archive. Show a park's confirmed recognitions as badges under its title, each opening the recognition's profile. Decided 12 November 2026; the toggle became the Recognitions button on 13 November 2026.
 - [ ] Task 10 — Profiles, roles, audit — naturewatch-app
   - *Goal:* Add `profiles`, `user_roles`, `has_role()`, contributor policies, and `audit_log`. Together with Molding Places.

@@ -1,6 +1,6 @@
 # Task 09b — Recognitions on the map and profile
 
-Parcel: [Database Honing](../parcels/database-honing.md)
+Parcel: [Database Honing](../../parcels/database-honing.md)
 
 Repository: naturewatch-app. Start only after task 09 has merged into `develop` (pull request #411, merged 12 November 2026).
 
