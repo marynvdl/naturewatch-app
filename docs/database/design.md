@@ -57,7 +57,7 @@ Types: `uuid`, `text`, `timestamptz`, `date`, `double precision`, `integer`, `bo
 
 ### 4.1 Places
 
-*In place* for `place_categories`, `place_types`, `places.place_type_id`, `publication_status`, `merged_into_place_id`, `place_source_ids`, and `conservation_area_details` since task 04 (`20261112100000_types_and_details.sql`). Since task 09 (`20261120100000_recognitions.sql`, `20261120110000_recognition_places.sql`) the category `recognition` and its six types, `world_heritage_site`, `ramsar_site`, `biosphere_reserve`, `natura_2000_site`, `emerald_site`, and `other_recognition`, and `recognition_details` are *in place*. Which WDPCA designations are recognitions is record 21. `recognition_type_for_designation()` is the only place that list is written, and `move_recognition_places()` moved those places out of the conservation areas, keeping their ids, boundaries, source ids, and stats. `places.submitted_by` and `place_source_ids.matched_by` come with `profiles` in [Molding Places](../parcels/molding-places.md). `old_growth_details` comes with its records. `designation_type` is set from WDPCA `DESIG_TYPE`, and `recognition_details.criteria` from `INT_CRIT`, by `import_wdpa.py attributes` (task 09). The WDPCA fields not yet imported (`protection_kind`, `legal_status`, `status_year`, `governance_type`, `source_attributes`) stay null until the next import. A conservation area place is one WDPCA parcel (record 20). Task 05 merged the parcels of each multi-parcel site, and task 05a undid it (`unmerge_wdpa_site_parcels()`). A `proposed` `wdpa_site_id` row marks a site whose parcels a person has not yet decided to merge or keep apart. Since task 06 (`20261117100000_merge_wdpa_site.sql`) a person decides with `keep_wdpa_site_apart(site_id)` or `merge_wdpa_site(site_id, name)`. Both confirm the site row. On a site with several published places, a confirmed `wdpa_site_id` means a person kept them apart. `merge_wdpa_site` keeps the place holding the site row, gives it the union of the parcels as its next boundary version, and sets the others to `merged`. `place_merged_into(id)` returns the published place a merged place went to, so its old address still opens. The 74 sites were decided on 11 November 2026 (`20261117110000_wdpa_site_decisions.sql`). There is no unmerge function yet. Each merged parcel's superseded boundary keeps its SITE_PID. The importer's reconciliation report (record 4) is *in place* since task 05b (`supabase/import_wdpa.py reconcile`). The importer writes only when every record is `unchanged` or `reshaped`. Its writes for the other classes come with the first release or review that needs them.
+*In place* for `place_categories`, `place_types`, `places.place_type_id`, `publication_status`, `merged_into_place_id`, `place_source_ids`, and `conservation_area_details` since task 04 (`20261112100000_types_and_details.sql`). Since task 09 (`20261120100000_recognitions.sql`, `20261120110000_recognition_places.sql`) the category `recognition` and its six types, `world_heritage_site`, `ramsar_site`, `biosphere_reserve`, `natura_2000_site`, `emerald_site`, and `other_recognition`, and `recognition_details` are *in place*. Which WDPCA designations are recognitions is record 21. `recognition_type_for_designation()` is the only place that list is written, and `move_recognition_places()` moved those places out of the conservation areas, keeping their ids, boundaries, source ids, and stats. `places.submitted_by` comes with contributors, deferred in [Molding Places](../parcels/molding-places.md). `place_source_ids.matched_by` comes with `confirm_source_match` in [Shaping Boundaries](../parcels/shaping-boundaries.md). `old_growth_details` comes with its records. `designation_type` is set from WDPCA `DESIG_TYPE`, and `recognition_details.criteria` from `INT_CRIT`, by `import_wdpa.py attributes` (task 09). The WDPCA fields not yet imported (`protection_kind`, `legal_status`, `status_year`, `governance_type`, `source_attributes`) stay null until the next import. A conservation area place is one WDPCA parcel (record 20). Task 05 merged the parcels of each multi-parcel site, and task 05a undid it (`unmerge_wdpa_site_parcels()`). A `proposed` `wdpa_site_id` row marks a site whose parcels a person has not yet decided to merge or keep apart. Since task 06 (`20261117100000_merge_wdpa_site.sql`) a person decides with `keep_wdpa_site_apart(site_id)` or `merge_wdpa_site(site_id, name)`. Both confirm the site row. On a site with several published places, a confirmed `wdpa_site_id` means a person kept them apart. `merge_wdpa_site` keeps the place holding the site row, gives it the union of the parcels as its next boundary version, and sets the others to `merged`. `place_merged_into(id)` returns the published place a merged place went to, so its old address still opens. The 74 sites were decided on 11 November 2026 (`20261117110000_wdpa_site_decisions.sql`). There is no unmerge function yet. Each merged parcel's superseded boundary keeps its SITE_PID. The importer's reconciliation report (record 4) is *in place* since task 05b (`supabase/import_wdpa.py reconcile`). The importer writes only when every record is `unchanged` or `reshaped`. Its writes for the other classes come with the first release or review that needs them.
 
 **`place_categories`** — lookup.
 
@@ -140,7 +140,7 @@ A trigger on each details table checks that the place's type has the matching `d
 
 ### 4.2 Boundaries and quality
 
-*In place* for `place_boundaries` since task 05 (`20261113100000_place_boundaries.sql`, `20261113110000_boundaries_readers.sql`). Each place has one current, approved boundary: its parcel's geometry. Task 05 gave each site a version 1 boundary. Task 05a superseded the 74 site unions with each parcel's own shape, as version 2 on the kept place and version 1 on the others. `qc_status`, the `stats_eligibility` columns, `set_stats_eligibility`, `boundary_checks`, and `stats_eligible_boundaries` come with the parcel that resumes Stats, which is their first reader. Task 06 deferred them on 11 November 2026. `submitted_by`, `reviewed_by`, and `stats_eligibility_set_by` come with `profiles` in [Molding Places](../parcels/molding-places.md). `approve_boundary` and `submit_boundary` come with the admin and contributor work. No separate `(place_id)` index: the version key and the unique current index both lead with `place_id`. The contract step is *done* since task 08 (`20261119100000_drop_old_reads.sql`): `places.geom`, `places.area_km2`, the bbox columns on `places`, their trigger and index, and the one-off backfill and merge functions of tasks 05 and 05a are dropped. `places` holds no geometry.
+*In place* for `place_boundaries` since task 05 (`20261113100000_place_boundaries.sql`, `20261113110000_boundaries_readers.sql`). Each place has one current, approved boundary: its parcel's geometry. Task 05 gave each site a version 1 boundary. Task 05a superseded the 74 site unions with each parcel's own shape, as version 2 on the kept place and version 1 on the others. `qc_status`, the `stats_eligibility` columns, `set_stats_eligibility`, `boundary_checks`, and `stats_eligible_boundaries` come with [Shaping Boundaries](../parcels/shaping-boundaries.md), whose review screens write them. Task 06 deferred them on 11 November 2026, and on 13 November 2026 they moved there from the parcel that resumes Stats. `submitted_by`, `reviewed_by`, `stats_eligibility_set_by`, `approve_boundary`, and `submit_boundary` come with [Shaping Boundaries](../parcels/shaping-boundaries.md) too. No separate `(place_id)` index: the version key and the unique current index both lead with `place_id`. The contract step is *done* since task 08 (`20261119100000_drop_old_reads.sql`): `places.geom`, `places.area_km2`, the bbox columns on `places`, their trigger and index, and the one-off backfill and merge functions of tasks 05 and 05a are dropped. `places` holds no geometry.
 
 **`place_boundaries`**
 
@@ -267,7 +267,7 @@ Examples: a WDPCA boundary fills all four. A boundary from a paper has a publica
 
 ### 4.4 Stats
 
-*In place* since task 07 (`20261118100000_stats.sql`, `20261118110000_stats_backfill.sql`) for `stats`, `stat_methods`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. The 941 cropland facts are 2,823 `place_stats` rows of one run, on each place's version 1 boundary. `place_stats` is append-only by grant: `service_role` can select and insert only. A trigger refuses a boundary of another place. `stat_run_issues` comes with the parcel that resumes Stats, its first writer. `stat_selections.selected_by` comes with `profiles` in [Molding Places](../parcels/molding-places.md). Task 08 dropped `facts` and `backfill_place_stats_from_facts()` after checking every fact was stored as the same three `place_stats`. The place profile reads `place_stats_preferred`.
+*In place* since task 07 (`20261118100000_stats.sql`, `20261118110000_stats_backfill.sql`) for `stats`, `stat_methods`, `sprouts`, `stat_runs`, `place_stats`, `stat_selections`, and `place_stats_preferred`. The 941 cropland facts are 2,823 `place_stats` rows of one run, on each place's version 1 boundary. `place_stats` is append-only by grant: `service_role` can select and insert only. A trigger refuses a boundary of another place. `stat_run_issues` comes with the parcel that resumes Stats, its first writer. `stat_selections.selected_by` comes with the first screen that changes a selection. Task 08 dropped `facts` and `backfill_place_stats_from_facts()` after checking every fact was stored as the same three `place_stats`. The place profile reads `place_stats_preferred`.
 
 **`stats`** — what is measured.
 
@@ -417,6 +417,8 @@ Spatial overlap is found on demand by an admin-only function, `place_overlaps(pl
 
 ### 4.6 People, images, audit
 
+*Proposed.* [Molding Places](../parcels/molding-places.md) adds these tables, each with the task whose screen uses it first: `profiles`, `user_roles`, and `audit_log` in task 01, `place_curations` in task 02, `images` and `place_images` in task 04, and `place_tagline_suggestions` in task 06. Only admins sign in at first. Contributor policies come with contributors.
+
 **`profiles`**: `id` uuid PK, FK → `auth.users` `on delete cascade`, `display_name`. References to a profile from review columns use `on delete set null`, so a deleted account leaves "former user".
 
 **`user_roles`**: `user_id` FK → `profiles`, `role` CHECK in `contributor`, `editor`, `admin`. PK `(user_id, role)`. The helper `has_role(role text)` is `security definer` and `stable`.
@@ -454,7 +456,34 @@ Supabase Auth does all sign-in. There are no password, session, or identity tabl
 
 `species_images` will have the same shape.
 
-**`audit_log`**: `id` bigint identity, `table_name`, `row_id`, `action`, `actor` (from `auth.uid()`), `changed_at`, `old_values` jsonb, `new_values` jsonb. Filled by trigger on `places`, `place_boundaries` (without `geom`), `place_source_ids`, `place_relationships`, `place_images`, `user_roles`, `stat_selections`. Not on `place_stats` or `boundary_checks`, which are append-only already.
+**`place_curations`** — curated values that the app shows in place of the source values (record 22). One row per place. Every value column is nullable, and null means the source value is shown.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `place_id` | uuid PK, FK → `places` | |
+| `display_name` | text, null | Shown instead of `places.name`. Search still finds the source name. |
+| `tagline` | text, null | One line: a memorable, unique fact about the place |
+| `description` | text, null | |
+| `designation` | text, null | Shown instead of the details table's `designation` |
+| `iso3` | text[], null | Shown instead of the details table's `iso3` |
+| `updated_by` | uuid FK → `profiles`, null | `on delete set null` |
+
+**`place_tagline_suggestions`** — taglines drafted by a pipeline, waiting for review (record 23).
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid PK | |
+| `place_id` | uuid FK → `places` | |
+| `text` | text | |
+| `source_url` | text | The page the tagline is drawn from |
+| `quoted_support` | text | The sentence from that page that supports it |
+| `suggested_by_pipeline` | text | Pipeline name, version, and model |
+| `status` | text | CHECK in `suggested`, `approved`, `rejected` |
+| `reviewed_by`, `reviewed_at` | | |
+
+Approving copies the text, as the reviewer edited it, into `place_curations.tagline`.
+
+**`audit_log`**: `id` bigint identity, `table_name`, `row_id`, `action`, `actor` (from `auth.uid()`), `changed_at`, `old_values` jsonb, `new_values` jsonb. Filled by trigger on `places`, `place_curations`, `place_boundaries` (without `geom`), `place_source_ids`, `place_relationships`, `place_images`, `place_tagline_suggestions`, `user_roles`, `stat_selections`. Each trigger is added with the first screen that edits its table. Not on `place_stats` or `boundary_checks`, which are append-only already.
 
 ## 5. Diagrams
 

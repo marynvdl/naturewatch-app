@@ -303,3 +303,40 @@ On 12 November 2026 that was 11,480 of 50,937 published places: 207, 1,087, 220,
 **Cost.**
 - A designation text that a later release adds or spells differently stays a conservation area until the list is extended.
 - The Protected areas list no longer shows recognitions. They come back as their own layer and Places buttons in task 09b.
+
+## 22. Curated values are overrides, not edits to source columns
+
+*Decided 13 November 2026 by the user, when defining [Molding Places](../parcels/molding-places.md).*
+
+**Decision.** A curated display name, tagline, description, designation, or country list is stored in `place_curations`, one row per place. `places.name` and the details tables keep what the source says. The public reads show the curated value when it is set, and the source value otherwise.
+
+**Why.**
+- The source data and its attribution stay as imported.
+- A new WDPCA release can update the source columns without overwriting a person's edit, so the importer needs no rule about which fields to skip.
+- Clearing a curated value goes back to the source value.
+- `audit_log` records each change with who made it.
+
+**Alternatives.** Writing edits into the source columns, with `audit_log` keeping the old values. The reads are simpler, but every import would have to know which fields a person changed.
+
+**Cost.** The reads join one more table. A curated value can go stale when the source changes, and nothing flags that yet.
+
+## 23. Suggestions are rows a person approves
+
+*Decided 13 November 2026 by the user, when defining [Molding Places](../parcels/molding-places.md).*
+
+**Decision.** Pipelines suggest photographs and taglines. They never publish them.
+- A suggested photograph is an `images` row with a `place_images` link in status `suggested`. Photographs come only from Wikimedia Commons, and only under a licence in `licences`.
+- A suggested tagline is a `place_tagline_suggestions` row. It is drafted by Claude only from the place's Wikipedia text. It stores that page's URL and the sentence that supports it. A place without a Wikipedia article gets no suggestion.
+- An admin approves, edits, or rejects each suggestion.
+- The first runs cover the published World Heritage Sites only.
+
+**Why.**
+- A tagline makes claims such as "largest" or "first", and an ungrounded model invents them.
+- The supporting sentence lets a reviewer check a claim in seconds.
+- Keeping suggestions in the same tables as approved items, with a status, means approving one does not move rows (record 14).
+- A small first batch tests the quality and the cost before larger runs.
+
+**Alternatives.**
+- Drafting taglines from the name and designation alone. This covers more places, but makes invented superlatives likely.
+- Using the Wikipedia short description verbatim. It is free, but rarely memorable.
+- A generic suggestions table for every field. Each workflow keeps its own review instead (record 16).
