@@ -57,6 +57,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
 - `species_images`, with Indicator Species.
 - The `*_by` columns in design.md that no screen writes yet.
 - Flagging a curated value whose source value changed in a new release.
+- `frontend/naturewatch/tsconfig.app.json`: replace `"moduleResolution": "node"` with `"bundler"` and drop `baseUrl`, which TypeScript 6 flags as deprecated. One `chore/` branch, outside this parcel's tasks.
 
 ## Done when
 
