@@ -35,7 +35,7 @@ The tables are in [design.md §4.6](../database/design.md#46-people-images-audit
 
 Do one task at a time, in this order. Each task is one branch and one pull request. Task files are written when a task starts. A task that changes the hosted database, or runs a paid pipeline, waits for approval of its row counts and cost.
 
-- [ ] Task 01 — Sign-in, roles, audit — naturewatch-app
+- [ ] [Task 01 — Sign-in, roles, audit](../tasks/task-01-sign-in-roles-audit.md) — naturewatch-app
   - *Goal:* Add `profiles`, `user_roles`, `has_role()`, and `audit_log`. Sign in by email magic link from the app bar, with the session in a Pinia store. Show an Edit/View toggle to admins only. Set the Supabase Auth site URL and the redirect URLs for local development and both Fly apps. Grant the user `admin` with a one-off statement, not a migration, so no email or user id is committed.
 - [ ] Task 02 — Curated text — naturewatch-app
   - *Goal:* Add `place_curations` and `curate_place`. `place_summaries` and `listed_places` show the curated values, and search still finds the source name. In edit mode the profile edits the display name, tagline, description, designation, and countries in place, shows the source value beside each, and can reset a field to it. In view mode the tagline shows under the title, and the description shows in Overview.
