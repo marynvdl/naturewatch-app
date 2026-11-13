@@ -45,6 +45,7 @@ vi.mock('@/places/api', () => ({
   loadPilotPlaceRank: vi.fn(),
   loadPlaceRelease: vi.fn(),
   PLACE_LIST_LIMIT: 50,
+  PLACE_TYPE: 'conservation_area',
 }));
 
 const places = [
@@ -226,6 +227,77 @@ describe('Places panel', () => {
       'is-on'
     );
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows recognition buttons that list and draw one type, size only', async () => {
+    const wrapper = mountPlaces();
+    const store = usePlacesStore();
+    await flushPromises();
+
+    await typeButton(wrapper, 'Protected areas').trigger('click');
+    await flushPromises();
+    expect(store.listType).toBe('conservation_area');
+    store.applyFilter([2000, null], [1, 50]);
+    await flushPromises();
+
+    await typeButton(wrapper, 'Recognitions').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[aria-label="Recognition types"]').exists()).toBe(
+      true
+    );
+    expect(wrapper.findAll('button.place-result')).toHaveLength(0);
+    expect(store.visible).toBe(false);
+    expect(store.listType).toBeNull();
+
+    vi.mocked(loadPilotPlaceWindow).mockClear();
+    await typeButton(wrapper, 'Ramsar').trigger('click');
+    await flushPromises();
+    expect(store.visible).toBe(true);
+    expect(store.listType).toBe('ramsar_site');
+    expect(store.listingRecognitions).toBe(true);
+    // A new type starts unfiltered
+    expect(store.filtering).toBe(false);
+    expect(loadPilotPlaceFilterStats).toHaveBeenLastCalledWith('ramsar_site');
+    expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        placeType: 'ramsar_site',
+        cropMin: 0,
+        cropMax: 100,
+      }),
+      expect.any(AbortSignal)
+    );
+    expect(wrapper.findAll('button.place-result').length).toBeGreaterThan(0);
+
+    await typeButton(wrapper, 'Ramsar').trigger('click');
+    await flushPromises();
+    expect(store.visible).toBe(false);
+    expect(store.listType).toBeNull();
+
+    await typeButton(wrapper, 'Recognitions').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[aria-label="Recognition types"]').exists()).toBe(
+      false
+    );
+  });
+
+  it('offers no cropland sorts for a recognition list', async () => {
+    const wrapper = mountPlaces(true);
+    await flushPromises();
+    await typeButton(wrapper, 'Recognitions').trigger('click');
+    await typeButton(wrapper, 'World Heritage').trigger('click');
+    await flushPromises();
+
+    await wrapper.get('button[aria-label^="Sort places"]').trigger('click');
+    await flushPromises();
+    const options = [
+      ...document.body.querySelectorAll('.places-sort-option'),
+    ].map(option => option.textContent?.trim());
+    expect(options).toEqual([
+      'Name',
+      'Size, largest first',
+      'Size, smallest first',
+    ]);
+    wrapper.unmount();
   });
 
   it('shows a place outside South Africa by its English country name', async () => {

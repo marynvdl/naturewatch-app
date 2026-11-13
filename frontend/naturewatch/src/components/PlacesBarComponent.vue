@@ -21,10 +21,13 @@ import {
   type PlaceSummary,
   type PlaceWindowQuery,
   PLACE_LIST_LIMIT,
+  PLACE_TYPE,
 } from '@/places/api';
 import {
+  RECOGNITION_BUTTONS,
   countryName,
   formatAreaTag,
+  type RecognitionButtonType,
   type FigureRange,
   type PlaceSort,
 } from '@/places/display';
@@ -32,15 +35,42 @@ import usePlacesStore from '@/store/PlacesStore';
 
 const placesStore = usePlacesStore();
 
-type PlaceTypeId = 'protected_area' | 'ecoregion' | 'country';
+type PlaceTypeId = 'protected_area' | 'recognition' | 'ecoregion' | 'country';
 
 const placeTypes: { id: PlaceTypeId; label: string }[] = [
   { id: 'protected_area', label: 'Protected areas' },
+  { id: 'recognition', label: 'Recognitions' },
   { id: 'ecoregion', label: 'Ecoregions' },
   { id: 'country', label: 'Countries' },
 ];
 
 const placeType = ref<PlaceTypeId | null>(null);
+/** The recognition button selected in the second row. */
+const recognitionType = ref<RecognitionButtonType | null>(null);
+/** The stored place type listed and drawn, or null when none is. */
+const listedType = computed<string | null>(() => {
+  if (placeType.value === 'protected_area') return PLACE_TYPE;
+  if (placeType.value === 'recognition') return recognitionType.value;
+  return null;
+});
+/** The listed type the size and cropland filter was last applied to. */
+let filteredType: string | null = null;
+
+watch(
+  listedType,
+  type => {
+    placesStore.listType = type;
+    if (type === null) return;
+    // The filter ranges belong to one type, so a new type starts unfiltered
+    if (filteredType !== null && filteredType !== type) {
+      placesStore.clearFilter();
+      if (placesStore.listingRecognitions && sort.value.startsWith('cropland'))
+        sort.value = 'size-desc';
+    }
+    filteredType = type;
+  },
+  { flush: 'sync' }
+);
 const listStatus = ref<'idle' | 'loading' | 'ok' | 'unconfigured' | 'error'>(
   'idle'
 );
@@ -50,7 +80,8 @@ const places = ref<PlaceSummary[]>([]);
 const windowStart = ref(0);
 const matchTotal = ref(0);
 const storedCount = ref(0);
-const statsReady = ref(false);
+/** The place type whose filter charts are loaded. */
+const statsType = ref<string | null>(null);
 const sizeFull = ref<FigureRange>([1, 1]);
 const sizeBins = ref<number[]>([]);
 const croplandBins = ref<number[]>([]);
@@ -84,13 +115,19 @@ const needle = computed(() => query.value.trim());
 const searchingAll = computed(
   () => placeType.value === null && needle.value.length > 0
 );
-const sortOptions: { id: PlaceSort; label: string }[] = [
+const allSortOptions: { id: PlaceSort; label: string }[] = [
   { id: 'name', label: 'Name' },
   { id: 'size-desc', label: 'Size, largest first' },
   { id: 'size-asc', label: 'Size, smallest first' },
   { id: 'cropland-desc', label: 'Cropland %, highest first' },
   { id: 'cropland-asc', label: 'Cropland %, lowest first' },
 ];
+/** Recognition lists sort by name and size only. */
+const sortOptions = computed(() =>
+  placesStore.listingRecognitions
+    ? allSortOptions.filter(option => !option.id.startsWith('cropland'))
+    : allSortOptions
+);
 const sort = ref<PlaceSort>('size-desc');
 const sortOpen = ref(false);
 const filterOpen = ref(false);
@@ -102,7 +139,7 @@ watch(filterOpen, async open => {
   filterButton.value?.focus();
 });
 const sortLabel = computed(
-  () => sortOptions.find(option => option.id === sort.value)?.label ?? ''
+  () => sortOptions.value.find(option => option.id === sort.value)?.label ?? ''
 );
 
 /**
@@ -125,7 +162,8 @@ const emptyMessage = computed(() =>
     ? nothingStored
     : 'No places match.'
 );
-const showProtected = computed(() => placeType.value === 'protected_area');
+/** Whether a place type with stored places is listed. */
+const showProtected = computed(() => listedType.value !== null);
 const showTools = computed(
   () =>
     showProtected.value &&
@@ -155,10 +193,13 @@ function listQuery(offset = 0): PlaceWindowQuery {
     sort: sort.value,
     sizeMin: placesStore.sizeKept[0],
     sizeMax: placesStore.sizeKept[1],
-    cropMin: placesStore.croplandKept[0],
-    cropMax: placesStore.croplandKept[1],
+    cropMin: placesStore.listingRecognitions ? 0 : placesStore.croplandKept[0],
+    cropMax: placesStore.listingRecognitions
+      ? 100
+      : placesStore.croplandKept[1],
     extent: listExtent.value,
     offset,
+    placeType: listedType.value ?? PLACE_TYPE,
   };
 }
 
@@ -200,12 +241,13 @@ function hideBoundaries() {
   if (placesStore.visible) placesStore.toggle();
 }
 
-/** Load the stored size range and chart counts once. */
+/** Load the stored size range and chart counts once per listed type. */
 async function ensureStats() {
-  if (statsReady.value) return;
-  const result = await loadPilotPlaceFilterStats();
-  if (result.status !== 'ok') return;
-  statsReady.value = true;
+  const type = listedType.value;
+  if (!type || statsType.value === type) return;
+  const result = await loadPilotPlaceFilterStats(type);
+  if (result.status !== 'ok' || listedType.value !== type) return;
+  statsType.value = type;
   storedCount.value = result.stats.placeCount;
   sizeFull.value = result.stats.sizeFull;
   sizeBins.value = result.stats.sizeBins;
@@ -354,7 +396,7 @@ function scheduleList() {
 watch(
   () =>
     [
-      placeType.value,
+      listedType.value,
       needle.value,
       searchingAll.value,
       sort.value,
@@ -383,6 +425,7 @@ watch(
 /** Return to the panel with no list and no drawn boundaries. */
 function clearPlaces() {
   placeType.value = null;
+  recognitionType.value = null;
   listInView.value = false;
   placesStore.clearSelection();
   hideBoundaries();
@@ -390,7 +433,8 @@ function clearPlaces() {
 
 /**
  * Select a place type, or clear it when that type is already selected.
- * Protected areas draws the stored boundaries. The other types have none.
+ * Protected areas draws the stored boundaries. Recognitions shows its own
+ * buttons and draws nothing until one is chosen. The other types have none.
  */
 function selectPlaceType(type: PlaceTypeId) {
   if (placeType.value === type) {
@@ -398,12 +442,28 @@ function selectPlaceType(type: PlaceTypeId) {
     return;
   }
   placeType.value = type;
+  recognitionType.value = null;
   placesStore.clearSelection();
   if (type === 'protected_area') {
     showBoundaries();
     return;
   }
   hideBoundaries();
+}
+
+/**
+ * List and draw one recognition type, or clear it when it is already selected.
+ * @param type - The recognition type.
+ */
+function selectRecognitionType(type: RecognitionButtonType) {
+  placesStore.clearSelection();
+  if (recognitionType.value === type) {
+    recognitionType.value = null;
+    hideBoundaries();
+    return;
+  }
+  recognitionType.value = type;
+  showBoundaries();
 }
 
 watch(
@@ -481,6 +541,24 @@ watch(
           :class="{ 'is-on': placeType === type.id }"
           :aria-pressed="placeType === type.id"
           @click="selectPlaceType(type.id)"
+        >
+          {{ type.label }}
+        </button>
+      </div>
+      <div
+        v-if="placeType === 'recognition'"
+        class="places-types places-subtypes"
+        role="group"
+        aria-label="Recognition types"
+      >
+        <button
+          v-for="type in RECOGNITION_BUTTONS"
+          :key="type.id"
+          type="button"
+          class="place-type map-control"
+          :class="{ 'is-on': recognitionType === type.id }"
+          :aria-pressed="recognitionType === type.id"
+          @click="selectRecognitionType(type.id)"
         >
           {{ type.label }}
         </button>
@@ -578,13 +656,18 @@ watch(
             :search-prefix="searchingAll"
             :extent="listExtent"
             :matched-total="matchTotal"
+            :place-type="listedType ?? PLACE_TYPE"
+            :size-only="placesStore.listingRecognitions"
           />
         </div>
-        <div v-if="placeType && !showProtected" class="places-list">
+        <div
+          v-if="placeType && placeType !== 'recognition' && !showProtected"
+          class="places-list"
+        >
           <p class="places-status">{{ nothingStored }}</p>
         </div>
         <div
-          v-else-if="listStatus === 'ok'"
+          v-else-if="showNames && listStatus === 'ok'"
           ref="resultsList"
           class="places-list"
         >

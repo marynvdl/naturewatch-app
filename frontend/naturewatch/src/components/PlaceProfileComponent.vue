@@ -2,9 +2,15 @@
 import { computed, ref, watch } from 'vue';
 import { LocateFixed, X } from '@lucide/vue';
 import PlacePhotos from '@/components/PlacePhotos.vue';
-import { loadPilotPlace, type PlaceDetail } from '@/places/api';
+import {
+  loadPilotPlace,
+  loadPlaceRecognitions,
+  type PlaceDetail,
+  type PlaceRecognition,
+} from '@/places/api';
 import {
   CROPLAND_NOT_CALCULATED,
+  recognitionColour,
   SPECIES_NOTHING_YET,
   countryName,
   formatAreaTag,
@@ -29,6 +35,8 @@ const emit = defineEmits<{
   zoom: [];
   /** The place was merged into another. Its id is the one shown. */
   moved: [id: string];
+  /** A recognition badge was chosen. Open that recognition. */
+  open: [id: string];
 }>();
 
 type TabId = 'overview' | 'landscape' | 'species';
@@ -43,6 +51,8 @@ const status = ref<'loading' | 'ok' | 'missing' | 'unconfigured' | 'error'>(
   'loading'
 );
 const place = ref<PlaceDetail | null>(null);
+/** Confirmed recognitions of the place. A recognition has none. */
+const recognitions = ref<PlaceRecognition[]>([]);
 const activeTab = ref<TabId>('overview');
 const tabButtons = ref<HTMLButtonElement[]>([]);
 
@@ -60,13 +70,20 @@ const source = computed(() => place.value?.citation ?? '');
 async function load(id: string) {
   status.value = 'loading';
   place.value = null;
+  recognitions.value = [];
   activeTab.value = 'overview';
   const result = await loadPilotPlace(id);
   if (id !== props.placeId) return;
   status.value = result.status;
   if (result.status !== 'ok') return;
   place.value = result.place;
-  if (result.place.id !== id) emit('moved', result.place.id);
+  if (result.place.id !== id) {
+    emit('moved', result.place.id);
+    return;
+  }
+  const recognised = await loadPlaceRecognitions(id);
+  if (id !== props.placeId || recognised.status !== 'ok') return;
+  recognitions.value = recognised.recognitions;
 }
 
 watch(() => props.placeId, load, { immediate: true });
@@ -97,6 +114,28 @@ function onTabKey(event: KeyboardEvent, index: number) {
 
     <div class="place-body">
       <h2 class="place-title panel-heading">{{ title }}</h2>
+      <ul
+        v-if="recognitions.length"
+        class="place-recognitions"
+        aria-label="Recognised as"
+      >
+        <li v-for="recognition in recognitions" :key="recognition.id">
+          <button
+            type="button"
+            class="place-recognition"
+            @click="$emit('open', recognition.id)"
+          >
+            <span
+              class="place-recognition-dot"
+              :style="{
+                backgroundColor: recognitionColour(recognition.placeTypeId),
+              }"
+              aria-hidden="true"
+            />
+            {{ recognition.name }}
+          </button>
+        </li>
+      </ul>
       <div class="place-meta">
         <p class="place-subtitle">{{ subtitle }}</p>
         <p v-if="place?.areaKm2 != null" class="place-area">
@@ -243,6 +282,49 @@ function onTabKey(event: KeyboardEvent, index: number) {
   font-size: 28px;
   line-height: 1.1;
   overflow-wrap: anywhere;
+}
+
+.place-recognitions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-recognition {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--map-control-radius);
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.place-recognition:hover {
+  background: var(--muted, #ece9e0);
+}
+
+.place-recognition:focus-visible {
+  outline: 2px solid var(--foreground, #24312c);
+  outline-offset: 2px;
+}
+
+.place-recognition-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
 
 .place-meta {

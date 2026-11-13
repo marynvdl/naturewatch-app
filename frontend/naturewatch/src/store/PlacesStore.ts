@@ -5,6 +5,7 @@ import {
   CROPLAND_FULL,
   PROTECTED_AREA_ATTRIBUTION,
   formatReleaseMonth,
+  isRecognitionButtonType,
   placeTileFilter,
   type FigureRange,
   type LngLatBounds,
@@ -24,6 +25,15 @@ const usePlacesStore = defineStore('places', () => {
   const notice = ref('');
   const selectedId = ref<string | null>(null);
   const selectedFrom = ref<'list' | 'map' | null>(null);
+  /**
+   * Stored place type the list shows and the map draws: `conservation_area`,
+   * one of the recognition button types, or null.
+   */
+  const listType = ref<string | null>(null);
+  /** Whether a recognition type is listed, so the tools are size only. */
+  const listingRecognitions = computed(() =>
+    isRecognitionButtonType(listType.value)
+  );
   /** Applied size filter, in km². */
   const sizeKept = ref<SizeBounds>([null, null]);
   /** Applied cropland filter, in percent. */
@@ -39,7 +49,10 @@ const usePlacesStore = defineStore('places', () => {
   );
   /** Tile filter for the applied size and cropland ranges. */
   const tileFilter = computed(() =>
-    placeTileFilter(sizeKept.value, croplandKept.value)
+    placeTileFilter(
+      sizeKept.value,
+      listingRecognitions.value ? CROPLAND_FULL : croplandKept.value
+    )
   );
 
   /**
@@ -110,6 +123,8 @@ const usePlacesStore = defineStore('places', () => {
     notice,
     selectedId,
     selectedFrom,
+    listType,
+    listingRecognitions,
     sizeKept,
     croplandKept,
     viewBounds,

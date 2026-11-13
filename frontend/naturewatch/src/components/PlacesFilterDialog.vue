@@ -28,22 +28,29 @@ import {
 } from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
 
-const props = defineProps<{
-  /** Smallest and largest stored size. */
-  sizeFull: FigureRange;
-  /** Stored size histogram, 40 bins on a log scale. */
-  sizeBins: number[];
-  /** Stored cropland histogram, 40 bins from 0 to 100. */
-  croplandBins: number[];
-  /** Text typed in the list. */
-  search: string;
-  /** True when the list matches a name prefix. */
-  searchPrefix: boolean;
-  /** Map view while In view is on. */
-  extent: LngLatBounds | null;
-  /** Matching places for the applied filter. */
-  matchedTotal: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** Smallest and largest stored size. */
+    sizeFull: FigureRange;
+    /** Stored size histogram, 40 bins on a log scale. */
+    sizeBins: number[];
+    /** Stored cropland histogram, 40 bins from 0 to 100. */
+    croplandBins: number[];
+    /** Text typed in the list. */
+    search: string;
+    /** True when the list matches a name prefix. */
+    searchPrefix: boolean;
+    /** Map view while In view is on. */
+    extent: LngLatBounds | null;
+    /** Matching places for the applied filter. */
+    matchedTotal: number;
+    /** Stored place type the list shows. */
+    placeType?: string;
+    /** Leave out the cropland range, for recognitions. */
+    sizeOnly?: boolean;
+  }>(),
+  { placeType: undefined, sizeOnly: false }
+);
 
 const open = defineModel<boolean>('open', { required: true });
 
@@ -208,6 +215,7 @@ watch(
       cropMin: croplandKept.value[0],
       cropMax: croplandKept.value[1],
       extent: props.extent,
+      placeType: props.placeType,
     });
     if (request !== countRequest) return;
     if (result.status === 'ok') keptCount.value = result.total;
@@ -242,8 +250,11 @@ function apply() {
           </DialogClose>
         </header>
         <DialogDescription class="filter-sr">
-          Keep the protected areas within a size and cropland range. The list
-          and the map follow.
+          {{
+            sizeOnly
+              ? 'Keep the places within a size range. The list and the map follow.'
+              : 'Keep the protected areas within a size and cropland range. The list and the map follow.'
+          }}
         </DialogDescription>
         <div class="filter-body">
           <section class="filter-section" aria-labelledby="filter-size-title">
@@ -296,6 +307,7 @@ function apply() {
             </div>
           </section>
           <section
+            v-if="!sizeOnly"
             class="filter-section"
             aria-labelledby="filter-cropland-title"
           >

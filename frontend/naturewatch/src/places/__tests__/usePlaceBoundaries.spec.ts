@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { shallowRef } from 'vue';
 import {
   PLACE_TILES_URL,
+  RECOGNITION_TILES_URL,
   loadPlaceBounds,
   loadPlaceRelease,
 } from '@/places/api';
@@ -41,6 +42,7 @@ class FakeMap {
   easeTo = vi.fn();
   setFilter = vi.fn();
   setPaintProperty = vi.fn();
+  setLayoutProperty = vi.fn();
   isStyleLoaded() {
     return true;
   }
@@ -216,6 +218,105 @@ describe('place boundaries from tiles', () => {
       'places-line',
       'line-color',
       '#f4f1e8'
+    );
+  });
+
+  it('draws recognition outlines only while a recognition type is listed', async () => {
+    const { map, store } = await drawPlaces();
+
+    expect(map.getSource('recognitions-tiles')).toEqual({
+      type: 'vector',
+      url: RECOGNITION_TILES_URL,
+    });
+    expect(map.getLayer('recognitions-line')).toMatchObject({
+      'source-layer': 'recognitions',
+    });
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'recognitions-line',
+      'visibility',
+      'none'
+    );
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'places-fill',
+      'visibility',
+      'visible'
+    );
+
+    map.setLayoutProperty.mockClear();
+    store.listType = 'ramsar_site';
+    store.applyFilter([100, null], [5, 50]);
+    await flushPromises();
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'places-fill',
+      'visibility',
+      'none'
+    );
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'recognitions-line',
+      'visibility',
+      'visible'
+    );
+    // Size only: the recognitions archive has no cropland field
+    expect(map.setFilter).toHaveBeenLastCalledWith('recognitions-line', [
+      'all',
+      ['==', ['get', 'place_type_id'], 'ramsar_site'],
+      ['all', ['>=', ['to-number', ['get', 'area_km2'], -1], 100]],
+    ]);
+  });
+
+  it('opens a clicked recognition and highlights it from its archive', async () => {
+    const { map, store } = await drawPlaces();
+    store.listType = 'world_heritage_site';
+    await flushPromises();
+
+    map.fire('click', 'recognitions-fill', {
+      features: [{ properties: { id: outsideWindow } }],
+    });
+    expect(store.selectedId).toBe(outsideWindow);
+    await flushPromises();
+    expect(map.setFilter).toHaveBeenCalledWith('recognitions-select-line', [
+      '==',
+      ['get', 'id'],
+      outsideWindow,
+    ]);
+  });
+
+  it('colours recognitions by group and lightens them on satellite', async () => {
+    const { map } = await drawPlaces();
+    const colour = [
+      'match',
+      ['get', 'place_type_id'],
+      'world_heritage_site',
+      '#a8730f',
+      'ramsar_site',
+      '#1f6f9a',
+      'biosphere_reserve',
+      '#7a4a9c',
+      '#7d7a72',
+    ];
+    expect(map.getLayer('recognitions-line')).toMatchObject({
+      paint: { 'line-color': colour },
+    });
+    expect(map.getLayer('recognitions-fill')).toMatchObject({
+      paint: { 'fill-opacity': 0 },
+    });
+
+    useBasemapStore().toggleBasemap();
+    await flushPromises();
+    expect(map.setPaintProperty).toHaveBeenCalledWith(
+      'recognitions-line',
+      'line-color',
+      [
+        'match',
+        ['get', 'place_type_id'],
+        'world_heritage_site',
+        '#f2c14e',
+        'ramsar_site',
+        '#8fd3f4',
+        'biosphere_reserve',
+        '#d9b3f5',
+        '#d8d5cc',
+      ]
     );
   });
 

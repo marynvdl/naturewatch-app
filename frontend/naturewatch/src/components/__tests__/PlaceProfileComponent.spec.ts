@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
-import { loadPilotPlace, type PlaceDetail } from '@/places/api';
+import {
+  loadPilotPlace,
+  loadPlaceRecognitions,
+  type PlaceDetail,
+} from '@/places/api';
 import { PHOTOS_NONE } from '@/places/photos';
 
 vi.mock('@/places/api', () => ({
   loadPilotPlace: vi.fn(),
+  loadPlaceRecognitions: vi.fn(),
 }));
 
 const placeId = '22222222-2222-2222-2222-222222222222';
@@ -58,6 +63,47 @@ async function openTab(
 describe('Place profile', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(loadPlaceRecognitions).mockResolvedValue({
+      status: 'ok',
+      recognitions: [],
+    });
+  });
+
+  it('shows confirmed recognitions as badges that open them', async () => {
+    const heritageId = '66666666-6666-6666-6666-666666666666';
+    vi.mocked(loadPlaceRecognitions).mockResolvedValue({
+      status: 'ok',
+      recognitions: [
+        {
+          id: heritageId,
+          name: 'Kruger to Canyons',
+          placeTypeId: 'biosphere_reserve',
+        },
+        {
+          id: '55555555-5555-5555-5555-555555555555',
+          name: 'Nylsvley Nature Reserve',
+          placeTypeId: 'ramsar_site',
+        },
+      ],
+    });
+    const wrapper = await mountProfile(kruger);
+
+    expect(loadPlaceRecognitions).toHaveBeenCalledWith(placeId);
+    const badges = wrapper.findAll('.place-recognition');
+    expect(badges.map(badge => badge.text())).toEqual([
+      'Kruger to Canyons',
+      'Nylsvley Nature Reserve',
+    ]);
+    expect(
+      badges[0].get('.place-recognition-dot').attributes('style')
+    ).toContain('background-color: rgb(122, 74, 156)');
+    await badges[0].trigger('click');
+    expect(wrapper.emitted('open')).toEqual([[heritageId]]);
+  });
+
+  it('shows no badges for a place without recognitions', async () => {
+    const wrapper = await mountProfile(kruger);
+    expect(wrapper.find('.place-recognitions').exists()).toBe(false);
   });
 
   it('shows the stored name, country, designation, area, and source', async () => {

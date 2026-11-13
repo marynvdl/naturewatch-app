@@ -18,7 +18,17 @@ export const PLACE_TILES_URL =
 /** Vector layer inside the places archive. */
 export const PLACE_TILE_LAYER = 'places';
 
-/** Place type the list, the filters, and the profile read. */
+/**
+ * Published recognition boundaries. Each feature carries `id` (`places.id`),
+ * `area_km2`, and `place_type_id`.
+ */
+export const RECOGNITION_TILES_URL =
+  'https://storage.googleapis.com/nature-watch-tiles/places/recognitions/v1/recognitions.pmtiles';
+
+/** Vector layer inside the recognitions archive. */
+export const RECOGNITION_TILE_LAYER = 'recognitions';
+
+/** Place type of the protected areas: the default list and the release notice. */
 export const PLACE_TYPE = 'conservation_area';
 
 /** Period of the cropland figures the profile shows. */
@@ -66,6 +76,8 @@ export interface PlaceWindowQuery {
   extent: LngLatBounds | null;
   /** Skip this many matching rows. Used to load the next 50. */
   offset?: number;
+  /** Stored place type to list. Protected areas when left out. */
+  placeType?: string;
 }
 
 /** Result of loading the capped list. */
@@ -106,6 +118,19 @@ type WindowRow = PlaceSummary & { total_count: number | string };
 export type PlaceLoadResult =
   | { status: 'ok'; place: PlaceDetail }
   | { status: 'missing' }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/** A recognition of a place, shown as a badge on its profile. */
+export interface PlaceRecognition {
+  id: string;
+  name: string;
+  placeTypeId: string;
+}
+
+/** Result of reading a place's confirmed recognitions. */
+export type PlaceRecognitionsResult =
+  | { status: 'ok'; recognitions: PlaceRecognition[] }
   | { status: 'unconfigured' }
   | { status: 'error' };
 
@@ -151,7 +176,7 @@ export function placesClient(): SupabaseClient | null {
  */
 function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
   return {
-    p_place_type: PLACE_TYPE,
+    p_place_type: query.placeType ?? PLACE_TYPE,
     p_search: query.search.trim(),
     p_search_prefix: query.searchPrefix,
     p_size_min: query.sizeMin,
@@ -265,13 +290,16 @@ export async function loadPilotPlaceWindowCount(
 
 /**
  * Size range and histogram counts for the filter charts.
+ * @param placeType - Stored place type. Protected areas when left out.
  * @returns The stored distribution, or why it could not be loaded.
  */
-export async function loadPilotPlaceFilterStats(): Promise<PlaceFilterStatsResult> {
+export async function loadPilotPlaceFilterStats(
+  placeType: string = PLACE_TYPE
+): Promise<PlaceFilterStatsResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase.rpc('place_filter_stats', {
-    p_place_type: PLACE_TYPE,
+    p_place_type: placeType,
   });
   if (error || !data?.[0]) return { status: 'error' };
   const row = data[0] as {
@@ -357,6 +385,68 @@ export async function loadPilotPlace(id: string): Promise<PlaceLoadResult> {
       percent: value('crops_percent'),
     },
   };
+}
+
+/** Badge order: the three with their own buttons, then the regional ones. */
+const RECOGNITION_ORDER = [
+  'world_heritage_site',
+  'ramsar_site',
+  'biosphere_reserve',
+  'natura_2000_site',
+  'emerald_site',
+  'other_recognition',
+];
+
+/**
+ * The published recognitions with a confirmed `recognises` link to a place,
+ * ordered by type and then name. A recognition itself has none.
+ * @param id - `places.id` of the recognised place.
+ * @returns The recognitions, or why they could not be read.
+ */
+export async function loadPlaceRecognitions(
+  id: string
+): Promise<PlaceRecognitionsResult> {
+  if (!PLACE_ID.test(id)) return { status: 'ok', recognitions: [] };
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data: links, error } = await supabase
+    .from('place_relationships')
+    .select('subject_place_id')
+    .eq('object_place_id', id)
+    .eq('relationship_type_id', 'recognises')
+    .eq('status', 'confirmed');
+  if (error) return { status: 'error' };
+  const ids = [
+    ...new Set(
+      ((links as { subject_place_id: string }[] | null) ?? []).map(
+        link => link.subject_place_id
+      )
+    ),
+  ];
+  if (ids.length === 0) return { status: 'ok', recognitions: [] };
+  const { data: rows, error: rowsError } = await supabase
+    .from('place_summaries')
+    .select('id, name, place_type_id')
+    .in('id', ids);
+  if (rowsError) return { status: 'error' };
+  const rank = (type: string) => {
+    const index = RECOGNITION_ORDER.indexOf(type);
+    return index === -1 ? RECOGNITION_ORDER.length : index;
+  };
+  const recognitions = (
+    (rows as { id: string; name: string; place_type_id: string }[] | null) ?? []
+  )
+    .map(row => ({
+      id: row.id,
+      name: row.name,
+      placeTypeId: row.place_type_id,
+    }))
+    .sort(
+      (a, b) =>
+        rank(a.placeTypeId) - rank(b.placeTypeId) ||
+        a.name.localeCompare(b.name)
+    );
+  return { status: 'ok', recognitions };
 }
 
 /**
