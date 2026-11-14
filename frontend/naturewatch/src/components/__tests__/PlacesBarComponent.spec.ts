@@ -15,6 +15,7 @@ import {
   sortPlaces,
   type PlaceSort,
 } from '@/places/display';
+import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 import usePlacesStore from '@/store/PlacesStore';
 
 vi.stubGlobal(
@@ -38,6 +39,11 @@ vi.stubGlobal(
     disconnect = vi.fn();
   }
 );
+
+vi.mock('@/places/mainPhotos', () => ({
+  requestMainPhotos: vi.fn(),
+  mainPhotoOf: vi.fn(() => null),
+}));
 
 vi.mock('@/places/api', () => ({
   loadPilotPlaceWindow: vi.fn(),
@@ -177,6 +183,28 @@ describe('Places panel', () => {
       ].filter(place => place.name.toLocaleLowerCase().startsWith(prefix));
       return { status: 'ok', places: list, total: list.length };
     });
+  });
+
+  it('shows the main photograph on a card that has one', async () => {
+    vi.mocked(mainPhotoOf).mockImplementation(id =>
+      id === places[1].id ? 'https://example.test/kruger.jpg' : null
+    );
+    const wrapper = mountPlaces();
+    await flushPromises();
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
+    await flushPromises();
+    expect(requestMainPhotos).toHaveBeenCalledWith(
+      expect.arrayContaining([places[1].id])
+    );
+    const card = wrapper
+      .findAll('[data-place-id]')
+      .find(item => item.attributes('data-place-id') === places[1].id);
+    expect(card?.get('img.place-thumb-image').attributes('src')).toBe(
+      'https://example.test/kruger.jpg'
+    );
+    const others = wrapper.findAll('img.place-thumb-image');
+    expect(others).toHaveLength(1);
+    vi.mocked(mainPhotoOf).mockImplementation(() => null);
   });
 
   it('shows results and boundaries only after a place type is selected', async () => {

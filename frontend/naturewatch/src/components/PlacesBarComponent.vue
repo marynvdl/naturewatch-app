@@ -32,6 +32,7 @@ import {
   type FigureRange,
   type PlaceSort,
 } from '@/places/display';
+import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 import usePlacesStore from '@/store/PlacesStore';
 
 const placesStore = usePlacesStore();
@@ -163,6 +164,13 @@ function toggleListInView() {
 }
 
 const shown = computed(() => places.value);
+
+/** Read the main photographs of the cards shown. */
+watch(
+  () => shown.value.map(place => place.id),
+  ids => requestMainPhotos(ids),
+  { immediate: true }
+);
 const emptyMessage = computed(() =>
   storedCount.value === 0 && !placesStore.filtering && !needle.value
     ? nothingStored
@@ -698,6 +706,7 @@ watch(
                 :area-km2="place.area_km2"
                 :place-type-id="place.place_type_id ?? listedType ?? PLACE_TYPE"
                 :current="placesStore.selectedId === place.id"
+                :photo="mainPhotoOf(place.id)"
                 @click="chooseResult(place)"
                 @highlight="on => placesStore.hoverPlace(place.id, on)"
               />

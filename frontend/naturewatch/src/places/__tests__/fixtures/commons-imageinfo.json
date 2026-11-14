@@ -1,0 +1,48 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 146267961,
+        "ns": 6,
+        "title": "File:Kruger National Park (ZA), Giraffe -- 2024 -- 0431.jpg",
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 15591660,
+            "width": 4480,
+            "height": 5973,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/a/a8/Kruger_National_Park_%28ZA%29%2C_Giraffe_--_2024_--_0431.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Kruger_National_Park_(ZA),_Giraffe_--_2024_--_0431.jpg",
+            "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=146267961",
+            "extmetadata": {
+              "ImageDescription": {
+                "value": "<a href=\"https://en.wikipedia.org/wiki/Northern_giraffe\" class=\"extiw\" title=\"en:Northern giraffe\">Giraffe</a> (near the Pretoriuskop\u2013Skukuza Road/Napi Road south of Skukuza), <a href=\"https://en.wikipedia.org/wiki/Kruger_National_Park\" class=\"extiw\" title=\"en:Kruger National Park\">Kruger National Park</a>, <a href=\"https://en.wikipedia.org/wiki/Mpumalanga\" class=\"extiw\" title=\"en:Mpumalanga\">Mpumalanga</a>, South Africa<br><small>Planning for the national park began in the 1890s, when South African bishop Jacob Louis Grobler and other conservationists pushed for the protection of wildlife. In 1898, the area was recognized as a protected area under the administration of the South African government. In 1902/1903, the protected areas of the Kingdom of Swaziland and the region formed the first state-mandated protected area system, which eventually became <a href=\"https://en.wikipedia.org/wiki/Kruger_National_Park\" class=\"extiw\" title=\"en:Kruger National Park\">Kruger National Park</a>. In 1906, major conservation measures came into force to protect wildlife from poaching and hunting. In 1916, the Kruger <a href=\"https://en.wikipedia.org/wiki/National_park\" class=\"extiw\" title=\"en:National park\">National Park</a> was formally established by the South African National Parks Act, which designated the park as a state reserve. In the 1920s, the park was opened to visitors. From 1930 onwards, the park continued to grow through the expansion of its territory.</small>",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "<bdi><a href=\"https://www.wikidata.org/wiki/Q34788025\" class=\"extiw\" title=\"d:Q34788025\"><span title=\"German photographer and mathematician\">Dietmar Rabich</span></a></bdi>",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "CC BY-SA 4.0",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "LicenseUrl": {
+                "value": "https://creativecommons.org/licenses/by-sa/4.0",
+                "source": "commons-desc-page"
+              },
+              "License": {
+                "value": "cc-by-sa-4.0",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            },
+            "mime": "image/jpeg"
+          }
+        ]
+      }
+    ]
+  }
+}

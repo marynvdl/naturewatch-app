@@ -7,6 +7,7 @@ import PlaceEditField, {
   type CuratedValue,
 } from '@/components/PlaceEditField.vue';
 import PlacePhotos from '@/components/PlacePhotos.vue';
+import PlacePhotosEditor from '@/components/PlacePhotosEditor.vue';
 import {
   SegmentedControl,
   SegmentedControlItem,
@@ -38,6 +39,12 @@ import {
   formatKm2,
   formatPercent,
 } from '@/places/display';
+import { approvedPhotos, loadPlaceImages } from '@/places/images';
+import {
+  forgetMainPhoto,
+  mainPhotoOf,
+  requestMainPhotos,
+} from '@/places/mainPhotos';
 import type { PlacePhoto } from '@/places/photos';
 
 const props = withDefaults(
@@ -45,10 +52,8 @@ const props = withDefaults(
     placeId: string;
     /** Shown while the stored record loads. */
     name?: string;
-    /** Approved photographs. None are stored yet. */
-    photos?: PlacePhoto[];
   }>(),
-  { name: undefined, photos: () => [] }
+  { name: undefined }
 );
 
 const emit = defineEmits<{
@@ -74,12 +79,20 @@ const profileMode = computed({
   set: (value: string) => auth.setEditMode(value === 'edit'),
 });
 
-type TabId = 'overview' | 'related' | 'landscape' | 'species' | 'links';
+type TabId =
+  | 'overview'
+  | 'related'
+  | 'landscape'
+  | 'species'
+  | 'links'
+  | 'photos';
 
 const status = ref<'loading' | 'ok' | 'missing' | 'unconfigured' | 'error'>(
   'loading'
 );
 const place = ref<PlaceDetail | null>(null);
+/** Approved photographs, main first. */
+const photos = ref<PlacePhoto[]>([]);
 /** Confirmed recognitions of the place. A recognition has none. */
 const recognitions = ref<PlaceRecognition[]>([]);
 /** Confirmed links to published places, largest place first. */
@@ -115,18 +128,24 @@ const countries = computed(() => countryNames(place.value?.iso3 ?? null));
 const subtitle = computed(() =>
   [country.value, place.value?.designation].filter(Boolean).join(' · ')
 );
-/** Every place type has the same tabs. Admins in edit mode also get Links. */
+/** Every place type has the same tabs. Admins in edit mode also get Links and Photos. */
 const tabs = computed<{ id: TabId; label: string }[]>(() => [
   { id: 'overview', label: 'Overview' },
   { id: 'related', label: 'Related' },
   { id: 'landscape', label: 'Landscape' },
   { id: 'species', label: 'Species' },
-  ...(editing.value ? [{ id: 'links' as const, label: 'Links' }] : []),
+  ...(editing.value
+    ? [
+        { id: 'links' as const, label: 'Links' },
+        { id: 'photos' as const, label: 'Photos' },
+      ]
+    : []),
 ]);
 
-/** Leaving edit mode closes the Links tab. */
+/** Leaving edit mode closes the Links and Photos tabs. */
 watch(editing, on => {
-  if (!on && activeTab.value === 'links') activeTab.value = 'overview';
+  if (!on && (activeTab.value === 'links' || activeTab.value === 'photos'))
+    activeTab.value = 'overview';
 });
 /** The Related tab's cards grouped by relationship, in a fixed order. */
 const relatedGroups = computed(() => {
@@ -220,6 +239,7 @@ async function saveField(
 async function load(id: string) {
   status.value = 'loading';
   place.value = null;
+  photos.value = [];
   recognitions.value = [];
   related.value = [];
   relatedStatus.value = 'loading';
@@ -237,8 +257,33 @@ async function load(id: string) {
     emit('moved', result.place.id);
     return;
   }
-  await loadLinked(id, result.place.placeTypeId);
+  await Promise.all([loadPhotos(id), loadLinked(id, result.place.placeTypeId)]);
 }
+
+/** Read the approved photographs for the header and the gallery. */
+async function loadPhotos(id: string) {
+  const read = await loadPlaceImages(id);
+  if (id === props.placeId && read.status === 'ok')
+    photos.value = approvedPhotos(read.images);
+}
+
+/** A photograph changed on the Photos tab. Read the header photographs again. */
+function onPhotosChanged() {
+  if (!place.value) return;
+  void loadPhotos(place.value.id);
+  forgetMainPhoto(place.value.id);
+}
+
+/** Read the main photographs of the Related cards shown. */
+watch(
+  () =>
+    activeTab.value === 'related'
+      ? relatedGroups.value.flatMap(group =>
+          group.links.slice(0, shownIn(group.label)).map(link => link.otherId)
+        )
+      : [],
+  ids => requestMainPhotos(ids)
+);
 
 /** Read the related places, and a conservation area's recognition badges. */
 async function loadLinked(id: string, placeTypeId: string) {
@@ -505,6 +550,12 @@ function onTabKey(event: KeyboardEvent, index: number) {
             @open="id => $emit('open', id)"
           />
 
+          <PlacePhotosEditor
+            v-else-if="activeTab === 'photos'"
+            :place-id="place.id"
+            @changed="onPhotosChanged"
+          />
+
           <template v-else-if="activeTab === 'related'">
             <p v-if="relatedStatus === 'loading'" class="place-note">
               Loading related places.
@@ -538,6 +589,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
                       :iso3="link.otherIso3"
                       :area-km2="link.otherAreaKm2"
                       :place-type-id="link.otherTypeId"
+                      :photo="mainPhotoOf(link.otherId)"
                       @click="$emit('open', link.otherId)"
                       @highlight="on => $emit('highlight', link.otherId, on)"
                     />
@@ -842,7 +894,8 @@ function onTabKey(event: KeyboardEvent, index: number) {
 
 .place-tabs {
   display: flex;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: 12px 24px;
   border-bottom: 1px solid var(--border);
 }
 

@@ -41,8 +41,8 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Add `place_curations` and `curate_place`. `place_summaries` and `listed_places` show the curated values, and search still finds the source name. In edit mode the profile edits the display name, tagline, description, designation, and countries in place, shows the source value beside each, and can reset a field to it. In view mode the tagline shows under the title, and the description shows in Overview.
 - [x] [Task 03 — Relationships](../archive/tasks/task-03-relationships.md) — naturewatch-app
   - *Goal:* In edit mode the profile lists all of the place's links, including `proposed` and `rejected` ones. The admin adds a link by choosing a type and finding a place by search, and can confirm, reject, or retire a link. Add `set_place_relationship`, `created_by`, and `reviewed_by`.
-- [ ] Task 04 — Photographs — naturewatch-app
-  - *Goal:* Add `images`, `place_images`, the `place-images` Storage bucket, the CC licences, and the sources `wikimedia-commons` and `sooty-earth-contributors`. In edit mode the admin adds a photograph by upload or by URL. A Commons URL fills in the creator and licence from the Commons API. The admin approves or rejects photographs, chooses the main one, and orders the rest. Edit mode also shows the photographs of recognitions that the place lies at least 75% inside, and one click links such a photograph to this place too. The profile shows approved photographs through the existing `PlacePhotos`.
+- [x] [Task 04 — Photographs](../archive/tasks/task-04-photographs.md) — naturewatch-app
+  - *Goal:* Add `images`, `place_images`, the `place-images` Storage bucket, the CC licences, and the sources `wikimedia-commons` and `sooty-earth-contributors`. In edit mode the admin adds a photograph by upload or by Commons URL. A Commons URL fills in the creator and licence from the Commons API. The admin approves or rejects photographs, chooses the main one, and orders the rest. Edit mode also shows the photographs of recognitions that the place lies at least 75% inside, and on a recognition the first 10 photographs of the conservation areas at least 75% inside it. One click links such a photograph to this place too. Place cards show the main photograph. The profile shows approved photographs through the existing `PlacePhotos`.
 - [ ] Task 05 — Photo suggestions — naturewatch-app
   - *Goal:* Add `supabase/suggest_photos.py`. For each published World Heritage Site it finds Commons images through Wikidata (WDPA id P809, then image P18 and Commons category P373) and through a Commons search by name. It keeps only images under a licence in `licences`, and writes them as `suggested` with the pipeline name and a score. A rerun adds nothing twice. Add the `/admin` route with a photo queue grouped by place, to approve, reject, and choose the main photograph, including the photographs of related recognitions.
 - [ ] Task 06 — Tagline suggestions — naturewatch-app
@@ -55,6 +55,11 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
 - More photograph sources: Flickr and Openverse.
 - Larger suggestion runs: conservation areas over 1,000 km², then national parks.
 - `species_images`, with Indicator Species.
+- Copies of approved Commons photographs in Storage (`images.storage_path`), so a photograph keeps showing if Commons moves it.
+- Smaller copies of uploads, for thumbnails.
+- Removing an image from every place (`image_status` `removed`), and deleting the files of rejected uploads.
+- Adding a photograph by the address of a site other than Wikimedia Commons, by a server-side copy into Storage.
+- Photographs under ported Creative Commons licences, such as CC BY-SA 3.0 de. They are refused for now.
 - The `*_by` columns in design.md that no screen writes yet.
 - Flagging a curated value whose source value changed in a new release.
 - `frontend/naturewatch/tsconfig.app.json`: replace `"moduleResolution": "node"` with `"bundler"` and drop `baseUrl`, which TypeScript 6 flags as deprecated. One `chore/` branch, outside this parcel's tasks.
