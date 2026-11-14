@@ -1,6 +1,6 @@
 # Task 03 — Relationships
 
-Parcel: [Molding Places](../parcels/molding-places.md)
+Parcel: [Molding Places](../../parcels/molding-places.md)
 
 Repository: naturewatch-app. Task 02 is merged and archived.
 
@@ -22,7 +22,7 @@ Changed 14 November 2026 by the user, during evaluation, so that every place typ
 
 From the code and the hosted database on 14 November 2026:
 
-- `place_relationship_types`, `place_relationships`, and `place_overlaps()` are in `20261120100000_recognitions.sql`, specified in [design.md §4.5](../database/design.md#45-relationships). Rows are unique per (subject, type, object) while not retired. A trigger stores a symmetric link with the smaller id as its subject, and refuses the reverse of an active asymmetric link. `created_by` and `reviewed_by` are not columns yet.
+- `place_relationship_types`, `place_relationships`, and `place_overlaps()` are in `20261120100000_recognitions.sql`, specified in [design.md §4.5](../../database/design.md#45-relationships). Rows are unique per (subject, type, object) while not retired. A trigger stores a symmetric link with the smaller id as its subject, and refuses the reverse of an active asymmetric link. `created_by` and `reviewed_by` are not columns yet.
 - The public select policy returns only confirmed, unretired links between published places.
 - The hosted table holds 14,765 rows. All are derived `recognises` links: 8,015 confirmed and 6,750 proposed. None are manual, rejected, or retired. Most places have at most 10 links. One recognition has 1,024.
 - Published places are 39,457 conservation areas and 11,480 recognitions. Countries are not places, so `located_in` and `part_of` have few targets for now.
@@ -63,7 +63,7 @@ From the code and the hosted database on 14 November 2026:
 ## Do not
 
 - Do not delete a relationship row. Retiring keeps it.
-- Do not change `place_overlaps()`, `derive_recognises.py`, or the coverage values. Overlap review and `place_overlaps()` fixes are in [Shaping Boundaries](../parcels/shaping-boundaries.md).
+- Do not change `place_overlaps()`, `derive_recognises.py`, or the coverage values. Overlap review and `place_overlaps()` fixes are in [Shaping Boundaries](../../parcels/shaping-boundaries.md).
 - Do not suggest links from `place_overlaps()` in the profile.
 - Do not add countries as places.
 - Do not rebuild the PMTiles or change the analysis repo.
