@@ -47,11 +47,21 @@ const rows: Record<string, Record<string, unknown>> = {
 
 // Confirmed recognises links, as anon sees them: recognition -> park.
 const links = [
-  { subject_place_id: ramsarId, object_place_id: croppedId },
-  { subject_place_id: natura2000Id, object_place_id: keptId },
-  { subject_place_id: ramsarId, object_place_id: keptId },
-  { subject_place_id: heritageId, object_place_id: keptId },
-];
+  [ramsarId, croppedId],
+  [natura2000Id, keptId],
+  [ramsarId, keptId],
+  [heritageId, keptId],
+].map(([subject, object], index) => ({
+  id: `link-${index}`,
+  subject_place_id: subject,
+  relationship_type_id: 'recognises',
+  object_place_id: object,
+  origin: 'derived',
+  status: 'confirmed',
+  subject_coverage: 1,
+  object_coverage: 0.8,
+  retired_at: null,
+}));
 const linkFilters: [string, unknown][] = [];
 
 // place_stats_preferred rows by place id.
@@ -84,6 +94,7 @@ function from(table: string) {
       select: () => linkBuilder,
       order: () => linkBuilder,
       range: () => linkBuilder,
+      is: () => linkBuilder,
       eq: (column: string, value: string) => {
         linkFilters.push([column, value]);
         if (column === 'object_place_id') object = value;
@@ -93,12 +104,8 @@ function from(table: string) {
       then: (resolve: (value: unknown) => void) =>
         resolve({
           data: subject
-            ? links
-                .filter(link => link.subject_place_id === subject)
-                .map(link => ({ object_place_id: link.object_place_id }))
-            : links
-                .filter(link => link.object_place_id === object)
-                .map(link => ({ subject_place_id: link.subject_place_id })),
+            ? links.filter(link => link.subject_place_id === subject)
+            : links.filter(link => link.object_place_id === object),
           error: null,
         }),
     };
@@ -232,7 +239,7 @@ describe('loadPlaceRecognitions', () => {
   });
 });
 
-describe('loadRecognisedPlaces', () => {
+describe('loadRelatedPlaces', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_SUPABASE_URL', 'http://localhost');
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test');
@@ -240,17 +247,37 @@ describe('loadRecognisedPlaces', () => {
   });
 
   it('reads the parks a recognition recognises, largest first', async () => {
-    const { loadRecognisedPlaces } = await import('@/places/api');
-    const result = await loadRecognisedPlaces(ramsarId);
+    const { loadRelatedPlaces } = await import('@/places/api');
+    const result = await loadRelatedPlaces(ramsarId);
     expect(linkFilters).toEqual(
       expect.arrayContaining([
         ['subject_place_id', ramsarId],
-        ['relationship_type_id', 'recognises'],
+        ['object_place_id', ramsarId],
         ['status', 'confirmed'],
       ])
     );
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') return;
-    expect(result.places.map(place => place.id)).toEqual([keptId, croppedId]);
+    expect(result.links.map(link => link.otherId)).toEqual([keptId, croppedId]);
+    expect(result.links[0]).toMatchObject({
+      typeId: 'recognises',
+      outward: true,
+      otherName: 'Gobiin ikh',
+      otherIso3: 'MNG',
+      otherAreaKm2: 63884.6,
+      coverage: 1,
+    });
+  });
+
+  it("reads a park's recognitions from the object side", async () => {
+    const { loadRelatedPlaces } = await import('@/places/api');
+    const result = await loadRelatedPlaces(keptId);
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.links.map(link => link.otherId).sort()).toEqual(
+      [heritageId, natura2000Id, ramsarId].sort()
+    );
+    expect(result.links.every(link => !link.outward)).toBe(true);
+    expect(result.links[0].coverage).toBe(0.8);
   });
 });

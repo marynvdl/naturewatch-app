@@ -600,11 +600,15 @@ describe('Places panel', () => {
 
     expect(wrapper.text()).toContain('Kruger National Park');
     expect(wrapper.text()).not.toContain('Addo Elephant National Park');
-    // Every type is searched, and a recognition says which type it is
+    // Every type is searched, and each card labels its type
     const cards = wrapper.findAll('button.place-result');
-    expect(cards.map(card => card.get('.place-card-meta').text())).toEqual([
+    expect(cards.map(card => card.get('.place-card-type').text())).toEqual([
+      'Conservation area',
+      'UNESCO-MAB',
+    ]);
+    expect(cards.map(card => card.get('.place-card-country').text())).toEqual([
       'South Africa',
-      'UNESCO-MAB · South Africa',
+      'South Africa',
     ]);
     expect(typeButton(wrapper, 'Conservation areas').classes()).not.toContain(
       'is-on'

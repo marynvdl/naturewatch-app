@@ -27,7 +27,6 @@ import {
 import {
   CROPLAND_FULL,
   RECOGNITION_BUTTONS,
-  RECOGNITION_LABEL,
   isRecognitionButtonType,
   type RecognitionButtonType,
   type FigureRange,
@@ -262,17 +261,6 @@ function loadWindow(query: PlaceWindowQuery, signal?: AbortSignal) {
   return searchingAll.value
     ? loadPlaceSearchWindow(query, signal)
     : loadPilotPlaceWindow(query, signal);
-}
-
-/**
- * A recognition type label for a card in the search across every type.
- * @param place - The card's place.
- * @returns The label, or undefined for a conservation area.
- */
-function cardKind(place: PlaceSummary): string | undefined {
-  const type = place.place_type_id;
-  if (!type || type === PLACE_TYPE) return undefined;
-  return RECOGNITION_LABEL[type];
 }
 
 /** Remove the conservation areas when they are drawn. */
@@ -708,7 +696,7 @@ watch(
                 :name="place.name"
                 :iso3="place.iso3"
                 :area-km2="place.area_km2"
-                :kind="cardKind(place)"
+                :place-type-id="place.place_type_id ?? listedType ?? PLACE_TYPE"
                 :current="placesStore.selectedId === place.id"
                 @click="chooseResult(place)"
                 @highlight="on => placesStore.hoverPlace(place.id, on)"

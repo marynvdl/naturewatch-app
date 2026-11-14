@@ -349,6 +349,30 @@ export function recognitionColour(type: string, satellite = false): string {
   return isRecognitionButtonType(type) ? colours[type] : colours.other;
 }
 
+/** Fill of the conservation areas on the monochrome basemap, and their card label. */
+export const CONSERVATION_AREA_COLOUR = '#1f4b3a';
+
+/**
+ * The type of a place as cards and the profile name it.
+ * @param type - `place_types.id`, or null for a place that is not published.
+ * @returns For example `Conservation area` or `World Heritage`.
+ */
+export function placeTypeLabel(type: string | null | undefined): string {
+  if (!type) return 'Unpublished place';
+  if (type === 'conservation_area') return 'Conservation area';
+  return RECOGNITION_LABEL[type] ?? 'Place';
+}
+
+/**
+ * The colour a place type is drawn in on the monochrome basemap.
+ * @param type - `place_types.id`.
+ * @returns A hex colour.
+ */
+export function placeTypeColour(type: string | null | undefined): string {
+  if (type === 'conservation_area') return CONSERVATION_AREA_COLOUR;
+  return recognitionColour(type ?? '');
+}
+
 export type LngLatBounds = [number, number, number, number];
 
 /** A Mapbox filter expression, kept loose so this file needs no Mapbox types. */

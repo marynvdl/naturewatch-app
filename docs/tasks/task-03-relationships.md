@@ -6,13 +6,17 @@ Repository: naturewatch-app. Task 02 is merged and archived.
 
 ## Goal
 
-An admin in edit mode sees all of a place's links on a **Links** tab, including `proposed`, `rejected`, and retired ones. The admin adds a link by choosing a type and finding a place by search, and confirms, rejects, or retires a link. Each change is one `set_place_relationship` call and one `audit_log` row. Visitors see every confirmed link: recognitions as they are today, and other types in a short **Related places** list in Overview.
+An admin in edit mode sees all of a place's links on a **Links** tab, including `proposed`, `rejected`, and retired ones. The admin adds a link by choosing a type and finding a place by search, and confirms, rejects, or retires a link. Each change is one `set_place_relationship` call and one `audit_log` row. Every place has a **Related** tab that lists the places it has a confirmed link with, as cards grouped by relationship. Every place card shows its type as a coloured label.
 
 Decided 14 November 2026 by the user:
 
 - **All four types.** The add form offers `recognises`, `overlaps`, `located_in`, and `part_of`, each read from this place's side: Recognises, Recognised by, Overlaps, Located in, Contains, Part of, Has part. The choice sets which place is the subject.
-- **Related places in view mode.** Confirmed links other than `recognises` show in Overview under **Related places**, with the label from this place's side. Recognitions keep their badges and the Areas tab.
-- **A Links tab in edit mode only.** It has the add form at the top, then the links grouped as Proposed, Confirmed, Rejected, and Retired, 20 at a time with **Show more**, as on the Areas tab.
+- **A Links tab in edit mode only.** **Add +** at its top right opens the add form in a popover (changed 14 November 2026 by the user, during evaluation). Under it, the links are grouped as Proposed, Confirmed, Rejected, and Retired, 20 at a time with **Show more**.
+
+Changed 14 November 2026 by the user, during evaluation, so that every place type works the same way:
+
+- **A Related tab for every place.** It replaces a recognition's Areas tab and the Related places list in Overview. It sits after Overview, and lists every confirmed link as place cards, grouped by relationship from this place's side, in the order Recognised by, Recognises, Located in, Contains, Part of, Has part, Overlaps. Each group is largest first, 20 at a time with **Show more**. While it is open, the map draws the conservation areas it lists, as the Areas tab did. A park's recognition badges under its title stay.
+- **A coloured type label on every place card.** The shared `PlaceCard` shows the place type as a pill in the map's colour for it: Conservation area green, World Heritage ochre, Ramsar blue, UNESCO-MAB purple, and Natura 2000, Emerald, and Regional grey. It replaces the type before the country on search cards. This applies to the Places list, search, and the Related tab.
 
 ## Facts already stored
 
@@ -39,18 +43,18 @@ From the code and the hosted database on 14 November 2026:
    - `loadPlaceLinks(id)`: every link with the place as subject or object, read in pages of 1,000, with the other place's name and type from `place_summaries` in chunks. A place missing from `place_summaries` shows as an unpublished place.
    - `searchPlaces(text)`: up to 8 published places of any type from `place_summaries` whose name or source name contains the text. Check its time on the hosted database read-only. If it is over one second, stop and ask.
    - `setPlaceRelationship(subject, type, object, status)`.
-   - `loadRelatedPlaces(id)`: confirmed links of other types than `recognises`, for view mode.
+   - `loadRelatedPlaces(id)`: every confirmed link with the other place's card values, for the Related tab. It replaces `loadRecognisedPlaces`.
 4. **Profile, edit mode: the Links tab.**
    - The add form: a type select with the labels above, a place search built on a reka-ui combobox, and **Add**. A new link is `confirmed`. A failed save keeps the form open with the error.
    - Each link shows the label from this place's side, the other place's name and type, the origin, and the coverage for a derived link. Proposed links have **Confirm** and **Reject**. Confirmed links have **Reject** and **Retire**. Rejected links have **Confirm** and **Retire**. Retired links have no actions.
-   - After a change, the list, the recognition badges, the Areas tab, and Related places refresh.
+   - After a change, the list, the recognition badges, and the Related tab refresh.
    - The Landscape and Measure panel style. Every existing control keeps its place.
-5. **Profile, view mode.** **Related places** in Overview, after the area, when the place has confirmed links other than `recognises`. Each one opens that place.
-6. **Tests.** Extend `PlaceProfileComponent.spec.ts`: no Links tab for a visitor or in view mode; links grouped by status with the right actions; adding, confirming, rejecting, and retiring call `setPlaceRelationship` with the right subject and object for each label; Related places shows in view mode. Run pytest for `supabase/tests`, the catalog suite, the component tests, `npm run type-check`, and `npm run lint`.
-7. **Browser check.** Run the `browser-check` skill on a park profile with Related places in view mode, and on a recognition, wide and narrow, on the local stack.
+5. **Profile, view mode.** The Related tab as decided above, for every place type, in place of Areas. An empty tab says the place has no related places yet. `PlaceCard` takes the place type and shows the coloured label, in the Places list and search too.
+6. **Tests.** Extend `PlaceProfileComponent.spec.ts`: no Links tab for a visitor or in view mode; links grouped by status with the right actions; adding, confirming, rejecting, and retiring call `setPlaceRelationship` with the right subject and object for each label; the Related tab groups cards by relationship, opens a card's place, and tells the map which conservation areas it lists; a card shows its type label. Run pytest for `supabase/tests`, the catalog suite, the component tests, `npm run type-check`, and `npm run lint`.
+7. **Browser check.** Run the `browser-check` skill on the Related tab of a park and of a recognition, and on the Places list, wide and narrow, on the local stack.
 8. **User evaluation.** Start the dev server on `http://localhost:5173` against the local stack and give the URL to the user, who signs in through Inbucket, adds and reviews links, and evaluates before the pull request is opened.
 9. **Docs.**
-   - `docs/user/using-the-map.md`: the Links tab in edit mode, and Related places.
+   - `docs/user/using-the-map.md`: the Links tab in edit mode, the Related tab in place of Areas, and the type label on cards.
    - `docs/user/data.md`: a link can be derived or added by Sooty Earth, and only confirmed links show.
    - design.md §4.5: `created_by` and `reviewed_by` in place, naming the migration and `set_place_relationship`. §6: add `set_place_relationship` to the privileged RPCs.
    - `docs/blueprint.md`: a profile reads its confirmed links of every type.

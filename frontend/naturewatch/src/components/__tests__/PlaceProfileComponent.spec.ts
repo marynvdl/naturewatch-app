@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
 import {
@@ -7,25 +7,36 @@ import {
   loadPilotPlace,
   loadPlaceCuration,
   loadPlaceRecognitions,
-  loadRecognisedPlaces,
+  loadPlaceLinks,
+  loadRelatedPlaces,
+  searchPlaces,
+  setPlaceRelationship,
   type PlaceDetail,
+  type PlaceLink,
 } from '@/places/api';
 import { PHOTOS_NONE } from '@/places/photos';
 import useAuthStore from '@/store/AuthStore';
 
-vi.mock('@/places/api', async importOriginal => ({
-  PLACE_TYPE: 'conservation_area',
-  applyCuration: (await importOriginal<typeof import('@/places/api')>())
-    .applyCuration,
-  curatePlace: vi.fn(),
-  loadDesignations: vi
-    .fn()
-    .mockResolvedValue(['National Park', 'Nature Reserve', 'Game Reserve']),
-  loadPlaceCuration: vi.fn(),
-  loadPilotPlace: vi.fn(),
-  loadPlaceRecognitions: vi.fn(),
-  loadRecognisedPlaces: vi.fn(),
-}));
+vi.mock('@/places/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/places/api')>();
+  return {
+    PLACE_TYPE: 'conservation_area',
+    LINK_CHOICES: actual.LINK_CHOICES,
+    linkLabel: actual.linkLabel,
+    applyCuration: actual.applyCuration,
+    curatePlace: vi.fn(),
+    loadDesignations: vi
+      .fn()
+      .mockResolvedValue(['National Park', 'Nature Reserve', 'Game Reserve']),
+    loadPlaceCuration: vi.fn(),
+    loadPilotPlace: vi.fn(),
+    loadPlaceRecognitions: vi.fn(),
+    loadPlaceLinks: vi.fn(),
+    loadRelatedPlaces: vi.fn(),
+    searchPlaces: vi.fn(),
+    setPlaceRelationship: vi.fn(),
+  };
+});
 
 const placeId = '22222222-2222-2222-2222-222222222222';
 
@@ -55,12 +66,14 @@ const kruger: PlaceDetail = {
 /**
  * Mount the profile for one stored place.
  * @param place - What `loadPilotPlace` returns.
+ * @param attach - Mount in the document, for popovers rendered outside the profile.
  * @returns The mounted profile, after the place has loaded.
  */
-async function mountProfile(place: PlaceDetail) {
+async function mountProfile(place: PlaceDetail, attach = false) {
   vi.mocked(loadPilotPlace).mockResolvedValue({ status: 'ok', place });
   const wrapper = mount(PlaceProfileComponent, {
     props: { placeId: place.id, name: place.name },
+    attachTo: attach ? document.body : undefined,
   });
   await flushPromises();
   return wrapper;
@@ -94,6 +107,7 @@ describe('Place profile', () => {
       status: 'ok',
       curation: null,
     });
+    vi.mocked(loadRelatedPlaces).mockResolvedValue({ status: 'ok', links: [] });
   });
 
   it('shows the tagline under the title and the description in Overview', async () => {
@@ -307,7 +321,6 @@ describe('Place profile', () => {
     expect(badges[1].attributes('aria-label')).toBe(
       'Ramsar: Nylsvley Nature Reserve'
     );
-    expect(loadRecognisedPlaces).not.toHaveBeenCalled();
     expect(
       badges[0].get('.place-recognition-dot').attributes('style')
     ).toContain('background-color: rgb(122, 74, 156)');
@@ -324,53 +337,284 @@ describe('Place profile', () => {
     expect(wrapper.findAll('.place-meta .place-country')).toHaveLength(0);
   });
 
-  it('lists the conservation areas a recognition recognises as cards', async () => {
-    const parks = Array.from({ length: 23 }, (_, index) => ({
-      id: `00000000-0000-0000-0000-${String(index).padStart(12, '0')}`,
-      name: `Park ${index + 1}`,
-      designation: 'Nature Reserve',
-      iso3: 'ZAF',
-      area_km2: 1000 - index,
-      cropland_percent: null,
-    }));
-    vi.mocked(loadRecognisedPlaces).mockResolvedValue({
-      status: 'ok',
-      places: parks,
-    });
-    const wrapper = await mountProfile({
-      ...kruger,
-      placeTypeId: 'world_heritage_site',
-      name: 'Maloti-Drakensberg Park',
+  describe('links', () => {
+    const siteId = '77777777-7777-7777-7777-777777777777';
+    const parkId = '88888888-8888-8888-8888-888888888888';
+
+    /** A link from Kruger's side. */
+    function link(values: Partial<PlaceLink>): PlaceLink {
+      return {
+        id: '99999999-9999-9999-9999-999999999999',
+        typeId: 'recognises',
+        outward: false,
+        otherId: siteId,
+        otherName: 'Kruger to Canyons',
+        otherTypeId: 'biosphere_reserve',
+        otherIso3: 'ZAF',
+        otherAreaKm2: 26000,
+        origin: 'derived',
+        status: 'proposed',
+        coverage: 0.62,
+        ...values,
+      };
+    }
+
+    /** Switch to edit mode and open the Links tab. */
+    async function openLinks(attach = false) {
+      const auth = useAuthStore();
+      auth.isAdmin = true;
+      auth.editMode = true;
+      const wrapper = await mountProfile(kruger, attach);
+      await openTab(wrapper, 'Links');
+      await flushPromises();
+      return wrapper;
+    }
+
+    beforeEach(() => {
+      // jsdom has no scrollIntoView, which the combobox calls
+      Element.prototype.scrollIntoView = vi.fn();
+      vi.mocked(setPlaceRelationship).mockResolvedValue({ status: 'ok' });
     });
 
-    expect(loadPlaceRecognitions).not.toHaveBeenCalled();
-    expect(loadRecognisedPlaces).toHaveBeenCalledWith(placeId);
-    expect(wrapper.find('.place-recognitions').exists()).toBe(false);
-    expect(wrapper.find('.place-recognised').exists()).toBe(false);
-    const tabs = wrapper.findAll('[role="tab"]').map(tab => tab.text());
-    expect(tabs).toEqual(['Overview', 'Areas', 'Landscape', 'Species']);
-    await openTab(wrapper, 'Areas');
-    expect(wrapper.get('.place-profile').classes()).toContain('is-list-tab');
-    expect(wrapper.get('.place-recognised-count').text()).toBe(
-      '23 conservation areas at least 75% inside'
+    it('groups related places by relationship as cards with a type label', async () => {
+      const parks = Array.from({ length: 23 }, (_, index) =>
+        link({
+          id: `p${index}`,
+          typeId: 'overlaps',
+          outward: true,
+          otherId: `00000000-0000-0000-0000-${String(index).padStart(12, '0')}`,
+          otherName: `Park ${index + 1}`,
+          otherTypeId: 'conservation_area',
+          otherAreaKm2: 1000 - index,
+          status: 'confirmed',
+          coverage: null,
+        })
+      );
+      vi.mocked(loadRelatedPlaces).mockResolvedValue({
+        status: 'ok',
+        links: [
+          ...parks,
+          link({ id: 's', status: 'confirmed' }),
+          link({
+            id: 'c',
+            typeId: 'located_in',
+            outward: false,
+            otherId: parkId,
+            otherName: 'Makuleke Contract Park',
+            otherTypeId: 'conservation_area',
+            status: 'confirmed',
+          }),
+        ],
+      });
+      const wrapper = await mountProfile(kruger);
+      expect(loadRelatedPlaces).toHaveBeenCalledWith(placeId);
+      const tabs = wrapper.findAll('[role="tab"]').map(tab => tab.text());
+      expect(tabs).toEqual(['Overview', 'Related', 'Landscape', 'Species']);
+      expect(wrapper.find('.place-related').exists()).toBe(false);
+      await openTab(wrapper, 'Related');
+      expect(wrapper.get('.place-profile').classes()).toContain('is-list-tab');
+
+      const groups = wrapper.findAll('.place-related-group');
+      expect(groups.map(group => group.attributes('aria-label'))).toEqual([
+        'Recognised by',
+        'Contains',
+        'Overlaps',
+      ]);
+      expect(groups[0].get('.place-card-type').text()).toBe('UNESCO-MAB');
+      expect(groups[1].get('.place-card-type').text()).toBe(
+        'Conservation area'
+      );
+      expect(groups[2].get('.place-related-heading').text()).toBe(
+        'Overlaps 23'
+      );
+      expect(groups[2].findAll('.place-result')).toHaveLength(20);
+      await groups[2].get('.place-related-more').trigger('click');
+      expect(groups[2].findAll('.place-result')).toHaveLength(23);
+      expect(groups[2].find('.place-related-more').exists()).toBe(false);
+
+      await groups[1].get('.place-result').trigger('click');
+      expect(wrapper.emitted('open')).toEqual([[parkId]]);
+      // The map draws the listed conservation areas only while the tab is open
+      expect(wrapper.emitted('areas')?.at(-1)).toEqual([
+        [...parks.map(park => park.otherId), parkId],
+      ]);
+      await openTab(wrapper, 'Overview');
+      expect(wrapper.emitted('areas')?.at(-1)).toEqual([null]);
+      wrapper.unmount();
+    });
+
+    it('shows no Links tab to a visitor or in view mode', async () => {
+      const visitor = await mountProfile(kruger);
+      expect(visitor.text()).not.toContain('Links');
+      const auth = useAuthStore();
+      auth.isAdmin = true;
+      const viewing = await mountProfile(kruger);
+      const tabs = viewing.findAll('[role="tab"]').map(tab => tab.text());
+      expect(tabs).not.toContain('Links');
+      expect(loadPlaceLinks).not.toHaveBeenCalled();
+    });
+
+    it('groups links by status with the actions each one offers', async () => {
+      vi.mocked(loadPlaceLinks).mockResolvedValue({
+        status: 'ok',
+        links: [
+          link({ id: 'p', status: 'proposed' }),
+          link({
+            id: 'c',
+            status: 'confirmed',
+            origin: 'manual',
+            coverage: null,
+          }),
+          link({ id: 'r', status: 'rejected' }),
+          link({ id: 't', status: 'retired' }),
+        ],
+      });
+      const wrapper = await openLinks();
+      expect(loadPlaceLinks).toHaveBeenCalledWith(placeId);
+      const groups = wrapper.findAll('.links-group');
+      expect(groups.map(group => group.attributes('data-status'))).toEqual([
+        'proposed',
+        'confirmed',
+        'rejected',
+        'retired',
+      ]);
+      const actions = (id: string) =>
+        wrapper
+          .get(`[data-link="${id}"]`)
+          .findAll('button')
+          .slice(1)
+          .map(button => button.text());
+      expect(actions('p')).toEqual(['Confirm', 'Reject']);
+      expect(actions('c')).toEqual(['Reject', 'Retire']);
+      expect(actions('r')).toEqual(['Confirm', 'Retire']);
+      expect(actions('t')).toEqual([]);
+      const proposed = wrapper.get('[data-link="p"]').text();
+      expect(proposed).toContain('Recognised by');
+      expect(proposed).toContain('62.0% of this place inside');
+      expect(wrapper.get('[data-link="c"]').text()).toContain(
+        'Added by an admin'
+      );
+    });
+
+    it('confirms, rejects, and retires with the stored subject and object', async () => {
+      vi.mocked(loadPlaceLinks).mockResolvedValue({
+        status: 'ok',
+        links: [
+          link({ id: 'p', status: 'proposed' }),
+          link({
+            id: 'c',
+            typeId: 'located_in',
+            outward: true,
+            otherId: parkId,
+            status: 'confirmed',
+          }),
+        ],
+      });
+      const wrapper = await openLinks();
+      const press = async (id: string, label: string) => {
+        const button = wrapper
+          .get(`[data-link="${id}"]`)
+          .findAll('button')
+          .find(item => item.text() === label);
+        if (!button) throw new Error(`Missing ${label}`);
+        await button.trigger('click');
+        await flushPromises();
+      };
+      await press('p', 'Confirm');
+      await press('p', 'Reject');
+      await press('c', 'Retire');
+      expect(vi.mocked(setPlaceRelationship).mock.calls).toEqual([
+        [siteId, 'recognises', placeId, 'confirmed'],
+        [siteId, 'recognises', placeId, 'rejected'],
+        [placeId, 'located_in', parkId, 'retired'],
+      ]);
+      // Each change reads the links and the Related tab again
+      expect(loadPlaceLinks).toHaveBeenCalledTimes(4);
+      expect(loadRelatedPlaces).toHaveBeenCalledTimes(4);
+    });
+
+    it('shows the error on the link when a change fails', async () => {
+      vi.mocked(loadPlaceLinks).mockResolvedValue({
+        status: 'ok',
+        links: [link({ id: 'p' })],
+      });
+      vi.mocked(setPlaceRelationship).mockResolvedValue({
+        status: 'error',
+        message: 'the reverse recognises link is already stored',
+      });
+      const wrapper = await openLinks();
+      await wrapper
+        .get('[data-link="p"] .links-actions button')
+        .trigger('click');
+      await flushPromises();
+      expect(wrapper.get('[data-link="p"] [role="alert"]').text()).toBe(
+        'the reverse recognises link is already stored'
+      );
+    });
+
+    it.each([
+      ['Recognised by', siteId, 'recognises', placeId],
+      ['Contains', siteId, 'located_in', placeId],
+      ['Part of', placeId, 'part_of', siteId],
+      ['Overlaps', placeId, 'overlaps', siteId],
+    ])(
+      'adds a link labelled %s as confirmed',
+      async (label, subject, type, object) => {
+        vi.useFakeTimers();
+        vi.mocked(loadPlaceLinks).mockResolvedValue({
+          status: 'ok',
+          links: [],
+        });
+        vi.mocked(searchPlaces).mockResolvedValue({
+          status: 'ok',
+          places: [
+            {
+              id: siteId,
+              name: 'Kruger to Canyons',
+              designation: null,
+              iso3: 'ZAF',
+              area_km2: 26000,
+              cropland_percent: null,
+              place_type_id: 'biosphere_reserve',
+            },
+          ],
+        });
+        const wrapper = await openLinks(true);
+        expect(document.body.querySelector('#link-type')).toBeNull();
+        await wrapper.get('.links-open').trigger('click');
+        await flushPromises();
+        // The popover renders outside the profile
+        const body = new DOMWrapper(document.body);
+        const select = body.get<HTMLSelectElement>('#link-type');
+        const index = [...select.element.options].findIndex(
+          option => option.text.trim() === label
+        );
+        await select.setValue(String(index));
+        await body.get('#link-place').setValue('Canyons');
+        await vi.advanceTimersByTimeAsync(300);
+        await flushPromises();
+        expect(searchPlaces).toHaveBeenCalledWith(
+          'Canyons',
+          expect.any(AbortSignal)
+        );
+        const item = document.body.querySelector<HTMLElement>('.suggest-item');
+        if (!item) throw new Error('Missing search result');
+        item.click();
+        await flushPromises();
+        await body.get('.links-add').trigger('submit');
+        await flushPromises();
+        vi.useRealTimers();
+        expect(setPlaceRelationship).toHaveBeenCalledWith(
+          subject,
+          type,
+          object,
+          'confirmed'
+        );
+        // A saved link closes the popover
+        expect(document.body.querySelector('.links-add')).toBeNull();
+        wrapper.unmount();
+      }
     );
-    const section = wrapper.get('.place-recognised');
-    expect(section.findAll('.place-result')).toHaveLength(20);
-    expect(section.find('.place-thumb').exists()).toBe(true);
-
-    await section.get('.place-recognised-more').trigger('click');
-    expect(section.findAll('.place-result')).toHaveLength(23);
-    expect(section.find('.place-recognised-more').exists()).toBe(false);
-
-    await section.findAll('.place-result')[0].trigger('click');
-    expect(wrapper.emitted('open')).toEqual([[parks[0].id]]);
-    // The map draws the listed areas only while the tab is open
-    expect(wrapper.emitted('areas')?.at(-1)).toEqual([
-      parks.map(park => park.id),
-    ]);
-    await openTab(wrapper, 'Overview');
-    expect(wrapper.emitted('areas')?.at(-1)).toEqual([null]);
-    wrapper.unmount();
   });
 
   it('shows no Edit/View toggle to a visitor', async () => {
@@ -397,19 +641,16 @@ describe('Place profile', () => {
     expect(wrapper.find('.place-recognitions').exists()).toBe(false);
   });
 
-  it('says when no conservation area is linked to a recognition', async () => {
-    vi.mocked(loadRecognisedPlaces).mockResolvedValue({
-      status: 'ok',
-      places: [],
-    });
+  it('says when a place has no related places', async () => {
     const wrapper = await mountProfile({
       ...kruger,
       placeTypeId: 'ramsar_site',
     });
-    await openTab(wrapper, 'Areas');
+    await openTab(wrapper, 'Related');
     expect(wrapper.get('[role="tabpanel"]').text()).toBe(
-      'No conservation area lies at least 75% inside this recognition.'
+      'No related places yet.'
     );
+    expect(wrapper.emitted('areas')).toBeUndefined();
   });
 
   it('shows the stored name, country, designation, area, and source', async () => {
@@ -425,7 +666,7 @@ describe('Place profile', () => {
     ]);
     expect(wrapper.get('.place-area').text()).toBe('19,485 km²');
     const tabs = wrapper.findAll('[role="tab"]').map(tab => tab.text());
-    expect(tabs).toEqual(['Overview', 'Landscape', 'Species']);
+    expect(tabs).toEqual(['Overview', 'Related', 'Landscape', 'Species']);
     const overview = wrapper.get('[role="tabpanel"]').text();
     expect(overview).toContain('19,485.20 km²');
     const source = wrapper.get('.place-source').text();
