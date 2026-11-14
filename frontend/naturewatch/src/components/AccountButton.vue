@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LogOut, UserRound } from '@lucide/vue';
+import { LogOut, ShieldCheck, UserRound } from '@lucide/vue';
 import {
   Popover,
   PopoverContent,
@@ -39,6 +39,10 @@ const auth = useAuthStore();
           {{ auth.isAdmin ? 'Admin' : 'No role' }}
         </span>
       </div>
+      <router-link v-if="auth.isAdmin" to="/admin" class="map-control">
+        <ShieldCheck :size="16" aria-hidden="true" />
+        Admin
+      </router-link>
       <button type="button" class="map-control" @click="auth.signOut()">
         <LogOut :size="16" aria-hidden="true" />
         Sign out
@@ -89,6 +93,10 @@ const auth = useAuthStore();
 .account-panel .account-email {
   font-size: 14px;
   overflow-wrap: anywhere;
+}
+
+.account-panel a.map-control {
+  text-decoration: none;
 }
 
 .account-panel .account-role {

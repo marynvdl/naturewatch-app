@@ -34,6 +34,22 @@ DATABASE_URL=... .venv/bin/python supabase/derive_recognises.py confirm 0.5
 
 On 12 November 2026 `derive` inserted 1,162 hosted links for 875 recognitions before the restart. `compute` ran on a 16 GB workstation in 4 minutes, with a peak of 1.5 GB, and wrote 14,765 links. For the 875 recognitions done in the database it found the same 1,162 pairs, with coverages within 0.0002. `load` inserted the other 13,603, and the table holds 5 MB. The user chose to confirm at 75%: 8,015 links were confirmed (World Heritage 524, Ramsar 793, UNESCO-MAB 1,526, Natura 2000 4,062, Emerald 909, Other regional 201), and 6,750 stay `proposed`. 1,023 of the UNESCO-MAB links are from Nilgiri, over Indian Reserve Forest records that cover its area 5.6 times over.
 
+## Photo suggestions
+
+`suggest_photos.py` suggests Wikimedia Commons photographs for the published World Heritage Sites (Molding Places task 05). It never approves one. An admin reviews them on `/admin`.
+
+```bash
+WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_photos.py fetch
+WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_photos.py counts
+WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_photos.py load
+```
+
+`fetch` only reads the database: each site's display name and its confirmed `wdpa_site_id`. One Wikidata query finds the items whose WDPA id (P809) matches, with their image (P18) and Commons category (P373). For each site it then takes the P18 file, up to 50 files in the category, and up to 30 results of a Commons search in the File namespace by the place's name, in that order. It keeps JPEG, PNG, and WebP files at least 1,000 px wide, under a licence in `licences`, with a creator, whose title has none of the words map, logo, flag, or locator, and stops at 12 per site. The score is 1.0 for P18, 0.7 for a category file, and 0.4 for a search result, less 0.01 for each file kept before it from the same origin. The alt text is the first sentence of the Commons description, or the file name. The caption is the description up to its first line break, at most 300 characters. It writes `suggest_photos.tsv` and caches every API response in `suggest_photos_cache/` in the work directory, so a second start sends no request twice. It pauses half a second between requests, sends `maxlag=5` to Commons, and waits at most 2 minutes on a `Retry-After`. The Wikidata query service limited clients to one query a minute on 14 November 2026, so all sites go in one query. The User-Agent is `suggest-photos/1`, or `SUGGEST_PHOTOS_USER_AGENT` when set.
+
+`counts` reports how many rows of the file `load` would add. `load` writes them in one transaction: a Commons file already in `images` is reused, otherwise it is inserted with `uploaded_by` null, and the place gets a `suggested` link with `suggested_by_pipeline` `suggest_photos/1`, the score, the alt text, and the caption. A place that already has a link to the file, in any status, is skipped, so a rerun adds nothing and a rejected photograph stays rejected.
+
+On three sites, Wikidata had a WDPA id for one, Maloti-Drakensberg Park. Its image and two other UNESCO photographs have no licence code on Commons, and were refused. The name search supplied the rest.
+
 ## Local database
 
 ```bash

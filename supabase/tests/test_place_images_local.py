@@ -142,8 +142,16 @@ class PlaceImagesLocalTest(unittest.TestCase):
         return {r["id"]: (r["p"], r["is_primary"]) for r in rows}
 
     def visible(self, user_id: str | None, table: str = "place_images") -> int:
+        """Rows of this test's places the user can read. Other rows are left out, so
+        photographs already in the local database do not count."""
+        mine = (
+            "place_id in (%s, %s)" if table == "place_images" else
+            "id in (select image_id from public.place_images where place_id in (%s, %s))"
+        )
         self.act_as(user_id)
-        n = self.conn.execute(f"select count(*) as n from public.{table}").fetchone()["n"]
+        n =self.conn.execute(
+            f"select count(*) as n from public.{table} where {mine}", (self.park, self.other)
+        ).fetchone()["n"]
         self.conn.execute("reset role")
         return n
 
@@ -297,6 +305,58 @@ class PlaceImagesLocalTest(unittest.TestCase):
                 {"table_name": "place_images", "action": "insert", "actor": self.admin},
                 {"table_name": "place_images", "action": "update", "actor": self.admin},
             ],
+        )
+
+    def suggest(self, place: str, image_id: str) -> None:
+        """A suggested link, as suggest_photos.py writes it."""
+        self.conn.execute(
+            """
+            insert into public.place_images (
+              place_id, image_id, status, suggested_by_pipeline, suggestion_score, alt_text
+            ) values (%s, %s, 'suggested', 'suggest_photos/1', 0.7, 'A waterfall')
+            """,
+            (place, image_id),
+        )
+
+    def queue(self, user_id: str | None = "admin") -> list[dict]:
+        rows = self.call(
+            "select place_id::text as place_id, name, place_type_id, suggested_count, "
+            "total_count from public.photo_queue(200, 0)",
+            (),
+            user_id,
+        )
+        return [r for r in rows if r["place_id"] in (self.park, self.other)]
+
+    def test_photo_queue_lists_places_with_suggestions(self):
+        first = self.add(self.other, commons())["image_id"]
+        second = self.add(self.other, commons("Zqx dusk.jpg"))["image_id"]
+        self.suggest(self.park, first)
+        self.suggest(self.park, second)
+        self.conn.execute(
+            "insert into public.place_curations (place_id, display_name) values (%s, 'Zqx Curated')",
+            (self.park,),
+        )
+        rows = self.queue()
+        self.assertEqual(
+            [(r["name"], r["place_type_id"], r["suggested_count"]) for r in rows],
+            [("Zqx Curated", "conservation_area", 2)],
+        )
+        self.assertGreaterEqual(rows[0]["total_count"], 1)
+
+        self.set(self.park, first, {"status": "approved"})
+        self.assertEqual(self.queue()[0]["suggested_count"], 1)
+        self.set(self.park, second, {"status": "rejected"})
+        self.assertEqual(self.queue(), [])
+
+    def test_only_an_admin_reads_the_photo_queue(self):
+        stranger = self.user()
+        for who in (None, stranger):
+            self.raises(self.errors.InsufficientPrivilege, self.queue, who)
+        self.raises(
+            self.errors.InvalidParameterValue,
+            self.call,
+            "select * from public.photo_queue(0, 0)",
+            (),
         )
 
 
