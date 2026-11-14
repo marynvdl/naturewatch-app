@@ -14,6 +14,19 @@ import {
   type PlaceDetail,
   type PlaceLink,
 } from '@/places/api';
+import { fetchCommonsFile } from '@/places/commons';
+import {
+  addPlaceImage,
+  linkPlaceImage,
+  loadImageLicences,
+  loadPlaceImages,
+  loadBorrowedImages,
+  loadMainPhotos,
+  orderPlaceImages,
+  setPlaceImage,
+  uploadPlaceImage,
+  type PlaceImage,
+} from '@/places/images';
 import { PHOTOS_NONE } from '@/places/photos';
 import useAuthStore from '@/store/AuthStore';
 
@@ -36,6 +49,27 @@ vi.mock('@/places/api', async importOriginal => {
     searchPlaces: vi.fn(),
     setPlaceRelationship: vi.fn(),
   };
+});
+
+vi.mock('@/places/images', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/places/images')>();
+  return {
+    ...actual,
+    addPlaceImage: vi.fn(),
+    linkPlaceImage: vi.fn(),
+    loadImageLicences: vi.fn(),
+    loadPlaceImages: vi.fn(),
+    loadBorrowedImages: vi.fn(),
+    loadMainPhotos: vi.fn(),
+    orderPlaceImages: vi.fn(),
+    setPlaceImage: vi.fn(),
+    uploadPlaceImage: vi.fn(),
+  };
+});
+
+vi.mock('@/places/commons', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/places/commons')>();
+  return { ...actual, fetchCommonsFile: vi.fn() };
 });
 
 const placeId = '22222222-2222-2222-2222-222222222222';
@@ -108,6 +142,14 @@ describe('Place profile', () => {
       curation: null,
     });
     vi.mocked(loadRelatedPlaces).mockResolvedValue({ status: 'ok', links: [] });
+    vi.mocked(loadPlaceImages).mockResolvedValue({ status: 'ok', images: [] });
+    vi.mocked(loadBorrowedImages).mockResolvedValue({
+      status: 'ok',
+      fromRecognitions: [],
+      fromAreas: [],
+      areasTotal: 0,
+    });
+    vi.mocked(loadMainPhotos).mockResolvedValue(new Map());
   });
 
   it('shows the tagline under the title and the description in Overview', async () => {
@@ -583,7 +625,7 @@ describe('Place profile', () => {
         expect(document.body.querySelector('#link-type')).toBeNull();
         await wrapper.get('.links-open').trigger('click');
         await flushPromises();
-        // The popover renders outside the profile
+        // The dialog renders outside the profile
         const body = new DOMWrapper(document.body);
         const select = body.get<HTMLSelectElement>('#link-type');
         const index = [...select.element.options].findIndex(
@@ -601,7 +643,7 @@ describe('Place profile', () => {
         if (!item) throw new Error('Missing search result');
         item.click();
         await flushPromises();
-        await body.get('.links-add').trigger('submit');
+        await body.get('.edit-form').trigger('submit');
         await flushPromises();
         vi.useRealTimers();
         expect(setPlaceRelationship).toHaveBeenCalledWith(
@@ -610,11 +652,364 @@ describe('Place profile', () => {
           object,
           'confirmed'
         );
-        // A saved link closes the popover
-        expect(document.body.querySelector('.links-add')).toBeNull();
+        // A saved link closes the dialog
+        expect(document.body.querySelector('.edit-form')).toBeNull();
         wrapper.unmount();
       }
     );
+  });
+
+  describe('photos', () => {
+    const siteId = '77777777-7777-7777-7777-777777777777';
+
+    /** A photograph linked to Kruger. */
+    function photo(values: Partial<PlaceImage>): PlaceImage {
+      return {
+        placeId,
+        imageId: 'a',
+        status: 'approved',
+        isPrimary: false,
+        position: 1,
+        caption: null,
+        altText: 'Grassland at dusk',
+        suggestedByPipeline: null,
+        createdAt: '2026-11-14T09:00:00Z',
+        src: 'https://example.test/a.jpg',
+        thumbnail: 'https://example.test/a-small.jpg',
+        creator: 'A. Photographer',
+        sourceId: 'wikimedia-commons',
+        sourceTitle: 'Wikimedia Commons',
+        sourceUrl: 'https://commons.wikimedia.org/wiki/File:A.jpg',
+        licenceId: 'cc-by-sa-4.0',
+        licenceTitle:
+          'Creative Commons Attribution-ShareAlike 4.0 International',
+        licenceUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+        ...values,
+      };
+    }
+
+    const stored = [
+      photo({ imageId: 'b', position: 2, altText: 'Second' }),
+      photo({ imageId: 'm', isPrimary: true, position: 3, altText: 'Main' }),
+      photo({ imageId: 'a', position: 1, altText: 'First' }),
+      photo({ imageId: 'c', position: 4, altText: 'Third' }),
+      photo({ imageId: 's', status: 'suggested', position: null }),
+      photo({ imageId: 'r', status: 'rejected', position: null }),
+    ];
+
+    /** Switch to edit mode and open the Photos tab. */
+    async function openPhotos(attach = false) {
+      const auth = useAuthStore();
+      auth.isAdmin = true;
+      auth.editMode = true;
+      const wrapper = await mountProfile(kruger, attach);
+      await openTab(wrapper, 'Photos');
+      await flushPromises();
+      return wrapper;
+    }
+
+    /** The labels of a photograph's buttons. */
+    function actions(
+      wrapper: Awaited<ReturnType<typeof mountProfile>>,
+      id: string
+    ) {
+      return wrapper
+        .findAll(`[data-image="${id}"] button`)
+        .map(button => button.attributes('aria-label') ?? button.text());
+    }
+
+    /** Click one of a photograph's buttons by its label. */
+    async function click(
+      wrapper: Awaited<ReturnType<typeof mountProfile>>,
+      id: string,
+      label: string
+    ) {
+      const button = wrapper
+        .findAll(`[data-image="${id}"] button`)
+        .find(item => (item.attributes('aria-label') ?? item.text()) === label);
+      if (!button) throw new Error(`Missing ${label} on ${id}`);
+      await button.trigger('click');
+      await flushPromises();
+    }
+
+    beforeEach(() => {
+      vi.mocked(loadPlaceImages).mockResolvedValue({
+        status: 'ok',
+        images: stored,
+      });
+      vi.mocked(setPlaceImage).mockResolvedValue({ status: 'ok' });
+      vi.mocked(orderPlaceImages).mockResolvedValue({ status: 'ok' });
+      vi.mocked(linkPlaceImage).mockResolvedValue({ status: 'ok' });
+      vi.mocked(addPlaceImage).mockResolvedValue({ status: 'ok' });
+      vi.mocked(loadImageLicences).mockResolvedValue({
+        status: 'ok',
+        licences: [
+          { id: 'cc-by-4.0', title: 'Creative Commons Attribution 4.0' },
+        ],
+      });
+    });
+
+    it('shows approved photographs in the header, main first', async () => {
+      const wrapper = await mountProfile(kruger);
+      const header = wrapper.get('button.place-photo');
+      expect(header.attributes('aria-label')).toBe(
+        'View all 4 photographs. Main'
+      );
+      expect(header.text()).toContain('Photo: A. Photographer · CC BY-SA 4.0');
+      expect(wrapper.find('.place-photo-empty').exists()).toBe(false);
+    });
+
+    it('shows no Photos tab to a visitor or in view mode', async () => {
+      const visitor = await mountProfile(kruger);
+      expect(visitor.text()).not.toContain('Photos');
+      const auth = useAuthStore();
+      auth.isAdmin = true;
+      const viewing = await mountProfile(kruger);
+      const labels = viewing.findAll('[role="tab"]').map(tab => tab.text());
+      expect(labels).not.toContain('Photos');
+    });
+
+    it('groups photographs by status with the actions each one offers', async () => {
+      const wrapper = await openPhotos();
+      const groups = wrapper
+        .findAll('.photos-group')
+        .map(group => group.attributes('data-status'));
+      expect(groups).toEqual(['approved', 'suggested', 'rejected']);
+      const approved = wrapper
+        .findAll('[data-status="approved"] [data-image]')
+        .map(item => item.attributes('data-image'));
+      expect(approved).toEqual(['m', 'a', 'b', 'c']);
+      expect(wrapper.get('[data-image="m"] .photos-main').text()).toBe(
+        'Main photograph'
+      );
+      expect(actions(wrapper, 'm')).toEqual(['Reject']);
+      expect(actions(wrapper, 'b')).toEqual([
+        'Move up',
+        'Move down',
+        'Make main',
+        'Reject',
+      ]);
+      expect(actions(wrapper, 's')).toEqual(['Approve', 'Reject']);
+      expect(actions(wrapper, 'r')).toEqual(['Approve']);
+      const first = wrapper.get('[data-image="a"] [aria-label="Move up"]');
+      expect(first.attributes('disabled')).toBeDefined();
+      const last = wrapper.get('[data-image="c"] [aria-label="Move down"]');
+      expect(last.attributes('disabled')).toBeDefined();
+      expect(
+        wrapper.get('[data-image="b"] .photos-order').attributes('aria-label')
+      ).toBe('Order');
+    });
+
+    it('approves, rejects, makes main, and moves', async () => {
+      const wrapper = await openPhotos();
+      await click(wrapper, 's', 'Approve');
+      expect(setPlaceImage).toHaveBeenLastCalledWith(placeId, 's', {
+        status: 'approved',
+      });
+      await click(wrapper, 'm', 'Reject');
+      expect(setPlaceImage).toHaveBeenLastCalledWith(placeId, 'm', {
+        status: 'rejected',
+      });
+      await click(wrapper, 'b', 'Make main');
+      expect(setPlaceImage).toHaveBeenLastCalledWith(placeId, 'b', {
+        is_primary: true,
+      });
+      await click(wrapper, 'b', 'Move up');
+      expect(orderPlaceImages).toHaveBeenLastCalledWith(placeId, [
+        'm',
+        'b',
+        'a',
+        'c',
+      ]);
+      await click(wrapper, 'b', 'Move down');
+      expect(orderPlaceImages).toHaveBeenLastCalledWith(placeId, [
+        'm',
+        'a',
+        'c',
+        'b',
+      ]);
+      // Each change reads the photographs again, and the header with them
+      expect(vi.mocked(loadPlaceImages).mock.calls.length).toBeGreaterThan(5);
+    });
+
+    it('shows the error on the photograph when a change fails', async () => {
+      vi.mocked(setPlaceImage).mockResolvedValue({
+        status: 'error',
+        message: 'Only an approved photograph can be the main one.',
+      });
+      const wrapper = await openPhotos();
+      await click(wrapper, 'b', 'Make main');
+      expect(wrapper.get('[data-image="b"] [role="alert"]').text()).toBe(
+        'Only an approved photograph can be the main one.'
+      );
+    });
+
+    it('links a recognition photograph with Use here', async () => {
+      vi.mocked(loadBorrowedImages).mockResolvedValue({
+        status: 'ok',
+        fromRecognitions: [
+          {
+            placeId: siteId,
+            name: 'Kruger to Canyons',
+            images: [photo({ imageId: 'k', placeId: siteId })],
+          },
+        ],
+        fromAreas: [],
+        areasTotal: 0,
+      });
+      const wrapper = await openPhotos();
+      const section = wrapper.get('[data-status="recognitions"]');
+      expect(section.text()).toContain('Kruger to Canyons');
+      await click(wrapper, 'k', 'Use here');
+      expect(linkPlaceImage).toHaveBeenCalledWith(placeId, 'k');
+    });
+
+    it('offers the first photographs of the conservation areas inside a recognition', async () => {
+      const parkId = '88888888-8888-8888-8888-888888888888';
+      vi.mocked(loadBorrowedImages).mockResolvedValue({
+        status: 'ok',
+        fromRecognitions: [],
+        fromAreas: [
+          {
+            placeId: parkId,
+            name: 'Tree Park',
+            images: [photo({ imageId: 'p', placeId: parkId })],
+          },
+        ],
+        areasTotal: 14,
+      });
+      const wrapper = await openPhotos();
+      const section = wrapper.get('[data-status="areas"]');
+      expect(section.text()).toContain('From conservation areas');
+      expect(section.text()).toContain('The first 10 of 14 photographs.');
+      expect(section.text()).toContain('Tree Park');
+      await click(wrapper, 'p', 'Use here');
+      expect(linkPlaceImage).toHaveBeenCalledWith(placeId, 'p');
+    });
+
+    it('adds a photograph by Commons URL', async () => {
+      vi.useFakeTimers();
+      vi.mocked(fetchCommonsFile).mockResolvedValue({
+        status: 'ok',
+        file: {
+          title: 'File:Kruger giraffe.jpg',
+          pageUrl: 'https://commons.wikimedia.org/wiki/File:Kruger_giraffe.jpg',
+          fileUrl:
+            'https://upload.wikimedia.org/wikipedia/commons/a/a8/Kruger_giraffe.jpg',
+          width: 4480,
+          height: 5973,
+          creator: 'Dietmar Rabich',
+          licenceId: 'cc-by-sa-4.0',
+          caption: 'Giraffe near Skukuza',
+        },
+      });
+      const wrapper = await openPhotos(true);
+      await wrapper.get('.photos-open').trigger('click');
+      await flushPromises();
+      const body = new DOMWrapper(document.body);
+      await body
+        .get('#photo-commons')
+        .setValue('https://commons.wikimedia.org/wiki/File:Kruger_giraffe.jpg');
+      await vi.advanceTimersByTimeAsync(500);
+      await flushPromises();
+      vi.useRealTimers();
+      expect(fetchCommonsFile).toHaveBeenCalledWith(
+        'File:Kruger giraffe.jpg',
+        expect.any(AbortSignal)
+      );
+      expect(body.get('[data-preview="commons"]').text()).toContain(
+        'Dietmar Rabich · CC BY-SA 4.0'
+      );
+      expect(
+        body.get<HTMLTextAreaElement>('#photo-caption').element.value
+      ).toBe('Giraffe near Skukuza');
+      const submit = body.get('.edit-form button[type="submit"]');
+      expect(submit.attributes('disabled')).toBeDefined();
+      await body.get('#photo-alt').setValue('A giraffe among trees');
+      await body.get('.edit-form').trigger('submit');
+      await flushPromises();
+      expect(addPlaceImage).toHaveBeenCalledWith(placeId, {
+        external_url:
+          'https://upload.wikimedia.org/wikipedia/commons/a/a8/Kruger_giraffe.jpg',
+        source_id: 'wikimedia-commons',
+        source_record_id: 'File:Kruger giraffe.jpg',
+        source_url:
+          'https://commons.wikimedia.org/wiki/File:Kruger_giraffe.jpg',
+        creator_name: 'Dietmar Rabich',
+        licence_id: 'cc-by-sa-4.0',
+        width: 4480,
+        height: 5973,
+        alt_text: 'A giraffe among trees',
+        caption: 'Giraffe near Skukuza',
+      });
+      expect(document.body.querySelector('.edit-form')).toBeNull();
+      wrapper.unmount();
+    });
+
+    it('uploads a photograph with its creator and licence', async () => {
+      vi.mocked(uploadPlaceImage).mockResolvedValue({
+        status: 'ok',
+        storagePath: `uploads/${'ab'.repeat(32)}.jpg`,
+        sha256: 'ab'.repeat(32),
+        width: 1600,
+        height: 1200,
+      });
+      URL.createObjectURL = vi.fn(() => 'blob:preview');
+      URL.revokeObjectURL = vi.fn();
+      const wrapper = await openPhotos(true);
+      await wrapper.get('.photos-open').trigger('click');
+      await flushPromises();
+      const body = new DOMWrapper(document.body);
+      const upload = [...document.body.querySelectorAll('button')].find(
+        button => button.textContent?.trim() === 'Upload'
+      );
+      if (!upload) throw new Error('Missing Upload');
+      upload.click();
+      await flushPromises();
+      const input = body.get<HTMLInputElement>('#photo-file');
+      const file = new File(['x'], 'dusk.jpg', { type: 'image/jpeg' });
+      Object.defineProperty(input.element, 'files', { value: [file] });
+      await input.trigger('change');
+      await body.get('#photo-creator').setValue('The admin');
+      await body.get('#photo-licence').setValue('cc-by-4.0');
+      await body.get('#photo-alt').setValue('Grassland at dusk');
+      await body.get('.edit-form').trigger('submit');
+      await flushPromises();
+      expect(uploadPlaceImage).toHaveBeenCalledWith(file);
+      expect(addPlaceImage).toHaveBeenCalledWith(placeId, {
+        storage_path: `uploads/${'ab'.repeat(32)}.jpg`,
+        source_id: 'sooty-earth-contributors',
+        creator_name: 'The admin',
+        licence_id: 'cc-by-4.0',
+        sha256: 'ab'.repeat(32),
+        width: 1600,
+        height: 1200,
+        alt_text: 'Grassland at dusk',
+        caption: undefined,
+      });
+      wrapper.unmount();
+    });
+
+    it('refuses a file that is not a photograph', async () => {
+      URL.createObjectURL = vi.fn(() => 'blob:preview');
+      const wrapper = await openPhotos(true);
+      await wrapper.get('.photos-open').trigger('click');
+      await flushPromises();
+      const upload = [...document.body.querySelectorAll('button')].find(
+        button => button.textContent?.trim() === 'Upload'
+      );
+      upload?.click();
+      await flushPromises();
+      const body = new DOMWrapper(document.body);
+      const input = body.get<HTMLInputElement>('#photo-file');
+      const file = new File(['x'], 'map.tiff', { type: 'image/tiff' });
+      Object.defineProperty(input.element, 'files', { value: [file] });
+      await input.trigger('change');
+      expect(body.get('.edit-form [role="alert"]').text()).toBe(
+        'Only JPEG, PNG, and WebP photographs can be uploaded.'
+      );
+      wrapper.unmount();
+    });
   });
 
   it('shows no Edit/View toggle to a visitor', async () => {

@@ -13,7 +13,14 @@ Decided 14 November 2026 by the user:
 - **Uploads go to Supabase Storage**, in a new public bucket `place-images`. Anyone can read an object. Only an admin can write one, through Storage policies that check `has_role('admin')`. Uploads come from the browser with the signed-in session, as the other admin writes do.
 - **A Commons photograph is linked, not copied.** `images.external_url` holds the Commons file, and the browser loads it from Commons. A photograph from any other site must be uploaded. URLs from other sites are not accepted.
 - **Licences:** `cc0-1.0`, `public-domain`, and `cc-by` and `cc-by-sa` in versions 2.0, 2.5, 3.0, and 4.0. No NC or ND licences.
-- **A Photos tab in edit mode only**, like Links, with **Add +** at its top right opening the add form in a popover.
+- **A Photos tab in edit mode only**, like Links, with **Add +** at its top right opening the add form.
+
+Changed 14 November 2026 by the user, during evaluation:
+
+- **The add forms are dialogs.** **Add +** on the Links and Photos tabs opens a larger form in the centre of the screen, over the map, in the style of the Filters dialog, with **Cancel** and **Add** at its foot.
+- **Place cards show the main photograph.** The card in the Places list, search, and the Related tab shows the place's main photograph, or the first in its gallery, in place of the placeholder.
+- **Photographs from other sites are uploaded.** The Upload choice says to save such a photograph and upload it. Accepting their addresses is deferred.
+- **Both directions.** A recognition's Photos tab also offers, under **From conservation areas**, the approved photographs of the conservation areas at least 75% inside it, the first 10 added, saying how many there are when there are more.
 
 ## Facts already stored
 
@@ -47,8 +54,8 @@ From the code and the hosted database on 14 November 2026:
    - A mapping from a link to `PlacePhoto`: the creator as photographer, the source title linked to `source_url`, the licence title linked to its URL, the caption as title, and the alt text.
 4. **Profile, edit mode: the Photos tab.**
    - The add form, with two choices: **Upload** (a file input) or **Commons URL**. A Commons URL shows a preview with the creator and licence it found. An upload asks for the creator and a licence from a select, with "Sooty Earth contributors" as the source. Both ask for alt text, which is required, and an optional caption. A Commons description fills the caption. A new photograph is `approved`. A failed save keeps the form open with the error.
-   - Approved photographs in gallery order, each as a thumbnail with its credit and licence. The main one is marked. The others have **Make main**, **Move up**, **Move down**, and **Reject**. Suggested photographs have **Approve** and **Reject**. Rejected photographs have **Approve**.
-   - **From recognitions**: the photographs from `loadRecognitionImages`, grouped by recognition name, each with **Use here**.
+   - Approved photographs in gallery order, each as a thumbnail with its credit and licence. The main one is marked. The others have **Make main** and **Reject**, and small up and down arrows stacked at the card's top right (changed 14 November 2026 by the user, during evaluation). Suggested photographs have **Approve** and **Reject**. Rejected photographs have **Approve**.
+   - **From recognitions**, and on a recognition **From conservation areas**: the photographs from `loadBorrowedImages`, grouped by place name, each with **Use here**.
    - After a change, the tab and the header photograph refresh.
    - The Landscape and Measure panel style. Every existing control keeps its place.
 5. **Profile, view mode.** The profile loads the approved photographs and passes them to `PlacePhotos`: the main one first, then by `gallery_position`. A place without any keeps "Camouflaged for now".
@@ -70,7 +77,6 @@ From the code and the hosted database on 14 November 2026:
 - Do not search Commons or Wikidata for photographs, or suggest any. That is task 05.
 - Do not add the `/admin` route, the photo queue, or tagline suggestions. Those are tasks 05 and 06.
 - Do not change the gallery's design or controls from task 011.
-- Do not add photographs to place cards.
 - Do not add `species_images`.
 - Do not call the FastAPI backend, or use Google Cloud Storage.
 - Do not apply the migration before approval.

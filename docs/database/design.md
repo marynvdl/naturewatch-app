@@ -224,7 +224,7 @@ where b.is_current
 
 ### 4.3 Sources and licences
 
-*In place* for `licences`, `sources`, and `source_releases` since task 03 (`20261111100000_sources.sql`). The provenance columns come with the tables that carry them, in later tasks.
+*In place* for `licences`, `sources`, and `source_releases` since task 03 (`20261111100000_sources.sql`). The provenance columns come with the tables that carry them, in later tasks. Molding Places task 04 (`20261124100000_place_images.sql`) added the photograph licences, `cc0-1.0`, `public-domain`, and `cc-by` and `cc-by-sa` in versions 2.0, 2.5, 3.0, and 4.0, and the sources `wikimedia-commons` (`platform`) and `sooty-earth-contributors` (`contributors`).
 
 **`licences`**: `id` text PK (e.g. `cc-by-4.0`), `title`, `url`, `requires_attribution`, `share_alike`, `allows_commercial`.
 
@@ -417,11 +417,13 @@ Spatial overlap is found on demand by an admin-only function, `place_overlaps(pl
 
 ### 4.6 People, images, audit
 
-*Proposed.* [Molding Places](../parcels/molding-places.md) adds these tables, each with the task whose screen uses it first: `images` and `place_images` in task 04, and `place_tagline_suggestions` in task 06. Only admins sign in at first. Contributor policies come with contributors.
+*Proposed.* [Molding Places](../parcels/molding-places.md) adds these tables, each with the task whose screen uses it first: `place_tagline_suggestions` in task 06. Only admins sign in at first. Contributor policies come with contributors.
 
-*In place* since Molding Places task 01 (`20261121100000_people_and_audit.sql`) for `profiles`, `user_roles`, `has_role()`, and `audit_log`. A trigger on `auth.users` creates each profile. A signed-in user reads only their own profile and roles, and only an admin reads `audit_log`. Roles are granted by the owner with a one-off statement, so no email or user id is in a migration. `audit_row(key columns…)` is the one trigger function for audited tables. It is on `user_roles` and `place_curations` so far. `actor` is null for statements the owner or a pipeline runs.
+*In place* since Molding Places task 01 (`20261121100000_people_and_audit.sql`) for `profiles`, `user_roles`, `has_role()`, and `audit_log`. A trigger on `auth.users` creates each profile. A signed-in user reads only their own profile and roles, and only an admin reads `audit_log`. Roles are granted by the owner with a one-off statement, so no email or user id is in a migration. `audit_row(key columns…)` is the one trigger function for audited tables. It is on `user_roles`, `place_curations`, `place_relationships`, `images`, and `place_images` so far. `actor` is null for statements the owner or a pipeline runs.
 
 *In place* since Molding Places task 02 (`20261122100000_place_curations.sql`) for `place_curations`, with `updated_at` too. Admins write it only through `curate_place(place_id, values jsonb)`: the keys of `values` are the fields to change, and a null or blank value resets one. The row is deleted once every value is null. `place_designations()` lists the designations published places show, with their counts, for edit mode to suggest. CHECKs keep the tagline to one line of at most 120 characters, the description to at most 2,000, and `iso3` to three-letter codes. Visitors read the rows of published places.
+
+*In place* since Molding Places task 04 (`20261124100000_place_images.sql`) for `images` and `place_images`, both with `created_at` and `updated_at`. `images` also has a unique index on `(source_id, source_record_id)` where the record id is set, so a Commons file (`File:…`) is stored once. `place_images` has `alt_text` not null, a unique index on `place_id` where `is_primary`, and an index on `image_id`. Uploads go to the public Storage bucket `place-images` at `uploads/<sha256>.<ext>`: JPEG, PNG, or WebP, at most 10 MB, written only by admins through Storage policies. A Commons photograph is linked by `external_url`, not copied. Admins write the tables only through `add_place_image(place_id, image jsonb)`, which stores an image or reuses the one with the same `sha256` or Commons file and links it as `approved`, `link_place_image(place_id, image_id)`, which links an approved image of another place, `set_place_image(place_id, image_id, values jsonb)`, which changes `status`, `caption`, `alt_text`, or `is_primary`, and `order_place_images(place_id, image_ids[])`. Visitors read approved links of published places and the active images they point to. Admins read every row. `audit_row()` is on both tables.
 
 **`profiles`**: `id` uuid PK, FK → `auth.users` `on delete cascade`, `display_name`. References to a profile from review columns use `on delete set null`, so a deleted account leaves "former user".
 
@@ -487,7 +489,7 @@ Supabase Auth does all sign-in. There are no password, session, or identity tabl
 
 Approving copies the text, as the reviewer edited it, into `place_curations.tagline`.
 
-**`audit_log`**: `id` bigint identity, `table_name`, `row_id`, `action`, `actor` (from `auth.uid()`), `changed_at`, `old_values` jsonb, `new_values` jsonb. Filled by trigger on `places`, `place_curations`, `place_boundaries` (without `geom`), `place_source_ids`, `place_relationships`, `place_images`, `place_tagline_suggestions`, `user_roles`, `stat_selections`. Each trigger is added with the first screen that edits its table. Not on `place_stats` or `boundary_checks`, which are append-only already.
+**`audit_log`**: `id` bigint identity, `table_name`, `row_id`, `action`, `actor` (from `auth.uid()`), `changed_at`, `old_values` jsonb, `new_values` jsonb. Filled by trigger on `places`, `place_curations`, `place_boundaries` (without `geom`), `place_source_ids`, `place_relationships`, `images`, `place_images`, `place_tagline_suggestions`, `user_roles`, `stat_selections`. Each trigger is added with the first screen that edits its table. Not on `place_stats` or `boundary_checks`, which are append-only already.
 
 ## 5. Diagrams
 
@@ -721,7 +723,7 @@ Rules:
 - **`geom` is never granted** to `anon` or `authenticated`. Grants on `place_boundaries` list the other columns. Map shapes come from PMTiles. `place_bounds` reads the bbox columns.
 - **Every table**: enable RLS, `revoke all … from public, anon, authenticated`, then grant what is needed. Supabase grants new objects in `public` to `anon` and `authenticated` by default.
 - **Every function**: `revoke execute … from public`, then grant to the roles that need it. Postgres grants new functions to `public`.
-- **Privileged RPCs** (`curate_place`, `set_place_relationship`, `approve_boundary`, `set_stats_eligibility`, `confirm_source_match`, `review_overlap`, `review_place_image`, `submit_boundary`): `security definer`, `set search_path = ''`, check `has_role()` inside, execute granted to `authenticated` only.
+- **Privileged RPCs** (`curate_place`, `set_place_relationship`, `add_place_image`, `link_place_image`, `set_place_image`, `order_place_images`, `approve_boundary`, `set_stats_eligibility`, `confirm_source_match`, `review_overlap`, `submit_boundary`): `security definer`, `set search_path = ''`, check `has_role()` inside, execute granted to `authenticated` only.
 - **Views** use `security_invoker = true`. Supabase's linter flags views that run as their owner. The tables under each view need their own public policy.
 - **Policies** wrap `auth.uid()` as `(select auth.uid())` so it runs once per query. Columns used in policies are indexed.
 

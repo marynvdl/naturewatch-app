@@ -10,12 +10,8 @@ import {
   ComboboxViewport,
 } from 'reka-ui';
 import { Plus } from '@lucide/vue';
+import EditDialog from '@/components/EditDialog.vue';
 import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import {
   LINK_CHOICES,
   linkLabel,
@@ -73,7 +69,7 @@ const shown = ref<Record<LinkStatus, number>>(initialShown());
 const busyId = ref<string | null>(null);
 const linkError = ref<{ id: string; message: string } | null>(null);
 
-/** The add form's popover is open. */
+/** The add form's dialog is open. */
 const addOpen = ref(false);
 const choiceIndex = ref(0);
 const query = ref('');
@@ -197,7 +193,7 @@ function resetForm() {
   addError.value = '';
 }
 
-/** Store the chosen link as confirmed, then close the popover. */
+/** Store the chosen link as confirmed, then close the dialog. */
 async function add() {
   const other = chosen.value;
   const choice = LINK_CHOICES[choiceIndex.value];
@@ -224,7 +220,7 @@ async function add() {
   emit('changed');
 }
 
-/** Closing the popover empties the form. */
+/** Closing the dialog empties the form. */
 watch(addOpen, open => {
   if (!open) resetForm();
 });
@@ -238,96 +234,87 @@ onBeforeUnmount(() => {
 <template>
   <div class="links">
     <div class="links-bar">
-      <Popover v-model:open="addOpen">
-        <PopoverTrigger as-child>
-          <Button type="button" size="sm" variant="outline" class="links-open">
-            Add
-            <Plus :size="14" :stroke-width="2.25" aria-hidden="true" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end">
-          <form class="links-add" aria-label="Add a link" @submit.prevent="add">
-            <p class="map-section links-heading">Add a link</p>
-            <label class="links-field" for="link-type">
-              <span class="links-label">This place</span>
-              <select
-                id="link-type"
-                v-model.number="choiceIndex"
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        class="links-open"
+        @click="addOpen = true"
+      >
+        Add
+        <Plus :size="14" :stroke-width="2.25" aria-hidden="true" />
+      </Button>
+      <EditDialog
+        v-model:open="addOpen"
+        title="Add a link"
+        description="Choose how this place relates to another place, then find that place by name."
+        submit-label="Add"
+        :submit-disabled="!chosen"
+        :busy="adding"
+        :error="addError"
+        @submit="add"
+      >
+        <label class="links-field" for="link-type">
+          <span class="links-label">This place</span>
+          <select
+            id="link-type"
+            v-model.number="choiceIndex"
+            class="links-input"
+          >
+            <option
+              v-for="(choice, index) in LINK_CHOICES"
+              :key="`${choice.typeId}-${choice.outward}`"
+              :value="index"
+            >
+              {{ choice.label }}
+            </option>
+          </select>
+        </label>
+        <div class="links-field">
+          <span id="link-place-label" class="links-label">Place</span>
+          <ComboboxRoot
+            :model-value="chosen"
+            by="id"
+            ignore-filter
+            :open="query.trim().length > 0 && !chosen"
+            @update:model-value="onChoose"
+          >
+            <ComboboxAnchor>
+              <ComboboxInput
+                id="link-place"
+                aria-labelledby="link-place-label"
+                :model-value="query"
                 class="links-input"
-              >
-                <option
-                  v-for="(choice, index) in LINK_CHOICES"
-                  :key="`${choice.typeId}-${choice.outward}`"
-                  :value="index"
+                placeholder="Search by name"
+                :display-value="() => query"
+                @update:model-value="onSearch"
+              />
+            </ComboboxAnchor>
+            <ComboboxContent
+              class="suggest-list nw"
+              position="popper"
+              :side-offset="4"
+            >
+              <ComboboxViewport>
+                <ComboboxEmpty class="suggest-item">
+                  {{ searching ? 'Searching.' : 'No place matches.' }}
+                </ComboboxEmpty>
+                <ComboboxItem
+                  v-for="item in results"
+                  :key="item.id"
+                  :value="item"
+                  class="suggest-item"
                 >
-                  {{ choice.label }}
-                </option>
-              </select>
-            </label>
-            <div class="links-field">
-              <span id="link-place-label" class="links-label">Place</span>
-              <ComboboxRoot
-                :model-value="chosen"
-                by="id"
-                ignore-filter
-                :open="query.trim().length > 0 && !chosen"
-                @update:model-value="onChoose"
-              >
-                <ComboboxAnchor>
-                  <ComboboxInput
-                    id="link-place"
-                    aria-labelledby="link-place-label"
-                    :model-value="query"
-                    class="links-input"
-                    placeholder="Search by name"
-                    :display-value="() => query"
-                    @update:model-value="onSearch"
-                  />
-                </ComboboxAnchor>
-                <ComboboxContent
-                  class="suggest-list nw"
-                  position="popper"
-                  :side-offset="4"
-                >
-                  <ComboboxViewport>
-                    <ComboboxEmpty class="suggest-item">
-                      {{ searching ? 'Searching.' : 'No place matches.' }}
-                    </ComboboxEmpty>
-                    <ComboboxItem
-                      v-for="item in results"
-                      :key="item.id"
-                      :value="item"
-                      class="suggest-item"
-                    >
-                      <span class="links-result-name">{{ item.name }}</span>
-                      <span class="links-result-type">
-                        {{ placeTypeLabel(item.place_type_id ?? null) }}
-                      </span>
-                    </ComboboxItem>
-                  </ComboboxViewport>
-                </ComboboxContent>
-              </ComboboxRoot>
-            </div>
-            <p v-if="addError" class="links-note is-error" role="alert">
-              {{ addError }}
-            </p>
-            <div class="links-actions">
-              <Button type="submit" size="sm" :disabled="!chosen || adding">
-                Add
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                :disabled="adding"
-                @click="addOpen = false"
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </PopoverContent>
-      </Popover>
+                  <span class="links-result-name">{{ item.name }}</span>
+                  <span class="links-result-type">
+                    {{ placeTypeLabel(item.place_type_id ?? null) }}
+                  </span>
+                </ComboboxItem>
+              </ComboboxViewport>
+            </ComboboxContent>
+          </ComboboxRoot>
+        </div>
+      </EditDialog>
     </div>
 
     <p v-if="status === 'loading'" class="place-note">Loading links.</p>
@@ -421,12 +408,6 @@ onBeforeUnmount(() => {
 
 .links-open {
   gap: 4px;
-}
-
-.links-add {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .links-heading {

@@ -16,6 +16,8 @@ const props = defineProps<{
   current?: boolean;
   /** `place_types.id`, shown as a coloured label. */
   placeTypeId?: string | null;
+  /** Address of the place's main photograph. A placeholder shows without it. */
+  photo?: string | null;
 }>();
 
 defineEmits<{
@@ -39,7 +41,14 @@ const country = computed(() => countryName(props.iso3));
     @blur="$emit('highlight', false)"
   >
     <span class="place-thumb" aria-hidden="true">
-      <Image :size="20" :stroke-width="1.25" />
+      <img
+        v-if="photo"
+        class="place-thumb-image"
+        :src="photo"
+        alt=""
+        loading="lazy"
+      />
+      <Image v-else :size="20" :stroke-width="1.25" />
     </span>
     <span class="place-card-text">
       <span class="place-card-name" :title="name">
@@ -104,8 +113,15 @@ const country = computed(() => countryName(props.iso3));
   height: 76px;
   place-items: center;
   border-radius: 6px;
+  overflow: hidden;
   background: linear-gradient(150deg, #eef0ee, #dfe3df);
   color: #a3aba6;
+}
+
+.place-thumb-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .place-card-text {
