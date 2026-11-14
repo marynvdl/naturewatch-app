@@ -168,12 +168,6 @@ export type PlaceRecognitionsResult =
   | { status: 'unconfigured' }
   | { status: 'error' };
 
-/** Result of reading the places a recognition recognises. */
-export type RecognisedPlacesResult =
-  | { status: 'ok'; places: PlaceSummary[] }
-  | { status: 'unconfigured' }
-  | { status: 'error' };
-
 /** Result of looking up the extent of one place. */
 export type PlaceBoundsResult =
   | { status: 'ok'; bounds: LngLatBounds }
@@ -633,64 +627,278 @@ export async function loadPlaceRecognitions(
 }
 
 /** Ids per `place_summaries` read, so the request address stays short. */
-const RECOGNISED_CHUNK = 150;
+const LINKED_CHUNK = 150;
 
 /** Rows per `place_relationships` read, the API's row limit. */
 const LINK_PAGE = 1000;
 
+/** Status of a link. `retired` is a link whose `retired_at` is set. */
+export type LinkStatus = 'proposed' | 'confirmed' | 'rejected' | 'retired';
+
+/** One way to link this place to another, read from this place's side. */
+export interface LinkChoice {
+  /** `place_relationship_types.id`. */
+  typeId: string;
+  /** This place is the subject. */
+  outward: boolean;
+  label: string;
+}
+
 /**
- * The published places a recognition has a confirmed `recognises` link to,
- * largest first. One UNESCO-MAB site has over a thousand, so the summaries
- * are read in chunks.
- * @param id - `places.id` of the recognition.
- * @returns The places, or why they could not be read.
+ * The link types an admin adds, from this place's side. The labels are
+ * `label` and `inverse_label` in `place_relationship_types`.
  */
-export async function loadRecognisedPlaces(
-  id: string
-): Promise<RecognisedPlacesResult> {
-  if (!PLACE_ID.test(id)) return { status: 'ok', places: [] };
+export const LINK_CHOICES: LinkChoice[] = [
+  { typeId: 'recognises', outward: true, label: 'Recognises' },
+  { typeId: 'recognises', outward: false, label: 'Recognised by' },
+  { typeId: 'overlaps', outward: true, label: 'Overlaps' },
+  { typeId: 'located_in', outward: true, label: 'Located in' },
+  { typeId: 'located_in', outward: false, label: 'Contains' },
+  { typeId: 'part_of', outward: true, label: 'Part of' },
+  { typeId: 'part_of', outward: false, label: 'Has part' },
+];
+
+/**
+ * How a link reads from this place's side.
+ * @param typeId - `place_relationship_types.id`.
+ * @param outward - This place is the subject.
+ * @returns The label, such as `Contains`.
+ */
+export function linkLabel(typeId: string, outward: boolean): string {
+  const choice =
+    LINK_CHOICES.find(
+      item =>
+        item.typeId === typeId &&
+        (item.outward === outward || item.typeId === 'overlaps')
+    ) ?? null;
+  return choice?.label ?? typeId;
+}
+
+/** A link between this place and another, from this place's side. */
+export interface PlaceLink {
+  id: string;
+  typeId: string;
+  /** This place is the subject. */
+  outward: boolean;
+  otherId: string;
+  /** Null when the other place is not published. */
+  otherName: string | null;
+  otherTypeId: string | null;
+  /** The other place's countries joined by `;`, for its card. */
+  otherIso3: string | null;
+  /** The other place's area, for its card. */
+  otherAreaKm2: number | null;
+  origin: 'manual' | 'imported' | 'derived';
+  status: LinkStatus;
+  /** Derived links: the share of this place inside the other. */
+  coverage: number | null;
+}
+
+/** Result of reading a place's links. */
+export type PlaceLinksResult =
+  | { status: 'ok'; links: PlaceLink[] }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/** Result of setting a link's status. */
+export type SetLinkResult =
+  | { status: 'ok' }
+  | { status: 'unconfigured' }
+  | { status: 'error'; message: string };
+
+/** Result of the place search in the add-link form. */
+export type PlaceSearchResult =
+  | { status: 'ok'; places: PlaceSummary[] }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+interface LinkRow {
+  id: string;
+  subject_place_id: string;
+  relationship_type_id: string;
+  object_place_id: string;
+  origin: PlaceLink['origin'];
+  status: Exclude<LinkStatus, 'retired'>;
+  subject_coverage: number | null;
+  object_coverage: number | null;
+  retired_at: string | null;
+}
+
+/**
+ * Every link the reader may see with the place as subject or object. A visitor
+ * sees confirmed links only. An admin sees every link, retired ones too.
+ * @param id - `places.id`.
+ * @param confirmedOnly - Only active confirmed links, for view mode.
+ * @returns The links ordered by the other place's name, or why they could not be read.
+ */
+export async function loadPlaceLinks(
+  id: string,
+  confirmedOnly = false
+): Promise<PlaceLinksResult> {
+  if (!PLACE_ID.test(id)) return { status: 'ok', links: [] };
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
-  // The API returns at most 1,000 rows per request, so read the links in pages
-  const linked: string[] = [];
-  for (let from = 0; ; from += LINK_PAGE) {
-    const { data: links, error } = await supabase
-      .from('place_relationships')
-      .select('object_place_id')
-      .eq('subject_place_id', id)
-      .eq('relationship_type_id', 'recognises')
-      .eq('status', 'confirmed')
-      .order('object_place_id')
-      .range(from, from + LINK_PAGE - 1);
-    if (error) return { status: 'error' };
-    const page = (links as { object_place_id: string }[] | null) ?? [];
-    linked.push(...page.map(link => link.object_place_id));
-    if (page.length < LINK_PAGE) break;
+  const rows: LinkRow[] = [];
+  for (const side of ['subject_place_id', 'object_place_id'] as const) {
+    for (let from = 0; ; from += LINK_PAGE) {
+      let call = supabase
+        .from('place_relationships')
+        .select(
+          'id, subject_place_id, relationship_type_id, object_place_id, origin, status, subject_coverage, object_coverage, retired_at'
+        )
+        .eq(side, id);
+      if (confirmedOnly)
+        call = call.eq('status', 'confirmed').is('retired_at', null);
+      const { data, error } = await call
+        .order('id')
+        .range(from, from + LINK_PAGE - 1);
+      if (error) return { status: 'error' };
+      const page = (data as LinkRow[] | null) ?? [];
+      rows.push(...page);
+      if (page.length < LINK_PAGE) break;
+    }
   }
-  const ids = [...new Set(linked)];
+  const links = rows.map(row => {
+    const outward = row.subject_place_id === id;
+    return {
+      id: row.id,
+      typeId: row.relationship_type_id,
+      outward,
+      otherId: outward ? row.object_place_id : row.subject_place_id,
+      otherName: null as string | null,
+      otherTypeId: null as string | null,
+      otherIso3: null as string | null,
+      otherAreaKm2: null as number | null,
+      origin: row.origin,
+      status: (row.retired_at ? 'retired' : row.status) as LinkStatus,
+      coverage: outward ? row.subject_coverage : row.object_coverage,
+    };
+  });
+  const ids = [...new Set(links.map(link => link.otherId))];
   const chunks: string[][] = [];
-  for (let start = 0; start < ids.length; start += RECOGNISED_CHUNK)
-    chunks.push(ids.slice(start, start + RECOGNISED_CHUNK));
+  for (let start = 0; start < ids.length; start += LINKED_CHUNK)
+    chunks.push(ids.slice(start, start + LINKED_CHUNK));
   const reads = await Promise.all(
     chunks.map(chunk =>
       supabase
         .from('place_summaries')
-        .select('id, name, designation, iso3, area_km2')
+        .select('id, name, place_type_id, iso3, area_km2')
         .in('id', chunk)
     )
   );
   if (reads.some(read => read.error)) return { status: 'error' };
-  const places = reads
-    .flatMap(
-      read =>
-        (read.data as Omit<PlaceSummary, 'cropland_percent'>[] | null) ?? []
-    )
-    .map(row => ({ ...row, cropland_percent: null }))
-    .sort(
-      (a, b) =>
-        (b.area_km2 ?? -1) - (a.area_km2 ?? -1) || a.name.localeCompare(b.name)
-    );
-  return { status: 'ok', places };
+  const names = new Map(
+    reads
+      .flatMap(
+        read =>
+          (read.data as {
+            id: string;
+            name: string;
+            place_type_id: string;
+            iso3: string | null;
+            area_km2: number | null;
+          }[]) ?? []
+      )
+      .map(row => [row.id, row])
+  );
+  for (const link of links) {
+    const other = names.get(link.otherId);
+    link.otherName = other?.name ?? null;
+    link.otherTypeId = other?.place_type_id ?? null;
+    link.otherIso3 = other?.iso3 ?? null;
+    link.otherAreaKm2 = other?.area_km2 ?? null;
+  }
+  links.sort((a, b) =>
+    (a.otherName ?? '\uffff').localeCompare(b.otherName ?? '\uffff')
+  );
+  return { status: 'ok', links };
+}
+
+/**
+ * Every active confirmed link to a published place, for the Related tab,
+ * largest place first. One UNESCO-MAB site has over a thousand.
+ * @param id - `places.id`.
+ * @returns The links with the other place's card values, or why they could not be read.
+ */
+export async function loadRelatedPlaces(id: string): Promise<PlaceLinksResult> {
+  const read = await loadPlaceLinks(id, true);
+  if (read.status !== 'ok') return read;
+  return {
+    status: 'ok',
+    links: read.links
+      .filter(link => link.otherName !== null)
+      .sort(
+        (a, b) =>
+          (b.otherAreaKm2 ?? -1) - (a.otherAreaKm2 ?? -1) ||
+          (a.otherName ?? '').localeCompare(b.otherName ?? '')
+      ),
+  };
+}
+
+/**
+ * Confirm, reject, or retire a link, or add a manual one. Admins only: the
+ * database checks the role.
+ * @param subjectId - `places.id` of the subject.
+ * @param typeId - `place_relationship_types.id`.
+ * @param objectId - `places.id` of the object.
+ * @param status - The new status.
+ * @returns Whether it was saved, or the database's message.
+ */
+export async function setPlaceRelationship(
+  subjectId: string,
+  typeId: string,
+  objectId: string,
+  status: LinkStatus
+): Promise<SetLinkResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { error } = await supabase.rpc('set_place_relationship', {
+    p_subject_place_id: subjectId,
+    p_relationship_type_id: typeId,
+    p_object_place_id: objectId,
+    p_status: status,
+  });
+  if (error) return { status: 'error', message: error.message };
+  return { status: 'ok' };
+}
+
+/** Places the add-link search offers at once. */
+export const PLACE_SEARCH_LIMIT = 8;
+
+/**
+ * Published places of any type whose shown or source name contains the text,
+ * largest first.
+ * @param text - What was typed.
+ * @param signal - Cancels the request when a newer one replaces it.
+ * @returns Up to `PLACE_SEARCH_LIMIT` places, or why they could not be read.
+ */
+export async function searchPlaces(
+  text: string,
+  signal?: AbortSignal
+): Promise<PlaceSearchResult> {
+  const needle = text.trim();
+  if (!needle) return { status: 'ok', places: [] };
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const escaped = needle.replace(/[\\%_]/g, match => `\\${match}`);
+  // Quoted, so a comma or bracket in the search does not split the `or` filter.
+  const pattern = `"${`%${escaped}%`.replace(/["\\]/g, match => `\\${match}`)}"`;
+  const call = supabase
+    .from('place_summaries')
+    .select('id, name, designation, iso3, area_km2, place_type_id')
+    .or(`name.ilike.${pattern},source_place_name.ilike.${pattern}`)
+    .order('area_km2', { ascending: false, nullsFirst: false })
+    .order('name')
+    .limit(PLACE_SEARCH_LIMIT);
+  const { data, error } = await (signal ? call.abortSignal(signal) : call);
+  if (error || !data) return { status: 'error' };
+  return {
+    status: 'ok',
+    places: (data as Omit<PlaceSummary, 'cropland_percent'>[]).map(row => ({
+      ...row,
+      cropland_percent: null,
+    })),
+  };
 }
 
 /**

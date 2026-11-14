@@ -13,6 +13,7 @@ import {
 import {
   RECOGNITION_COLOUR,
   boundsInsideFrame,
+  CONSERVATION_AREA_COLOUR,
   type LngLatBounds,
 } from './display';
 
@@ -41,7 +42,7 @@ const PLACE_FILL_OPACITY = [
 
 /** Green on the monochrome basemap, off-white on satellite imagery. */
 const PLACE_COLOUR = {
-  monochrome: { place: '#1f4b3a', selected: '#143528' },
+  monochrome: { place: CONSERVATION_AREA_COLOUR, selected: '#143528' },
   satellite: { place: '#f4f1e8', selected: '#fbfaf5' },
 };
 
@@ -213,7 +214,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * Hide the boundaries the size and cropland filter leaves out. Conservation
    * areas draw unless a recognition type is listed. Recognitions draw only
    * while one of their types is listed. A selected place's outline always draws.
-   * While a recognition's Areas tab is open, the conservation areas it lists
+   * While a profile's Related tab is open, the conservation areas it lists
    * draw instead, whatever the list and the filter show.
    * @param mapInstance - The map.
    */

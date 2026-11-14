@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ChevronRight, LocateFixed, X } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
+import PlaceLinksEditor from '@/components/PlaceLinksEditor.vue';
 import PlaceEditField, {
   type CuratedValue,
 } from '@/components/PlaceEditField.vue';
@@ -15,15 +16,16 @@ import {
   PLACE_TYPE,
   applyCuration,
   curatePlace,
+  linkLabel,
   loadDesignations,
   loadPilotPlace,
   loadPlaceCuration,
   loadPlaceRecognitions,
-  loadRecognisedPlaces,
+  loadRelatedPlaces,
   type PlaceCuration,
   type PlaceDetail,
+  type PlaceLink,
   type PlaceRecognition,
-  type PlaceSummary,
 } from '@/places/api';
 import {
   CROPLAND_NOT_CALCULATED,
@@ -54,11 +56,14 @@ const emit = defineEmits<{
   zoom: [];
   /** The place was merged into another. Its id is the one shown. */
   moved: [id: string];
-  /** A recognition badge or a recognised place was chosen. Open it. */
+  /** A recognition badge or a related place was chosen. Open it. */
   open: [id: string];
-  /** The conservation areas the open Areas tab lists, or null when it is closed. */
+  /**
+   * The conservation areas the open Related tab lists, or null when it is
+   * closed or lists none.
+   */
   areas: [ids: string[] | null];
-  /** The pointer or focus entered or left a card on the Areas tab. */
+  /** The pointer or focus entered or left a card on the Related tab. */
   highlight: [id: string, on: boolean];
 }>();
 
@@ -69,7 +74,7 @@ const profileMode = computed({
   set: (value: string) => auth.setEditMode(value === 'edit'),
 });
 
-type TabId = 'overview' | 'areas' | 'landscape' | 'species';
+type TabId = 'overview' | 'related' | 'landscape' | 'species' | 'links';
 
 const status = ref<'loading' | 'ok' | 'missing' | 'unconfigured' | 'error'>(
   'loading'
@@ -77,13 +82,24 @@ const status = ref<'loading' | 'ok' | 'missing' | 'unconfigured' | 'error'>(
 const place = ref<PlaceDetail | null>(null);
 /** Confirmed recognitions of the place. A recognition has none. */
 const recognitions = ref<PlaceRecognition[]>([]);
-/** Conservation areas a recognition recognises, largest first. */
-const recognised = ref<PlaceSummary[]>([]);
-/** Whether the conservation areas of a recognition have been read. */
-const recognisedStatus = ref<'loading' | 'ok' | 'error'>('loading');
-/** Cards shown at once on a recognition's Conservation areas tab. */
-const RECOGNISED_STEP = 20;
-const recognisedShown = ref(RECOGNISED_STEP);
+/** Confirmed links to published places, largest place first. */
+const related = ref<PlaceLink[]>([]);
+/** Whether the related places have been read. */
+const relatedStatus = ref<'loading' | 'ok' | 'error'>('loading');
+/** Cards shown at once in each group of the Related tab. */
+const RELATED_STEP = 20;
+/** Cards shown in each group, by its label. */
+const relatedShown = ref<Record<string, number>>({});
+/** Related tab groups, read from this place's side. */
+const RELATED_ORDER = [
+  'Recognised by',
+  'Recognises',
+  'Located in',
+  'Contains',
+  'Part of',
+  'Has part',
+  'Overlaps',
+];
 const activeTab = ref<TabId>('overview');
 /** Curated values of the place, read in edit mode. */
 const curation = ref<PlaceCuration | null>(null);
@@ -99,16 +115,44 @@ const countries = computed(() => countryNames(place.value?.iso3 ?? null));
 const subtitle = computed(() =>
   [country.value, place.value?.designation].filter(Boolean).join(' · ')
 );
-const isRecognition = computed(
-  () => !!place.value && place.value.placeTypeId !== PLACE_TYPE
-);
-/** A recognition has a tab for the conservation areas it recognises. */
+/** Every place type has the same tabs. Admins in edit mode also get Links. */
 const tabs = computed<{ id: TabId; label: string }[]>(() => [
   { id: 'overview', label: 'Overview' },
-  ...(isRecognition.value ? [{ id: 'areas' as const, label: 'Areas' }] : []),
+  { id: 'related', label: 'Related' },
   { id: 'landscape', label: 'Landscape' },
   { id: 'species', label: 'Species' },
+  ...(editing.value ? [{ id: 'links' as const, label: 'Links' }] : []),
 ]);
+
+/** Leaving edit mode closes the Links tab. */
+watch(editing, on => {
+  if (!on && activeTab.value === 'links') activeTab.value = 'overview';
+});
+/** The Related tab's cards grouped by relationship, in a fixed order. */
+const relatedGroups = computed(() => {
+  const groups = new Map<string, PlaceLink[]>();
+  for (const link of related.value) {
+    const label = linkLabel(link.typeId, link.outward);
+    groups.set(label, [...(groups.get(label) ?? []), link]);
+  }
+  const rank = (label: string) => {
+    const index = RELATED_ORDER.indexOf(label);
+    return index === -1 ? RELATED_ORDER.length : index;
+  };
+  return [...groups.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([label, links]) => ({ label, links }));
+});
+
+/**
+ * Cards shown in one Related group.
+ * @param label - The group's label.
+ * @returns How many cards to show.
+ */
+function shownIn(label: string): number {
+  return relatedShown.value[label] ?? RELATED_STEP;
+}
+
 const hasCropland = computed(
   () => place.value?.croplandKm2 != null && place.value?.percent != null
 );
@@ -177,9 +221,9 @@ async function load(id: string) {
   status.value = 'loading';
   place.value = null;
   recognitions.value = [];
-  recognised.value = [];
-  recognisedStatus.value = 'loading';
-  recognisedShown.value = RECOGNISED_STEP;
+  related.value = [];
+  relatedStatus.value = 'loading';
+  relatedShown.value = {};
   activeTab.value = 'overview';
   curation.value = null;
   curationStatus.value = 'idle';
@@ -193,27 +237,48 @@ async function load(id: string) {
     emit('moved', result.place.id);
     return;
   }
-  if (result.place.placeTypeId === PLACE_TYPE) {
-    const read = await loadPlaceRecognitions(id);
-    if (id !== props.placeId || read.status !== 'ok') return;
-    recognitions.value = read.recognitions;
-    return;
-  }
-  const read = await loadRecognisedPlaces(id);
-  if (id !== props.placeId) return;
-  recognisedStatus.value = read.status === 'ok' ? 'ok' : 'error';
-  if (read.status === 'ok') recognised.value = read.places;
+  await loadLinked(id, result.place.placeTypeId);
+}
+
+/** Read the related places, and a conservation area's recognition badges. */
+async function loadLinked(id: string, placeTypeId: string) {
+  const reads: Promise<void>[] = [
+    loadRelatedPlaces(id).then(read => {
+      if (id !== props.placeId) return;
+      relatedStatus.value = read.status === 'ok' ? 'ok' : 'error';
+      if (read.status === 'ok') related.value = read.links;
+    }),
+  ];
+  if (placeTypeId === PLACE_TYPE)
+    reads.push(
+      loadPlaceRecognitions(id).then(read => {
+        if (id === props.placeId && read.status === 'ok')
+          recognitions.value = read.recognitions;
+      })
+    );
+  await Promise.all(reads);
+}
+
+/** A link changed on the Links tab. Read what view mode shows again. */
+function onLinksChanged() {
+  if (place.value) void loadLinked(place.value.id, place.value.placeTypeId);
 }
 
 watch(() => props.placeId, load, { immediate: true });
 
-/** Tell the map which conservation areas the Areas tab lists. */
+/** Tell the map which conservation areas the open Related tab lists. */
 watch(
-  () =>
-    activeTab.value === 'areas' && recognisedStatus.value === 'ok'
-      ? recognised.value.map(item => item.id)
-      : null,
-  ids => emit('areas', ids)
+  () => {
+    if (activeTab.value !== 'related' || relatedStatus.value !== 'ok')
+      return null;
+    const ids = related.value
+      .filter(link => link.otherTypeId === PLACE_TYPE)
+      .map(link => link.otherId);
+    return ids.length ? ids : null;
+  },
+  (ids, before) => {
+    if (ids?.join() !== before?.join()) emit('areas', ids);
+  }
 );
 
 onBeforeUnmount(() => emit('areas', null));
@@ -233,7 +298,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
 <template>
   <section
     class="place-profile"
-    :class="{ 'is-list-tab': activeTab === 'areas' }"
+    :class="{ 'is-list-tab': activeTab === 'related' && related.length > 0 }"
     aria-label="Place"
   >
     <PlacePhotos :photos="photos" :place-name="title" />
@@ -433,57 +498,72 @@ function onTabKey(event: KeyboardEvent, index: number) {
             </dl>
           </template>
 
-          <template v-else-if="activeTab === 'areas'">
-            <p v-if="recognisedStatus === 'loading'" class="place-note">
-              Loading conservation areas.
+          <PlaceLinksEditor
+            v-else-if="activeTab === 'links'"
+            :place-id="place.id"
+            @changed="onLinksChanged"
+            @open="id => $emit('open', id)"
+          />
+
+          <template v-else-if="activeTab === 'related'">
+            <p v-if="relatedStatus === 'loading'" class="place-note">
+              Loading related places.
             </p>
-            <p v-else-if="recognisedStatus === 'error'" class="place-note">
-              The conservation areas could not be loaded.
+            <p v-else-if="relatedStatus === 'error'" class="place-note">
+              The related places could not be loaded.
             </p>
-            <p v-else-if="recognised.length === 0" class="place-note">
-              No conservation area lies at least 75% inside this recognition.
+            <p v-else-if="related.length === 0" class="place-note">
+              No related places yet.
             </p>
-            <template v-else>
-              <p class="place-recognised-count map-section">
-                {{ recognised.length.toLocaleString('en-GB') }}
-                {{
-                  recognised.length === 1
-                    ? 'conservation area'
-                    : 'conservation areas'
-                }}
-                at least 75% inside
-              </p>
-              <ul class="place-recognised" aria-label="Conservation areas">
-                <li
-                  v-for="item in recognised.slice(0, recognisedShown)"
-                  :key="item.id"
-                >
-                  <PlaceCard
-                    :name="item.name"
-                    :iso3="item.iso3"
-                    :area-km2="item.area_km2"
-                    @click="$emit('open', item.id)"
-                    @highlight="on => $emit('highlight', item.id, on)"
-                  />
-                </li>
-                <li v-if="recognisedShown < recognised.length">
-                  <button
-                    type="button"
-                    class="place-recognised-more map-control"
-                    @click="recognisedShown += RECOGNISED_STEP"
+            <div v-else class="place-related">
+              <section
+                v-for="group in relatedGroups"
+                :key="group.label"
+                class="place-related-group"
+                :aria-label="group.label"
+              >
+                <p class="place-related-heading map-section">
+                  {{ group.label }}
+                  <span class="place-related-count">
+                    {{ group.links.length.toLocaleString('en-GB') }}
+                  </span>
+                </p>
+                <ul class="place-related-list">
+                  <li
+                    v-for="link in group.links.slice(0, shownIn(group.label))"
+                    :key="link.id"
                   >
-                    Show
-                    {{
-                      Math.min(
-                        RECOGNISED_STEP,
-                        recognised.length - recognisedShown
-                      )
-                    }}
-                    more
-                  </button>
-                </li>
-              </ul>
-            </template>
+                    <PlaceCard
+                      :name="link.otherName ?? ''"
+                      :iso3="link.otherIso3"
+                      :area-km2="link.otherAreaKm2"
+                      :place-type-id="link.otherTypeId"
+                      @click="$emit('open', link.otherId)"
+                      @highlight="on => $emit('highlight', link.otherId, on)"
+                    />
+                  </li>
+                  <li v-if="shownIn(group.label) < group.links.length">
+                    <button
+                      type="button"
+                      class="place-related-more map-control"
+                      @click="
+                        relatedShown[group.label] =
+                          shownIn(group.label) + RELATED_STEP
+                      "
+                    >
+                      Show
+                      {{
+                        Math.min(
+                          RELATED_STEP,
+                          group.links.length - shownIn(group.label)
+                        )
+                      }}
+                      more
+                    </button>
+                  </li>
+                </ul>
+              </section>
+            </div>
           </template>
 
           <template v-else-if="activeTab === 'landscape'">
@@ -659,20 +739,41 @@ function onTabKey(event: KeyboardEvent, index: number) {
   line-height: 1.4;
 }
 
-.place-recognised-count {
+.place-related {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 2px;
+}
+
+.place-related-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.place-related-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   margin: 0;
 }
 
-.place-recognised {
+.place-related-count {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.place-related-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin: 0;
-  padding: 2px;
+  padding: 0;
   list-style: none;
 }
 
-.place-recognised-more {
+.place-related-more {
   cursor: pointer;
 }
 
@@ -682,7 +783,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
 }
 
 /*
- * On the Conservation areas tab only the list scrolls. The header, the tabs,
+ * On the Related tab only the cards scroll. The header, the tabs,
  * and the source line stay where they are. A narrow screen scrolls as one.
  */
 @media (min-width: 721px) {
@@ -696,7 +797,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
     min-height: 0;
   }
 
-  .place-profile.is-list-tab .place-recognised {
+  .place-profile.is-list-tab .place-related {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;

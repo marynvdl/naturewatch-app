@@ -31,7 +31,7 @@ const usePlacesStore = defineStore('places', () => {
    */
   const listType = ref<string | null>(null);
   /**
-   * Conservation areas a recognition's Areas tab lists. The map draws them
+   * Conservation areas a profile's Related tab lists. The map draws them
    * while the tab is open. Null otherwise.
    */
   const shownAreaIds = ref<string[] | null>(null);

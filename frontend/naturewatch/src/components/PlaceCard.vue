@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { Image } from '@lucide/vue';
 import { computed } from 'vue';
-import { countryName, formatAreaTag } from '@/places/display';
+import {
+  countryName,
+  formatAreaTag,
+  placeTypeColour,
+  placeTypeLabel,
+} from '@/places/display';
 
 const props = defineProps<{
   name: string;
@@ -9,8 +14,8 @@ const props = defineProps<{
   areaKm2: number | null;
   /** Marks the card as the open place. */
   current?: boolean;
-  /** A recognition type label, shown before the country. */
-  kind?: string;
+  /** `place_types.id`, shown as a coloured label. */
+  placeTypeId?: string | null;
 }>();
 
 defineEmits<{
@@ -19,9 +24,7 @@ defineEmits<{
   highlight: [on: boolean];
 }>();
 
-const meta = computed(() =>
-  [props.kind, countryName(props.iso3)].filter(Boolean).join(' · ')
-);
+const country = computed(() => countryName(props.iso3));
 </script>
 
 <template>
@@ -42,8 +45,16 @@ const meta = computed(() =>
       <span class="place-card-name" :title="name">
         {{ name }}
       </span>
-      <span v-if="meta" class="place-card-meta">
-        {{ meta }}
+      <span class="place-card-meta">
+        <span
+          v-if="placeTypeId !== undefined"
+          class="place-card-type"
+          :style="{ '--type-colour': placeTypeColour(placeTypeId) }"
+        >
+          <span class="place-card-type-dot" aria-hidden="true" />
+          {{ placeTypeLabel(placeTypeId) }}
+        </span>
+        <span v-if="country" class="place-card-country">{{ country }}</span>
       </span>
       <span v-if="areaKm2 != null" class="place-card-area">
         {{ formatAreaTag(areaKm2) }} km²
@@ -119,8 +130,33 @@ const meta = computed(() =>
 }
 
 .place-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
   font-size: 12px;
   color: var(--muted-foreground);
+}
+
+.place-card-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--type-colour) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--type-colour) 10%, transparent);
+  color: var(--foreground);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.place-card-type-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--type-colour);
 }
 
 .place-card-area {

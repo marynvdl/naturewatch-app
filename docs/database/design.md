@@ -365,7 +365,7 @@ Move the selection to a new sprout only once its run covers the eligible boundar
 
 ### 4.5 Relationships
 
-*In place* since task 09 (`20261120100000_recognitions.sql`) for `place_relationship_types`, `place_relationships`, and `place_overlaps(place_id)`. `created_by` and `reviewed_by` come with `profiles` in [Molding Places](../parcels/molding-places.md). `object_coverage` was added beside `subject_coverage`: for `recognises` it is the share of the park inside the recognition, which decides whether a derived link is confirmed. `supabase/derive_recognises.py` writes the derived `recognises` links. Only links between a recognition and a conservation area are derived.
+*In place* since task 09 (`20261120100000_recognitions.sql`) for `place_relationship_types`, `place_relationships`, and `place_overlaps(place_id)`. `created_by` and `reviewed_by` are in place since Molding Places task 03 (`20261123100000_relationship_review.sql`), with `set_place_relationship(subject, type, object, status)`. It sets `proposed`, `confirmed`, or `rejected` on the active link, sets `retired_at` for `retired`, or adds a `manual` link. An `audit_row()` trigger records every change, and an admin select policy lets edit mode read every link. `object_coverage` was added beside `subject_coverage`: for `recognises` it is the share of the park inside the recognition, which decides whether a derived link is confirmed. `supabase/derive_recognises.py` writes the derived `recognises` links. Only links between a recognition and a conservation area are derived.
 
 **`place_relationship_types`**: `id` text PK, `label`, `inverse_label`, `is_symmetric`.
 
@@ -721,7 +721,7 @@ Rules:
 - **`geom` is never granted** to `anon` or `authenticated`. Grants on `place_boundaries` list the other columns. Map shapes come from PMTiles. `place_bounds` reads the bbox columns.
 - **Every table**: enable RLS, `revoke all … from public, anon, authenticated`, then grant what is needed. Supabase grants new objects in `public` to `anon` and `authenticated` by default.
 - **Every function**: `revoke execute … from public`, then grant to the roles that need it. Postgres grants new functions to `public`.
-- **Privileged RPCs** (`curate_place`, `approve_boundary`, `set_stats_eligibility`, `confirm_source_match`, `review_overlap`, `review_place_image`, `submit_boundary`): `security definer`, `set search_path = ''`, check `has_role()` inside, execute granted to `authenticated` only.
+- **Privileged RPCs** (`curate_place`, `set_place_relationship`, `approve_boundary`, `set_stats_eligibility`, `confirm_source_match`, `review_overlap`, `review_place_image`, `submit_boundary`): `security definer`, `set search_path = ''`, check `has_role()` inside, execute granted to `authenticated` only.
 - **Views** use `security_invoker = true`. Supabase's linter flags views that run as their owner. The tables under each view need their own public policy.
 - **Policies** wrap `auth.uid()` as `(select auth.uid())` so it runs once per query. Columns used in policies are indexed.
 
