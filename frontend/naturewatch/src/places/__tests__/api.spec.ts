@@ -94,7 +94,10 @@ function from(table: string) {
       select: () => linkBuilder,
       order: () => linkBuilder,
       range: () => linkBuilder,
-      is: () => linkBuilder,
+      is: (column: string, value: unknown) => {
+        linkFilters.push([column, value]);
+        return linkBuilder;
+      },
       eq: (column: string, value: string) => {
         linkFilters.push([column, value]);
         if (column === 'object_place_id') object = value;
@@ -204,7 +207,7 @@ describe('loadPlaceRecognitions', () => {
     linkFilters.length = 0;
   });
 
-  it('reads confirmed recognises links and orders them by type', async () => {
+  it('reads confirmed, unretired recognises links and orders them by type', async () => {
     const { loadPlaceRecognitions } = await import('@/places/api');
     const result = await loadPlaceRecognitions(keptId);
     expect(linkFilters).toEqual(
@@ -212,6 +215,7 @@ describe('loadPlaceRecognitions', () => {
         ['object_place_id', keptId],
         ['relationship_type_id', 'recognises'],
         ['status', 'confirmed'],
+        ['retired_at', null],
       ])
     );
     expect(result).toEqual({
