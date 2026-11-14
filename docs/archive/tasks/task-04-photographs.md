@@ -1,6 +1,6 @@
 # Task 04 — Photographs
 
-Parcel: [Molding Places](../parcels/molding-places.md)
+Parcel: [Molding Places](../../parcels/molding-places.md)
 
 Repository: naturewatch-app. Task 03 is merged and archived.
 
@@ -26,7 +26,7 @@ Changed 14 November 2026 by the user, during evaluation:
 
 From the code and the hosted database on 14 November 2026:
 
-- `images` and `place_images` are specified in [design.md §4.6](../database/design.md#46-people-images-audit) and are not in the database. [Record 14](../database/decisions.md#14-shared-images-linked-per-entity) explains why one image can link to many places.
+- `images` and `place_images` are specified in [design.md §4.6](../../database/design.md#46-people-images-audit) and are not in the database. [Record 14](../../database/decisions.md#14-shared-images-linked-per-entity) explains why one image can link to many places.
 - `licences` holds only `wdpa-terms`. `sources` holds `wdpca` and `glad-annual-cropland`. Both are in `20261111100000_sources.sql`, specified in design.md §4.3.
 - The hosted project has no Storage buckets. `supabase/config.toml` has Storage enabled, with a 50 MiB file limit and no buckets.
 - `PlacePhotos.vue` and `PlacePhotoGallery.vue` take `PlacePhoto[]` (`src/places/photos.ts`) and show the first as the main image. `PlaceProfileComponent` has a `photos` prop that nothing fills yet, so every profile shows "Camouflaged for now". Place cards show a placeholder photograph.
