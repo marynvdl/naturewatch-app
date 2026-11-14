@@ -1,6 +1,6 @@
 # Task 02 — Curated text
 
-Parcel: [Molding Places](../parcels/molding-places.md)
+Parcel: [Molding Places](../../parcels/molding-places.md)
 
 Repository: naturewatch-app. Task 01 is merged and archived.
 
@@ -18,7 +18,7 @@ Decided 13 November 2026 by the user:
 
 From the code and the repository on 13 November 2026:
 
-- `place_curations` is specified in [design.md §4.6](../database/design.md#46-people-images-audit), and the override rule is [record 22](../database/decisions.md#22-curated-values-are-overrides-not-edits-to-source-columns). Admin writes go through `security definer` RPCs that check `has_role('admin')` ([design.md §6](../database/design.md#6-access-and-row-level-security)).
+- `place_curations` is specified in [design.md §4.6](../../database/design.md#46-people-images-audit), and the override rule is [record 22](../../database/decisions.md#22-curated-values-are-overrides-not-edits-to-source-columns). Admin writes go through `security definer` RPCs that check `has_role('admin')` ([design.md §6](../../database/design.md#6-access-and-row-level-security)).
 - Task 01 added `profiles`, `user_roles`, `has_role()`, `audit_log`, and the trigger function `audit_row()` in `20261121100000_people_and_audit.sql`. That is the latest migration.
 - `place_summaries` was last replaced in `20261120100000_recognitions.sql`. It takes `name` from `places`, and `designation` and `iso3` from `conservation_area_details` or `recognition_details`. `iso3` is joined into one text with `;`. `source_name` is already the source's title. `listed_places` is `select *` from `place_summaries`.
 - Search matches `name` in three places: `place_matched` on `listed_places` and on `places_in_extent` (`20261116100000_generic_place_reads.sql`), and `loadPlaceSearchWindow` in `src/places/api.ts`, which reads `listed_places` with `.ilike('name', …)`.

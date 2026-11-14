@@ -37,7 +37,7 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
 
 - [x] [Task 01 — Sign-in, roles, audit](../archive/tasks/task-01-sign-in-roles-audit.md) — naturewatch-app
   - *Goal:* Add `profiles`, `user_roles`, `has_role()`, and `audit_log`. Sign in by email magic link from the app bar, with the session in a Pinia store. Show an Edit/View toggle to admins only. Set the Supabase Auth site URL and the redirect URLs for local development and both Fly apps. Grant the user `admin` with a one-off statement, not a migration, so no email or user id is committed.
-- [ ] [Task 02 — Curated text](../tasks/task-02-curated-text.md) — naturewatch-app
+- [x] [Task 02 — Curated text](../archive/tasks/task-02-curated-text.md) — naturewatch-app
   - *Goal:* Add `place_curations` and `curate_place`. `place_summaries` and `listed_places` show the curated values, and search still finds the source name. In edit mode the profile edits the display name, tagline, description, designation, and countries in place, shows the source value beside each, and can reset a field to it. In view mode the tagline shows under the title, and the description shows in Overview.
 - [ ] Task 03 — Relationships — naturewatch-app
   - *Goal:* In edit mode the profile lists all of the place's links, including `proposed` and `rejected` ones. The admin adds a link by choosing a type and finding a place by search, and can confirm, reject, or retire a link. Add `set_place_relationship`, `created_by`, and `reviewed_by`.
