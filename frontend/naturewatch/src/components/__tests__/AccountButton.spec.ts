@@ -34,24 +34,31 @@ describe('Account button', () => {
     wrapper.unmount();
   });
 
-  it('turns Edit mode on and off, and opens the photo queue in Edit mode', async () => {
+  it('turns Edit mode on and off, with the photo queue only in Edit mode', async () => {
     const auth = useAuthStore();
     const places = usePlacesStore();
     const { wrapper, body } = await openPanel(true);
-    const toggle = body.get('[aria-label="Edit mode"]');
-    expect(toggle.attributes('aria-checked')).toBe('false');
-    await toggle.trigger('click');
-    expect(auth.editMode).toBe(true);
-    await toggle.trigger('click');
-    expect(auth.editMode).toBe(false);
+    const queueButton = () =>
+      body.findAll('button').find(button => button.text() === 'Photo queue');
+    const edit = body.get('button[aria-label="Edit mode"]');
+    expect(edit.attributes('aria-pressed')).toBe('false');
+    expect(queueButton()).toBeUndefined();
 
-    const queue = body
-      .findAll('button')
-      .find(button => button.text() === 'Photo queue');
-    await queue!.trigger('click');
+    await edit.trigger('click');
+    expect(auth.editMode).toBe(true);
+    expect(edit.classes()).toContain('is-on');
+    await queueButton()!.trigger('click');
     await flushPromises();
     expect(places.photoQueueOpen).toBe(true);
-    expect(auth.editMode).toBe(true);
+
+    // Turning Edit mode off closes the queue.
+    await wrapper.get('button[aria-label="Account"]').trigger('click');
+    await flushPromises();
+    await body.get('button[aria-label="Edit mode"]').trigger('click');
+    await flushPromises();
+    expect(auth.editMode).toBe(false);
+    expect(places.photoQueueOpen).toBe(false);
+    expect(queueButton()).toBeUndefined();
     wrapper.unmount();
   });
 });

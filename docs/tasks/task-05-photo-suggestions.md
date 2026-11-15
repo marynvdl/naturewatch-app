@@ -22,7 +22,7 @@ Changed 15 November 2026 by the user, during evaluation:
 - **The first approved photograph becomes the main one.** `set_place_image` makes an approved link main when the place has none. When the main one is rejected, the next approved one in gallery order becomes main.
 - **The editor reads "Suggested by Sooty"** for a pipeline's suggestion. `suggested_by_pipeline` keeps `suggest_photos/1`.
 - **The place card shows the area and the count of suggestions as separate tags.**
-- **Admin controls are in the Profile panel.** It gets an **Edit mode** switch with a pencil icon, replacing View and Edit on the place profile, and the **Photo queue** button, replacing the one in the Places panel. Photo queue turns on Edit mode and opens the Places panel with the queue list.
+- **Admin controls are in the Profile panel.** It gets an **Edit mode** button, a pencil icon that is filled while Edit mode is on, replacing View and Edit on the place profile. The **Photo queue** button, replacing the one in the Places panel, shows only in Edit mode and opens the Places panel with the queue list. Turning Edit mode off closes the queue.
 
 ## Facts already stored
 
