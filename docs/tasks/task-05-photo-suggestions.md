@@ -50,7 +50,7 @@ From the code and the hosted database on 14 November 2026:
 4. **Client.**
    - `src/places/images.ts`: `loadPhotoQueue(limit, offset)`. `photo_queue` also returns the place's countries and area from `place_summaries`, for the cards.
    - `PhotoQueueList.vue`, in the Places panel, opened by an admin-only **Photo queue** button in the Profile panel. Choosing a place type or typing a search closes it. It lists the places with suggestions as `PlaceCard`s, 20 at a time with **Show more**, each with its main photograph and a separate tag such as "3 suggested". Choosing one selects the place as the Places list does, turns on Edit mode, and opens the Photos tab. After a change on the Photos tab the counts refresh. A place with no suggestions left leaves the list and stays open.
-   - The Profile panel has the **Edit mode** switch and the **Photo queue** button for admins. The place profile no longer has View and Edit.
+   - The Profile panel has the **Edit mode** pencil button and, in Edit mode, the **Photo queue** button for admins. The place profile no longer has View and Edit.
    - In the Photos editor a thumbnail opens `PlacePhotoGallery`, with **Approve** and **Reject** for a suggested photograph. A pipeline's suggestion reads "Suggested by Sooty".
    - The profile takes the tab to open with, and, while the queue is open, shows **Next place** at the top of the Photos tab. It opens the next place in the queue the same way.
 5. **Tests.** `PhotoQueueList.spec.ts`: no button for a visitor; the cards and counts; choosing a place selects it, turns on Edit mode, and asks for the Photos tab; a change reloads the list. `PlaceProfileComponent.spec.ts`: the profile opens on the tab given, and **Next place** emits. Run pytest for `supabase/tests`, the catalog suite, the component tests, `npm run type-check`, and `npm run lint`.
@@ -59,7 +59,7 @@ From the code and the hosted database on 14 November 2026:
 8. **User evaluation.** Start the dev server on `http://localhost:5173` against the local stack and give the URL to the user, who signs in through Inbucket and works part of the queue before the pull request is opened.
 9. **Docs.**
    - `supabase/README.md`: how to run `suggest_photos.py`, what it reads and writes, and the hosted run's counts and date.
-   - `docs/user/using-the-map.md`: the **Edit mode** switch and the **Photo queue** in the Profile panel, and the photo viewer in the Photos editor.
+   - `docs/user/using-the-map.md`: the **Edit mode** button and the **Photo queue** in the Profile panel, and the photo viewer in the Photos editor.
    - `docs/user/data.md`: suggested photographs are found automatically on Wikimedia Commons, and only those an admin approves show.
    - design.md §4.6: `photo_queue` in place, and the pipeline name in `suggested_by_pipeline`. §6: add `photo_queue` to the privileged RPCs.
    - `docs/blueprint.md`: what the photo queue reads.
