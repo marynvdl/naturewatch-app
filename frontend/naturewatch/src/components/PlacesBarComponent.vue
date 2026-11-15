@@ -484,17 +484,15 @@ function selectPlaceType(type: PlaceTypeId) {
   hideBoundaries();
 }
 
-/**
- * List the photo queue in place of a place type, or close it. Admins only.
- */
-function togglePhotoQueue() {
-  const open = !placesStore.photoQueueOpen;
-  if (open) {
+/** The photo queue, opened from the Profile panel, lists in place of a type. */
+watch(
+  () => placesStore.photoQueueOpen,
+  open => {
+    if (!open) return;
     query.value = '';
     clearPlaces();
   }
-  placesStore.photoQueueOpen = open;
-}
+);
 
 /** Typing a search closes the photo queue. */
 watch(needle, text => {
@@ -601,16 +599,6 @@ watch(
           @click="toggleMore"
         >
           {{ showMore ? 'Less' : 'More…' }}
-        </button>
-        <button
-          v-if="auth.isAdmin"
-          type="button"
-          class="place-type map-control"
-          :class="{ 'is-on': placesStore.photoQueueOpen }"
-          :aria-pressed="placesStore.photoQueueOpen"
-          @click="togglePhotoQueue"
-        >
-          Photo queue
         </button>
       </div>
       <PhotoQueueList v-if="auth.isAdmin && placesStore.photoQueueOpen" />

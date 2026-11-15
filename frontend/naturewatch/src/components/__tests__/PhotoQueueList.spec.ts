@@ -69,7 +69,9 @@ describe('Photo queue list', () => {
     expect(cards).toHaveLength(3);
     expect(cards[0].text()).toContain('Lut Desert');
     expect(cards[0].text()).toContain('World Heritage');
-    expect(cards[0].text()).toContain('12 suggested');
+    expect(cards[0].findAll('.place-card-area').map(tag => tag.text())).toEqual(
+      ['34,481 km²', '12 suggested']
+    );
     expect(wrapper.text()).toContain('3 places with suggested photographs');
     expect(usePlacesStore().photoQueueIds).toEqual(['a', 'b', 'c']);
   });

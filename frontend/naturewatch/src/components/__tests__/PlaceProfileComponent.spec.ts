@@ -708,13 +708,13 @@ describe('Place profile', () => {
       return wrapper;
     }
 
-    /** The labels of a photograph's buttons. */
+    /** The labels of a photograph's buttons, without its thumbnail. */
     function actions(
       wrapper: Awaited<ReturnType<typeof mountProfile>>,
       id: string
     ) {
       return wrapper
-        .findAll(`[data-image="${id}"] button`)
+        .findAll(`[data-image="${id}"] button:not(.photos-view)`)
         .map(button => button.attributes('aria-label') ?? button.text());
     }
 
@@ -792,6 +792,79 @@ describe('Place profile', () => {
       const wrapper = await openPhotos();
       expect(wrapper.text()).not.toContain('Next place');
       expect(wrapper.emitted('started')).toBeUndefined();
+    });
+
+    it('reviews suggestions in the photo viewer, one after another', async () => {
+      const suggested = [
+        photo({
+          imageId: 's1',
+          status: 'suggested',
+          position: null,
+          altText: 'Dunes at dusk',
+          suggestedByPipeline: 'suggest_photos/1',
+        }),
+        photo({
+          imageId: 's2',
+          status: 'suggested',
+          position: null,
+          altText: 'Salt flat',
+          suggestedByPipeline: 'suggest_photos/1',
+        }),
+      ];
+      vi.mocked(loadPlaceImages).mockResolvedValue({
+        status: 'ok',
+        images: suggested,
+      });
+      const wrapper = await openPhotos(true);
+      expect(wrapper.get('[data-image="s1"]').text()).toContain(
+        'Suggested by Sooty'
+      );
+      const body = new DOMWrapper(document.body);
+      /** A button in the viewer by its text. */
+      const inViewer = (text: string) => {
+        const buttons = body.findAll('.gallery button');
+        return buttons.find(button => button.text() === text);
+      };
+
+      await wrapper.get('[data-image="s1"] .photos-view').trigger('click');
+      await flushPromises();
+      expect(body.get('.gallery-image').attributes('alt')).toBe(
+        'Dunes at dusk'
+      );
+
+      // Approving moves on to the next suggestion.
+      vi.mocked(loadPlaceImages).mockResolvedValue({
+        status: 'ok',
+        images: [{ ...suggested[0], status: 'approved' }, suggested[1]],
+      });
+      await inViewer('Approve')!.trigger('click');
+      await flushPromises();
+      expect(setPlaceImage).toHaveBeenLastCalledWith(placeId, 's1', {
+        status: 'approved',
+      });
+      expect(body.get('.gallery-image').attributes('alt')).toBe('Salt flat');
+
+      // Rejecting the last one closes the viewer.
+      vi.mocked(loadPlaceImages).mockResolvedValue({
+        status: 'ok',
+        images: [
+          { ...suggested[0], status: 'approved' },
+          { ...suggested[1], status: 'rejected' },
+        ],
+      });
+      await inViewer('Reject')!.trigger('click');
+      await flushPromises();
+      expect(setPlaceImage).toHaveBeenLastCalledWith(placeId, 's2', {
+        status: 'rejected',
+      });
+      expect(body.find('.gallery').exists()).toBe(false);
+
+      // An approved photograph opens without Approve or Reject.
+      await wrapper.get('[data-image="s1"] .photos-view').trigger('click');
+      await flushPromises();
+      expect(body.find('.gallery').exists()).toBe(true);
+      expect(inViewer('Approve')).toBeUndefined();
+      wrapper.unmount();
     });
 
     it('shows approved photographs in the header, main first', async () => {
@@ -1057,23 +1130,10 @@ describe('Place profile', () => {
     });
   });
 
-  it('shows no Edit/View toggle to a visitor', async () => {
+  it('has no View/Edit toggle: Edit mode is in the Profile panel', async () => {
+    useAuthStore().isAdmin = true;
     const wrapper = await mountProfile(kruger);
     expect(wrapper.find('[aria-label="Profile mode"]').exists()).toBe(false);
-  });
-
-  it('lets an admin switch the profile to edit mode', async () => {
-    const auth = useAuthStore();
-    auth.isAdmin = true;
-    const wrapper = await mountProfile(kruger);
-    const toggle = wrapper.find('[aria-label="Profile mode"]');
-    expect(toggle.exists()).toBe(true);
-    const edit = toggle
-      .findAll('button')
-      .find(button => button.text() === 'Edit');
-    if (!edit) throw new Error('Missing Edit');
-    await edit.trigger('click');
-    expect(auth.editMode).toBe(true);
   });
 
   it('shows no badges for a place without recognitions', async () => {

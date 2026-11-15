@@ -190,7 +190,7 @@ describe('Places panel', () => {
     });
   });
 
-  it('offers the photo queue to admins only, and closes it for a type or a search', async () => {
+  it('lists the photo queue opened from the Profile panel, and closes it for a type or a search', async () => {
     const pinia = createPinia();
     const wrapper = mount(PlacesBarComponent, {
       global: { plugins: [pinia] },
@@ -198,17 +198,16 @@ describe('Places panel', () => {
     await flushPromises();
     const types = () =>
       wrapper.findAll('button.place-type').map(item => item.text());
-    expect(types()).not.toContain('Photo queue');
-
     const auth = useAuthStore(pinia);
     const store = usePlacesStore(pinia);
     auth.isAdmin = true;
     await flushPromises();
+    expect(types()).not.toContain('Photo queue');
+
     await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
-    await typeButton(wrapper, 'Photo queue').trigger('click');
+    store.photoQueueOpen = true;
     await flushPromises();
-    expect(store.photoQueueOpen).toBe(true);
     expect(wrapper.find('.queue-stub').exists()).toBe(true);
     expect(wrapper.text()).not.toContain('Addo Elephant National Park');
 
@@ -217,12 +216,16 @@ describe('Places panel', () => {
     expect(store.photoQueueOpen).toBe(false);
     expect(wrapper.find('.queue-stub').exists()).toBe(false);
 
-    await typeButton(wrapper, 'Photo queue').trigger('click');
+    store.photoQueueOpen = true;
+    await flushPromises();
     await wrapper.get('input[type="search"]').setValue('Kru');
     await flushPromises();
     expect(store.photoQueueOpen).toBe(false);
 
-    await typeButton(wrapper, 'Photo queue').trigger('click');
+    store.photoQueueOpen = true;
+    await flushPromises();
+    const search = wrapper.get<HTMLInputElement>('input[type="search"]');
+    expect(search.element.value).toBe('');
     auth.isAdmin = false;
     await flushPromises();
     expect(store.photoQueueOpen).toBe(false);

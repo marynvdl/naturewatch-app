@@ -155,25 +155,27 @@ class ChooseTest(unittest.TestCase):
                                    "title": 1, "missing": 1})
 
     def test_order_cap_and_scores(self):
-        titles = [f"File:C{i}.jpg" for i in range(10)] + [f"File:S{i}.jpg" for i in range(5)]
-        files = infos(page("File:P18.jpg"), *[page(t) for t in titles])
-        candidates = (
-            [("wikidata", "File:P18.jpg")]
-            + [("category", t) for t in titles[:10]]
-            + [("search", "File:C0.jpg")]
-            + [("search", t) for t in titles[10:]]
-        )
+        files = infos(*[page(t) for t in ["File:P18.jpg", "File:C0.jpg", "File:C1.jpg",
+                                          "File:C2.jpg", "File:S0.jpg"]])
+        candidates = [("wikidata", "File:P18.jpg"), ("category", "File:C0.jpg"),
+                      ("category", "File:C1.jpg"), ("search", "File:C0.jpg"),
+                      ("category", "File:C2.jpg"), ("search", "File:S0.jpg")]
         rows, _ = suggest_photos.choose(SITE, candidates, files)
-        self.assertEqual(len(rows), suggest_photos.PER_PLACE)
-        self.assertEqual(rows[0]["title"], "File:P18.jpg")
-        self.assertEqual(rows[0]["score"], 1.0)
-        self.assertEqual([r["score"] for r in rows[1:3]], [0.7, 0.69])
-        self.assertEqual(rows[10]["score"], 0.61)
-        # C0 is not repeated by the search; the search adds its own files after.
-        self.assertEqual([r["title"] for r in rows[11:]], ["File:S0.jpg"])
-        self.assertEqual(rows[11]["score"], 0.4)
-        self.assertEqual(rows[1]["alt_text"], "Spray over the falls.")
-        self.assertEqual(rows[1]["caption"], "Spray over the falls. Taken at dawn.")
+        self.assertEqual(suggest_photos.PER_PLACE, 3)
+        self.assertEqual([r["title"] for r in rows],
+                         ["File:P18.jpg", "File:C0.jpg", "File:C1.jpg"])
+        self.assertEqual([r["score"] for r in rows], [1.0, 0.7, 0.69])
+        # The search score, after the category files and without repeating C0.
+        search = [("search", "File:C0.jpg"), ("search", "File:S0.jpg")]
+        rows, _ = suggest_photos.choose(SITE, search, files)
+        self.assertEqual([(r["title"], r["score"]) for r in rows],
+                         [("File:C0.jpg", 0.4), ("File:S0.jpg", 0.39)])
+
+    def test_caption_is_the_first_sentence(self):
+        rows, _ = suggest_photos.choose(SITE, [("category", "File:P18.jpg")],
+                                        infos(page("File:P18.jpg")))
+        self.assertEqual(rows[0]["alt_text"], "Spray over the falls.")
+        self.assertEqual(rows[0]["caption"], "Spray over the falls.")
 
 
 class LoadLocalTest(unittest.TestCase):

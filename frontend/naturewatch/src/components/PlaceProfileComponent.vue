@@ -8,10 +8,6 @@ import PlaceEditField, {
 } from '@/components/PlaceEditField.vue';
 import PlacePhotos from '@/components/PlacePhotos.vue';
 import PlacePhotosEditor from '@/components/PlacePhotosEditor.vue';
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from '@/components/ui/segmented-control';
 import useAuthStore from '@/store/AuthStore';
 import {
   PLACE_TYPE,
@@ -82,12 +78,8 @@ const emit = defineEmits<{
   next: [];
 }>();
 
-/** Admins switch between viewing and editing. Visitors see no toggle. */
+/** Admins turn Edit mode on in the Profile panel. */
 const auth = useAuthStore();
-const profileMode = computed({
-  get: () => (auth.editMode ? 'edit' : 'view'),
-  set: (value: string) => auth.setEditMode(value === 'edit'),
-});
 
 type TabId =
   | 'overview'
@@ -375,18 +367,6 @@ function onTabKey(event: KeyboardEvent, index: number) {
     </button>
 
     <div class="place-body">
-      <SegmentedControl
-        v-if="auth.isAdmin"
-        v-model="profileMode"
-        type="single"
-        variant="outline"
-        size="sm"
-        class="place-mode"
-        aria-label="Profile mode"
-      >
-        <SegmentedControlItem value="view">View</SegmentedControlItem>
-        <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
-      </SegmentedControl>
       <p v-if="auth.editMode && curationStatus === 'error'" class="place-note">
         The curated values could not be read, so editing is off.
       </p>
@@ -580,6 +560,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
             </button>
             <PlacePhotosEditor
               :place-id="place.id"
+              :place-name="title"
               @changed="onPhotosChanged"
             />
           </template>
@@ -716,10 +697,6 @@ function onTabKey(event: KeyboardEvent, index: number) {
   align-items: stretch;
   gap: 16px;
   padding: var(--map-panel-padding);
-}
-
-.place-mode {
-  align-self: flex-start;
 }
 
 .place-tagline {

@@ -196,10 +196,10 @@ class PlaceImagesLocalTest(unittest.TestCase):
         second = self.add(self.park, upload())
         self.assertEqual(
             {k: first[k] for k in ("status", "is_primary", "gallery_position", "reviewed_by")},
-            {"status": "approved", "is_primary": False, "gallery_position": 1,
+            {"status": "approved", "is_primary": True, "gallery_position": 1,
              "reviewed_by": self.admin},
         )
-        self.assertEqual(second["gallery_position"], 2)
+        self.assertEqual((second["gallery_position"], second["is_primary"]), (2, False))
         uploaded_by = self.conn.execute(
             "select uploaded_by::text as u from public.images where id = %s",
             (second["image_id"],),
@@ -241,7 +241,32 @@ class PlaceImagesLocalTest(unittest.TestCase):
             self.errors.InvalidParameterValue, self.set, self.park, b, {"is_primary": True}
         )
         row = self.set(self.park, b, {"status": "approved"})
-        self.assertEqual(row["gallery_position"], 2)
+        self.assertEqual((row["gallery_position"], row["is_primary"]), (2, False))
+
+    def test_the_first_approved_photograph_becomes_main(self):
+        stored = [self.add(self.other, commons(name))["image_id"]
+                  for name in ("Zqx a.jpg", "Zqx b.jpg", "Zqx c.jpg")]
+        for image in stored:
+            self.suggest(self.park, image)
+        a, b, c = stored
+        self.assertTrue(self.set(self.park, b, {"status": "approved"})["is_primary"])
+        self.assertFalse(self.set(self.park, a, {"status": "approved"})["is_primary"])
+        self.set(self.park, c, {"status": "approved"})
+        self.assertEqual(
+            {k: v for k, v in self.positions(self.park).items()},
+            {b: (1, True), a: (2, False), c: (3, False)},
+        )
+        # Rejecting the main one makes the next approved one in gallery order main.
+        self.order(self.park, [b, c, a])
+        self.set(self.park, b, {"status": "rejected"})
+        self.assertEqual(
+            {k: v[1] for k, v in self.positions(self.park).items()},
+            {b: False, c: True, a: False},
+        )
+        # A place whose approved photographs are all rejected has no main one.
+        self.set(self.park, c, {"status": "rejected"})
+        self.set(self.park, a, {"status": "rejected"})
+        self.assertFalse(any(v[1] for v in self.positions(self.park).values()))
 
     def test_ordering_lists_each_approved_photograph_once(self):
         a = self.add(self.park, commons())["image_id"]

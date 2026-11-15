@@ -62,6 +62,16 @@ function togglePlaces() {
   if (placesOpen.value) closeOthers('places');
 }
 
+/** Opening the photo queue, from the Profile panel, opens Places to list it. */
+watch(
+  () => placesStore.photoQueueOpen,
+  open => {
+    if (!open || placesOpen.value) return;
+    placesOpen.value = true;
+    closeOthers('places');
+  }
+);
+
 /** Open or close Layers, and on a narrow screen close the other panels. */
 function toggleLayers() {
   toggleDrawerVisibility();

@@ -1,18 +1,39 @@
 <script setup lang="ts">
-import { LogOut, UserRound } from '@lucide/vue';
+import { computed, ref } from 'vue';
+import { Images, LogOut, Pencil, UserRound } from '@lucide/vue';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import useAuthStore from '@/store/AuthStore';
+import usePlacesStore from '@/store/PlacesStore';
 
-/** Shown only while someone is signed in. Visitors see nothing. */
+/**
+ * Shown only while someone is signed in. Visitors see nothing. An admin's
+ * controls are here: Edit mode and the Photo queue.
+ */
 const auth = useAuthStore();
+const placesStore = usePlacesStore();
+const open = ref(false);
+
+const editMode = computed({
+  get: () => auth.editMode,
+  set: (on: boolean) => auth.setEditMode(on),
+});
+
+/** Open the photo queue in the Places panel, in Edit mode, or close it. */
+function togglePhotoQueue() {
+  const on = !placesStore.photoQueueOpen;
+  if (on) auth.setEditMode(true);
+  placesStore.photoQueueOpen = on;
+  open.value = false;
+}
 </script>
 
 <template>
-  <Popover v-if="auth.signedIn">
+  <Popover v-if="auth.signedIn" v-model:open="open">
     <PopoverTrigger as-child>
       <button
         type="button"
@@ -38,6 +59,24 @@ const auth = useAuthStore();
         <span class="account-role">
           {{ auth.isAdmin ? 'Admin' : 'No role' }}
         </span>
+      </div>
+      <div v-if="auth.isAdmin" class="account-section" aria-label="Admin">
+        <p class="map-section">Admin</p>
+        <div class="account-switch">
+          <Pencil :size="16" aria-hidden="true" />
+          <span aria-hidden="true">Edit mode</span>
+          <Switch v-model="editMode" aria-label="Edit mode" />
+        </div>
+        <button
+          type="button"
+          class="map-control"
+          :class="{ 'is-on': placesStore.photoQueueOpen }"
+          :aria-pressed="placesStore.photoQueueOpen"
+          @click="togglePhotoQueue"
+        >
+          <Images :size="16" aria-hidden="true" />
+          Photo queue
+        </button>
       </div>
       <button type="button" class="map-control" @click="auth.signOut()">
         <LogOut :size="16" aria-hidden="true" />
@@ -89,6 +128,18 @@ const auth = useAuthStore();
 .account-panel .account-email {
   font-size: 14px;
   overflow-wrap: anywhere;
+}
+
+.account-panel .account-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 14px;
+}
+
+.account-panel .account-switch [data-slot='switch'] {
+  margin-left: auto;
 }
 
 .account-panel .account-role {

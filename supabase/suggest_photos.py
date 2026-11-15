@@ -7,7 +7,7 @@
           Commons search by the place's name. Keep JPEG, PNG, and WebP files at
           least 1,000 px wide, under a licence in `licences`, with a creator,
           whose title does not name a map, logo, flag, or locator. Keep the
-          first 12 per site. Write suggest_photos.tsv to the work directory.
+          first 3 per site. Write suggest_photos.tsv to the work directory.
           API responses are cached there, so a second start reads no page twice.
   counts  Read-only. How many rows of the file load would add, and how many it
           would skip because the place already has a link to that file.
@@ -53,7 +53,7 @@ _spec.loader.exec_module(import_wdpa)
 
 PIPELINE = "suggest_photos/1"
 SOURCE_ID = "wikimedia-commons"
-PER_PLACE = 12
+PER_PLACE = 3
 MIN_WIDTH = 1000
 IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
 # A title with one of these words is rarely a photograph of the place.
@@ -142,13 +142,18 @@ def file_name(title: str) -> str:
     return re.sub(r"\.[A-Za-z0-9]{2,5}$", "", name).replace("_", " ").strip()
 
 
-def alt_text(title: str, description: str | None) -> str:
-    """The first sentence of the description, or else the file name."""
+def first_sentence(description: str | None) -> str:
+    """The first sentence of the description, at most 300 characters. It is the
+    caption of a suggestion, so a card does not show a paragraph."""
     text = commons_caption(description).rstrip("…")
     # A sentence ends before a capital letter, so "approx. 360" does not end one.
     match = re.match(r"(.+?[.!?])(\s+(?=[A-Z])|$)", text)
-    sentence = (match.group(1) if match else text).strip()
-    return cut_at_word(sentence or file_name(title))
+    return cut_at_word((match.group(1) if match else text).strip())
+
+
+def alt_text(title: str, description: str | None) -> str:
+    """The first sentence of the description, or else the file name."""
+    return first_sentence(description) or cut_at_word(file_name(title))
 
 
 def commons_licence_id(code: str | None, licences: set[str]) -> str | None:
@@ -265,7 +270,7 @@ def choose(
             "licence_id": file.licence_id,
             "score": round(max(ORIGIN_SCORES[origin] - SCORE_STEP * rank, 0.0), 2),
             "alt_text": alt_text(file.title, file.description),
-            "caption": commons_caption(file.description),
+            "caption": first_sentence(file.description),
         })
     return rows, refused
 

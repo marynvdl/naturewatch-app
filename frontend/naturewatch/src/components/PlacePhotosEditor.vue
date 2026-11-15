@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ChevronDown, ChevronUp, Plus } from '@lucide/vue';
 import EditDialog from '@/components/EditDialog.vue';
+import PlacePhotoGallery from '@/components/PlacePhotoGallery.vue';
 import { Button } from '@/components/ui/button';
 import {
   SegmentedControl,
@@ -27,6 +28,7 @@ import {
   loadBorrowedImages,
   orderPlaceImages,
   setPlaceImage,
+  toPlacePhoto,
   uploadPlaceImage,
   uploadProblem,
   type ImageLicence,
@@ -36,7 +38,7 @@ import {
   type ImageGroup,
 } from '@/places/images';
 
-const props = defineProps<{ placeId: string }>();
+const props = defineProps<{ placeId: string; placeName?: string }>();
 
 const emit = defineEmits<{
   /** A photograph was added, reviewed, or moved. */
@@ -82,6 +84,12 @@ const altText = ref('');
 const caption = ref('');
 const adding = ref(false);
 const addError = ref('');
+/** The photo viewer: open on one of the editor's groups, or a related place's. */
+const viewerOpen = ref(false);
+const viewerIndex = ref(0);
+const viewerSource = ref<
+  { status: PlaceImageStatus } | { images: PlaceImage[] } | null
+>(null);
 let commonsTimer: ReturnType<typeof setTimeout> | undefined;
 let commonsAbort: AbortController | null = null;
 
@@ -104,6 +112,65 @@ const canAdd = computed(() => {
   if (addMode.value === 'commons') return commonsFile.value !== null;
   return file.value !== null && !!creator.value.trim() && !!licenceId.value;
 });
+
+/** The photographs the viewer steps through. A reviewed one leaves its group. */
+const viewerImages = computed<PlaceImage[]>(() => {
+  const source = viewerSource.value;
+  if (!source) return [];
+  if ('images' in source) return source.images;
+  return (
+    grouped.value.find(group => group.status === source.status)?.images ?? []
+  );
+});
+const viewerPhotos = computed(() => viewerImages.value.map(toPlacePhoto));
+const viewerDescription = computed(() => {
+  const source = viewerSource.value;
+  const which =
+    source && 'status' in source
+      ? (GROUPS.find(group => group.status === source.status)?.label ?? '')
+      : 'Related';
+  return `${which} photographs, with the photographer, the source, and the licence of each.`;
+});
+
+/**
+ * Open the viewer at a photograph.
+ * @param source - The group it belongs to.
+ * @param image - The photograph.
+ */
+function view(
+  source: { status: PlaceImageStatus } | { images: PlaceImage[] },
+  image: PlaceImage
+) {
+  viewerSource.value = source;
+  viewerIndex.value = Math.max(
+    viewerImages.value.findIndex(item => item.imageId === image.imageId),
+    0
+  );
+  viewerOpen.value = true;
+}
+
+/**
+ * Approve or reject the suggested photograph in the viewer. The next one takes
+ * its place, and the viewer closes after the last.
+ * @param next - The new status.
+ */
+async function reviewInViewer(next: 'approved' | 'rejected') {
+  const image = viewerImages.value[viewerIndex.value];
+  if (!image) return;
+  await review(image, next);
+  const left = viewerImages.value.length;
+  if (left === 0) viewerOpen.value = false;
+  else if (viewerIndex.value >= left) viewerIndex.value = left - 1;
+}
+
+watch(viewerOpen, open => {
+  if (!open) viewerSource.value = null;
+});
+
+/** Who suggested a photograph. Every pipeline suggests as Sooty. */
+function suggestedBy(image: PlaceImage): string {
+  return image.suggestedByPipeline ? 'Sooty' : '';
+}
 
 /** Nothing borrowed yet. */
 function noneBorrowed() {
@@ -156,6 +223,7 @@ watch(
     borrowed.value = noneBorrowed();
     imageError.value = null;
     addOpen.value = false;
+    viewerOpen.value = false;
     resetForm();
     void load();
   },
@@ -579,18 +647,29 @@ onBeforeUnmount(() => {
                 />
               </button>
             </div>
-            <img
-              class="photos-thumb"
-              :src="image.thumbnail"
-              :alt="image.altText"
-              loading="lazy"
-            />
+            <button
+              type="button"
+              class="photos-view"
+              :aria-label="`View ${image.altText}`"
+              @click="view({ status: group.status }, image)"
+            >
+              <img
+                class="photos-thumb"
+                :src="image.thumbnail"
+                :alt="image.altText"
+                loading="lazy"
+              />
+            </button>
             <div class="photos-text">
               <p v-if="image.isPrimary" class="photos-main">Main photograph</p>
               <p class="photos-caption">{{ image.caption ?? image.altText }}</p>
               <p class="photos-note">{{ credit(image) }}</p>
-              <p v-if="image.suggestedByPipeline" class="photos-note">
-                Suggested by {{ image.suggestedByPipeline }}
+              <p
+                v-if="image.suggestedByPipeline"
+                class="photos-note"
+                :title="image.suggestedByPipeline"
+              >
+                Suggested by {{ suggestedBy(image) }}
               </p>
               <p
                 v-if="imageError?.id === image.imageId"
@@ -670,12 +749,19 @@ onBeforeUnmount(() => {
               class="photos-item"
               :data-image="image.imageId"
             >
-              <img
-                class="photos-thumb"
-                :src="image.thumbnail"
-                :alt="image.altText"
-                loading="lazy"
-              />
+              <button
+                type="button"
+                class="photos-view"
+                :aria-label="`View ${image.altText}`"
+                @click="view({ images: group.images }, image)"
+              >
+                <img
+                  class="photos-thumb"
+                  :src="image.thumbnail"
+                  :alt="image.altText"
+                  loading="lazy"
+                />
+              </button>
               <div class="photos-text">
                 <p class="photos-caption">
                   {{ image.caption ?? image.altText }}
@@ -705,6 +791,46 @@ onBeforeUnmount(() => {
         </section>
       </section>
     </template>
+
+    <PlacePhotoGallery
+      v-model:open="viewerOpen"
+      v-model:index="viewerIndex"
+      :photos="viewerPhotos"
+      :place-name="placeName"
+      :description="viewerDescription"
+    >
+      <template
+        v-if="
+          viewerSource &&
+          'status' in viewerSource &&
+          viewerSource.status === 'suggested'
+        "
+        #actions="{ index }"
+      >
+        <p
+          v-if="imageError && imageError.id === viewerImages[index]?.imageId"
+          class="photos-note is-error"
+          role="alert"
+        >
+          {{ imageError.message }}
+        </p>
+        <Button
+          type="button"
+          :disabled="busyId !== null"
+          @click="reviewInViewer('approved')"
+        >
+          Approve
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          :disabled="busyId !== null"
+          @click="reviewInViewer('rejected')"
+        >
+          Reject
+        </Button>
+      </template>
+    </PlacePhotoGallery>
   </div>
 </template>
 
@@ -893,7 +1019,26 @@ onBeforeUnmount(() => {
 }
 
 /* Room for the arrows beside the text. */
-.photos-order + .photos-thumb + .photos-text {
+.photos-view {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: zoom-in;
+}
+
+.photos-view:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+.photos-view .photos-thumb {
+  display: block;
+}
+
+.photos-order + .photos-view + .photos-text {
   padding-right: 24px;
 }
 
