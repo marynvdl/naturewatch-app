@@ -36,7 +36,7 @@ On 12 November 2026 `derive` inserted 1,162 hosted links for 875 recognitions be
 
 ## Photo suggestions
 
-`suggest_photos.py` suggests Wikimedia Commons photographs for the published World Heritage Sites (Molding Places task 05). It never approves one. An admin reviews them on `/admin`.
+`suggest_photos.py` suggests Wikimedia Commons photographs for the published World Heritage Sites (Molding Places task 05). It never approves one. An admin reviews them from the Photo queue in the Places panel.
 
 ```bash
 WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_photos.py fetch

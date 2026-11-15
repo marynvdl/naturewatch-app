@@ -130,6 +130,39 @@ const usePlacesStore = defineStore('places', () => {
     if (status.value === 'loading') status.value = 'ready';
   }
 
+  /** Whether the Places panel lists the photo queue. Admins only. */
+  const photoQueueOpen = ref(false);
+  /** The queue's places as listed, in order. */
+  const photoQueueIds = ref<string[]>([]);
+  /** Where the place opened from the queue was listed, so Next place still works once it leaves. */
+  const photoQueueIndex = ref(0);
+  /** Goes up after a photograph is reviewed, so the queue reads its counts again. */
+  const photoQueueVersion = ref(0);
+  /** The profile tab to open the next selected place on. Cleared once used. */
+  const startTab = ref<'photos' | null>(null);
+
+  /** The place after the open one in the queue, or null at its end. */
+  const nextInPhotoQueue = computed<string | null>(() => {
+    if (!photoQueueOpen.value) return null;
+    const ids = photoQueueIds.value;
+    const at = selectedId.value ? ids.indexOf(selectedId.value) : -1;
+    return ids[at >= 0 ? at + 1 : photoQueueIndex.value] ?? null;
+  });
+
+  /**
+   * Open a place from the photo queue on its Photos tab.
+   * @param id - The place id.
+   */
+  function openFromPhotoQueue(id: string) {
+    const index = photoQueueIds.value.indexOf(id);
+    if (index >= 0) photoQueueIndex.value = index;
+    if (selectedId.value === id) return;
+    hoveredId.value = null;
+    startTab.value = 'photos';
+    selectedId.value = id;
+    selectedFrom.value = 'list';
+  }
+
   /** Show or hide the boundaries on the map. */
   function toggle(): void {
     visible.value = !visible.value;
@@ -158,6 +191,12 @@ const usePlacesStore = defineStore('places', () => {
     toggle,
     selectPlace,
     clearSelection,
+    photoQueueOpen,
+    photoQueueIds,
+    photoQueueVersion,
+    startTab,
+    nextInPhotoQueue,
+    openFromPhotoQueue,
   };
 });
 

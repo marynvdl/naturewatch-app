@@ -753,6 +753,14 @@ function addSourceAndLayer(
             v-if="placesStore.selectedId"
             class="map-place map-panel nw"
             :place-id="placesStore.selectedId"
+            :start-tab="placesStore.startTab"
+            :has-next="placesStore.nextInPhotoQueue !== null"
+            @started="placesStore.startTab = null"
+            @photos-changed="placesStore.photoQueueVersion += 1"
+            @next="
+              placesStore.nextInPhotoQueue &&
+              placesStore.openFromPhotoQueue(placesStore.nextInPhotoQueue)
+            "
             @close="placesStore.clearSelection()"
             @zoom="zoomToSelectedPlace"
             @open="id => placesStore.selectPlace(id, 'list')"

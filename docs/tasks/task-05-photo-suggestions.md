@@ -6,12 +6,16 @@ Repository: naturewatch-app. Task 04 is merged and archived.
 
 ## Goal
 
-`supabase/suggest_photos.py` finds Wikimedia Commons photographs for each published World Heritage Site and stores up to 12 per site as `suggested`, with the pipeline name and a score. A rerun adds nothing twice. An admin works through them on a new `/admin` route: a list of places with suggestions, and the Photos editor of the chosen place, to approve, reject, choose the main photograph, and use the photographs of related recognitions.
+`supabase/suggest_photos.py` finds Wikimedia Commons photographs for each published World Heritage Site and stores up to 12 per site as `suggested`, with the pipeline name and a score. A rerun adds nothing twice. An admin works through them from a Photo queue in the Places panel on the map: a list of places with suggestions, each opening on its Photos tab, to approve, reject, choose the main photograph, and use the photographs of related recognitions.
 
 Decided 14 November 2026 by the user:
 
 - **Up to 12 suggestions per site**, in this order: the Wikidata image (P18), files in the site's Commons category (P373), then a Commons search by the place's name.
 - **The queue shows one place at a time.** The places with suggestions are listed on the left. Choosing one shows the existing Photos editor for that place on the right, with **Next place**.
+
+Changed 15 November 2026 by the user, during evaluation:
+
+- **The queue is on the map, not on `/admin`.** Reviewing a photograph beside the place on the map is faster. The Places panel gets a **Photo queue** button for admins. It lists the places with suggestions as place cards, with their counts. Choosing one opens the place as the Places list does, in Edit mode, on its Photos tab. The Photos tab then has **Next place**. `/admin` and its menu item are removed.
 
 ## Facts already stored
 
@@ -35,22 +39,22 @@ From the code and the hosted database on 14 November 2026:
    - `load` writes the file in one transaction. It reuses the `images` row of a Commons file already stored, or inserts one with `uploaded_by` null. It inserts a `place_images` link as `suggested`, with `suggested_by_pipeline` `suggest_photos/1`, the score, the alt text, and the caption, unless the place already has a link to that image. It prints what it added. A rerun adds nothing twice, and a rejected link stays rejected.
    - The User-Agent is generic (`suggest-photos/1`) unless `SUGGEST_PHOTOS_USER_AGENT` is set. It carries no name, email, or project URL.
 2. **Tests, `supabase/tests/test_suggest_photos.py`.** Without the network, from stored Wikidata and Commons responses: the licence mapping, the size, type, and title filters, the order and the cap of 12, the scores, and the alt text and caption. On the local stack, as in `test_derive_recognises_local.py` and rolled back: `load` stores a Commons file once across two places, writes `suggested` links with the pipeline and score, and a second `load` adds nothing, including where a link was rejected.
-3. **Migration `20261125100000_photo_queue.sql`.** `photo_queue(p_limit integer, p_offset integer)`, `security definer` with `set search_path = ''`, raising unless `has_role('admin')`, executable by `authenticated` only. It returns each place with at least one `suggested` link: its id, display name (curated name first), place type, and the count of suggested links, ordered by name, with the total count. `photo_queue_count()` too, or a total column, whichever matches the existing window reads.
+3. **Migration `20261125100000_photo_queue.sql`.** `photo_queue(p_limit integer, p_offset integer)`, `security definer` with `set search_path = ''`, raising unless `has_role('admin')`, executable by `authenticated` only. It returns each published place with at least one `suggested` link: its id, display name (curated name first), place type, countries, area, and the count of suggested links, ordered by name, with the total count. `photo_queue_count()` too, or a total column, whichever matches the existing window reads.
 4. **Client.**
-   - `src/places/images.ts`: `loadPhotoQueue(limit, offset)`.
-   - The `/admin` route and `AdminView.vue`. A visitor or a non-admin sees that the page is for admins, with **Sign in**. An admin sees **Photo queue**: on the left the places with suggestions, 20 at a time, each with its type and count, and the chosen one marked. On the right the place's name, which opens its profile, and `PlacePhotosEditor` for that place. **Next place** moves down the list. After `changed` the counts refresh, and a place with no suggestions left stays shown until another is chosen. On a narrow screen the list sits above the editor. Landscape and Measure panel style.
-   - **Admin** in the `AccountButton` menu for an admin, opening `/admin`.
-5. **Tests.** `AdminView.spec.ts`: a non-admin sees no queue; an admin sees the places and counts; choosing a place and **Next place** pass its id to `PlacePhotosEditor`; `changed` reloads the queue. Run pytest for `supabase/tests`, the catalog suite, the component tests, `npm run type-check`, and `npm run lint`.
+   - `src/places/images.ts`: `loadPhotoQueue(limit, offset)`. `photo_queue` also returns the place's countries and area from `place_summaries`, for the cards.
+   - `PhotoQueueList.vue`, in the Places panel behind an admin-only **Photo queue** button beside the type buttons. Choosing a place type or typing a search closes it. It lists the places with suggestions as `PlaceCard`s, 20 at a time with **Show more**, each with its main photograph and a note such as "12 suggested". Choosing one selects the place as the Places list does, turns on Edit mode, and opens the Photos tab. After a change on the Photos tab the counts refresh. A place with no suggestions left leaves the list and stays open.
+   - The profile takes the tab to open with, and, while the queue is open, shows **Next place** at the top of the Photos tab. It opens the next place in the queue the same way.
+5. **Tests.** `PhotoQueueList.spec.ts`: no button for a visitor; the cards and counts; choosing a place selects it, turns on Edit mode, and asks for the Photos tab; a change reloads the list. `PlaceProfileComponent.spec.ts`: the profile opens on the tab given, and **Next place** emits. Run pytest for `supabase/tests`, the catalog suite, the component tests, `npm run type-check`, and `npm run lint`.
 6. **Local run.** Apply the migration locally, run `fetch` against the hosted database read-only, and `load` into the local stack with the hosted World Heritage Sites seeded as needed, or with a few fixture places, so the queue can be checked locally.
-7. **Browser check.** Run the `browser-check` skill on `/admin`, wide and narrow, signed out and signed in with suggestions loaded.
+7. **Browser check.** Run the `browser-check` skill on `/`, wide and narrow, signed in with suggestions loaded: the Photo queue list, and a place opened from it on its Photos tab.
 8. **User evaluation.** Start the dev server on `http://localhost:5173` against the local stack and give the URL to the user, who signs in through Inbucket and works part of the queue before the pull request is opened.
 9. **Docs.**
    - `supabase/README.md`: how to run `suggest_photos.py`, what it reads and writes, and the hosted run's counts and date.
-   - `docs/user/using-the-map.md`: the **Admin** menu item and the photo queue.
+   - `docs/user/using-the-map.md`: the **Photo queue** in the Places panel.
    - `docs/user/data.md`: suggested photographs are found automatically on Wikimedia Commons, and only those an admin approves show.
    - design.md §4.6: `photo_queue` in place, and the pipeline name in `suggested_by_pipeline`. §6: add `photo_queue` to the privileged RPCs.
-   - `docs/blueprint.md`: the `/admin` route and what it reads, if blueprint lists routes and reads.
-10. **Hosted steps, after approval.** Open the pull request first. Then, after approval of the migration: `supabase migration list` and `supabase db push`. Run `fetch` and `counts` against the hosted database and report the counts. After approval of those counts, run `load`. Check read-only how many `images` rows and `suggested` links were added, and that `anon` cannot call `photo_queue` or read a suggested link. After the merge deploys `naturewatch`, the user opens `/admin` there and reviews photographs. Record the dates and counts in the pull request.
+   - `docs/blueprint.md`: what the photo queue reads.
+10. **Hosted steps, after approval.** Open the pull request first. Then, after approval of the migration: `supabase migration list` and `supabase db push`. Run `fetch` and `counts` against the hosted database and report the counts. After approval of those counts, run `load`. Check read-only how many `images` rows and `suggested` links were added, and that `anon` cannot call `photo_queue` or read a suggested link. After the merge deploys `naturewatch`, the user opens the Photo queue there and reviews photographs. Record the dates and counts in the pull request.
 
 ## Do not
 
@@ -67,7 +71,7 @@ From the code and the hosted database on 14 November 2026:
 ## Done when
 
 - The migration is applied to the hosted database, and the hosted `load` has run with approved counts.
-- The user can open `/admin` on the `naturewatch` Fly app, go through places, approve, reject, choose the main photograph, and use a recognition's photograph.
+- The user can open the Photo queue on the `naturewatch` Fly app, go through places, approve, reject, choose the main photograph, and use a recognition's photograph.
 - A second `load` adds nothing.
 - The tests, type check, lint, and browser check pass, with no console errors.
 - supabase/README.md, using-the-map.md, data.md, design.md, and blueprint.md match the result.

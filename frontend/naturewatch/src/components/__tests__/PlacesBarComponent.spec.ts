@@ -17,6 +17,7 @@ import {
 } from '@/places/display';
 import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 import usePlacesStore from '@/store/PlacesStore';
+import useAuthStore from '@/store/AuthStore';
 
 vi.stubGlobal(
   'ResizeObserver',
@@ -43,6 +44,10 @@ vi.stubGlobal(
 vi.mock('@/places/mainPhotos', () => ({
   requestMainPhotos: vi.fn(),
   mainPhotoOf: vi.fn(() => null),
+}));
+
+vi.mock('@/components/PhotoQueueList.vue', () => ({
+  default: { name: 'PhotoQueueList', template: '<div class="queue-stub" />' },
 }));
 
 vi.mock('@/places/api', () => ({
@@ -183,6 +188,45 @@ describe('Places panel', () => {
       ].filter(place => place.name.toLocaleLowerCase().startsWith(prefix));
       return { status: 'ok', places: list, total: list.length };
     });
+  });
+
+  it('offers the photo queue to admins only, and closes it for a type or a search', async () => {
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    await flushPromises();
+    const types = () =>
+      wrapper.findAll('button.place-type').map(item => item.text());
+    expect(types()).not.toContain('Photo queue');
+
+    const auth = useAuthStore(pinia);
+    const store = usePlacesStore(pinia);
+    auth.isAdmin = true;
+    await flushPromises();
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
+    await flushPromises();
+    await typeButton(wrapper, 'Photo queue').trigger('click');
+    await flushPromises();
+    expect(store.photoQueueOpen).toBe(true);
+    expect(wrapper.find('.queue-stub').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('Addo Elephant National Park');
+
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
+    await flushPromises();
+    expect(store.photoQueueOpen).toBe(false);
+    expect(wrapper.find('.queue-stub').exists()).toBe(false);
+
+    await typeButton(wrapper, 'Photo queue').trigger('click');
+    await wrapper.get('input[type="search"]').setValue('Kru');
+    await flushPromises();
+    expect(store.photoQueueOpen).toBe(false);
+
+    await typeButton(wrapper, 'Photo queue').trigger('click');
+    auth.isAdmin = false;
+    await flushPromises();
+    expect(store.photoQueueOpen).toBe(false);
+    expect(wrapper.find('.queue-stub').exists()).toBe(false);
   });
 
   it('shows the main photograph on a card that has one', async () => {

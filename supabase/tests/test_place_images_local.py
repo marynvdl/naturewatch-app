@@ -332,6 +332,22 @@ class PlaceImagesLocalTest(unittest.TestCase):
         second = self.add(self.other, commons("Zqx dusk.jpg"))["image_id"]
         self.suggest(self.park, first)
         self.suggest(self.park, second)
+        # The queue lists published places with a current boundary, as place_summaries does.
+        self.conn.execute(
+            """
+            insert into public.place_boundaries (
+              place_id, version_number, geom, source_id, source_release_id,
+              review_status, is_current
+            )
+            select %s, 1,
+              extensions.ST_GeomFromText(
+                'MULTIPOLYGON(((30 -20, 30.2 -20, 30.2 -19.8, 30 -19.8, 30 -20)))', 4326
+              )::extensions.geometry(MultiPolygon, 4326),
+              'wdpca', id, 'approved', true
+            from public.source_releases where source_id = 'wdpca' limit 1
+            """,
+            (self.park,),
+        )
         self.conn.execute(
             "insert into public.place_curations (place_id, display_name) values (%s, 'Zqx Curated')",
             (self.park,),

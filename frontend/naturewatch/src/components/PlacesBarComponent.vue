@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
 } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
+import PhotoQueueList from '@/components/PhotoQueueList.vue';
 import PlacesFilterDialog from '@/components/PlacesFilterDialog.vue';
 import {
   Popover,
@@ -34,8 +35,10 @@ import {
 } from '@/places/display';
 import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 import usePlacesStore from '@/store/PlacesStore';
+import useAuthStore from '@/store/AuthStore';
 
 const placesStore = usePlacesStore();
+const auth = useAuthStore();
 
 type PlaceTypeId =
   | 'protected_area'
@@ -467,6 +470,7 @@ function clearPlaces() {
  * outlines. The other types have none.
  */
 function selectPlaceType(type: PlaceTypeId) {
+  placesStore.photoQueueOpen = false;
   if (placeType.value === type) {
     clearPlaces();
     return;
@@ -479,6 +483,31 @@ function selectPlaceType(type: PlaceTypeId) {
   }
   hideBoundaries();
 }
+
+/**
+ * List the photo queue in place of a place type, or close it. Admins only.
+ */
+function togglePhotoQueue() {
+  const open = !placesStore.photoQueueOpen;
+  if (open) {
+    query.value = '';
+    clearPlaces();
+  }
+  placesStore.photoQueueOpen = open;
+}
+
+/** Typing a search closes the photo queue. */
+watch(needle, text => {
+  if (text) placesStore.photoQueueOpen = false;
+});
+
+/** Signing out or leaving the admin role closes the photo queue. */
+watch(
+  () => auth.isAdmin,
+  isAdmin => {
+    if (!isAdmin) placesStore.photoQueueOpen = false;
+  }
+);
 
 /** Show or hide the recognition buttons. Less clears a selected one. */
 function toggleMore() {
@@ -573,7 +602,18 @@ watch(
         >
           {{ showMore ? 'Less' : 'More…' }}
         </button>
+        <button
+          v-if="auth.isAdmin"
+          type="button"
+          class="place-type map-control"
+          :class="{ 'is-on': placesStore.photoQueueOpen }"
+          :aria-pressed="placesStore.photoQueueOpen"
+          @click="togglePhotoQueue"
+        >
+          Photo queue
+        </button>
       </div>
+      <PhotoQueueList v-if="auth.isAdmin && placesStore.photoQueueOpen" />
       <template v-if="placeType || searchingAll">
         <p v-if="showNames && listStatus === 'loading'" class="places-status">
           Loading places.

@@ -749,6 +749,51 @@ describe('Place profile', () => {
       });
     });
 
+    it('opens on the Photos tab from the queue, with Next place', async () => {
+      const auth = useAuthStore();
+      auth.isAdmin = true;
+      auth.editMode = true;
+      vi.mocked(loadPilotPlace).mockResolvedValue({
+        status: 'ok',
+        place: kruger,
+      });
+      const wrapper = mount(PlaceProfileComponent, {
+        props: { placeId: kruger.id, startTab: 'photos', hasNext: true },
+      });
+      await flushPromises();
+      expect(wrapper.emitted('started')).toHaveLength(1);
+      const selected = wrapper.get('[aria-selected="true"]');
+      expect(selected.text()).toBe('Photos');
+      expect(actions(wrapper, 's')).toEqual(['Approve', 'Reject']);
+
+      await click(wrapper, 's', 'Approve');
+      expect(wrapper.emitted('photosChanged')).toHaveLength(1);
+
+      const next = wrapper
+        .findAll('button')
+        .find(button => button.text() === 'Next place');
+      await next!.trigger('click');
+      expect(wrapper.emitted('next')).toHaveLength(1);
+
+      // The next place opens on Photos too, while its curated values load.
+      const next2 = { ...kruger, id: '88888888-8888-8888-8888-888888888888' };
+      vi.mocked(loadPilotPlace).mockResolvedValue({
+        status: 'ok',
+        place: next2,
+      });
+      await wrapper.setProps({ placeId: next2.id, hasNext: false });
+      await flushPromises();
+      expect(wrapper.get('[aria-selected="true"]').text()).toBe('Photos');
+      expect(wrapper.emitted('started')).toHaveLength(2);
+      expect(wrapper.text()).not.toContain('Next place');
+    });
+
+    it('opens on Overview without a start tab, with no Next place', async () => {
+      const wrapper = await openPhotos();
+      expect(wrapper.text()).not.toContain('Next place');
+      expect(wrapper.emitted('started')).toBeUndefined();
+    });
+
     it('shows approved photographs in the header, main first', async () => {
       const wrapper = await mountProfile(kruger);
       const header = wrapper.get('button.place-photo');
