@@ -4,6 +4,7 @@ import useBasemapStore from '@/store/BasemapStore';
 import usePlacesStore from '@/store/PlacesStore';
 import { useMeasureStore } from '@/store/MeasureStore';
 import {
+  PLACE_TYPE,
   PLACE_TILES_URL,
   PLACE_TILE_LAYER,
   RECOGNITION_TILES_URL,
@@ -13,6 +14,7 @@ import {
 import {
   RECOGNITION_COLOUR,
   boundsInsideFrame,
+  isRecognitionButtonType,
   CONSERVATION_AREA_COLOUR,
   type LngLatBounds,
 } from './display';
@@ -76,8 +78,8 @@ function placePaint(satellite: boolean) {
         2,
       ],
     },
-    selectedLine: { 'line-color': colour.selected, 'line-width': 3 },
-    hoverLine: { 'line-color': colour.selected, 'line-width': 2.5 },
+    selectedLine: { 'line-color': colour.selected, 'line-width': 2 },
+    hoverLine: { 'line-color': colour.selected, 'line-width': 1.75 },
   } satisfies {
     fill: mapboxgl.FillLayer['paint'];
     line: mapboxgl.LineLayer['paint'];
@@ -126,8 +128,8 @@ function recognitionPaint(satellite: boolean) {
         2.6,
       ],
     },
-    selectedLine: { 'line-color': colour, 'line-width': 3.5 },
-    hoverLine: { 'line-color': colour, 'line-width': 3 },
+    selectedLine: { 'line-color': colour, 'line-width': 2.5 },
+    hoverLine: { 'line-color': colour, 'line-width': 2 },
   } satisfies {
     fill: mapboxgl.FillLayer['paint'];
     line: mapboxgl.LineLayer['paint'];
@@ -199,40 +201,76 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     return placesStore.tileFilter as mapboxgl.FilterSpecification | null;
   }
 
-  /** Filter that keeps the listed recognition type within the size filter. */
-  function recognitionFilter(): mapboxgl.FilterSpecification {
-    const type: mapboxgl.FilterSpecification = [
-      '==',
-      ['get', 'place_type_id'],
-      placesStore.listType ?? '',
-    ];
-    const kept = keptFilter();
-    return kept ? (['all', type, kept] as mapboxgl.FilterSpecification) : type;
+  /**
+   * Filter that leaves out withdrawn places, which the tiles still hold until
+   * they are rebuilt. Null when none is withdrawn.
+   */
+  function withdrawnFilter(): mapboxgl.FilterSpecification | null {
+    const ids = placesStore.withdrawnIds;
+    if (!ids.length) return null;
+    return ['!', ['in', ['get', 'id'], ['literal', ids]]];
   }
 
   /**
-   * Hide the boundaries the size and cropland filter leaves out. Conservation
-   * areas draw unless a recognition type is listed. Recognitions draw only
-   * while one of their types is listed. A selected place's outline always draws.
+   * Every filter given, combined.
+   * @param filters - Filters, or null for none.
+   * @returns One filter, or null when none is given.
+   */
+  function allOf(
+    ...filters: (mapboxgl.FilterSpecification | null)[]
+  ): mapboxgl.FilterSpecification | null {
+    const set = filters.filter(
+      (filter): filter is mapboxgl.FilterSpecification => filter !== null
+    );
+    if (set.length === 0) return null;
+    if (set.length === 1) return set[0];
+    return ['all', ...set] as mapboxgl.FilterSpecification;
+  }
+
+  /** The recognition types listed. */
+  function listedRecognitions(): string[] {
+    return placesStore.listTypes.filter(type => isRecognitionButtonType(type));
+  }
+
+  /** Filter that keeps the listed recognition types within the size filter. */
+  function recognitionFilter(): mapboxgl.FilterSpecification {
+    const type: mapboxgl.FilterSpecification = [
+      'in',
+      ['get', 'place_type_id'],
+      ['literal', listedRecognitions()],
+    ];
+    return allOf(type, keptFilter(), withdrawnFilter()) ?? type;
+  }
+
+  /**
+   * Hide the boundaries the size and cropland filter leaves out, and withdrawn
+   * places. Conservation areas draw while they are listed, or while no
+   * recognition type is. Each listed recognition type draws. A selected
+   * place's outline always draws.
    * While a profile's Related tab is open, the conservation areas it lists
-   * draw instead, whatever the list and the filter show. While the photo queue
+   * draw instead, whatever the list and the filter show. While an admin list
    * is open, only the selected and hovered outlines draw.
    * @param mapInstance - The map.
    */
   function applyKeptFilter(mapInstance: mapboxgl.Map) {
     const areas = placesStore.shownAreaIds;
-    const filter: mapboxgl.FilterSpecification | null = areas
-      ? ['in', ['get', 'id'], ['literal', areas]]
-      : keptFilter();
-    const queueOnly = placesStore.photoQueueOpen && !placesStore.visible;
+    const filter = allOf(
+      areas ? ['in', ['get', 'id'], ['literal', areas]] : keptFilter(),
+      withdrawnFilter()
+    );
+    const queueOnly = placesStore.adminList !== null && !placesStore.visible;
     const recognitions = placesStore.listingRecognitions && !queueOnly;
+    const conservationAreas =
+      !queueOnly &&
+      (placesStore.listTypes.includes(PLACE_TYPE) ||
+        !placesStore.listingRecognitions);
     [PLACE_FILL, PLACE_LINE].forEach(layer => {
       if (!mapInstance.getLayer(layer)) return;
       mapInstance.setFilter(layer, filter);
       mapInstance.setLayoutProperty(
         layer,
         'visibility',
-        areas || (!recognitions && !queueOnly) ? 'visible' : 'none'
+        areas || conservationAreas ? 'visible' : 'none'
       );
     });
     [RECOGNITION_FILL, RECOGNITION_LINE].forEach(layer => {
@@ -477,7 +515,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     if (
       !placesStore.visible &&
       !placesStore.shownAreaIds &&
-      !placesStore.photoQueueOpen
+      !placesStore.adminList
     ) {
       removePlaceOverlay(mapInstance);
       return;
@@ -637,7 +675,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       [
         placesStore.visible,
         placesStore.shownAreaIds,
-        placesStore.photoQueueOpen,
+        placesStore.adminList,
       ] as const,
     () => {
       const mapInstance = readMap();
@@ -655,7 +693,12 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   );
 
   watch(
-    () => [placesStore.tileFilter, placesStore.listType] as const,
+    () =>
+      [
+        placesStore.tileFilter,
+        placesStore.listTypes,
+        placesStore.withdrawnIds,
+      ] as const,
     () => {
       const mapInstance = readMap();
       if (mapInstance)

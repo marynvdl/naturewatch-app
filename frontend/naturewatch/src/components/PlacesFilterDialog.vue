@@ -44,12 +44,12 @@ const props = withDefaults(
     extent: LngLatBounds | null;
     /** Matching places for the applied filter. */
     matchedTotal: number;
-    /** Stored place type the list shows. */
-    placeType?: string;
+    /** Stored place types the list shows. */
+    placeTypes?: string[];
     /** Leave out the cropland range, for recognitions. */
     sizeOnly?: boolean;
   }>(),
-  { placeType: undefined, sizeOnly: false }
+  { placeTypes: undefined, sizeOnly: false }
 );
 
 const open = defineModel<boolean>('open', { required: true });
@@ -215,7 +215,7 @@ watch(
       cropMin: croplandKept.value[0],
       cropMax: croplandKept.value[1],
       extent: props.extent,
-      placeType: props.placeType,
+      placeTypes: props.placeTypes,
     });
     if (request !== countRequest) return;
     if (result.status === 'ok') keptCount.value = result.total;

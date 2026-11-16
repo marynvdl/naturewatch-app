@@ -47,7 +47,7 @@ export interface PlaceSummary {
   area_km2: number | null;
   /** Stored cropland percent, or null when none is stored. */
   cropland_percent: number | null;
-  /** `place_types.id`. Set by the search across every type. */
+  /** `place_types.id`, for the type on a card of a mixed list. */
   place_type_id?: string;
 }
 
@@ -110,8 +110,8 @@ export interface PlaceWindowQuery {
   extent: LngLatBounds | null;
   /** Skip this many matching rows. Used to load the next 50. */
   offset?: number;
-  /** Stored place type to list. Conservation areas when left out. */
-  placeType?: string;
+  /** Stored place types to list. Conservation areas when left out or empty. */
+  placeTypes?: string[];
 }
 
 /** Result of loading the capped list. */
@@ -199,7 +199,7 @@ export function placesClient(): SupabaseClient | null {
  */
 function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
   return {
-    p_place_type: query.placeType ?? PLACE_TYPE,
+    p_place_types: query.placeTypes?.length ? query.placeTypes : [PLACE_TYPE],
     p_search: query.search.trim(),
     p_search_prefix: query.searchPrefix,
     p_size_min: query.sizeMin,
@@ -260,6 +260,7 @@ export async function loadPilotPlaceWindow(
     places: rows.map(row => ({
       id: row.id,
       name: row.name,
+      place_type_id: row.place_type_id,
       designation: row.designation,
       iso3: row.iso3,
       area_km2: row.area_km2,
@@ -362,18 +363,37 @@ export async function loadPilotPlaceWindowCount(
   return { status: 'ok', total: Number(data) };
 }
 
+/** Ids of withdrawn places, or why they could not be read. */
+export type WithdrawnIdsResult =
+  | { status: 'ok'; ids: string[] }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/**
+ * Ids of the withdrawn places. The tiles still hold them until they are
+ * rebuilt, so the map leaves them out.
+ * @returns The ids, or why they could not be read.
+ */
+export async function loadWithdrawnPlaceIds(): Promise<WithdrawnIdsResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('withdrawn_place_ids');
+  if (error || !Array.isArray(data)) return { status: 'error' };
+  return { status: 'ok', ids: data.map(String) };
+}
+
 /**
  * Size range and histogram counts for the filter charts.
- * @param placeType - Stored place type. Conservation areas when left out.
+ * @param placeTypes - Stored place types. Conservation areas when left out.
  * @returns The stored distribution, or why it could not be loaded.
  */
 export async function loadPilotPlaceFilterStats(
-  placeType: string = PLACE_TYPE
+  placeTypes: string[] = [PLACE_TYPE]
 ): Promise<PlaceFilterStatsResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase.rpc('place_filter_stats', {
-    p_place_type: placeType,
+    p_place_types: placeTypes,
   });
   if (error || !data?.[0]) return { status: 'error' };
   const row = data[0] as {

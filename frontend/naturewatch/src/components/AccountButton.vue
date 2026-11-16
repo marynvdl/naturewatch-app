@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Images, LogOut, Pencil, UserRound } from '@lucide/vue';
+import { Archive, Flag, Images, LogOut, Pencil, UserRound } from '@lucide/vue';
 import {
   Popover,
   PopoverContent,
@@ -11,21 +11,32 @@ import usePlacesStore from '@/store/PlacesStore';
 
 /**
  * Shown only while someone is signed in. Visitors see nothing. An admin's
- * controls are here: Edit mode and the Photo queue.
+ * controls are here: Edit mode, and in Edit mode the Photo queue, Needs
+ * attention, and Withdrawn lists.
  */
 const auth = useAuthStore();
 const placesStore = usePlacesStore();
 const open = ref(false);
 
-/** Turn Edit mode on or off. The photo queue works in Edit mode only. */
+/** Turn Edit mode on or off. The admin lists work in Edit mode only. */
 function toggleEditMode() {
   auth.setEditMode(!auth.editMode);
-  if (!auth.editMode) placesStore.photoQueueOpen = false;
+  if (!auth.editMode) placesStore.adminList = null;
 }
 
-/** Open the photo queue in the Places panel, or close it. */
-function togglePhotoQueue() {
-  placesStore.photoQueueOpen = !placesStore.photoQueueOpen;
+/** The admin lists, in the order their buttons show. */
+const lists = [
+  { id: 'photos', label: 'Photo queue', icon: Images },
+  { id: 'attention', label: 'Needs attention', icon: Flag },
+  { id: 'withdrawn', label: 'Withdrawn', icon: Archive },
+] as const;
+
+/**
+ * Open an admin list in the Places panel, or close it.
+ * @param id - The list.
+ */
+function toggleList(id: (typeof lists)[number]['id']) {
+  placesStore.adminList = placesStore.adminList === id ? null : id;
   open.value = false;
 }
 </script>
@@ -73,17 +84,20 @@ function togglePhotoQueue() {
             aria-hidden="true"
           />
         </button>
-        <button
-          v-if="auth.editMode"
-          type="button"
-          class="map-control"
-          :class="{ 'is-on': placesStore.photoQueueOpen }"
-          :aria-pressed="placesStore.photoQueueOpen"
-          @click="togglePhotoQueue"
-        >
-          <Images :size="16" aria-hidden="true" />
-          Photo queue
-        </button>
+        <template v-if="auth.editMode">
+          <button
+            v-for="list in lists"
+            :key="list.id"
+            type="button"
+            class="map-control"
+            :class="{ 'is-on': placesStore.adminList === list.id }"
+            :aria-pressed="placesStore.adminList === list.id"
+            @click="toggleList(list.id)"
+          >
+            <component :is="list.icon" :size="16" aria-hidden="true" />
+            {{ list.label }}
+          </button>
+        </template>
       </div>
       <div class="account-foot">
         <button type="button" class="map-control" @click="auth.signOut()">

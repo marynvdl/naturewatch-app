@@ -28,6 +28,7 @@ import {
   type PlaceImage,
 } from '@/places/images';
 import { PHOTOS_NONE } from '@/places/photos';
+import { loadPlaceStatus } from '@/places/status';
 import useAuthStore from '@/store/AuthStore';
 
 vi.mock('@/places/api', async importOriginal => {
@@ -64,6 +65,25 @@ vi.mock('@/places/images', async importOriginal => {
     orderPlaceImages: vi.fn(),
     setPlaceImage: vi.fn(),
     uploadPlaceImage: vi.fn(),
+  };
+});
+
+vi.mock('@/places/status', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/places/status')>();
+  return {
+    ...actual,
+    loadPlaceStatus: vi.fn().mockResolvedValue({
+      status: 'ok',
+      placeStatus: {
+        withdrawn: false,
+        withdrawalReason: null,
+        withdrawalNote: null,
+        attentionReason: null,
+        attentionNote: null,
+      },
+    }),
+    setPlaceWithdrawn: vi.fn(),
+    setPlaceAttention: vi.fn(),
   };
 });
 
@@ -416,6 +436,42 @@ describe('Place profile', () => {
       // jsdom has no scrollIntoView, which the combobox calls
       Element.prototype.scrollIntoView = vi.fn();
       vi.mocked(setPlaceRelationship).mockResolvedValue({ status: 'ok' });
+    });
+
+    it('leaves the recognitions shown as badges out of the Related tab', async () => {
+      vi.mocked(loadPlaceRecognitions).mockResolvedValue({
+        status: 'ok',
+        recognitions: [
+          {
+            id: siteId,
+            name: 'Kruger to Canyons',
+            placeTypeId: 'biosphere_reserve',
+          },
+        ],
+      });
+      vi.mocked(loadRelatedPlaces).mockResolvedValue({
+        status: 'ok',
+        links: [
+          link({ id: 's', status: 'confirmed' }),
+          link({
+            id: 'c',
+            typeId: 'located_in',
+            outward: false,
+            otherId: parkId,
+            otherName: 'Makuleke Contract Park',
+            otherTypeId: 'conservation_area',
+            status: 'confirmed',
+          }),
+        ],
+      });
+      const wrapper = await mountProfile(kruger);
+      expect(wrapper.findAll('.place-recognition')).toHaveLength(1);
+      await openTab(wrapper, 'Related');
+      const groups = wrapper.findAll('.place-related-group');
+      expect(groups.map(group => group.attributes('aria-label'))).toEqual([
+        'Contains',
+      ]);
+      expect(wrapper.text().split('Kruger to Canyons').length - 1).toBe(0);
     });
 
     it('groups related places by relationship as cards with a type label', async () => {
@@ -1158,13 +1214,9 @@ describe('Place profile', () => {
 
     expect(loadPilotPlace).toHaveBeenCalledWith(placeId);
     expect(wrapper.get('h2').text()).toBe('Kruger National Park');
-    expect(wrapper.get('.place-subtitle').text()).toBe(
-      'South Africa · National Park'
-    );
     expect(wrapper.findAll('.place-country').map(tag => tag.text())).toEqual([
       'South Africa',
     ]);
-    expect(wrapper.get('.place-area').text()).toBe('19,485 km²');
     const tabs = wrapper.findAll('[role="tab"]').map(tab => tab.text());
     expect(tabs).toEqual(['Overview', 'Related', 'Landscape', 'Species']);
     const overview = wrapper.get('[role="tabpanel"]').text();
@@ -1175,9 +1227,66 @@ describe('Place profile', () => {
     expect(wrapper.text()).not.toMatch(/\bha\b|hectare/);
   });
 
-  it('uses two decimals on the area tag below 100 km²', async () => {
-    const wrapper = await mountProfile({ ...kruger, areaKm2: 15.284 });
-    expect(wrapper.get('.place-area').text()).toBe('15.28 km²');
+  it('has a Status tab in Edit mode and tags a withdrawn, flagged place', async () => {
+    vi.mocked(loadPlaceStatus).mockResolvedValueOnce({
+      status: 'ok',
+      placeStatus: {
+        withdrawn: true,
+        withdrawalReason: 'captured_by_other_places',
+        withdrawalNote: null,
+        attentionReason: 'possible_duplicate',
+        attentionNote: null,
+      },
+    });
+    const auth = useAuthStore();
+    auth.isAdmin = true;
+    auth.editMode = true;
+    const wrapper = await mountProfile(kruger);
+    const tabs = wrapper.findAll('[role="tab"]').map(tab => tab.text());
+    expect(tabs.at(-1)).toBe('Status');
+    expect(wrapper.findAll('.place-flag').map(tag => tag.text())).toEqual([
+      'Withdrawn: Already captured by other places',
+      'Needs attention: Possible duplicate',
+    ]);
+    await openTab(wrapper, 'Status');
+    expect(wrapper.find('.status').exists()).toBe(true);
+
+    auth.editMode = false;
+    await flushPromises();
+    expect(wrapper.find('.place-flag').exists()).toBe(false);
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toEqual([
+      'Overview',
+      'Related',
+      'Landscape',
+      'Species',
+    ]);
+  });
+
+  it('opens on the Status tab when asked', async () => {
+    const auth = useAuthStore();
+    auth.isAdmin = true;
+    auth.editMode = true;
+    vi.mocked(loadPilotPlace).mockResolvedValue({
+      status: 'ok',
+      place: kruger,
+    });
+    const wrapper = mount(PlaceProfileComponent, {
+      props: { placeId: kruger.id, startTab: 'status' },
+    });
+    await flushPromises();
+    expect(wrapper.emitted('started')).toHaveLength(1);
+    expect(wrapper.find('.status').exists()).toBe(true);
+  });
+
+  it('shows each fact once, in the Overview table and not under the title', async () => {
+    const wrapper = await mountProfile(kruger);
+    const text = wrapper.text();
+    const count = (needle: string) => text.split(needle).length - 1;
+    expect(count('National Park')).toBe(2); // the title and the designation
+    expect(count('South Africa')).toBe(1);
+    expect(count('19,485')).toBe(1);
+    expect(wrapper.find('.place-subtitle').exists()).toBe(false);
+    expect(wrapper.find('.place-area').exists()).toBe(false);
   });
 
   it('shows the stored cropland fact under Landscape', async () => {

@@ -9,6 +9,7 @@ import {
 } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
 import PhotoQueueList from '@/components/PhotoQueueList.vue';
+import AdminPlaceList from '@/components/AdminPlaceList.vue';
 import PlacesFilterDialog from '@/components/PlacesFilterDialog.vue';
 import {
   Popover,
@@ -54,22 +55,40 @@ const mainTypes: { id: PlaceTypeId; label: string }[] = [
 
 /** Whether More… has added the recognition buttons. */
 const showMore = ref(false);
-const placeTypes = computed(() =>
+const placeTypeButtons = computed(() =>
   showMore.value ? [...mainTypes, ...RECOGNITION_BUTTONS] : mainTypes
 );
+/** The attention or withdrawn list, when one of them is open. */
+const placeListKind = computed(() =>
+  placesStore.adminList === 'attention' || placesStore.adminList === 'withdrawn'
+    ? placesStore.adminList
+    : null
+);
+/** Ecoregions and Countries list nothing yet, and are chosen on their own. */
+const ALONE: PlaceTypeId[] = ['ecoregion', 'country'];
 
-const placeType = ref<PlaceTypeId | null>(null);
-/** The stored place type listed and drawn, or null when none is. */
-const listedType = computed<string | null>(() => {
-  if (placeType.value === 'protected_area') return PLACE_TYPE;
-  if (isRecognitionButtonType(placeType.value)) return placeType.value;
-  return null;
-});
+/** The type buttons that are on, in the order they were chosen. */
+const placeTypes = ref<PlaceTypeId[]>([]);
+/** Whether any type button is on. */
+const anyType = computed(() => placeTypes.value.length > 0);
+/** The stored place types listed and drawn, in button order. Empty when none is. */
+const listedTypes = computed<string[]>(() =>
+  placeTypeButtons.value
+    .map(button => button.id)
+    .filter(id => placeTypes.value.includes(id))
+    .flatMap(id => {
+      if (id === 'protected_area') return [PLACE_TYPE];
+      if (isRecognitionButtonType(id)) return [id];
+      return [];
+    })
+);
+/** The listed types as one value, so a watcher sees a change only when they change. */
+const listedKey = computed(() => listedTypes.value.join(','));
 
 watch(
-  listedType,
-  type => {
-    placesStore.listType = type;
+  listedKey,
+  () => {
+    placesStore.listTypes = [...listedTypes.value];
     if (!placesStore.listingRecognitions) return;
     // Only the size filter applies to recognitions. It stays; cropland is cleared.
     if (
@@ -90,8 +109,8 @@ const places = ref<PlaceSummary[]>([]);
 const windowStart = ref(0);
 const matchTotal = ref(0);
 const storedCount = ref(0);
-/** The place type whose filter charts are loaded. */
-const statsType = ref<string | null>(null);
+/** The place types whose filter charts are loaded, as `listedKey`. */
+const statsKey = ref<string | null>(null);
 const sizeFull = ref<FigureRange>([1, 1]);
 const sizeBins = ref<number[]>([]);
 const croplandBins = ref<number[]>([]);
@@ -122,9 +141,7 @@ const WINDOW_AHEAD = PLACE_LIST_LIMIT / 2;
 const listWaitMs = import.meta.env.MODE === 'test' ? 0 : 200;
 
 const needle = computed(() => query.value.trim());
-const searchingAll = computed(
-  () => placeType.value === null && needle.value.length > 0
-);
+const searchingAll = computed(() => !anyType.value && needle.value.length > 0);
 const allSortOptions: { id: PlaceSort; label: string }[] = [
   { id: 'name', label: 'Name' },
   { id: 'size-desc', label: 'Size, largest first' },
@@ -180,7 +197,7 @@ const emptyMessage = computed(() =>
     : 'No places match.'
 );
 /** Whether a place type with stored places is listed. */
-const showList = computed(() => listedType.value !== null);
+const showList = computed(() => listedTypes.value.length > 0);
 const showTools = computed(
   () =>
     showList.value &&
@@ -216,7 +233,7 @@ function listQuery(offset = 0): PlaceWindowQuery {
       : placesStore.croplandKept[1],
     extent: listExtent.value,
     offset,
-    placeType: listedType.value ?? PLACE_TYPE,
+    placeTypes: listedTypes.value.length ? listedTypes.value : [PLACE_TYPE],
   };
 }
 
@@ -248,12 +265,12 @@ function chooseResult(place: PlaceSummary) {
   const id = place.id;
   if (placesStore.selectedId !== id) {
     // A search across every type turns on the chosen place's type, when it has a button
-    if (placeType.value === null) {
+    if (!anyType.value) {
       const type = place.place_type_id ?? PLACE_TYPE;
-      if (type === PLACE_TYPE) placeType.value = 'protected_area';
+      if (type === PLACE_TYPE) placeTypes.value = ['protected_area'];
       else if (isRecognitionButtonType(type)) {
         showMore.value = true;
-        placeType.value = type;
+        placeTypes.value = [type];
       }
     }
     showBoundaries();
@@ -281,11 +298,11 @@ function hideBoundaries() {
 
 /** Load the stored size range and chart counts once per listed type. */
 async function ensureStats() {
-  const type = listedType.value;
-  if (!type || statsType.value === type) return;
-  const result = await loadPilotPlaceFilterStats(type);
-  if (result.status !== 'ok' || listedType.value !== type) return;
-  statsType.value = type;
+  const key = listedKey.value;
+  if (!key || statsKey.value === key) return;
+  const result = await loadPilotPlaceFilterStats([...listedTypes.value]);
+  if (result.status !== 'ok' || listedKey.value !== key) return;
+  statsKey.value = key;
   storedCount.value = result.stats.placeCount;
   sizeFull.value = result.stats.sizeFull;
   sizeBins.value = result.stats.sizeBins;
@@ -430,7 +447,7 @@ function scheduleList() {
 watch(
   () =>
     [
-      listedType.value,
+      listedKey.value,
       needle.value,
       searchingAll.value,
       sort.value,
@@ -458,35 +475,43 @@ watch(
 
 /** Return to the panel with no list and no drawn boundaries. */
 function clearPlaces() {
-  placeType.value = null;
+  placeTypes.value = [];
   listInView.value = false;
   placesStore.clearSelection();
   hideBoundaries();
 }
 
 /**
- * Select a place type, or clear it when that type is already selected.
- * Conservation areas draws the stored boundaries, and a recognition type its
- * outlines. The other types have none.
+ * Turn a place type on, or off when it is on. Conservation areas and the
+ * recognition types can be on together: the list holds them all, and the map
+ * draws them all. Ecoregions and Countries have no stored places and are on
+ * alone. Turning a type off closes the open place.
  */
 function selectPlaceType(type: PlaceTypeId) {
-  placesStore.photoQueueOpen = false;
-  if (placeType.value === type) {
-    clearPlaces();
+  placesStore.adminList = null;
+  if (placeTypes.value.includes(type)) {
+    placeTypes.value = placeTypes.value.filter(id => id !== type);
+    placesStore.clearSelection();
+    if (!anyType.value) clearPlaces();
+    else if (!showList.value) hideBoundaries();
     return;
   }
-  placeType.value = type;
-  placesStore.clearSelection();
-  if (type === 'protected_area' || isRecognitionButtonType(type)) {
-    showBoundaries();
+  if (ALONE.includes(type)) {
+    placeTypes.value = [type];
+    placesStore.clearSelection();
+    hideBoundaries();
     return;
   }
-  hideBoundaries();
+  placeTypes.value = [
+    ...placeTypes.value.filter(id => !ALONE.includes(id)),
+    type,
+  ];
+  showBoundaries();
 }
 
-/** The photo queue, opened from the Profile panel, lists in place of a type. */
+/** An admin list, opened from the Profile panel, lists in place of a type. */
 watch(
-  () => placesStore.photoQueueOpen,
+  () => placesStore.adminList,
   open => {
     if (!open) return;
     query.value = '';
@@ -494,24 +519,29 @@ watch(
   }
 );
 
-/** Typing a search closes the photo queue. */
+/** Typing a search closes an admin list. */
 watch(needle, text => {
-  if (text) placesStore.photoQueueOpen = false;
+  if (text) placesStore.adminList = null;
 });
 
-/** Signing out or leaving the admin role closes the photo queue. */
+/** Signing out or leaving the admin role closes an admin list. */
 watch(
   () => auth.isAdmin,
   isAdmin => {
-    if (!isAdmin) placesStore.photoQueueOpen = false;
+    if (!isAdmin) placesStore.adminList = null;
   }
 );
 
 /** Show or hide the recognition buttons. Less clears a selected one. */
 function toggleMore() {
   showMore.value = !showMore.value;
-  if (!showMore.value && isRecognitionButtonType(placeType.value))
-    clearPlaces();
+  if (!showMore.value && placeTypes.value.some(isRecognitionButtonType)) {
+    placeTypes.value = placeTypes.value.filter(
+      id => !isRecognitionButtonType(id)
+    );
+    placesStore.clearSelection();
+    if (!anyType.value) clearPlaces();
+  }
 }
 
 watch(
@@ -567,7 +597,7 @@ watch(
   <div class="places-frame" :class="{ 'has-detail': placesStore.selectedId }">
     <div
       class="places-bar places-results map-panel nw"
-      :class="{ 'has-results': placeType }"
+      :class="{ 'has-results': anyType }"
     >
       <h2 class="places-title panel-heading">Places</h2>
       <div class="places-search">
@@ -582,12 +612,12 @@ watch(
       </div>
       <div class="places-types" role="group" aria-label="Place types">
         <button
-          v-for="type in placeTypes"
+          v-for="type in placeTypeButtons"
           :key="type.id"
           type="button"
           class="place-type map-control"
-          :class="{ 'is-on': placeType === type.id }"
-          :aria-pressed="placeType === type.id"
+          :class="{ 'is-on': placeTypes.includes(type.id) }"
+          :aria-pressed="placeTypes.includes(type.id)"
           @click="selectPlaceType(type.id)"
         >
           {{ type.label }}
@@ -601,8 +631,14 @@ watch(
           {{ showMore ? 'Less' : 'More…' }}
         </button>
       </div>
-      <PhotoQueueList v-if="auth.isAdmin && placesStore.photoQueueOpen" />
-      <template v-if="placeType || searchingAll">
+      <PhotoQueueList
+        v-if="auth.isAdmin && placesStore.adminList === 'photos'"
+      />
+      <AdminPlaceList
+        v-else-if="auth.isAdmin && placeListKind"
+        :kind="placeListKind"
+      />
+      <template v-if="anyType || searchingAll">
         <p v-if="showNames && listStatus === 'loading'" class="places-status">
           Loading places.
         </p>
@@ -695,11 +731,11 @@ watch(
             :search-prefix="searchingAll"
             :extent="listExtent"
             :matched-total="matchTotal"
-            :place-type="listedType ?? PLACE_TYPE"
+            :place-types="listedTypes"
             :size-only="placesStore.listingRecognitions"
           />
         </div>
-        <div v-if="placeType && !showList" class="places-list">
+        <div v-if="anyType && !showList" class="places-list">
           <p class="places-status">{{ nothingStored }}</p>
         </div>
         <div
@@ -732,7 +768,9 @@ watch(
                 :name="place.name"
                 :iso3="place.iso3"
                 :area-km2="place.area_km2"
-                :place-type-id="place.place_type_id ?? listedType ?? PLACE_TYPE"
+                :place-type-id="
+                  place.place_type_id ?? listedTypes[0] ?? PLACE_TYPE
+                "
                 :current="placesStore.selectedId === place.id"
                 :photo="mainPhotoOf(place.id)"
                 @click="chooseResult(place)"

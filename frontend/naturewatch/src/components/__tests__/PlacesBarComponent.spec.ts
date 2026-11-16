@@ -51,6 +51,7 @@ vi.mock('@/components/PhotoQueueList.vue', () => ({
 }));
 
 vi.mock('@/places/api', () => ({
+  loadWithdrawnPlaceIds: vi.fn(async () => ({ status: 'ok', ids: [] })),
   loadPilotPlaceWindow: vi.fn(),
   loadPlaceSearchWindow: vi.fn(),
   loadPilotPlaceWindowCount: vi.fn(),
@@ -345,7 +346,7 @@ describe('Places panel', () => {
 
     await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
-    expect(store.listType).toBe('conservation_area');
+    expect(store.listTypes).toEqual(['conservation_area']);
     store.applyFilter([2000, null], [1, 50]);
     await flushPromises();
 
@@ -363,21 +364,29 @@ describe('Places panel', () => {
       'map-control'
     );
     // More… only shows the buttons; Conservation areas stays listed
-    expect(store.listType).toBe('conservation_area');
+    expect(store.listTypes).toEqual(['conservation_area']);
 
+    // A second type joins the first, in one list
     vi.mocked(loadPilotPlaceWindow).mockClear();
     await typeButton(wrapper, 'Ramsar').trigger('click');
     await flushPromises();
     expect(store.visible).toBe(true);
-    expect(store.listType).toBe('ramsar_site');
+    expect(store.listTypes).toEqual(['conservation_area', 'ramsar_site']);
+    expect(typeButton(wrapper, 'Conservation areas').classes()).toContain(
+      'is-on'
+    );
+    expect(typeButton(wrapper, 'Ramsar').classes()).toContain('is-on');
     expect(store.listingRecognitions).toBe(true);
-    // The size filter stays; cropland does not apply to recognitions
+    // The size filter stays; cropland does not apply once a recognition is listed
     expect(store.sizeKept).toEqual([2000, null]);
     expect(store.croplandKept).toEqual([0, 100]);
-    expect(loadPilotPlaceFilterStats).toHaveBeenLastCalledWith('ramsar_site');
+    expect(loadPilotPlaceFilterStats).toHaveBeenLastCalledWith([
+      'conservation_area',
+      'ramsar_site',
+    ]);
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        placeType: 'ramsar_site',
+        placeTypes: ['conservation_area', 'ramsar_site'],
         sizeMin: 2000,
         cropMin: 0,
         cropMax: 100,
@@ -385,15 +394,27 @@ describe('Places panel', () => {
       expect.any(AbortSignal)
     );
 
+    // Clicking a type that is on turns only that one off
     await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
+    expect(store.listTypes).toEqual(['ramsar_site']);
     expect(store.sizeKept).toEqual([2000, null]);
 
     await typeButton(wrapper, 'UNESCO-MAB').trigger('click');
     await flushPromises();
-    expect(store.listType).toBe('biosphere_reserve');
+    expect(store.listTypes).toEqual(['ramsar_site', 'biosphere_reserve']);
 
-    // Less hides the buttons and clears a selected recognition type
+    // Ecoregions has no stored places and is on alone
+    await typeButton(wrapper, 'Ecoregions').trigger('click');
+    await flushPromises();
+    expect(store.listTypes).toEqual([]);
+    expect(store.visible).toBe(false);
+    await typeButton(wrapper, 'UNESCO-MAB').trigger('click');
+    await flushPromises();
+    expect(store.listTypes).toEqual(['biosphere_reserve']);
+    expect(typeButton(wrapper, 'Ecoregions').classes()).not.toContain('is-on');
+
+    // Less hides the buttons and clears the selected recognition types
     await wrapper.get('.place-type-more').trigger('click');
     await flushPromises();
     expect(labels()).toEqual([
@@ -402,7 +423,7 @@ describe('Places panel', () => {
       'Countries',
       'More…',
     ]);
-    expect(store.listType).toBeNull();
+    expect(store.listTypes).toEqual([]);
     expect(store.visible).toBe(false);
   });
 
@@ -821,7 +842,7 @@ describe('Places panel', () => {
     await flushPromises();
     expect(store.selectedId).toBe(heritage.id);
     expect(store.visible).toBe(true);
-    expect(store.listType).toBe('biosphere_reserve');
+    expect(store.listTypes).toEqual(['biosphere_reserve']);
     expect(typeButton(wrapper, 'UNESCO-MAB').classes()).toContain('is-on');
   });
 

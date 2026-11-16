@@ -8,6 +8,7 @@ import PlaceEditField, {
 } from '@/components/PlaceEditField.vue';
 import PlacePhotos from '@/components/PlacePhotos.vue';
 import PlacePhotosEditor from '@/components/PlacePhotosEditor.vue';
+import PlaceStatusEditor from '@/components/PlaceStatusEditor.vue';
 import useAuthStore from '@/store/AuthStore';
 import {
   PLACE_TYPE,
@@ -29,9 +30,7 @@ import {
   RECOGNITION_LABEL,
   recognitionColour,
   SPECIES_NOTHING_YET,
-  countryName,
   countryNames,
-  formatAreaTag,
   formatKm2,
   formatPercent,
 } from '@/places/display';
@@ -42,6 +41,11 @@ import {
   requestMainPhotos,
 } from '@/places/mainPhotos';
 import type { PlacePhoto } from '@/places/photos';
+import {
+  loadPlaceStatus,
+  reasonLabel,
+  type PlaceStatus,
+} from '@/places/status';
 
 const props = withDefaults(
   defineProps<{
@@ -49,7 +53,7 @@ const props = withDefaults(
     /** Shown while the stored record loads. */
     name?: string;
     /** The tab to open the place on, instead of Overview. */
-    startTab?: 'photos' | null;
+    startTab?: 'photos' | 'status' | null;
     /** Whether the photo queue has a place after this one. Shows Next place on the Photos tab. */
     hasNext?: boolean;
   }>(),
@@ -87,7 +91,8 @@ type TabId =
   | 'landscape'
   | 'species'
   | 'links'
-  | 'photos';
+  | 'photos'
+  | 'status';
 
 const status = ref<'loading' | 'ok' | 'missing' | 'unconfigured' | 'error'>(
   'loading'
@@ -125,11 +130,7 @@ const editing = computed(
 const tabButtons = ref<HTMLButtonElement[]>([]);
 
 const title = computed(() => place.value?.name ?? props.name ?? '');
-const country = computed(() => countryName(place.value?.iso3 ?? null));
 const countries = computed(() => countryNames(place.value?.iso3 ?? null));
-const subtitle = computed(() =>
-  [country.value, place.value?.designation].filter(Boolean).join(' · ')
-);
 /** Every place type has the same tabs. Admins in edit mode also get Links and Photos. */
 const tabs = computed<{ id: TabId; label: string }[]>(() => [
   { id: 'overview', label: 'Overview' },
@@ -140,6 +141,7 @@ const tabs = computed<{ id: TabId; label: string }[]>(() => [
     ? [
         { id: 'links' as const, label: 'Links' },
         { id: 'photos' as const, label: 'Photos' },
+        { id: 'status' as const, label: 'Status' },
       ]
     : []),
 ]);
@@ -151,14 +153,24 @@ const tabs = computed<{ id: TabId; label: string }[]>(() => [
 watch(
   () => auth.isAdmin && auth.editMode,
   on => {
-    if (!on && (activeTab.value === 'links' || activeTab.value === 'photos'))
+    if (
+      !on &&
+      (activeTab.value === 'links' ||
+        activeTab.value === 'photos' ||
+        activeTab.value === 'status')
+    )
       activeTab.value = 'overview';
   }
 );
-/** The Related tab's cards grouped by relationship, in a fixed order. */
+/**
+ * The Related tab's cards grouped by relationship, in a fixed order. The
+ * recognitions already shown as badges under the title are left out.
+ */
 const relatedGroups = computed(() => {
   const groups = new Map<string, PlaceLink[]>();
+  const badged = new Set(recognitions.value.map(item => item.id));
   for (const link of related.value) {
+    if (badged.has(link.otherId)) continue;
     const label = linkLabel(link.typeId, link.outward);
     groups.set(label, [...(groups.get(label) ?? []), link]);
   }
@@ -198,6 +210,18 @@ const sourceCountryNames = computed(
   () => countryNames(place.value?.source.iso3 ?? null).join(', ') || null
 );
 
+/** Whether the place is withdrawn or flagged. Read in edit mode. */
+const placeStatus = ref<PlaceStatus | null>(null);
+
+/** Read whether the place is withdrawn or flagged, when an admin is in edit mode. */
+async function loadStatus() {
+  const id = place.value?.id;
+  if (!id || !auth.isAdmin || !auth.editMode) return;
+  const result = await loadPlaceStatus(id);
+  if (place.value?.id !== id) return;
+  placeStatus.value = result.status === 'ok' ? result.placeStatus : null;
+}
+
 /** Read the curated values when an admin is in edit mode. */
 async function loadCuration() {
   const id = place.value?.id;
@@ -217,6 +241,7 @@ watch(
   () => [place.value?.id, auth.isAdmin, auth.editMode],
   () => {
     if (curationStatus.value !== 'ok' || !auth.editMode) void loadCuration();
+    if (!placeStatus.value) void loadStatus();
   }
 );
 
@@ -256,6 +281,7 @@ async function load(id: string) {
   if (props.startTab) emit('started');
   curation.value = null;
   curationStatus.value = 'idle';
+  placeStatus.value = null;
   const result = await loadPilotPlace(id);
   if (id !== props.placeId) return;
   status.value = result.status;
@@ -380,6 +406,25 @@ function onTabKey(event: KeyboardEvent, index: number) {
       >
         <h2 class="place-title panel-heading">{{ title }}</h2>
       </PlaceEditField>
+      <ul
+        v-if="
+          editing &&
+          placeStatus &&
+          (placeStatus.withdrawn || placeStatus.attentionReason)
+        "
+        class="place-flags"
+        aria-label="Status"
+      >
+        <li v-if="placeStatus.withdrawn" class="place-flag is-withdrawn">
+          Withdrawn
+          <template v-if="placeStatus.withdrawalReason">
+            : {{ reasonLabel(placeStatus.withdrawalReason) }}
+          </template>
+        </li>
+        <li v-if="placeStatus.attentionReason" class="place-flag">
+          Needs attention: {{ reasonLabel(placeStatus.attentionReason) }}
+        </li>
+      </ul>
       <PlaceEditField
         v-if="place && (editing || place.tagline)"
         :editable="editing"
@@ -422,12 +467,6 @@ function onTabKey(event: KeyboardEvent, index: number) {
           </button>
         </li>
       </ul>
-      <div class="place-meta">
-        <p class="place-subtitle">{{ subtitle }}</p>
-        <p v-if="place?.areaKm2 != null" class="place-area">
-          {{ formatAreaTag(place.areaKm2) }} km²
-        </p>
-      </div>
 
       <button
         type="button"
@@ -564,6 +603,16 @@ function onTabKey(event: KeyboardEvent, index: number) {
               @changed="onPhotosChanged"
             />
           </template>
+
+          <PlaceStatusEditor
+            v-else-if="activeTab === 'status' && placeStatus"
+            :place-id="place.id"
+            :place-status="placeStatus"
+            @changed="next => (placeStatus = next)"
+          />
+          <p v-else-if="activeTab === 'status'" class="place-note">
+            Loading the status.
+          </p>
 
           <template v-else-if="activeTab === 'related'">
             <p v-if="relatedStatus === 'loading'" class="place-note">
@@ -769,12 +818,27 @@ function onTabKey(event: KeyboardEvent, index: number) {
   border-radius: 50%;
 }
 
-.place-meta {
+.place-flags {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: -6px;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-flag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fdf0d5;
+  color: #6b4a07;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.place-flag.is-withdrawn {
+  background: #f6dcd9;
+  color: #7a271a;
 }
 
 .place-countries {
@@ -861,28 +925,6 @@ function onTabKey(event: KeyboardEvent, index: number) {
     overscroll-behavior: contain;
     scrollbar-width: thin;
   }
-}
-
-.place-subtitle {
-  min-width: 0;
-  margin: 0;
-  padding-top: 5px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--muted-foreground);
-}
-
-.place-area {
-  flex: none;
-  margin: 0;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: var(--on);
-  color: var(--on-foreground);
-  font-size: 14px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .place-zoom {
