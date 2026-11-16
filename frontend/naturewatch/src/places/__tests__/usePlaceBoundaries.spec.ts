@@ -377,6 +377,44 @@ describe('place boundaries from tiles', () => {
     expect(map.getSource('places-tiles')).toBeUndefined();
   });
 
+  it('outlines only the selected place while the photo queue is open', async () => {
+    const { map, store } = await drawPlaces();
+    store.toggle();
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeUndefined();
+
+    map.setLayoutProperty.mockClear();
+    store.photoQueueOpen = true;
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeDefined();
+    expect(map.getSource('recognitions-tiles')).toBeDefined();
+    [
+      'places-fill',
+      'places-line',
+      'recognitions-fill',
+      'recognitions-line',
+    ].forEach(layer =>
+      expect(map.setLayoutProperty).toHaveBeenCalledWith(
+        layer,
+        'visibility',
+        'none'
+      )
+    );
+
+    store.openFromPhotoQueue(outsideWindow);
+    await flushPromises();
+    const selection = ['==', ['get', 'id'], outsideWindow];
+    expect(map.setFilter).toHaveBeenCalledWith('places-select-line', selection);
+    expect(map.setFilter).toHaveBeenCalledWith(
+      'recognitions-select-line',
+      selection
+    );
+
+    store.photoQueueOpen = false;
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeUndefined();
+  });
+
   it('outlines the place of a hovered card from either archive', async () => {
     const { map, store } = await drawPlaces();
     expect(map.getLayer('places-hover-line')).toBeDefined();
