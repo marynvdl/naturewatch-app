@@ -50,7 +50,7 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
-    "@babel/types": "^8.0.10",
+    "@babel/types": "^8.1.2",
     "@playwright/test": "1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tsconfig/node18": "^18.2.4",
