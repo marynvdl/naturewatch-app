@@ -1,6 +1,6 @@
 # Task 03 — Relationships
 
-Parcel: [Molding Places](../../parcels/molding-places.md)
+Parcel: [Molding Places](../parcels/molding-places.md)
 
 Repository: naturewatch-app. Task 02 is merged and archived.
 

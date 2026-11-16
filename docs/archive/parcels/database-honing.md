@@ -6,7 +6,7 @@ The proposed design is [docs/database/design.md](../../database/design.md). The 
 
 *Written 9 November 2026.*
 
-Archived 13 November 2026. It began as a planning parcel. Tasks 01 to 09b then carried out the migration on the hosted database. Tasks 10 and 11 were not started. Nothing would read profiles, roles, or images until there is a sign-in and an admin screen, so they moved to [Molding Places](../../parcels/molding-places.md).
+Archived 13 November 2026. It began as a planning parcel. Tasks 01 to 09b then carried out the migration on the hosted database. Tasks 10 and 11 were not started. Nothing would read profiles, roles, or images until there is a sign-in and an admin screen, so they moved to [Molding Places](molding-places.md).
 
 ## Goal
 
@@ -252,7 +252,7 @@ Supported by the design, not built in this work:
 - `place_overlaps()` on large shapes. On Micro compute one call over a Natura 2000 site of 862,145 vertices and 53 candidate parks ran the hosted database out of memory and restarted it (12 November 2026). 59 recognitions and 139 conservation areas have more than 100,000 vertices. Cut both shapes into pieces (`ST_Subdivide`) before intersecting, or cap the vertices it accepts, before the admin overlap screen calls it.
 - A recognition designation that a later release adds or spells differently stays a conservation area until `recognition_type_for_designation()` is extended. With the next import.
 - Boundary quality and Stats eligibility, with the parcel that resumes Stats, their first reader: the four starting checks (`geometry_valid`, `small_components`, `holes`, `vertex_count`), `boundary_checks`, `qc_status`, the `stats_eligibility` columns and `set_stats_eligibility`, `stats_eligible_boundaries`, and the review of flagged boundaries. The thresholds are set against real Stats runs. Moved out of task 06 on 11 November 2026.
-- The derived admin review queue over every check's findings and source matches, with the reviewers' stored decisions. With [Molding Places](../../parcels/molding-places.md).
+- The derived admin review queue over every check's findings and source matches, with the reviewers' stored decisions. With [Molding Places](molding-places.md).
 - `reconcile` comparing a merged place with the union of its parcel records, and keeping a merged place's name and details on upload. Until then a merged place stops `upload`. With the next import.
 - A function to undo a merge. Each merged parcel's superseded boundary keeps its SITE_PID. With the first unmerge.
 - The reconcile report suggesting a decision for a new multi-parcel site from the criteria in record 20. With the next release that has new multi-parcel sites.
@@ -288,9 +288,9 @@ Do one task at a time, in this order. Each task is one branch and one pull reque
   - *Goal:* Move the 32 designations the user grouped as recognitions (record 21) into six recognition types with `recognition_details`. Import `DESIG_TYPE` and `INT_CRIT`. Add `place_relationships`, `place_overlaps`, and derived `recognises` links, confirmed above a share the user picks. Publish a recognitions PMTiles archive, rebuild the places archive from the current boundaries of published conservation areas, and remove the stale South Africa rollback copy.
 - [x] [Task 09b — Recognitions on the map and profile](../tasks/task-09b-recognitions-on-the-map.md) — naturewatch-app
   - *Goal:* Add a Recognitions button to Places that opens World Heritage, Ramsar, and UNESCO-MAB buttons, each listing its type and drawing its outlines from the recognitions archive. Show a park's confirmed recognitions as badges under its title, each opening the recognition's profile. Decided 12 November 2026; the toggle became the Recognitions button on 13 November 2026.
-- [ ] Task 10 — Profiles, roles, audit — naturewatch-app — moved to [Molding Places](../../parcels/molding-places.md)
+- [ ] Task 10 — Profiles, roles, audit — naturewatch-app — moved to [Molding Places](molding-places.md)
   - *Goal:* Add `profiles`, `user_roles`, `has_role()`, contributor policies, and `audit_log`. Together with Molding Places.
-- [ ] Task 11 — Images — naturewatch-app — moved to [Molding Places](../../parcels/molding-places.md)
+- [ ] Task 11 — Images — naturewatch-app — moved to [Molding Places](molding-places.md)
   - *Goal:* Add `images` and `place_images`, a Storage bucket, and upload policies. When Molding Places approves photographs.
 
 ## Done when

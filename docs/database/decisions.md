@@ -306,7 +306,7 @@ On 12 November 2026 that was 11,480 of 50,937 published places: 207, 1,087, 220,
 
 ## 22. Curated values are overrides, not edits to source columns
 
-*Decided 13 November 2026 by the user, when defining [Molding Places](../parcels/molding-places.md).*
+*Decided 13 November 2026 by the user, when defining [Molding Places](../archive/parcels/molding-places.md).*
 
 **Decision.** A curated display name, tagline, description, designation, or country list is stored in `place_curations`, one row per place. `places.name` and the details tables keep what the source says. The public reads show the curated value when it is set, and the source value otherwise.
 
@@ -322,7 +322,7 @@ On 12 November 2026 that was 11,480 of 50,937 published places: 207, 1,087, 220,
 
 ## 23. Suggestions are rows a person approves
 
-*Decided 13 November 2026 by the user, when defining [Molding Places](../parcels/molding-places.md).*
+*Decided 13 November 2026 by the user, when defining [Molding Places](../archive/parcels/molding-places.md).*
 
 **Decision.** Pipelines suggest photographs and taglines. They never publish them.
 - A suggested photograph is an `images` row with a `place_images` link in status `suggested`. Photographs come only from Wikimedia Commons, and only under a licence in `licences`.

@@ -1,6 +1,6 @@
 # Parcel: Shaping Boundaries
 
-The admin work on boundaries. It follows [Molding Places](molding-places.md), which builds sign-in, roles, edit mode, and the `/admin` route that this parcel uses.
+The admin work on boundaries. It follows [Molding Places](../archive/parcels/molding-places.md), which built sign-in, roles, edit mode, and the admin lists in the Places panel that this parcel uses.
 
 *Started 13 November 2026 as notes. Not defined yet. The goal and the tasks are still to be agreed.*
 
