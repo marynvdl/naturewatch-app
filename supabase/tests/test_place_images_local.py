@@ -142,8 +142,16 @@ class PlaceImagesLocalTest(unittest.TestCase):
         return {r["id"]: (r["p"], r["is_primary"]) for r in rows}
 
     def visible(self, user_id: str | None, table: str = "place_images") -> int:
+        """Rows of this test's places the user can read. Other rows are left out, so
+        photographs already in the local database do not count."""
+        mine = (
+            "place_id in (%s, %s)" if table == "place_images" else
+            "id in (select image_id from public.place_images where place_id in (%s, %s))"
+        )
         self.act_as(user_id)
-        n = self.conn.execute(f"select count(*) as n from public.{table}").fetchone()["n"]
+        n =self.conn.execute(
+            f"select count(*) as n from public.{table} where {mine}", (self.park, self.other)
+        ).fetchone()["n"]
         self.conn.execute("reset role")
         return n
 
@@ -188,10 +196,10 @@ class PlaceImagesLocalTest(unittest.TestCase):
         second = self.add(self.park, upload())
         self.assertEqual(
             {k: first[k] for k in ("status", "is_primary", "gallery_position", "reviewed_by")},
-            {"status": "approved", "is_primary": False, "gallery_position": 1,
+            {"status": "approved", "is_primary": True, "gallery_position": 1,
              "reviewed_by": self.admin},
         )
-        self.assertEqual(second["gallery_position"], 2)
+        self.assertEqual((second["gallery_position"], second["is_primary"]), (2, False))
         uploaded_by = self.conn.execute(
             "select uploaded_by::text as u from public.images where id = %s",
             (second["image_id"],),
@@ -233,7 +241,32 @@ class PlaceImagesLocalTest(unittest.TestCase):
             self.errors.InvalidParameterValue, self.set, self.park, b, {"is_primary": True}
         )
         row = self.set(self.park, b, {"status": "approved"})
-        self.assertEqual(row["gallery_position"], 2)
+        self.assertEqual((row["gallery_position"], row["is_primary"]), (2, False))
+
+    def test_the_first_approved_photograph_becomes_main(self):
+        stored = [self.add(self.other, commons(name))["image_id"]
+                  for name in ("Zqx a.jpg", "Zqx b.jpg", "Zqx c.jpg")]
+        for image in stored:
+            self.suggest(self.park, image)
+        a, b, c = stored
+        self.assertTrue(self.set(self.park, b, {"status": "approved"})["is_primary"])
+        self.assertFalse(self.set(self.park, a, {"status": "approved"})["is_primary"])
+        self.set(self.park, c, {"status": "approved"})
+        self.assertEqual(
+            {k: v for k, v in self.positions(self.park).items()},
+            {b: (1, True), a: (2, False), c: (3, False)},
+        )
+        # Rejecting the main one makes the next approved one in gallery order main.
+        self.order(self.park, [b, c, a])
+        self.set(self.park, b, {"status": "rejected"})
+        self.assertEqual(
+            {k: v[1] for k, v in self.positions(self.park).items()},
+            {b: False, c: True, a: False},
+        )
+        # A place whose approved photographs are all rejected has no main one.
+        self.set(self.park, c, {"status": "rejected"})
+        self.set(self.park, a, {"status": "rejected"})
+        self.assertFalse(any(v[1] for v in self.positions(self.park).values()))
 
     def test_ordering_lists_each_approved_photograph_once(self):
         a = self.add(self.park, commons())["image_id"]
@@ -297,6 +330,74 @@ class PlaceImagesLocalTest(unittest.TestCase):
                 {"table_name": "place_images", "action": "insert", "actor": self.admin},
                 {"table_name": "place_images", "action": "update", "actor": self.admin},
             ],
+        )
+
+    def suggest(self, place: str, image_id: str) -> None:
+        """A suggested link, as suggest_photos.py writes it."""
+        self.conn.execute(
+            """
+            insert into public.place_images (
+              place_id, image_id, status, suggested_by_pipeline, suggestion_score, alt_text
+            ) values (%s, %s, 'suggested', 'suggest_photos/1', 0.7, 'A waterfall')
+            """,
+            (place, image_id),
+        )
+
+    def queue(self, user_id: str | None = "admin") -> list[dict]:
+        rows = self.call(
+            "select place_id::text as place_id, name, place_type_id, suggested_count, "
+            "total_count from public.photo_queue(200, 0)",
+            (),
+            user_id,
+        )
+        return [r for r in rows if r["place_id"] in (self.park, self.other)]
+
+    def test_photo_queue_lists_places_with_suggestions(self):
+        first = self.add(self.other, commons())["image_id"]
+        second = self.add(self.other, commons("Zqx dusk.jpg"))["image_id"]
+        self.suggest(self.park, first)
+        self.suggest(self.park, second)
+        # The queue lists published places with a current boundary, as place_summaries does.
+        self.conn.execute(
+            """
+            insert into public.place_boundaries (
+              place_id, version_number, geom, source_id, source_release_id,
+              review_status, is_current
+            )
+            select %s, 1,
+              extensions.ST_GeomFromText(
+                'MULTIPOLYGON(((30 -20, 30.2 -20, 30.2 -19.8, 30 -19.8, 30 -20)))', 4326
+              )::extensions.geometry(MultiPolygon, 4326),
+              'wdpca', id, 'approved', true
+            from public.source_releases where source_id = 'wdpca' limit 1
+            """,
+            (self.park,),
+        )
+        self.conn.execute(
+            "insert into public.place_curations (place_id, display_name) values (%s, 'Zqx Curated')",
+            (self.park,),
+        )
+        rows = self.queue()
+        self.assertEqual(
+            [(r["name"], r["place_type_id"], r["suggested_count"]) for r in rows],
+            [("Zqx Curated", "conservation_area", 2)],
+        )
+        self.assertGreaterEqual(rows[0]["total_count"], 1)
+
+        self.set(self.park, first, {"status": "approved"})
+        self.assertEqual(self.queue()[0]["suggested_count"], 1)
+        self.set(self.park, second, {"status": "rejected"})
+        self.assertEqual(self.queue(), [])
+
+    def test_only_an_admin_reads_the_photo_queue(self):
+        stranger = self.user()
+        for who in (None, stranger):
+            self.raises(self.errors.InsufficientPrivilege, self.queue, who)
+        self.raises(
+            self.errors.InvalidParameterValue,
+            self.call,
+            "select * from public.photo_queue(0, 0)",
+            (),
         )
 
 

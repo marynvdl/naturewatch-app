@@ -62,6 +62,16 @@ function togglePlaces() {
   if (placesOpen.value) closeOthers('places');
 }
 
+/** Opening the photo queue, from the Profile panel, opens Places to list it. */
+watch(
+  () => placesStore.photoQueueOpen,
+  open => {
+    if (!open || placesOpen.value) return;
+    placesOpen.value = true;
+    closeOthers('places');
+  }
+);
+
 /** Open or close Layers, and on a narrow screen close the other panels. */
 function toggleLayers() {
   toggleDrawerVisibility();
@@ -753,6 +763,14 @@ function addSourceAndLayer(
             v-if="placesStore.selectedId"
             class="map-place map-panel nw"
             :place-id="placesStore.selectedId"
+            :start-tab="placesStore.startTab"
+            :has-next="placesStore.nextInPhotoQueue !== null"
+            @started="placesStore.startTab = null"
+            @photos-changed="placesStore.photoQueueVersion += 1"
+            @next="
+              placesStore.nextInPhotoQueue &&
+              placesStore.openFromPhotoQueue(placesStore.nextInPhotoQueue)
+            "
             @close="placesStore.clearSelection()"
             @zoom="zoomToSelectedPlace"
             @open="id => placesStore.selectPlace(id, 'list')"

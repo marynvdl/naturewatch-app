@@ -16,6 +16,13 @@ const props = defineProps<{
   photos: PlacePhoto[];
   /** Shown above the photographs. */
   placeName?: string;
+  /** For screen readers: what the set is. */
+  description?: string;
+}>();
+
+defineSlots<{
+  /** Buttons under the credit, such as Approve and Reject in the Photos editor. */
+  actions?: (props: { index: number }) => unknown;
 }>();
 
 const open = defineModel<boolean>('open', { required: true });
@@ -69,8 +76,11 @@ function onKey(event: KeyboardEvent) {
           </DialogClose>
         </header>
         <DialogDescription class="gallery-sr">
-          Approved photographs, with the photographer, the source, and the
-          licence of each. The arrow keys move between them.
+          {{
+            description ??
+            'Approved photographs, with the photographer, the source, and the licence of each.'
+          }}
+          The arrow keys move between them.
         </DialogDescription>
 
         <div v-if="photo" class="gallery-stage">
@@ -129,6 +139,9 @@ function onKey(event: KeyboardEvent) {
             </a>
             <span v-else>{{ photo.licence.name }}</span>
           </p>
+          <div v-if="$slots.actions" class="gallery-actions">
+            <slot name="actions" :index="Math.min(index, count - 1)" />
+          </div>
         </div>
 
         <div v-if="count > 1" class="gallery-strip">
@@ -270,6 +283,13 @@ function onKey(event: KeyboardEvent) {
   font-size: 13px;
   line-height: 1.5;
   color: var(--muted-foreground);
+}
+
+.gallery-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .gallery-dot {

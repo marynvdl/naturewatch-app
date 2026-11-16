@@ -574,3 +574,63 @@ export function orderPlaceImages(placeId: string, imageIds: string[]) {
     p_image_ids: imageIds,
   });
 }
+
+/** Places per page of the photo queue. */
+export const PHOTO_QUEUE_PAGE = 20;
+
+/** A place with suggested photographs, in the photo queue. */
+export interface QueuedPlace {
+  placeId: string;
+  name: string;
+  placeType: string;
+  iso3: string | null;
+  areaKm2: number | null;
+  suggested: number;
+}
+
+export type PhotoQueueResult =
+  | { status: 'ok'; places: QueuedPlace[]; total: number }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+interface QueueRow {
+  place_id: string;
+  name: string;
+  place_type_id: string;
+  iso3: string | null;
+  area_km2: number | null;
+  suggested_count: number;
+  total_count: number;
+}
+
+/**
+ * The published places with suggested photographs, by name. Admin only.
+ * @param limit - Places to return.
+ * @param offset - Places to skip.
+ * @returns The places, and how many there are in all.
+ */
+export async function loadPhotoQueue(
+  limit: number,
+  offset: number
+): Promise<PhotoQueueResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('photo_queue', {
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) return { status: 'error' };
+  const rows = (data as QueueRow[] | null) ?? [];
+  return {
+    status: 'ok',
+    places: rows.map(row => ({
+      placeId: row.place_id,
+      name: row.name,
+      placeType: row.place_type_id,
+      iso3: row.iso3,
+      areaKm2: row.area_km2,
+      suggested: Number(row.suggested_count),
+    })),
+    total: rows.length ? Number(rows[0].total_count) : offset,
+  };
+}

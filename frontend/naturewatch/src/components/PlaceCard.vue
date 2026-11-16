@@ -18,6 +18,8 @@ const props = defineProps<{
   placeTypeId?: string | null;
   /** Address of the place's main photograph. A placeholder shows without it. */
   photo?: string | null;
+  /** A tag after the area, such as how many photographs are suggested. */
+  note?: string | null;
 }>();
 
 defineEmits<{
@@ -65,8 +67,13 @@ const country = computed(() => countryName(props.iso3));
         </span>
         <span v-if="country" class="place-card-country">{{ country }}</span>
       </span>
-      <span v-if="areaKm2 != null" class="place-card-area">
-        {{ formatAreaTag(areaKm2) }} km²
+      <span v-if="areaKm2 != null || note" class="place-card-tags">
+        <span v-if="areaKm2 != null" class="place-card-area">
+          {{ formatAreaTag(areaKm2) }} km²
+        </span>
+        <span v-if="note" class="place-card-area place-card-note">
+          {{ note }}
+        </span>
       </span>
     </span>
   </button>
@@ -175,8 +182,14 @@ const country = computed(() => countryName(props.iso3));
   background: var(--type-colour);
 }
 
-.place-card-area {
+.place-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   margin-top: auto;
+}
+
+.place-card-area {
   padding: 1px 6px;
   border-radius: 6px;
   background: var(--on);

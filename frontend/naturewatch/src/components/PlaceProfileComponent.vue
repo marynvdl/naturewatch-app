@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { ChevronRight, LocateFixed, X } from '@lucide/vue';
+import { ArrowRight, ChevronRight, LocateFixed, X } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
 import PlaceLinksEditor from '@/components/PlaceLinksEditor.vue';
 import PlaceEditField, {
@@ -8,10 +8,6 @@ import PlaceEditField, {
 } from '@/components/PlaceEditField.vue';
 import PlacePhotos from '@/components/PlacePhotos.vue';
 import PlacePhotosEditor from '@/components/PlacePhotosEditor.vue';
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from '@/components/ui/segmented-control';
 import useAuthStore from '@/store/AuthStore';
 import {
   PLACE_TYPE,
@@ -52,8 +48,12 @@ const props = withDefaults(
     placeId: string;
     /** Shown while the stored record loads. */
     name?: string;
+    /** The tab to open the place on, instead of Overview. */
+    startTab?: 'photos' | null;
+    /** Whether the photo queue has a place after this one. Shows Next place on the Photos tab. */
+    hasNext?: boolean;
   }>(),
-  { name: undefined }
+  { name: undefined, startTab: null, hasNext: false }
 );
 
 const emit = defineEmits<{
@@ -70,14 +70,16 @@ const emit = defineEmits<{
   areas: [ids: string[] | null];
   /** The pointer or focus entered or left a card on the Related tab. */
   highlight: [id: string, on: boolean];
+  /** The place opened on `startTab`. */
+  started: [];
+  /** A photograph was added, reviewed, or moved. */
+  photosChanged: [];
+  /** Next place was chosen on the Photos tab. */
+  next: [];
 }>();
 
-/** Admins switch between viewing and editing. Visitors see no toggle. */
+/** Admins turn Edit mode on in the Profile panel. */
 const auth = useAuthStore();
-const profileMode = computed({
-  get: () => (auth.editMode ? 'edit' : 'view'),
-  set: (value: string) => auth.setEditMode(value === 'edit'),
-});
 
 type TabId =
   | 'overview'
@@ -142,11 +144,17 @@ const tabs = computed<{ id: TabId; label: string }[]>(() => [
     : []),
 ]);
 
-/** Leaving edit mode closes the Links and Photos tabs. */
-watch(editing, on => {
-  if (!on && (activeTab.value === 'links' || activeTab.value === 'photos'))
-    activeTab.value = 'overview';
-});
+/**
+ * Leaving edit mode closes the Links and Photos tabs. This follows the toggle,
+ * not `editing`, which is briefly false while the next place's values load.
+ */
+watch(
+  () => auth.isAdmin && auth.editMode,
+  on => {
+    if (!on && (activeTab.value === 'links' || activeTab.value === 'photos'))
+      activeTab.value = 'overview';
+  }
+);
 /** The Related tab's cards grouped by relationship, in a fixed order. */
 const relatedGroups = computed(() => {
   const groups = new Map<string, PlaceLink[]>();
@@ -244,7 +252,8 @@ async function load(id: string) {
   related.value = [];
   relatedStatus.value = 'loading';
   relatedShown.value = {};
-  activeTab.value = 'overview';
+  activeTab.value = props.startTab ?? 'overview';
+  if (props.startTab) emit('started');
   curation.value = null;
   curationStatus.value = 'idle';
   const result = await loadPilotPlace(id);
@@ -272,6 +281,7 @@ function onPhotosChanged() {
   if (!place.value) return;
   void loadPhotos(place.value.id);
   forgetMainPhoto(place.value.id);
+  emit('photosChanged');
 }
 
 /** Read the main photographs of the Related cards shown. */
@@ -357,18 +367,6 @@ function onTabKey(event: KeyboardEvent, index: number) {
     </button>
 
     <div class="place-body">
-      <SegmentedControl
-        v-if="auth.isAdmin"
-        v-model="profileMode"
-        type="single"
-        variant="outline"
-        size="sm"
-        class="place-mode"
-        aria-label="Profile mode"
-      >
-        <SegmentedControlItem value="view">View</SegmentedControlItem>
-        <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
-      </SegmentedControl>
       <p v-if="auth.editMode && curationStatus === 'error'" class="place-note">
         The curated values could not be read, so editing is off.
       </p>
@@ -550,11 +548,22 @@ function onTabKey(event: KeyboardEvent, index: number) {
             @open="id => $emit('open', id)"
           />
 
-          <PlacePhotosEditor
-            v-else-if="activeTab === 'photos'"
-            :place-id="place.id"
-            @changed="onPhotosChanged"
-          />
+          <template v-else-if="activeTab === 'photos'">
+            <button
+              v-if="hasNext"
+              type="button"
+              class="map-control place-next"
+              @click="$emit('next')"
+            >
+              Next place
+              <ArrowRight :size="16" aria-hidden="true" />
+            </button>
+            <PlacePhotosEditor
+              :place-id="place.id"
+              :place-name="title"
+              @changed="onPhotosChanged"
+            />
+          </template>
 
           <template v-else-if="activeTab === 'related'">
             <p v-if="relatedStatus === 'loading'" class="place-note">
@@ -688,10 +697,6 @@ function onTabKey(event: KeyboardEvent, index: number) {
   align-items: stretch;
   gap: 16px;
   padding: var(--map-panel-padding);
-}
-
-.place-mode {
-  align-self: flex-start;
 }
 
 .place-tagline {
@@ -885,6 +890,10 @@ function onTabKey(event: KeyboardEvent, index: number) {
 }
 
 .place-status,
+.place-next {
+  align-self: flex-end;
+}
+
 .place-note {
   margin: 0;
   font-size: 13px;

@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
 } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
+import PhotoQueueList from '@/components/PhotoQueueList.vue';
 import PlacesFilterDialog from '@/components/PlacesFilterDialog.vue';
 import {
   Popover,
@@ -34,8 +35,10 @@ import {
 } from '@/places/display';
 import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 import usePlacesStore from '@/store/PlacesStore';
+import useAuthStore from '@/store/AuthStore';
 
 const placesStore = usePlacesStore();
+const auth = useAuthStore();
 
 type PlaceTypeId =
   | 'protected_area'
@@ -467,6 +470,7 @@ function clearPlaces() {
  * outlines. The other types have none.
  */
 function selectPlaceType(type: PlaceTypeId) {
+  placesStore.photoQueueOpen = false;
   if (placeType.value === type) {
     clearPlaces();
     return;
@@ -479,6 +483,29 @@ function selectPlaceType(type: PlaceTypeId) {
   }
   hideBoundaries();
 }
+
+/** The photo queue, opened from the Profile panel, lists in place of a type. */
+watch(
+  () => placesStore.photoQueueOpen,
+  open => {
+    if (!open) return;
+    query.value = '';
+    clearPlaces();
+  }
+);
+
+/** Typing a search closes the photo queue. */
+watch(needle, text => {
+  if (text) placesStore.photoQueueOpen = false;
+});
+
+/** Signing out or leaving the admin role closes the photo queue. */
+watch(
+  () => auth.isAdmin,
+  isAdmin => {
+    if (!isAdmin) placesStore.photoQueueOpen = false;
+  }
+);
 
 /** Show or hide the recognition buttons. Less clears a selected one. */
 function toggleMore() {
@@ -574,6 +601,7 @@ watch(
           {{ showMore ? 'Less' : 'More…' }}
         </button>
       </div>
+      <PhotoQueueList v-if="auth.isAdmin && placesStore.photoQueueOpen" />
       <template v-if="placeType || searchingAll">
         <p v-if="showNames && listStatus === 'loading'" class="places-status">
           Loading places.
