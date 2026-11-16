@@ -215,7 +215,8 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * areas draw unless a recognition type is listed. Recognitions draw only
    * while one of their types is listed. A selected place's outline always draws.
    * While a profile's Related tab is open, the conservation areas it lists
-   * draw instead, whatever the list and the filter show.
+   * draw instead, whatever the list and the filter show. While the photo queue
+   * is open, only the selected and hovered outlines draw.
    * @param mapInstance - The map.
    */
   function applyKeptFilter(mapInstance: mapboxgl.Map) {
@@ -223,14 +224,15 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     const filter: mapboxgl.FilterSpecification | null = areas
       ? ['in', ['get', 'id'], ['literal', areas]]
       : keptFilter();
-    const recognitions = placesStore.listingRecognitions;
+    const queueOnly = placesStore.photoQueueOpen && !placesStore.visible;
+    const recognitions = placesStore.listingRecognitions && !queueOnly;
     [PLACE_FILL, PLACE_LINE].forEach(layer => {
       if (!mapInstance.getLayer(layer)) return;
       mapInstance.setFilter(layer, filter);
       mapInstance.setLayoutProperty(
         layer,
         'visibility',
-        areas || !recognitions ? 'visible' : 'none'
+        areas || (!recognitions && !queueOnly) ? 'visible' : 'none'
       );
     });
     [RECOGNITION_FILL, RECOGNITION_LINE].forEach(layer => {
@@ -472,7 +474,11 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
 
   /** Draw or clear the conservation-area boundaries. */
   function syncPlaceOverlay(mapInstance: mapboxgl.Map) {
-    if (!placesStore.visible && !placesStore.shownAreaIds) {
+    if (
+      !placesStore.visible &&
+      !placesStore.shownAreaIds &&
+      !placesStore.photoQueueOpen
+    ) {
       removePlaceOverlay(mapInstance);
       return;
     }
@@ -627,7 +633,12 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   );
 
   watch(
-    () => [placesStore.visible, placesStore.shownAreaIds] as const,
+    () =>
+      [
+        placesStore.visible,
+        placesStore.shownAreaIds,
+        placesStore.photoQueueOpen,
+      ] as const,
     () => {
       const mapInstance = readMap();
       if (mapInstance) drawWhenReady(mapInstance);
