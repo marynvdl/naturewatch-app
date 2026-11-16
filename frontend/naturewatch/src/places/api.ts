@@ -575,8 +575,8 @@ const RECOGNITION_ORDER = [
 ];
 
 /**
- * The published recognitions with a confirmed `recognises` link to a place,
- * ordered by type and then name. A recognition itself has none.
+ * The published recognitions with a confirmed, unretired `recognises` link
+ * to a place, ordered by type and then name. A recognition itself has none.
  * @param id - `places.id` of the recognised place.
  * @returns The recognitions, or why they could not be read.
  */
@@ -591,7 +591,8 @@ export async function loadPlaceRecognitions(
     .select('subject_place_id')
     .eq('object_place_id', id)
     .eq('relationship_type_id', 'recognises')
-    .eq('status', 'confirmed');
+    .eq('status', 'confirmed')
+    .is('retired_at', null);
   if (error) return { status: 'error' };
   const ids = [
     ...new Set(
