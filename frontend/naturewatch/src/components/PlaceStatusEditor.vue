@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
   ATTENTION_REASONS,
@@ -31,6 +31,8 @@ const emit = defineEmits<{
 }>();
 
 const placesStore = usePlacesStore();
+/** Ties each label to its control. */
+const uid = useId();
 
 const withdrawalReason = ref<WithdrawalReason | ''>('');
 const withdrawalNote = ref('');
@@ -144,9 +146,10 @@ function clearFlag() {
             : 'A withdrawn place leaves the map, the list, and search, and gets no new facts.'
         }}
       </p>
-      <label class="status-field">
+      <label class="status-field" :for="`${uid}-withdrawal-reason`">
         <span class="status-label">Reason</span>
         <select
+          :id="`${uid}-withdrawal-reason`"
           v-model="withdrawalReason"
           class="status-input"
           name="withdrawal-reason"
@@ -161,9 +164,10 @@ function clearFlag() {
           </option>
         </select>
       </label>
-      <label class="status-field">
+      <label class="status-field" :for="`${uid}-withdrawal-note`">
         <span class="status-label">Note (optional)</span>
         <textarea
+          :id="`${uid}-withdrawal-note`"
           v-model="withdrawalNote"
           class="status-input status-note"
           name="withdrawal-note"
@@ -217,9 +221,10 @@ function clearFlag() {
             : 'A flagged place is listed under Needs attention. Visitors do not see the flag.'
         }}
       </p>
-      <label class="status-field">
+      <label class="status-field" :for="`${uid}-attention-reason`">
         <span class="status-label">Reason</span>
         <select
+          :id="`${uid}-attention-reason`"
           v-model="attentionReason"
           class="status-input"
           name="attention-reason"
@@ -234,9 +239,10 @@ function clearFlag() {
           </option>
         </select>
       </label>
-      <label class="status-field">
+      <label class="status-field" :for="`${uid}-attention-note`">
         <span class="status-label">Note (optional)</span>
         <textarea
+          :id="`${uid}-attention-note`"
           v-model="attentionNote"
           class="status-input status-note"
           name="attention-note"

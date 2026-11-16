@@ -416,10 +416,11 @@ function onTabKey(event: KeyboardEvent, index: number) {
         aria-label="Status"
       >
         <li v-if="placeStatus.withdrawn" class="place-flag is-withdrawn">
-          Withdrawn
-          <template v-if="placeStatus.withdrawalReason">
-            : {{ reasonLabel(placeStatus.withdrawalReason) }}
-          </template>
+          {{
+            placeStatus.withdrawalReason
+              ? `Withdrawn: ${reasonLabel(placeStatus.withdrawalReason)}`
+              : 'Withdrawn'
+          }}
         </li>
         <li v-if="placeStatus.attentionReason" class="place-flag">
           Needs attention: {{ reasonLabel(placeStatus.attentionReason) }}

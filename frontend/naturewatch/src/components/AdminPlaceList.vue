@@ -37,9 +37,8 @@ const countText = computed(() => {
     places.value.length === total.value
       ? `${total.value} ${noun}`
       : `${places.value.length} of ${total.value} ${noun}`;
-  return props.kind === 'attention'
-    ? `${count} need attention`
-    : `${count} withdrawn`;
+  if (props.kind === 'withdrawn') return `${count} withdrawn`;
+  return `${count} ${total.value === 1 ? 'needs' : 'need'} attention`;
 });
 
 watch(places, list => requestMainPhotos(list.map(place => place.placeId)));
