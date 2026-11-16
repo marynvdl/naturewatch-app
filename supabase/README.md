@@ -48,6 +48,8 @@ WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_
 
 `counts` reports how many rows of the file `load` would add. `load` writes them in one transaction: a Commons file already in `images` is reused, otherwise it is inserted with `uploaded_by` null, and the place gets a `suggested` link with `suggested_by_pipeline` `suggest_photos/1`, the score, the alt text, and the caption. A place that already has a link to the file, in any status, is skipped, so a rerun adds nothing and a rejected photograph stays rejected.
 
+The hosted migration ran on 16 November 2026. The one approved link from task 04 was already main, so nothing else changed. The same day `fetch` found suggestions for 195 of the 207 World Heritage Sites: 3 for 186 sites, 1 or 2 for 9, and none for 12. Of the 572 rows, 37 are Wikidata images, 56 category files, and 479 search results, over 570 distinct files. `load` added 570 `images` rows, all Commons links with `uploaded_by` null, and 572 `suggested` links, in one transaction. As `anon`, no suggested link is readable, `images` still shows only the one approved photograph, and `photo_queue` cannot be called.
+
 On three sites, Wikidata had a WDPA id for one, Maloti-Drakensberg Park. Its image and two other UNESCO photographs have no licence code on Commons, and were refused. The name search supplied the rest.
 
 ## Local database
