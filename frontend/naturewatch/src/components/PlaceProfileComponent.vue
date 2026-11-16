@@ -41,10 +41,7 @@ import {
   requestMainPhotos,
 } from '@/places/mainPhotos';
 import type { PlacePhoto } from '@/places/photos';
-import {
-  loadPlaceStatus,
-  type PlaceStatus,
-} from '@/places/status';
+import { loadPlaceStatus, type PlaceStatus } from '@/places/status';
 
 const props = withDefaults(
   defineProps<{

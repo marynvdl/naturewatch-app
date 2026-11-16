@@ -25,11 +25,13 @@ const props = defineProps<{
 const focused = ref(false);
 let blurWait: ReturnType<typeof setTimeout> | null = null;
 
+/** The field gained focus. */
 function onFocus() {
   if (blurWait) clearTimeout(blurWait);
   focused.value = true;
 }
 
+/** The field lost focus. Wait, so a click on a suggestion still lands. */
 function onBlur() {
   blurWait = setTimeout(() => (focused.value = false), 150);
 }
@@ -58,6 +60,10 @@ const suggestions = computed(() => {
   return [...starts, ...contains].slice(0, SUGGESTION_LIMIT);
 });
 
+/**
+ * Put the chosen suggestion in the field.
+ * @param value - The chosen option.
+ */
 function choose(value: unknown) {
   if (typeof value === 'string') text.value = value;
 }
