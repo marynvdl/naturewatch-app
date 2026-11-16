@@ -422,13 +422,13 @@ describe('Place profile', () => {
       };
     }
 
-    /** Switch to edit mode and open the Links tab. */
+    /** Switch to edit mode and open Related, which edits the links. */
     async function openLinks(attach = false) {
       const auth = useAuthStore();
       auth.isAdmin = true;
       auth.editMode = true;
       const wrapper = await mountProfile(kruger, attach);
-      await openTab(wrapper, 'Links');
+      await openTab(wrapper, 'Related');
       await flushPromises();
       return wrapper;
     }
@@ -542,15 +542,39 @@ describe('Place profile', () => {
       wrapper.unmount();
     });
 
-    it('shows no Links tab to a visitor or in view mode', async () => {
+    it('edits links only in edit mode, on the Related tab', async () => {
       const visitor = await mountProfile(kruger);
-      expect(visitor.text()).not.toContain('Links');
+      await openTab(visitor, 'Related');
+      expect(visitor.find('.links').exists()).toBe(false);
       const auth = useAuthStore();
       auth.isAdmin = true;
       const viewing = await mountProfile(kruger);
-      const tabs = viewing.findAll('[role="tab"]').map(tab => tab.text());
-      expect(tabs).not.toContain('Links');
+      await openTab(viewing, 'Related');
+      expect(viewing.find('.links').exists()).toBe(false);
       expect(loadPlaceLinks).not.toHaveBeenCalled();
+    });
+
+    it('has only the tabs an admin edits in edit mode, and keeps Related open across the switch', async () => {
+      vi.mocked(loadPlaceLinks).mockResolvedValue({ status: 'ok', links: [] });
+      const auth = useAuthStore();
+      auth.isAdmin = true;
+      const wrapper = await mountProfile(kruger);
+      await openTab(wrapper, 'Related');
+      auth.editMode = true;
+      await flushPromises();
+      const tabs = () => wrapper.findAll('[role="tab"]').map(tab => tab.text());
+      expect(tabs()).toEqual(['Overview', 'Related', 'Photos', 'Status']);
+      expect(wrapper.find('.links').exists()).toBe(true);
+      auth.editMode = false;
+      await flushPromises();
+      expect(tabs()).toEqual(['Overview', 'Related', 'Landscape', 'Species']);
+      expect(wrapper.find('.place-related, .place-note').exists()).toBe(true);
+      expect(wrapper.find('.links').exists()).toBe(false);
+
+      await openTab(wrapper, 'Landscape');
+      auth.editMode = true;
+      await flushPromises();
+      expect(wrapper.get('[aria-selected="true"]').text()).toBe('Overview');
     });
 
     it('groups links by status with the actions each one offers', async () => {

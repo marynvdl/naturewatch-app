@@ -19,6 +19,7 @@ Decided 16 November 2026 by the user:
 Changed 16 November 2026 by the user, during evaluation:
 
 - **Reasons are free text with suggestions**, not fixed lists. Each reason field lists the reasons in use, most used first, then the presets, and takes a new reason typed in. `place_status_reasons(kind)` reads the reasons in use. A reason is at most 80 characters.
+- **Edit mode has only the tabs an admin edits**: Overview, Related, Photos, and Status. Landscape and Species are hidden, and the Links tab is renamed Related, since it is the editable form of Related. Switching Edit mode keeps Related open; Landscape and Species fall back to Overview.
 
 ## Facts already stored
 

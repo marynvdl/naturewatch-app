@@ -128,34 +128,50 @@ const tabButtons = ref<HTMLButtonElement[]>([]);
 const title = computed(() => place.value?.name ?? props.name ?? '');
 const countries = computed(() => countryNames(place.value?.iso3 ?? null));
 /** Every place type has the same tabs. Admins in edit mode also get Links and Photos. */
-const tabs = computed<{ id: TabId; label: string }[]>(() => [
-  { id: 'overview', label: 'Overview' },
-  { id: 'related', label: 'Related' },
-  { id: 'landscape', label: 'Landscape' },
-  { id: 'species', label: 'Species' },
-  ...(editing.value
+/**
+ * View mode has Overview, Related, Landscape, and Species. Edit mode has only
+ * what an admin edits: Overview, Related (every link, to review), Photos, and
+ * Status.
+ */
+const tabs = computed<{ id: TabId; label: string }[]>(() =>
+  editing.value
     ? [
-        { id: 'links' as const, label: 'Links' },
-        { id: 'photos' as const, label: 'Photos' },
-        { id: 'status' as const, label: 'Status' },
+        { id: 'overview', label: 'Overview' },
+        { id: 'links', label: 'Related' },
+        { id: 'photos', label: 'Photos' },
+        { id: 'status', label: 'Status' },
       ]
-    : []),
-]);
+    : [
+        { id: 'overview', label: 'Overview' },
+        { id: 'related', label: 'Related' },
+        { id: 'landscape', label: 'Landscape' },
+        { id: 'species', label: 'Species' },
+      ]
+);
+
+/** The tab each tab becomes when Edit mode is turned on. */
+const EDIT_TAB: Partial<Record<TabId, TabId>> = {
+  related: 'links',
+  landscape: 'overview',
+  species: 'overview',
+};
+/** The tab each tab becomes when Edit mode is turned off. */
+const VIEW_TAB: Partial<Record<TabId, TabId>> = {
+  links: 'related',
+  photos: 'overview',
+  status: 'overview',
+};
 
 /**
- * Leaving edit mode closes the Links and Photos tabs. This follows the toggle,
- * not `editing`, which is briefly false while the next place's values load.
+ * Turning Edit mode on or off keeps the open tab where it has a counterpart:
+ * Related in view mode is Related in edit mode. This follows the toggle, not
+ * `editing`, which is briefly false while the next place's values load.
  */
 watch(
   () => auth.isAdmin && auth.editMode,
   on => {
-    if (
-      !on &&
-      (activeTab.value === 'links' ||
-        activeTab.value === 'photos' ||
-        activeTab.value === 'status')
-    )
-      activeTab.value = 'overview';
+    const next = (on ? EDIT_TAB : VIEW_TAB)[activeTab.value];
+    if (next) activeTab.value = next;
   }
 );
 /**
