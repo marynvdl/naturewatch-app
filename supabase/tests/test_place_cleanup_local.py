@@ -108,7 +108,7 @@ class PlaceCleanupLocalTest(unittest.TestCase):
         self.conn.execute("rollback to savepoint s")
         self.conn.execute("reset role")
 
-    def withdraw(self, reason="captured_by_other_places", note=None):
+    def withdraw(self, reason="Already captured by other places", note=None):
         return self.run_as(
             self.admin,
             "select public.set_place_publication(%s, 'withdrawn', %s, %s)",
@@ -116,8 +116,8 @@ class PlaceCleanupLocalTest(unittest.TestCase):
         )
 
     def test_only_an_admin_withdraws_or_flags(self):
-        sql_withdraw = "select public.set_place_publication(%s, 'withdrawn', 'other', null)"
-        sql_flag = "select public.set_place_attention(%s, 'other', null)"
+        sql_withdraw = "select public.set_place_publication(%s, 'withdrawn', 'Other', null)"
+        sql_flag = "select public.set_place_attention(%s, 'Other', null)"
         self.raises(self.errors.InsufficientPrivilege, self.user(), sql_withdraw, (self.place_id,))
         self.raises(self.errors.InsufficientPrivilege, self.user(), sql_flag, (self.place_id,))
         self.raises(self.errors.InsufficientPrivilege, None, sql_withdraw, (self.place_id,))
@@ -127,10 +127,33 @@ class PlaceCleanupLocalTest(unittest.TestCase):
             "select * from public.admin_place_list('withdrawn', 20, 0)",
         )
 
-    def test_withdrawing_needs_a_known_reason(self):
+    def test_withdrawing_needs_a_short_reason(self):
         sql = "select public.set_place_publication(%s, 'withdrawn', %s, null)"
         self.raises(self.errors.InvalidParameterValue, self.admin, sql, (self.place_id, None))
-        self.raises(self.errors.CheckViolation, self.admin, sql, (self.place_id, "bored"))
+        self.raises(self.errors.InvalidParameterValue, self.admin, sql, (self.place_id, "   "))
+        self.raises(self.errors.CheckViolation, self.admin, sql, (self.place_id, "x" * 81))
+
+    def test_reasons_are_free_text_and_suggested_most_used_first(self):
+        other = self.place("Zqx Cleanup Other", "conservation_area")
+        flag = "select public.set_place_attention(%s, %s, null)"
+        self.run_as(self.admin, flag, (self.place_id, "  Zqx river cut  "))
+        self.run_as(self.admin, flag, (other, "Zqx river cut"))
+        self.run_as(self.admin, flag, (self.site_id, "Zqx odd name"))
+        rows = self.run_as(
+            self.admin, "select * from public.place_status_reasons('attention')"
+        )
+        mine = [(r["reason"], r["place_count"]) for r in rows if r["reason"].startswith("Zqx")]
+        self.assertEqual(mine, [("Zqx river cut", 2), ("Zqx odd name", 1)])
+        self.withdraw(reason="Zqx inside a bigger park")
+        rows = self.run_as(
+            self.admin, "select reason from public.place_status_reasons('withdrawal')"
+        )
+        self.assertIn("Zqx inside a bigger park", [r["reason"] for r in rows])
+        self.raises(
+            self.errors.InsufficientPrivilege,
+            self.user(),
+            "select * from public.place_status_reasons('attention')",
+        )
 
     def test_a_withdrawn_place_leaves_the_lists_but_admins_still_open_it(self):
         self.withdraw(note="  Inside the larger park.  ")
@@ -140,7 +163,7 @@ class PlaceCleanupLocalTest(unittest.TestCase):
             (self.place_id,),
         ).fetchone()
         self.assertEqual(row["publication_status"], "withdrawn")
-        self.assertEqual(row["withdrawal_reason"], "captured_by_other_places")
+        self.assertEqual(row["withdrawal_reason"], "Already captured by other places")
         self.assertEqual(row["withdrawal_note"], "Inside the larger park.")
         self.assertEqual(row["withdrawn_by"], self.admin)
 
@@ -200,12 +223,12 @@ class PlaceCleanupLocalTest(unittest.TestCase):
 
     def test_a_flag_is_set_changed_listed_and_cleared(self):
         flag = "select * from public.set_place_attention(%s, %s, %s)"
-        self.run_as(self.admin, flag, (self.place_id, "boundary_wrong", "Cuts the river."))
-        self.run_as(self.admin, flag, (self.place_id, "possible_duplicate", None))
+        self.run_as(self.admin, flag, (self.place_id, "Boundary looks wrong", "Cuts the river."))
+        self.run_as(self.admin, flag, (self.place_id, "Possible duplicate", None))
         rows = self.run_as(self.admin, "select * from public.admin_place_list('attention', 20, 0)")
         mine = [r for r in rows if r["id"] == uuid.UUID(self.place_id)]
         self.assertEqual(len(mine), 1)
-        self.assertEqual(mine[0]["reason"], "possible_duplicate")
+        self.assertEqual(mine[0]["reason"], "Possible duplicate")
         self.assertIsNone(mine[0]["note"])
         cleared = self.run_as(self.admin, flag, (self.place_id, None, None))
         self.assertIsNone(cleared[0]["place_id"])
@@ -224,10 +247,10 @@ class PlaceCleanupLocalTest(unittest.TestCase):
         self.assertEqual([r["action"] for r in actions], ["insert", "update", "delete"])
 
     def test_the_withdrawn_list_has_the_reason(self):
-        self.withdraw(reason="not_a_place", note="A road reserve.")
+        self.withdraw(reason="Not a place", note="A road reserve.")
         rows = self.run_as(self.admin, "select * from public.admin_place_list('withdrawn', 20, 0)")
         mine = [r for r in rows if r["id"] == uuid.UUID(self.place_id)][0]
-        self.assertEqual(mine["reason"], "not_a_place")
+        self.assertEqual(mine["reason"], "Not a place")
         self.assertEqual(mine["note"], "A road reserve.")
         self.assertGreaterEqual(mine["total_count"], 1)
 

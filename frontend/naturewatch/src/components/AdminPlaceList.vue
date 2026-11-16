@@ -4,7 +4,6 @@ import PlaceCard from '@/components/PlaceCard.vue';
 import {
   ADMIN_LIST_PAGE,
   loadAdminPlaceList,
-  reasonLabel,
   type AdminListedPlace,
   type AdminPlaceListKind,
 } from '@/places/status';
@@ -130,7 +129,7 @@ watch(
             :place-type-id="place.placeType"
             :current="placesStore.selectedId === place.placeId"
             :photo="mainPhotoOf(place.placeId)"
-            :note="reasonLabel(place.reason) || undefined"
+            :note="place.reason"
             @click="choose(place)"
             @highlight="on => placesStore.hoverPlace(place.placeId, on)"
           />

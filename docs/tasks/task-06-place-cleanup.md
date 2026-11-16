@@ -16,6 +16,10 @@ Decided 16 November 2026 by the user:
 - **Several place types at once, in one merged list.** Each type button toggles. The map draws every chosen type. The list merges them, and each card carries its type. Cropland filter and sort show only while conservation areas are the only type chosen.
 - **Each fact is shown once on the place profile**, and the same principle applies to new screens. It is written in CLAUDE.md.
 
+Changed 16 November 2026 by the user, during evaluation:
+
+- **Reasons are free text with suggestions**, not fixed lists. Each reason field lists the reasons in use, most used first, then the presets, and takes a new reason typed in. `place_status_reasons(kind)` reads the reasons in use. A reason is at most 80 characters.
+
 ## Facts already stored
 
 From the code and the migrations on 16 November 2026:

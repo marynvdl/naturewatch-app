@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, useId, watch } from 'vue';
+import { computed, onMounted, ref, useId, watch } from 'vue';
+import PlaceSuggestInput from '@/components/PlaceSuggestInput.vue';
 import { Button } from '@/components/ui/button';
 import {
-  ATTENTION_REASONS,
+  ATTENTION_PRESETS,
   STATUS_NOTE_MAX,
-  WITHDRAWAL_REASONS,
+  STATUS_REASON_MAX,
+  WITHDRAWAL_PRESETS,
   loadPlaceStatus,
+  loadStatusReasons,
   setPlaceAttention,
   setPlaceWithdrawn,
-  type AttentionReason,
   type PlaceStatus,
-  type WithdrawalReason,
 } from '@/places/status';
 import usePlacesStore from '@/store/PlacesStore';
 
@@ -34,14 +35,30 @@ const placesStore = usePlacesStore();
 /** Ties each label to its control. */
 const uid = useId();
 
-const withdrawalReason = ref<WithdrawalReason | ''>('');
+const withdrawalReason = ref('');
 const withdrawalNote = ref('');
-const attentionReason = ref<AttentionReason | ''>('');
+const attentionReason = ref('');
 const attentionNote = ref('');
 const busy = ref<'withdrawal' | 'attention' | null>(null);
 const error = ref<{ form: 'withdrawal' | 'attention'; text: string } | null>(
   null
 );
+
+/** Reasons to suggest: those in use, most used first, then the presets. */
+const withdrawalReasons = ref<string[]>([...WITHDRAWAL_PRESETS]);
+const attentionReasons = ref<string[]>([...ATTENTION_PRESETS]);
+
+/** Read the reasons in use, for both fields. */
+async function loadReasons() {
+  const [withdrawal, attention] = await Promise.all([
+    loadStatusReasons('withdrawal'),
+    loadStatusReasons('attention'),
+  ]);
+  withdrawalReasons.value = withdrawal;
+  attentionReasons.value = attention;
+}
+
+onMounted(loadReasons);
 
 watch(
   () => props.placeStatus,
@@ -57,13 +74,15 @@ watch(
 /** Whether the withdrawal form differs from what is stored. */
 const withdrawalEdited = computed(
   () =>
-    withdrawalReason.value !== (props.placeStatus.withdrawalReason ?? '') ||
+    withdrawalReason.value.trim() !==
+      (props.placeStatus.withdrawalReason ?? '') ||
     withdrawalNote.value.trim() !== (props.placeStatus.withdrawalNote ?? '')
 );
 /** Whether the attention form differs from what is stored. */
 const attentionEdited = computed(
   () =>
-    attentionReason.value !== (props.placeStatus.attentionReason ?? '') ||
+    attentionReason.value.trim() !==
+      (props.placeStatus.attentionReason ?? '') ||
     attentionNote.value.trim() !== (props.placeStatus.attentionNote ?? '')
 );
 
@@ -89,6 +108,7 @@ async function run(
   busy.value = null;
   if (form === 'withdrawal') void placesStore.loadWithdrawn();
   placesStore.adminListVersion += 1;
+  void loadReasons();
   if (id !== props.placeId) return;
   if (read.status !== 'ok') {
     error.value = {
@@ -102,7 +122,7 @@ async function run(
 
 /** Withdraw the place, or save a new reason or note while it is withdrawn. */
 function withdraw() {
-  const reason = withdrawalReason.value;
+  const reason = withdrawalReason.value.trim();
   if (!reason) return;
   void run('withdrawal', () =>
     setPlaceWithdrawn(
@@ -120,7 +140,7 @@ function restore() {
 
 /** Flag the place, or save a new reason or note while it is flagged. */
 function flag() {
-  const reason = attentionReason.value;
+  const reason = attentionReason.value.trim();
   if (!reason) return;
   void run('attention', () =>
     setPlaceAttention(props.placeId, reason, attentionNote.value.trim() || null)
@@ -148,21 +168,15 @@ function clearFlag() {
       </p>
       <label class="status-field" :for="`${uid}-withdrawal-reason`">
         <span class="status-label">Reason</span>
-        <select
+        <PlaceSuggestInput
           :id="`${uid}-withdrawal-reason`"
           v-model="withdrawalReason"
-          class="status-input"
           name="withdrawal-reason"
-        >
-          <option value="" disabled>Choose a reason</option>
-          <option
-            v-for="choice in WITHDRAWAL_REASONS"
-            :key="choice.id"
-            :value="choice.id"
-          >
-            {{ choice.label }}
-          </option>
-        </select>
+          placeholder="Choose or type a reason"
+          show-all
+          :options="withdrawalReasons"
+          :maxlength="STATUS_REASON_MAX"
+        />
       </label>
       <label class="status-field" :for="`${uid}-withdrawal-note`">
         <span class="status-label">Note (optional)</span>
@@ -183,7 +197,7 @@ function clearFlag() {
           v-if="!placeStatus.withdrawn"
           type="button"
           size="sm"
-          :disabled="!withdrawalReason || busy !== null"
+          :disabled="!withdrawalReason.trim() || busy !== null"
           @click="withdraw"
         >
           Withdraw
@@ -193,7 +207,7 @@ function clearFlag() {
             type="button"
             size="sm"
             variant="outline"
-            :disabled="!withdrawalReason || !withdrawalEdited || busy !== null"
+            :disabled="!withdrawalReason.trim() || !withdrawalEdited || busy !== null"
             @click="withdraw"
           >
             Save
@@ -223,21 +237,15 @@ function clearFlag() {
       </p>
       <label class="status-field" :for="`${uid}-attention-reason`">
         <span class="status-label">Reason</span>
-        <select
+        <PlaceSuggestInput
           :id="`${uid}-attention-reason`"
           v-model="attentionReason"
-          class="status-input"
           name="attention-reason"
-        >
-          <option value="" disabled>Choose a reason</option>
-          <option
-            v-for="choice in ATTENTION_REASONS"
-            :key="choice.id"
-            :value="choice.id"
-          >
-            {{ choice.label }}
-          </option>
-        </select>
+          placeholder="Choose or type a reason"
+          show-all
+          :options="attentionReasons"
+          :maxlength="STATUS_REASON_MAX"
+        />
       </label>
       <label class="status-field" :for="`${uid}-attention-note`">
         <span class="status-label">Note (optional)</span>
@@ -258,7 +266,7 @@ function clearFlag() {
           v-if="!placeStatus.attentionReason"
           type="button"
           size="sm"
-          :disabled="!attentionReason || busy !== null"
+          :disabled="!attentionReason.trim() || busy !== null"
           @click="flag"
         >
           Flag
@@ -268,7 +276,7 @@ function clearFlag() {
             type="button"
             size="sm"
             variant="outline"
-            :disabled="!attentionReason || !attentionEdited || busy !== null"
+            :disabled="!attentionReason.trim() || !attentionEdited || busy !== null"
             @click="flag"
           >
             Save

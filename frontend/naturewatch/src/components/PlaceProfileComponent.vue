@@ -43,7 +43,6 @@ import {
 import type { PlacePhoto } from '@/places/photos';
 import {
   loadPlaceStatus,
-  reasonLabel,
   type PlaceStatus,
 } from '@/places/status';
 
@@ -418,12 +417,12 @@ function onTabKey(event: KeyboardEvent, index: number) {
         <li v-if="placeStatus.withdrawn" class="place-flag is-withdrawn">
           {{
             placeStatus.withdrawalReason
-              ? `Withdrawn: ${reasonLabel(placeStatus.withdrawalReason)}`
+              ? `Withdrawn: ${placeStatus.withdrawalReason}`
               : 'Withdrawn'
           }}
         </li>
         <li v-if="placeStatus.attentionReason" class="place-flag">
-          Needs attention: {{ reasonLabel(placeStatus.attentionReason) }}
+          Needs attention: {{ placeStatus.attentionReason }}
         </li>
       </ul>
       <PlaceEditField

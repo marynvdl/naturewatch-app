@@ -5,13 +5,14 @@
 -- set_place_publication(). The map hides withdrawn places at once by reading
 -- withdrawn_place_ids(), before the PMTiles are rebuilt. An admin flags a place as
 -- needing attention through set_place_attention(). admin_place_list() lists either.
+-- Reasons are short free text. place_status_reasons() suggests the ones in use.
 -- Admins can open a withdrawn place. The list reads take several place types.
 
 -- Withdrawal ----------------------------------------------------------------------------
 
 alter table public.places
   add column withdrawal_reason text check (
-    withdrawal_reason in ('captured_by_other_places', 'not_a_place', 'boundary_unusable', 'other')
+    char_length(withdrawal_reason) <= 80 and btrim(withdrawal_reason) <> ''
   ),
   add column withdrawal_note text check (
     char_length(withdrawal_note) <= 500 and btrim(withdrawal_note) <> ''
@@ -26,7 +27,7 @@ alter table public.places
   check (withdrawal_reason is null or publication_status = 'withdrawn');
 
 comment on column public.places.withdrawal_reason is
-  'Why an admin withdrew the place. Set only while it is withdrawn.';
+  'Why an admin withdrew the place, as they wrote it. Set only while it is withdrawn.';
 
 -- Only a change to publication is audited, so importer writes are not logged.
 create trigger audit_places_publication
@@ -54,6 +55,7 @@ set search_path = ''
 as $$
 declare
   current_status text;
+  clean_reason text := nullif(btrim(coalesce(p_reason, '')), '');
   note text := nullif(btrim(coalesce(p_note, '')), '');
 begin
   if not (select public.has_role('admin')) then
@@ -71,12 +73,12 @@ begin
   end if;
 
   if p_status = 'withdrawn' then
-    if p_reason is null then
+    if clean_reason is null then
       raise exception 'Withdrawing a place needs a reason.' using errcode = '22023';
     end if;
     update public.places
     set publication_status = 'withdrawn',
-      withdrawal_reason = p_reason,
+      withdrawal_reason = clean_reason,
       withdrawal_note = note,
       withdrawn_by = (select auth.uid()),
       withdrawn_at = case when current_status = 'withdrawn' then withdrawn_at else now() end
@@ -119,9 +121,7 @@ comment on function public.withdrawn_place_ids() is
 
 create table public.place_attention (
   place_id uuid primary key references public.places (id) on delete cascade,
-  reason text not null check (
-    reason in ('boundary_wrong', 'details_wrong', 'possible_duplicate', 'missing_photographs', 'other')
-  ),
+  reason text not null check (char_length(reason) <= 80 and btrim(reason) <> ''),
   note text check (char_length(note) <= 500 and btrim(note) <> ''),
   flagged_by uuid references public.profiles (id) on delete set null,
   created_at timestamptz not null default now(),
@@ -152,6 +152,7 @@ set search_path = ''
 as $$
 declare
   saved public.place_attention;
+  clean_reason text := nullif(btrim(coalesce(p_reason, '')), '');
 begin
   if not (select public.has_role('admin')) then
     raise exception 'Only an admin can flag a place.' using errcode = '42501';
@@ -159,12 +160,12 @@ begin
   if not exists (select 1 from public.places where places.id = p_place_id) then
     raise exception 'No place has id %', p_place_id using errcode = 'P0002';
   end if;
-  if p_reason is null then
+  if clean_reason is null then
     delete from public.place_attention where place_id = p_place_id;
     return null;
   end if;
   insert into public.place_attention as flag (place_id, reason, note, flagged_by)
-  values (p_place_id, p_reason, nullif(btrim(coalesce(p_note, '')), ''), (select auth.uid()))
+  values (p_place_id, clean_reason, nullif(btrim(coalesce(p_note, '')), ''), (select auth.uid()))
   on conflict (place_id) do update
     set reason = excluded.reason,
       note = excluded.note,
@@ -175,7 +176,41 @@ end;
 $$;
 
 comment on function public.set_place_attention(uuid, text, text) is
-  'Admin only. Flags a place as needing attention with a reason and an optional note. A null reason clears it.';
+  'Admin only. Flags a place as needing attention with a reason and an optional note. A null or blank reason clears it.';
+
+-- The reasons in use, most used first, for the reason fields to suggest.
+create function public.place_status_reasons(p_kind text)
+returns table (reason text, place_count bigint)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not (select public.has_role('admin')) then
+    raise exception 'Only an admin can read the reasons.' using errcode = '42501';
+  end if;
+  if p_kind = 'withdrawal' then
+    return query
+    select places.withdrawal_reason, count(*)
+    from public.places
+    where places.withdrawal_reason is not null
+    group by places.withdrawal_reason
+    order by count(*) desc, places.withdrawal_reason;
+  elsif p_kind = 'attention' then
+    return query
+    select flag.reason, count(*)
+    from public.place_attention as flag
+    group by flag.reason
+    order by count(*) desc, flag.reason;
+  else
+    raise exception 'The kind must be withdrawal or attention.' using errcode = '22023';
+  end if;
+end;
+$$;
+
+comment on function public.place_status_reasons(text) is
+  'Admin only. The withdrawal or attention reasons in use, with how many places have each, most used first.';
 
 -- Reads ---------------------------------------------------------------------------------
 -- place_summaries also holds withdrawn places. Row security shows them to admins only.
@@ -908,6 +943,8 @@ revoke all on function public.set_place_publication(uuid, text, text, text) from
 grant execute on function public.set_place_publication(uuid, text, text, text) to authenticated;
 revoke all on function public.set_place_attention(uuid, text, text) from public, anon, authenticated;
 grant execute on function public.set_place_attention(uuid, text, text) to authenticated;
+revoke all on function public.place_status_reasons(text) from public, anon, authenticated;
+grant execute on function public.place_status_reasons(text) to authenticated;
 revoke all on function public.admin_place_list(text, integer, integer) from public, anon, authenticated;
 grant execute on function public.admin_place_list(text, integer, integer) to authenticated;
 revoke all on function public.withdrawn_place_ids() from public;

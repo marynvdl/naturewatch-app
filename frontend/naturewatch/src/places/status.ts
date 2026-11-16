@@ -1,50 +1,59 @@
 import { placesClient } from '@/places/api';
 
-/** Why an admin withdrew a place, as stored in `places.withdrawal_reason`. */
-export const WITHDRAWAL_REASONS = [
-  { id: 'captured_by_other_places', label: 'Already captured by other places' },
-  { id: 'not_a_place', label: 'Not a place' },
-  { id: 'boundary_unusable', label: 'Boundary unusable' },
-  { id: 'other', label: 'Other' },
-] as const;
+/** Reasons offered for withdrawing a place before any is in use. */
+export const WITHDRAWAL_PRESETS = [
+  'Already captured by other places',
+  'Not a place',
+  'Boundary unusable',
+];
 
-/** Why a place needs attention, as stored in `place_attention.reason`. */
-export const ATTENTION_REASONS = [
-  { id: 'boundary_wrong', label: 'Boundary looks wrong' },
-  { id: 'details_wrong', label: 'Details wrong' },
-  { id: 'possible_duplicate', label: 'Possible duplicate' },
-  { id: 'missing_photographs', label: 'Missing photographs' },
-  { id: 'other', label: 'Other' },
-] as const;
-
-export type WithdrawalReason = (typeof WITHDRAWAL_REASONS)[number]['id'];
-export type AttentionReason = (typeof ATTENTION_REASONS)[number]['id'];
+/** Reasons offered for flagging a place before any is in use. */
+export const ATTENTION_PRESETS = [
+  'Boundary looks wrong',
+  'Details wrong',
+  'Possible duplicate',
+  'Missing photographs',
+];
 
 /** Notes are at most this long, as the database checks. */
 export const STATUS_NOTE_MAX = 500;
+/** Reasons are at most this long, as the database checks. */
+export const STATUS_REASON_MAX = 80;
+
+/** Which reason field: withdrawing, or needing attention. */
+export type ReasonKind = 'withdrawal' | 'attention';
 
 /**
- * The label of a stored reason.
- * @param reason - A withdrawal or attention reason id.
- * @returns Its label, or the id when it is not known.
+ * The reasons to suggest: those in use, most used first, then the presets not
+ * in use yet. Falls back to the presets when the reasons cannot be read.
+ * @param kind - Which reason field.
+ * @returns The suggestions.
  */
-export function reasonLabel(reason: string | null): string {
-  if (!reason) return '';
-  return (
-    [...WITHDRAWAL_REASONS, ...ATTENTION_REASONS].find(
-      choice => choice.id === reason
-    )?.label ?? reason
-  );
+export async function loadStatusReasons(kind: ReasonKind): Promise<string[]> {
+  const presets =
+    kind === 'withdrawal' ? WITHDRAWAL_PRESETS : ATTENTION_PRESETS;
+  const supabase = placesClient();
+  if (!supabase) return [...presets];
+  const { data, error } = await supabase.rpc('place_status_reasons', {
+    p_kind: kind,
+  });
+  if (error || !Array.isArray(data)) return [...presets];
+  const used = (data as { reason: string }[]).map(row => row.reason);
+  const seen = new Set(used.map(reason => reason.toLowerCase()));
+  return [
+    ...used,
+    ...presets.filter(reason => !seen.has(reason.toLowerCase())),
+  ];
 }
 
 /** Whether a place is withdrawn, and whether it is flagged, with why. */
 export interface PlaceStatus {
   withdrawn: boolean;
   /** Null for a place withdrawn before reasons were stored. */
-  withdrawalReason: WithdrawalReason | null;
+  withdrawalReason: string | null;
   withdrawalNote: string | null;
   /** Null when the place is not flagged. */
-  attentionReason: AttentionReason | null;
+  attentionReason: string | null;
   attentionNote: string | null;
 }
 
@@ -79,11 +88,11 @@ export async function loadPlaceStatus(id: string): Promise<PlaceStatusResult> {
     return { status: 'error', message: 'The place could not be found.' };
   const row = place.data as {
     publication_status: string;
-    withdrawal_reason: WithdrawalReason | null;
+    withdrawal_reason: string | null;
     withdrawal_note: string | null;
   };
   const attention = flag.data as {
-    reason: AttentionReason;
+    reason: string;
     note: string | null;
   } | null;
   return {
@@ -110,7 +119,7 @@ type SaveResult = Promise<string | null>;
  */
 export async function setPlaceWithdrawn(
   id: string,
-  reason: WithdrawalReason | null,
+  reason: string | null,
   note: string | null = null
 ): SaveResult {
   const supabase = placesClient();
@@ -133,7 +142,7 @@ export async function setPlaceWithdrawn(
  */
 export async function setPlaceAttention(
   id: string,
-  reason: AttentionReason | null,
+  reason: string | null,
   note: string | null = null
 ): SaveResult {
   const supabase = placesClient();

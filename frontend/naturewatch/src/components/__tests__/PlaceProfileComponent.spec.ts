@@ -72,6 +72,7 @@ vi.mock('@/places/status', async importOriginal => {
   const actual = await importOriginal<typeof import('@/places/status')>();
   return {
     ...actual,
+    loadStatusReasons: vi.fn().mockResolvedValue([]),
     loadPlaceStatus: vi.fn().mockResolvedValue({
       status: 'ok',
       placeStatus: {
@@ -1232,9 +1233,9 @@ describe('Place profile', () => {
       status: 'ok',
       placeStatus: {
         withdrawn: true,
-        withdrawalReason: 'captured_by_other_places',
+        withdrawalReason: 'Already captured by other places',
         withdrawalNote: null,
-        attentionReason: 'possible_duplicate',
+        attentionReason: 'Possible duplicate',
         attentionNote: null,
       },
     });

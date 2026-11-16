@@ -43,8 +43,8 @@ describe('Admin place list', () => {
     vi.mocked(loadAdminPlaceList).mockResolvedValue({
       status: 'ok',
       places: [
-        listed('a', 'Alpha Reserve', 'boundary_wrong'),
-        listed('b', 'Beta Park', 'possible_duplicate'),
+        listed('a', 'Alpha Reserve', 'Boundary looks wrong'),
+        listed('b', 'Beta Park', 'Possible duplicate'),
       ],
       total: 2,
     });

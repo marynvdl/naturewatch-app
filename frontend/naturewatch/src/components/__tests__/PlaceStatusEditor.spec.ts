@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import PlaceStatusEditor from '@/components/PlaceStatusEditor.vue';
 import {
   loadPlaceStatus,
+  loadStatusReasons,
   setPlaceAttention,
   setPlaceWithdrawn,
   type PlaceStatus,
@@ -16,6 +17,7 @@ vi.mock('@/places/status', async importOriginal => {
   return {
     ...actual,
     loadPlaceStatus: vi.fn(),
+    loadStatusReasons: vi.fn(),
     setPlaceWithdrawn: vi.fn(),
     setPlaceAttention: vi.fn(),
   };
@@ -67,9 +69,16 @@ function button(
 describe('Place status editor', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    // jsdom has no scrollIntoView, which the suggestion list calls
+    Element.prototype.scrollIntoView = vi.fn();
     vi.mocked(setPlaceWithdrawn).mockReset().mockResolvedValue(null);
     vi.mocked(setPlaceAttention).mockReset().mockResolvedValue(null);
     vi.mocked(loadPlaceStatus).mockReset();
+    vi.mocked(loadStatusReasons).mockImplementation(async kind =>
+      kind === 'withdrawal'
+        ? ['Inside a bigger park', 'Already captured by other places']
+        : ['Boundary looks wrong']
+    );
     vi.mocked(loadWithdrawnPlaceIds).mockResolvedValue({
       status: 'ok',
       ids: [placeId],
@@ -80,7 +89,7 @@ describe('Place status editor', () => {
     const withdrawn: PlaceStatus = {
       ...PUBLISHED,
       withdrawn: true,
-      withdrawalReason: 'captured_by_other_places',
+      withdrawalReason: 'Already captured by other places',
       withdrawalNote: 'Inside Kruger.',
     };
     vi.mocked(loadPlaceStatus).mockResolvedValue({
@@ -93,8 +102,8 @@ describe('Place status editor', () => {
     expect(withdraw.attributes('disabled')).toBeDefined();
 
     await wrapper
-      .get('select[name="withdrawal-reason"]')
-      .setValue('captured_by_other_places');
+      .get('input[name="withdrawal-reason"]')
+      .setValue('Already captured by other places');
     await wrapper
       .get('textarea[name="withdrawal-note"]')
       .setValue('  Inside Kruger. ');
@@ -103,7 +112,7 @@ describe('Place status editor', () => {
 
     expect(setPlaceWithdrawn).toHaveBeenCalledWith(
       placeId,
-      'captured_by_other_places',
+      'Already captured by other places',
       'Inside Kruger.'
     );
     expect(wrapper.emitted('changed')).toEqual([[withdrawn]]);
@@ -119,15 +128,15 @@ describe('Place status editor', () => {
     const wrapper = mountEditor({
       ...PUBLISHED,
       withdrawn: true,
-      withdrawalReason: 'not_a_place',
+      withdrawalReason: 'Not a place',
     });
     expect(wrapper.text()).toContain('Withdrawn. Visitors do not see');
     expect(
       (
-        wrapper.get('select[name="withdrawal-reason"]')
+        wrapper.get('input[name="withdrawal-reason"]')
           .element as HTMLSelectElement
       ).value
-    ).toBe('not_a_place');
+    ).toBe('Not a place');
     await button(wrapper, 0, 'Restore').trigger('click');
     await flushPromises();
     expect(setPlaceWithdrawn).toHaveBeenCalledWith(placeId, null);
@@ -137,7 +146,7 @@ describe('Place status editor', () => {
   it('flags a place and clears the flag', async () => {
     const flagged: PlaceStatus = {
       ...PUBLISHED,
-      attentionReason: 'boundary_wrong',
+      attentionReason: 'Boundary looks wrong',
     };
     vi.mocked(loadPlaceStatus).mockResolvedValue({
       status: 'ok',
@@ -145,13 +154,13 @@ describe('Place status editor', () => {
     });
     const wrapper = mountEditor();
     await wrapper
-      .get('select[name="attention-reason"]')
-      .setValue('boundary_wrong');
+      .get('input[name="attention-reason"]')
+      .setValue('Boundary looks wrong');
     await button(wrapper, 1, 'Flag').trigger('click');
     await flushPromises();
     expect(setPlaceAttention).toHaveBeenCalledWith(
       placeId,
-      'boundary_wrong',
+      'Boundary looks wrong',
       null
     );
     expect(setPlaceWithdrawn).not.toHaveBeenCalled();
@@ -166,12 +175,49 @@ describe('Place status editor', () => {
     expect(setPlaceAttention).toHaveBeenLastCalledWith(placeId, null);
   });
 
+  it('suggests the reasons in use on focus, and takes a new one typed', async () => {
+    const wrapper = mount(PlaceStatusEditor, {
+      props: { placeId, placeStatus: PUBLISHED },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    expect(loadStatusReasons).toHaveBeenCalledWith('withdrawal');
+    expect(loadStatusReasons).toHaveBeenCalledWith('attention');
+    const input = wrapper.get('input[name="withdrawal-reason"]');
+    await input.trigger('focus');
+    await flushPromises();
+    const items = [...document.querySelectorAll('.suggest-item')].map(item =>
+      item.textContent?.trim()
+    );
+    expect(items).toEqual([
+      'Inside a bigger park',
+      'Already captured by other places',
+    ]);
+
+    vi.mocked(loadPlaceStatus).mockResolvedValue({
+      status: 'ok',
+      placeStatus: PUBLISHED,
+    });
+    vi.mocked(loadStatusReasons).mockClear();
+    await input.setValue('  Merged into its neighbour ');
+    await button(wrapper, 0, 'Withdraw').trigger('click');
+    await flushPromises();
+    expect(setPlaceWithdrawn).toHaveBeenCalledWith(
+      placeId,
+      'Merged into its neighbour',
+      null
+    );
+    // The reasons are read again after a change
+    expect(loadStatusReasons).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
   it('shows why a change failed', async () => {
     vi.mocked(setPlaceAttention).mockResolvedValue(
       'Only an admin can flag a place.'
     );
     const wrapper = mountEditor();
-    await wrapper.get('select[name="attention-reason"]').setValue('other');
+    await wrapper.get('input[name="attention-reason"]').setValue('Other');
     await button(wrapper, 1, 'Flag').trigger('click');
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toBe(
