@@ -1,6 +1,6 @@
 # Task 05 — Photo suggestions
 
-Parcel: [Molding Places](../parcels/molding-places.md)
+Parcel: [Molding Places](../../parcels/molding-places.md)
 
 Repository: naturewatch-app. Task 04 is merged and archived.
 
