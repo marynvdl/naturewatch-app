@@ -17,7 +17,7 @@ The scope comes from the user's notes for Molding Places, 13 November 2026.
   - whether Stats are calculated.
 
   It also takes the review of the `recognises` links left `proposed` below the confirmation share in Database Honing task 09.
-- **Which places the map draws.** Publishing or withdrawing a place.
+- **Which places the map draws.** Moved to [Molding Places task 06](../archive/tasks/task-06-place-cleanup.md) on 16 November 2026: an admin withdraws or restores a place, and the map hides it before a rebuild.
 - **Replacing or editing a boundary.**
 
 ### Prerequisites and pieces

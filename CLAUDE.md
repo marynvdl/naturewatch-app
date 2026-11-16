@@ -35,6 +35,10 @@ Plan a task before changing code, and wait for the plan to be approved.
 
 Build for today, design for tomorrow. Add a table, column, function, or feature only when a task uses it now. Keep the design open to what is planned, and write later needs down in the parcel's Deferred section instead of building them.
 
+## Screens
+
+Show each fact once on a screen. If a value is in a table or tab, do not repeat it in a header, card, or tag on the same screen.
+
 ## Secrets
 
 Never commit, push, or paste a key or token. That includes a service-account JSON key, a private key, an API token, a password, and the contents of a GitHub secret or `.env` file. A workflow names a secret as `${{ secrets.SECRET_NAME }}`. A service-account email and a secret's name are identifiers. If a secret value is already in the repo, do not repeat it. Tell the user so it can be rotated.

@@ -340,3 +340,25 @@ On 12 November 2026 that was 11,480 of 50,937 published places: 207, 1,087, 220,
 - Drafting taglines from the name and designation alone. This covers more places, but makes invented superlatives likely.
 - Using the Wikipedia short description verbatim. It is free, but rarely memorable.
 - A generic suggestions table for every field. Each workflow keeps its own review instead (record 16).
+
+## 24. Withdrawing and flagging places by hand
+
+*Decided 16 November 2026 by the user, for [Molding Places task 06](../archive/tasks/task-06-place-cleanup.md).*
+
+**Decision.**
+- An admin withdraws a place by setting `publication_status` to `withdrawn` with a reason from a fixed list and an optional note. Restoring sets it back to `published`.
+- The map hides withdrawn places at once by reading their ids with `withdrawn_place_ids()`. The PMTiles still hold them until the next rebuild.
+- A withdrawn place gets no new facts, because the Stats Pipeline reads only published places. There is no separate switch.
+- An admin flags a place as needing attention with a reason from a fixed list and a note. The flag is a stored row in `place_attention`, not a derived finding.
+
+**Why.**
+- Places that duplicate others, such as a park already captured by its parts, should leave the map without deleting anything.
+- Rebuilding the tiles for each withdrawal costs a Batch run. The list of withdrawn ids is short, so the map can filter it.
+- A person often sees a problem that no check finds. A preset reason makes the list sortable later.
+
+**Alternatives.**
+- Rebuilding the PMTiles after each withdrawal. Correct without a client filter, but slow and billable for each change.
+- A separate "calculate facts" switch per place. Stats eligibility per boundary is planned in [Shaping Boundaries](../parcels/shaping-boundaries.md) instead.
+- Deriving "needs attention" only from checks, as design.md §3 first said. That still comes, beside the manual flag.
+
+**Cost.** Until a rebuild, every visitor reads the withdrawn ids once per page load. The withdrawn places stay in the archives, so anyone reading the tiles directly still sees them.
