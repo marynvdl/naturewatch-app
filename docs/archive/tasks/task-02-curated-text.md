@@ -1,6 +1,6 @@
 # Task 02 — Curated text
 
-Parcel: [Molding Places](../../parcels/molding-places.md)
+Parcel: [Molding Places](../parcels/molding-places.md)
 
 Repository: naturewatch-app. Task 01 is merged and archived.
 

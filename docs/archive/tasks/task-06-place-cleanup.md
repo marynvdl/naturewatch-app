@@ -1,6 +1,6 @@
 # Task 06 — Place cleanup
 
-Parcel: [Molding Places](../../parcels/molding-places.md)
+Parcel: [Molding Places](../parcels/molding-places.md)
 
 Repository: naturewatch-app. Task 05 is merged and archived.
 

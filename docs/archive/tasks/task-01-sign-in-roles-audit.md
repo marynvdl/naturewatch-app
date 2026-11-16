@@ -1,6 +1,6 @@
 # Task 01 — Sign-in, roles, audit
 
-Parcel: [Molding Places](../../parcels/molding-places.md)
+Parcel: [Molding Places](../parcels/molding-places.md)
 
 Repository: naturewatch-app. This is the parcel's first task, so nothing has to merge first.
 
