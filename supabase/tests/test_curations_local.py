@@ -219,7 +219,7 @@ class CurationsLocalTest(unittest.TestCase):
                     rows = self.conn.execute(
                         """
                         select id::text as id, name from public.place_window(
-                          'conservation_area', %s, true, 'size-desc',
+                          array['conservation_area'], %s, true, 'size-desc',
                           null, null, 0, 100, %s, %s, %s, %s
                         )
                         """,
