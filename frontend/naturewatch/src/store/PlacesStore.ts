@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { loadPlaceRelease } from '@/places/api';
+import { loadPlaceRelease, loadWithdrawnPlaceIds } from '@/places/api';
 import {
   CROPLAND_FULL,
   PROTECTED_AREA_ATTRIBUTION,
@@ -26,10 +26,18 @@ const usePlacesStore = defineStore('places', () => {
   const selectedId = ref<string | null>(null);
   const selectedFrom = ref<'list' | 'map' | null>(null);
   /**
-   * Stored place type the list shows and the map draws: `conservation_area`,
-   * one of the recognition button types, or null.
+   * Stored place types the list shows and the map draws: `conservation_area`
+   * and the recognition button types chosen. Empty when none is.
    */
-  const listType = ref<string | null>(null);
+  const listTypes = ref<string[]>([]);
+  /** Withdrawn places, which the map hides until the tiles are rebuilt. */
+  const withdrawnIds = ref<string[]>([]);
+
+  /** Read the withdrawn places again, after one is withdrawn or restored. */
+  async function loadWithdrawn(): Promise<void> {
+    const result = await loadWithdrawnPlaceIds();
+    if (result.status === 'ok') withdrawnIds.value = result.ids;
+  }
   /**
    * Conservation areas a profile's Related tab lists. The map draws them
    * while the tab is open. Null otherwise.
@@ -49,7 +57,7 @@ const usePlacesStore = defineStore('places', () => {
   }
   /** Whether a recognition type is listed, so the tools are size only. */
   const listingRecognitions = computed(() =>
-    isRecognitionButtonType(listType.value)
+    listTypes.value.some(type => isRecognitionButtonType(type))
   );
   /** Applied size filter, in km². */
   const sizeKept = ref<SizeBounds>([null, null]);
@@ -117,6 +125,7 @@ const usePlacesStore = defineStore('places', () => {
   async function load(): Promise<void> {
     if (status.value !== 'idle') return;
     status.value = 'loading';
+    void loadWithdrawn();
     const result = await loadPlaceRelease();
     if (result.status === 'unconfigured') {
       status.value = 'unconfigured';
@@ -130,8 +139,21 @@ const usePlacesStore = defineStore('places', () => {
     if (status.value === 'loading') status.value = 'ready';
   }
 
-  /** Whether the Places panel lists the photo queue. Admins only. */
-  const photoQueueOpen = ref(false);
+  /**
+   * The admin list the Places panel shows in place of a place type: the photo
+   * queue, the places that need attention, or the withdrawn places. Admins only.
+   */
+  const adminList = ref<'photos' | 'attention' | 'withdrawn' | null>(null);
+  /** Whether the Places panel lists the photo queue. */
+  const photoQueueOpen = computed({
+    get: () => adminList.value === 'photos',
+    set: (open: boolean) => {
+      if (open) adminList.value = 'photos';
+      else if (adminList.value === 'photos') adminList.value = null;
+    },
+  });
+  /** Goes up after a place is withdrawn, restored, flagged, or cleared, so the lists read again. */
+  const adminListVersion = ref(0);
   /** The queue's places as listed, in order. */
   const photoQueueIds = ref<string[]>([]);
   /** Where the place opened from the queue was listed, so Next place still works once it leaves. */
@@ -139,7 +161,7 @@ const usePlacesStore = defineStore('places', () => {
   /** Goes up after a photograph is reviewed, so the queue reads its counts again. */
   const photoQueueVersion = ref(0);
   /** The profile tab to open the next selected place on. Cleared once used. */
-  const startTab = ref<'photos' | null>(null);
+  const startTab = ref<'photos' | 'status' | null>(null);
 
   /** The place after the open one in the queue, or null at its end. */
   const nextInPhotoQueue = computed<string | null>(() => {
@@ -163,6 +185,18 @@ const usePlacesStore = defineStore('places', () => {
     selectedFrom.value = 'list';
   }
 
+  /**
+   * Open a place from the attention or withdrawn list on its Status tab.
+   * @param id - The place id.
+   */
+  function openFromAdminList(id: string) {
+    if (selectedId.value === id) return;
+    hoveredId.value = null;
+    startTab.value = 'status';
+    selectedId.value = id;
+    selectedFrom.value = 'list';
+  }
+
   /** Show or hide the boundaries on the map. */
   function toggle(): void {
     visible.value = !visible.value;
@@ -175,7 +209,9 @@ const usePlacesStore = defineStore('places', () => {
     notice,
     selectedId,
     selectedFrom,
-    listType,
+    listTypes,
+    withdrawnIds,
+    loadWithdrawn,
     shownAreaIds,
     hoveredId,
     hoverPlace,
@@ -191,6 +227,9 @@ const usePlacesStore = defineStore('places', () => {
     toggle,
     selectPlace,
     clearSelection,
+    adminList,
+    adminListVersion,
+    openFromAdminList,
     photoQueueOpen,
     photoQueueIds,
     photoQueueVersion,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import {
   ComboboxAnchor,
   ComboboxContent,
@@ -14,7 +14,27 @@ const props = defineProps<{
   options: string[];
   id?: string;
   invalid?: boolean;
+  /** List the first suggestions as soon as the field has focus, before typing. */
+  showAll?: boolean;
+  name?: string;
+  placeholder?: string;
+  maxlength?: number;
 }>();
+
+/** Whether the field has focus. Kept briefly after blur, so a click on a suggestion lands. */
+const focused = ref(false);
+let blurWait: ReturnType<typeof setTimeout> | null = null;
+
+/** The field gained focus. */
+function onFocus() {
+  if (blurWait) clearTimeout(blurWait);
+  focused.value = true;
+}
+
+/** The field lost focus. Wait, so a click on a suggestion still lands. */
+function onBlur() {
+  blurWait = setTimeout(() => (focused.value = false), 150);
+}
 
 /** The typed text. Any text is allowed, not only a suggestion. */
 const text = defineModel<string>({ required: true });
@@ -24,7 +44,10 @@ const SUGGESTION_LIMIT = 8;
 
 const suggestions = computed(() => {
   const needle = text.value.trim().toLowerCase();
-  if (!needle) return [];
+  if (!needle)
+    return props.showAll && focused.value
+      ? props.options.slice(0, SUGGESTION_LIMIT)
+      : [];
   const starts: string[] = [];
   const contains: string[] = [];
   for (const option of props.options) {
@@ -37,6 +60,10 @@ const suggestions = computed(() => {
   return [...starts, ...contains].slice(0, SUGGESTION_LIMIT);
 });
 
+/**
+ * Put the chosen suggestion in the field.
+ * @param value - The chosen option.
+ */
 function choose(value: unknown) {
   if (typeof value === 'string') text.value = value;
 }
@@ -54,7 +81,12 @@ function choose(value: unknown) {
         :id="id"
         v-model="text"
         class="suggest-input"
+        :name="name"
+        :placeholder="placeholder"
+        :maxlength="maxlength"
         :aria-invalid="invalid || undefined"
+        @focus="onFocus"
+        @blur="onBlur"
       />
     </ComboboxAnchor>
     <ComboboxContent class="suggest-list nw" position="popper" :side-offset="4">

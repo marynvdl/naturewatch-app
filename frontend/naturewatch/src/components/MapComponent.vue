@@ -62,9 +62,9 @@ function togglePlaces() {
   if (placesOpen.value) closeOthers('places');
 }
 
-/** Opening the photo queue, from the Profile panel, opens Places to list it. */
+/** Opening an admin list, from the Profile panel, opens Places to list it. */
 watch(
-  () => placesStore.photoQueueOpen,
+  () => placesStore.adminList,
   open => {
     if (!open || placesOpen.value) return;
     placesOpen.value = true;

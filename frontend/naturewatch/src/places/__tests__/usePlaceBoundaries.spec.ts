@@ -205,7 +205,10 @@ describe('place boundaries from tiles', () => {
 
     expect(map.getLayer('places-select-fill')).toBeUndefined();
     expect(map.getLayer('places-select-line')).toMatchObject({
-      paint: { 'line-width': 3 },
+      paint: { 'line-width': 2 },
+    });
+    expect(map.getLayer('recognitions-select-line')).toMatchObject({
+      paint: { 'line-width': 2.5 },
     });
   });
 
@@ -251,7 +254,7 @@ describe('place boundaries from tiles', () => {
     );
 
     map.setLayoutProperty.mockClear();
-    store.listType = 'ramsar_site';
+    store.listTypes = ['ramsar_site'];
     store.applyFilter([100, null], [5, 50]);
     await flushPromises();
     expect(map.setLayoutProperty).toHaveBeenCalledWith(
@@ -267,14 +270,50 @@ describe('place boundaries from tiles', () => {
     // Size only: the recognitions archive has no cropland field
     expect(map.setFilter).toHaveBeenLastCalledWith('recognitions-line', [
       'all',
-      ['==', ['get', 'place_type_id'], 'ramsar_site'],
+      ['in', ['get', 'place_type_id'], ['literal', ['ramsar_site']]],
       ['all', ['>=', ['to-number', ['get', 'area_km2'], -1], 100]],
+    ]);
+  });
+
+  it('draws conservation areas and recognitions together when both are listed', async () => {
+    const { map, store } = await drawPlaces();
+    map.setLayoutProperty.mockClear();
+    store.listTypes = ['conservation_area', 'world_heritage_site'];
+    await flushPromises();
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'places-fill',
+      'visibility',
+      'visible'
+    );
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(
+      'recognitions-line',
+      'visibility',
+      'visible'
+    );
+    expect(map.setFilter).toHaveBeenLastCalledWith('recognitions-line', [
+      'in',
+      ['get', 'place_type_id'],
+      ['literal', ['world_heritage_site']],
+    ]);
+  });
+
+  it('leaves withdrawn places out of every layer', async () => {
+    const { map, store } = await drawPlaces();
+    store.listTypes = ['conservation_area', 'ramsar_site'];
+    store.withdrawnIds = [outsideWindow];
+    await flushPromises();
+    const hidden = ['!', ['in', ['get', 'id'], ['literal', [outsideWindow]]]];
+    expect(map.setFilter).toHaveBeenCalledWith('places-fill', hidden);
+    expect(map.setFilter).toHaveBeenLastCalledWith('recognitions-line', [
+      'all',
+      ['in', ['get', 'place_type_id'], ['literal', ['ramsar_site']]],
+      hidden,
     ]);
   });
 
   it('opens a clicked recognition and highlights it from its archive', async () => {
     const { map, store } = await drawPlaces();
-    store.listType = 'world_heritage_site';
+    store.listTypes = ['world_heritage_site'];
     await flushPromises();
 
     map.fire('click', 'recognitions-fill', {
@@ -352,7 +391,7 @@ describe('place boundaries from tiles', () => {
 
   it('draws the conservation areas of an open Areas tab', async () => {
     const { map, store } = await drawPlaces();
-    store.listType = 'world_heritage_site';
+    store.listTypes = ['world_heritage_site'];
     store.toggle();
     await flushPromises();
     expect(map.getSource('places-tiles')).toBeUndefined();
