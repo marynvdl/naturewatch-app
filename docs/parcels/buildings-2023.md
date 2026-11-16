@@ -20,7 +20,8 @@ The choice comes from a side-by-side comparison of seven 5 × 5 km boxes on 10 N
 What the comparison showed:
 
 - Google Temporal covered every African box, including Mali and northern Chad. The current Built tiles fall back to GHSL 2020 there. So the current tiles came from Google's polygon product, not from the Temporal raster.
-- TEMPO's built area was 0.97–1.07 times Overture's in four boxes, 1.13–1.14 in Mueda and Mali, and 0.76 in the Aïr. No false positives on rock in the two desert boxes. Two boxes do not clear the whole Sahara.
+- TEMPO's built area was 0.97–1.07 times Overture's in four boxes, 1.13–1.14 in Mueda and Mali, and 0.76 in the Aïr. Every box was centred on a settlement, so these ratios say nothing about empty land.
+- TEMPO marks buildings on empty land. On 16 November 2026, the TEMPO viewer showed many low-density false positives at 20.8892° N, 5.8708° E (southern Algeria). Google Temporal 2023 has valid data there and finds no buildings: the highest `building_presence` in a 6 × 6 km box is 0.09.
 - GlobalBuildingAtlas has no buildings at Bardaï and is mostly other datasets' outlines. It is not used.
 - Overture and OpenStreetMap outlines are sharper than TEMPO in Europe. They are left for later, see below.
 
@@ -29,6 +30,8 @@ What the comparison showed:
 **Value.** The sprout and the tiles carry building share: the fraction of each cell covered by buildings, from 0 to 1. Both sources are turned into share before they are merged. Google: presence above a threshold, averaged into the cell. TEMPO: its density band, which is already a share.
 
 **Merge.** Each sprout cell takes Google where Google has data, otherwise TEMPO. A second band records the source (1 = Google, 2 = TEMPO, 0 = none), so the About text and a later stats run can say which source a number came from. Google's coverage is where `building_presence` is not nodata (−99).
+
+**TEMPO floor.** TEMPO share below a floor is set to 0. Where Google's coverage ends, TEMPO is the only source. Around 5–6° E that edge is near 22.7° N. Beyond it are the northern Sahara, Arabia, Iran, Central Asia and inland Australia. Without a floor, the map would show a faint grey haze north of Google's edge and clean desert south of it. The √share palette makes this worse, because a share of 0.01 already gets the first shade. Task 01 sets the floor where both sources exist: Google reads about 0 on empty land, so TEMPO's share there measures its false positives. The floor has to remove that noise and keep the scattered real buildings in the comparison boxes. If one floor cannot do both, the fallback is to keep a TEMPO cell only near an Overture outline. That needs the global Overture buildings, which is a much larger job, and task 01 would estimate its cost first.
 
 **Sprout grid.** Task 01 decides it. The starting proposal is EPSG:4326 at 0.00025°, the cropland grid, so later stats can read both layers the same way. TEMPO is coarser than that grid and is resampled onto it.
 
@@ -70,8 +73,8 @@ This parcel publishes 2023 only. The plan for more years:
 ## Left for later
 
 - Stats for places: no building facts are sampled in this parcel. They wait for the parcel that resumes Stats.
-- Overture or OpenStreetMap outlines as the source in Europe, North America and Australia, where they beat TEMPO.
-- A check for TEMPO false positives across the Sahara, beyond the two desert boxes.
+- Overture or OpenStreetMap outlines as the source in Europe, North America and Australia, where they beat TEMPO. Kept out of this parcel because Google already covers most of the places the app focuses on, and because the outlines have no yearly snapshots, which breaks the one-source-per-cell rule for yearly layers. The licence is ODbL.
+- Corrections from users. A person draws a polygon around an area the layer gets wrong and says either "there are buildings here" or "there are no buildings here", with a reason or evidence. The TEMPO false positives are the first use case. This is its own parcel, and it may cover more layers than Built.
 - Deleting the current Built tiles at `built/2023/`.
 - A production release. Merge app work into `develop` only.
 
@@ -80,13 +83,13 @@ This parcel publishes 2023 only. The plan for more years:
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. Task files are written when a task starts.
 
 - [ ] Task 01 — Recipe — naturewatch-analysis
-  - *Goal:* Add `buildings-2023-v1.yaml`. Fix the sprout grid, the Google presence threshold, and the merge rule. Set the threshold by comparing Google share with Overture outline area in the Google-covered comparison boxes. List the TEMPO tiles from the index. Compare the Earth Engine and Batch routes for Google and write both cost estimates. Add the comparison scripts (`compare.py`, `render.py`) under `tiles/` or a new `buildings/` folder, so the boxes can be checked again in task 03. No transfer, export or Batch job.
+  - *Goal:* Add `buildings-2023-v1.yaml`. Fix the sprout grid, the Google presence threshold, the TEMPO floor, and the merge rule. Set the TEMPO floor by comparing TEMPO with Google on empty Saharan land where both exist, including 20.8892° N, 5.8708° E, and check it against the comparison boxes. Set the threshold by comparing Google share with Overture outline area in the Google-covered comparison boxes. List the TEMPO tiles from the index. Compare the Earth Engine and Batch routes for Google and write both cost estimates. Add the comparison scripts (`compare.py`, `render.py`) under `tiles/` or a new `buildings/` folder, so the boxes can be checked again in task 03. No transfer, export or Batch job.
 - [ ] Task 02 — Seeds — naturewatch-analysis
   - *Goal:* After approval, write both seeds by the chosen route and check them against the recipe. Record the run cost.
 - [ ] Task 03 — Sprout — naturewatch-analysis
   - *Goal:* After approval, merge the seeds into the share and source bands as Cloud Optimized GeoTIFFs, with static STAC files. Check the seven comparison boxes against the comparison figures. Record the run cost.
 - [ ] Task 04 — Tile sample — naturewatch-analysis
-  - *Goal:* Build the share pyramid on small windows: a rural Sahel village, Bria, Mueda, Saint-Flour, and one edge where Google meets TEMPO. Choose the top zoom and the top-zoom rule. Stop for approval. Do not build the global archive.
+  - *Goal:* Build the share pyramid on small windows: a rural Sahel village, Bria, Mueda, Saint-Flour, empty desert where only TEMPO exists, and the edge where Google meets TEMPO in the Sahara near 22.7° N. Choose the top zoom and the top-zoom rule. Stop for approval. Do not build the global archive.
 - [ ] Task 05 — PMTiles — naturewatch-analysis
   - *Goal:* After the sample is approved, write the global archive to `buildings/2023/v1/buildings.pmtiles`. Verify, upload with the immutable cache header, and record the run cost.
 - [ ] Task 06 — Built on the map — naturewatch-app
