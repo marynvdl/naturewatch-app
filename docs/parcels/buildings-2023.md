@@ -15,7 +15,7 @@ The choice comes from a side-by-side comparison of seven 5 × 5 km boxes on 10 N
 | Use | Dataset | Year | Grid | Licence |
 | --- | --- | --- | --- | --- |
 | Main source where it has data | [Google Open Buildings 2.5D Temporal](https://sites.research.google/open-buildings/), band `building_presence` | 2023 | 0.5 m COGs in the public bucket `open-buildings-temporal-data`, per UTM zone | CC BY 4.0 |
-| Everywhere else | [Microsoft TEMPO](https://github.com/microsoft/buildings) global layer, band 1 density | 2023 Q4 | about 76 m, Web Mercator, 256 px COGs from a GeoPackage tile index | MIT |
+| Everywhere else | [Microsoft TEMPO](https://github.com/microsoft/buildings) global layer, band 1 density | 2023 Q4 | about 76 m, Web Mercator, 256 px COGs from a GeoPackage tile index | CDLA Permissive 2.0 |
 
 What the comparison showed:
 
@@ -27,11 +27,11 @@ What the comparison showed:
 
 ## Design
 
-**Value.** The sprout and the tiles carry building share: the fraction of each cell covered by buildings, from 0 to 1. Both sources are turned into share before they are merged. Google: presence above a threshold, averaged into the cell. TEMPO: its density band, which is already a share.
+**Value.** The sprout and the tiles carry building share: the fraction of each cell covered by buildings, from 0 to 1. Both sources are turned into share before they are merged. Google: the mean of `building_presence` in the cell, read by Earth Engine from its mean pyramid. Over the comparison boxes it is 1.19 times Overture's built area. TEMPO: its density band, which is already a share, 1.07 times Overture's.
 
 **Merge.** Each sprout cell takes Google where Google has data, otherwise TEMPO. A second band records the source (1 = Google, 2 = TEMPO, 0 = none), so the About text and a later stats run can say which source a number came from. Google's coverage is where `building_presence` is not nodata (−99).
 
-**TEMPO floor.** TEMPO share below a floor is set to 0. Where Google's coverage ends, TEMPO is the only source. Around 5–6° E that edge is near 22.7° N. Beyond it are the northern Sahara, Arabia, Iran, Central Asia and inland Australia. Without a floor, the map would show a faint grey haze north of Google's edge and clean desert south of it. The √share palette makes this worse, because a share of 0.01 already gets the first shade. Task 01 sets the floor where both sources exist: Google reads about 0 on empty land, so TEMPO's share there measures its false positives. The floor has to remove that noise and keep the scattered real buildings in the comparison boxes. If one floor cannot do both, the fallback is to keep a TEMPO cell only near an Overture outline. That needs the global Overture buildings, which is a much larger job, and task 01 would estimate its cost first.
+**TEMPO false positives.** TEMPO marks faint buildings on empty land, and they are removed. Where Google's coverage ends, TEMPO is the only source. Around 5–6° E that edge is near 22.7° N. Beyond it are the northern Sahara, Arabia, Iran, Central Asia and inland Australia. Without a floor, the map would show a faint grey haze north of Google's edge and clean desert south of it. The √share palette makes this worse, because a share of 0.01 already gets the first shade. Task 01 sets the floor where both sources exist: Google reads about 0 on empty land, so TEMPO's share there measures its false positives. The floor has to remove that noise and keep the scattered real buildings in the comparison boxes. Task 01 found that no floor does both, and that an Overture mask keeps the noise, because Overture holds Microsoft's outlines on the same rocks. The sprout uses a seed rule instead: a TEMPO cell is kept only if a cell within 2 km reaches a share of 0.15. The measurements are in `buildings/README.md` in naturewatch-analysis.
 
 **Sprout grid.** Task 01 decides it. The starting proposal is EPSG:4326 at 0.00025°, the cropland grid, so later stats can read both layers the same way. TEMPO is coarser than that grid and is resampled onto it.
 
@@ -51,10 +51,7 @@ Objects:
 
 ## Cost
 
-Google's 2023 epoch is large: 0.5 m float32 tiles over Africa, Latin America, and South and South-East Asia. Copying it whole is probably the wrong move. Task 01 compares two routes and estimates both:
-
-- Earth Engine reduces `GOOGLE/Research/open-buildings-temporal/v1` to share on the sprout grid and exports COGs per block, like the fire export. The seed is then the share export, not Google's tiles. The saved Earth Engine login on the laptop no longer works (its OAuth client was deleted), so `earthengine authenticate` comes first.
-- A Batch job reads Google's public COGs in place at a coarse overview and writes share per block. The seed is then a manifest of the tiles read, with their checksums.
+Google's 2023 epoch is large: 0.5 m float32 tiles over Africa, Latin America, and South and South-East Asia, about 18 TB. Task 01 chose Earth Engine: one export per 10° block of mean presence on the sprout grid, like the fire export and the earlier Africa built layer. It is about 60–90 EECU-hours on the noncommercial project. Thresholding Google's 0.5 m pixels instead would cost far more in Earth Engine or on Batch. The estimates are in `cookbook/README.md` in naturewatch-analysis.
 
 TEMPO 2023 Q4 is small tiles from one index, and a Storage Transfer Service job from a URL list can fetch them, like the cropland seed.
 
@@ -82,7 +79,7 @@ This parcel publishes 2023 only. The plan for more years:
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. Task files are written when a task starts.
 
-- [ ] Task 01 — Recipe — naturewatch-analysis
+- [x] [Task 01 — Recipe](../archive/tasks/task-01-buildings-2023-recipe.md) — naturewatch-analysis
   - *Goal:* Add `buildings-2023-v1.yaml`. Fix the sprout grid, the Google presence threshold, the TEMPO floor, and the merge rule. Set the TEMPO floor by comparing TEMPO with Google on empty Saharan land where both exist, including 20.8892° N, 5.8708° E, and check it against the comparison boxes. Set the threshold by comparing Google share with Overture outline area in the Google-covered comparison boxes. List the TEMPO tiles from the index. Compare the Earth Engine and Batch routes for Google and write both cost estimates. Add the comparison scripts (`compare.py`, `render.py`) under `tiles/` or a new `buildings/` folder, so the boxes can be checked again in task 03. No transfer, export or Batch job.
 - [ ] Task 02 — Seeds — naturewatch-analysis
   - *Goal:* After approval, write both seeds by the chosen route and check them against the recipe. Record the run cost.
