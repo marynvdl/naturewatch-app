@@ -1,12 +1,14 @@
 # Parcel: Roads
 
-The first roads pressure layer. One global snapshot of roads from Overture Maps, classed by how much impact a road has, drawn from one vector PMTiles archive.
+The first roads pressure layer. One global snapshot of roads from Overture Maps, published as a seed, a sprout, and one raster PMTiles archive, and shown on the map as the Roads layer.
 
-*Written 11 November 2026.*
+*Written 11 November 2026. Revised 17 November 2026: raster instead of vector tiles, and a sprout for place stats.*
 
 ## Goal
 
-A person can turn on a Roads layer in the threats group and see the world's mapped roads. The layer distinguishes a motorway from a main road, a minor road, and a track. Where the surface is known, it distinguishes paved from unpaved. The layer says which Overture release it shows.
+A person can turn on a Roads layer in the threats group and see the world's mapped roads. Zoomed out, the layer shows how much of the land roads reach, the same way Crops shows cropland. Zoomed in, it distinguishes a motorway from a main road, a minor road, and a track. Where the surface is known, it distinguishes paved from unpaved. The layer says which Overture release it shows.
+
+The sprout is analysis-ready, so a later Stats parcel can count roads inside places the same way it counts cropland.
 
 ## Why Overture alone
 
@@ -34,57 +36,79 @@ No dataset showed the most recently cleared logging roads in Suriname.
 
 ## Road levels
 
-Every feature keeps Overture's own `class`, so roads can be reclassed later without rebuilding. The tiles also carry a derived `level` that the map styles. A first proposal:
+Every seed feature keeps Overture's own `class`, so roads can be reclassed later by rebuilding the sprout from the seed. The sprout and the tiles carry a derived `level`. A first proposal:
 
-| `level` | Overture `class` |
-| --- | --- |
-| `major` | `motorway`, `trunk` |
-| `main` | `primary`, `secondary`, `tertiary` |
-| `minor` | `residential`, `living_street`, `service`, `unknown`, and `unclassified` when paved |
-| `track` | `track`, and `unclassified` when unpaved or the surface is not given |
+| `level` | Value | Overture `class` |
+| --- | --- | --- |
+| `major` | 4 | `motorway`, `trunk` |
+| `main` | 3 | `primary`, `secondary`, `tertiary` |
+| `minor` | 2 | `residential`, `living_street`, `service`, `unknown`, and `unclassified` when paved |
+| `track` | 1 | `track`, and `unclassified` when unpaved or the surface is not given |
 
-`surface` is `paved`, `unpaved`, or left off, read from Overture `road_surface`. A road whose surface changes along its length takes the value that covers most of it.
+`surface` is `paved`, `unpaved`, or unknown, read from Overture `road_surface`. A road whose surface changes along its length takes the value that covers most of it.
 
 Paths are left out of this layer: `footway`, `path`, `steps`, `cycleway`, `bridleway`, and `pedestrian`.
 
-Task 01 checks the levels on the sample before anything is built globally. This parcel shows the snapshot only. Each feature also keeps its OSM way id and its name, so other sources can later be joined on that id.
+Task 01 checks the levels on the sample before anything is built globally.
 
-## Tiles and map
+## Design
 
-- One vector PMTiles archive with layer `roads`, built with Tippecanoe 2.79.0. The image `places/Dockerfile` defines in naturewatch-analysis can be reused.
-- Object: `gs://nature-watch-tiles/roads/overture-2026-10-21/roads.pmtiles`. The release goes in the path, so a later release is a new object.
-- Fields on each feature: `level`, `class`, `surface` when known, `name` when known, and `osm_id`.
-- The zoom at which each level first appears is set in task 01, from tile sizes on the sample. Major roads appear first and tracks last.
-- The map stays Mapbox. Colour and line width come from `level`. Unpaved roads are drawn differently from paved roads. The catalog marks the layer as a snapshot, not a time series.
-- Attribution: © OpenStreetMap contributors, Overture Maps Foundation. The transportation theme is ODbL.
+**Why raster.** Decided on 17 November 2026. A vector tile has a size budget. At the zooms that show a continent, Tippecanoe has to drop or merge most roads, so dense networks look thin and remote tracks vanish, which hides the impact the layer is for. A raster pyramid keeps every road at every zoom as a share, like Crops. The sprout has to be rasterized for Stats anyway, so the tiles come from the same raster, and there is no Tippecanoe run and no vector archive. What is given up: road names, and crisp lines past the top zoom, where roads are enlarged cells.
+
+**Seed.** One read of the Overture release from its public bucket, with DuckDB, keeping the road classes above. GeoParquet with geometry, `class`, `level`, `surface`, OSM way id, and name, split by 10° block. The seed pins the release, so a rebuild never reads Overture again, and later sources can be joined on the OSM way id.
+
+**Sprout.** One COG per 10° block on the shared stats grid, EPSG:4326 at 0.00025° (about 28 m), the grid of cropland and Buildings 2023, with a VRT and static STAC files beside it, like cropland version 2. A cell is a road cell when a road line touches it. Two `uint8` bands:
+
+- `level`: 0 no mapped road, otherwise the highest level in the cell (1–4).
+- `surface`: 0 unknown, 1 paved, 2 unpaved, from a road of that level. Paved wins over unpaved, and unpaved over unknown.
+
+Road length is not stored. A later Stats parcel can count the share of a place in road cells by level and surface, and derive distance to the nearest road from the `level` band. Task 01 decides how blocks without roads and the open sea are handled in the VRT, and checks the all-touched rule on the sample.
+
+**Tiles.** Follow the cropland version 3 design (`tiles/README.md` in naturewatch-analysis, "Version 3"): palette PNG, index 0 nodata, 512 px tiles, a pyramid where a parent's share is the weighted mean of its children. Below the top zoom, a pixel holds the share of its cells that are road cells. At the top zoom, a pixel holds the highest level in it and that road's surface. Task 01 sets the encoding, the shades, and the top zoom (11 or 12) from the sample.
+
+**Map.** The client paints the share like Crops, in its own colour, with opacity rising with √share. At the top zoom it colours by level and draws unpaved differently from paved. The catalog marks the layer as a snapshot, not a time series. Attribution: © OpenStreetMap contributors, Overture Maps Foundation. The transportation theme is ODbL. The sprout is a derived database, so if it is ever offered for download it goes out under ODbL.
+
+Objects:
+
+- Seed: `gs://nature-watch-bucket/seeds/roads/overture/2026-10-21.0/`
+- Sprout: `gs://nature-watch-bucket/sprouts/roads/2026-10/v1/`, id `roads-2026-10-v1`
+- Tiles: `gs://nature-watch-tiles/roads/2026-10/v1/roads.pmtiles`
+- Recipe: `cookbook/recipes/roads-2026-10-v1.yaml` in naturewatch-analysis
+
+A later Overture release is a new seed path and a new sprout and tiles version.
 
 ## Cost
 
-Reading Overture from its public bucket has no transfer cost to us. The global build probably needs a Batch machine, like the places archive.
+Overture's public bucket charges us nothing to read, and Google Cloud charges nothing for data coming in. The global seed and sprout probably need one spot Batch job each, and the tiles reuse the cropland version 3 job, whose global run was estimated at about $0.6–2 of spot compute.
 
-Task 01 runs on the laptop. It records the sample's archive bytes, wall time, and peak memory, and the largest tile per zoom. From those it writes an expected cost for the global run, then waits for approval. Task 02 records the run in the step README in naturewatch-analysis.
+Earth Engine was considered and is not used. Overture transportation is not in the Earth Engine catalog. Loading it through the public BigQuery table bills BigQuery scans to this project, outside the noncommercial EECU quota, and painting hundreds of millions of lines at 28 m globally in Earth Engine is slow and hits memory limits. Rasterizing vectors on Batch is cheap CPU work.
+
+Task 01 runs on the laptop. It records the sample's seed bytes, sprout bytes, tile bytes, wall time, and peak memory. From those it writes an expected cost for each global run, then waits for approval. Each later task records its run in the step README in naturewatch-analysis.
 
 ## Tasks
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. When a task has merged, move its file to `docs/archive/tasks/` in naturewatch-app, and point the tick at that copy.
 
 - [ ] [task-01-roads-recipe-and-sample.md](../tasks/task-01-roads-recipe-and-sample.md) — naturewatch-analysis
-  - *Goal:* Add the roads recipe: the release, the classes kept, the levels, and the zoom per level. Build a sample archive on the laptop for a window, such as South Africa or Chad and the Central African Republic. Check the levels and tile sizes, write the expected global cost, and stop for approval.
-- [ ] [task-02-roads-global-pmtiles.md](../tasks/task-02-roads-global-pmtiles.md) — naturewatch-analysis
-  - *Goal:* After approval, build the global archive and upload it. Record the run cost.
-- [ ] [task-03-roads-on-the-map.md](../tasks/task-03-roads-on-the-map.md) — naturewatch-app
-  - *Goal:* Add the Roads layer to the threats group in `layers.json`, styled by level and surface. Add its entry to `docs/user/data.md` and its object to `docs/blueprint.md`. Check it in the browser at a wide and a narrow size.
+  - *Goal:* Add the roads recipe: the release, the classes kept, the levels, the sprout grid and bands, and the tile encoding. On the laptop, build a sample seed, sprout, and tile archive for a window, such as South Africa or Chad and the Central African Republic. Check the levels against imagery, the look at globe and close zooms, and choose the top zoom. Write the expected global cost and stop for approval.
+- [ ] [task-02-roads-seed-and-sprout.md](../tasks/task-02-roads-seed-and-sprout.md) — naturewatch-analysis
+  - *Goal:* After approval, write the global seed and the sprout COGs with their VRT and STAC files. Check the sample window against task 01. Record the run cost.
+- [ ] [task-03-roads-pmtiles.md](../tasks/task-03-roads-pmtiles.md) — naturewatch-analysis
+  - *Goal:* After approval, build the global raster archive from the sprout. Verify, upload with the immutable cache header, and record the run cost.
+- [ ] [task-04-roads-on-the-map.md](../tasks/task-04-roads-on-the-map.md) — naturewatch-app
+  - *Goal:* Add the Roads layer to the threats group in `layers.json`, painted by share and, at the top zoom, by level and surface. Add its entry to `docs/user/data.md` and its objects to `docs/blueprint.md`. Run the catalog tests. Check it in the browser at a wide and a narrow size.
 
 ## Done when
 
-A person can turn on Roads and see the global Overture snapshot styled by level, with paved and unpaved told apart where known. The layer names its release and attribution. The sample was approved before the global build. Costs are in the step README in naturewatch-analysis. The catalog tests pass. No production deploy.
+A person can turn on Roads and see the global Overture snapshot as a share zoomed out and by level zoomed in, with paved and unpaved told apart where known. The layer names its release and attribution. The sprout and its STAC files are in place for Stats. The sample was approved before the global runs. Costs are in the step README in naturewatch-analysis. The catalog tests pass. No production deploy.
 
 ## Left for later
 
+- **Road stats for places**: share of a place in road cells by level, and distance to road. They wait for the parcel that resumes Stats, which registers the sprout in `sprouts`.
 - **Microsoft RoadDetections** as a separate experimental "detected tracks" layer, off by default. It would need a filter for dry riverbeds and sand.
 - **Surface from HeiGIT** joined on the OSM way id where Overture has no surface.
 - **GRIP4 attributes or geometry** where it is the better source, such as logging roads in the Congo Basin. Its accuracy has to be checked first.
 - **Regional logging-road datasets**, such as the Congo Basin roads mapped from Sentinel imagery (Slagter et al.), and recent clearings like those in Suriname.
 - **Roads over time.** One Overture release per year would give yearly snapshots. The change between them mostly shows mapping effort, not new roads. HeiGIT Planet 2020 → 2024 can be revisited if its change classes improve.
+- **Vector roads up close**, with names and crisp lines, if the enlarged cells past the top zoom are not good enough.
 - **Paths** as their own layer.
-- **A road density or distance-to-road raster** for place facts.
