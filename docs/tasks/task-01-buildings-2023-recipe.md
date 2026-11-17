@@ -13,6 +13,13 @@ Decided 16 November 2026 by the user:
 - The buildings code goes in a new `buildings/` folder, with its own README and tests.
 - This task runs `earthengine authenticate` and reduces one comparison box to share in Earth Engine. It uses `computePixels` or `getPixels`, not an export task. Both global costs are still estimates.
 
+Changed 17 November 2026 by the user, after the measurements:
+
+- **Google is read through Earth Engine as mean presence.** Each sprout cell holds the mean `building_presence` of the 2023 images, read from Earth Engine's mean pyramid, as in the user's earlier Africa built layer (`built.ipynb`) without its cut at 0.1. There is no presence threshold. Thresholding 0.5 m pixels cost about $40–120 on Batch or over 100,000 EECU-hours in Earth Engine. Mean presence is about 60–90 EECU-hours. Steps 2 and 5 below became comparisons. Their tables stay in `buildings/README.md`.
+- **TEMPO uses a seed rule, not a floor.** A TEMPO cell is kept only if a cell within 2 km reaches a share of 0.15. No floor removed the noise and kept scattered buildings, and an Overture mask keeps the noise.
+- **The grid is EPSG:4326 at 0.00025°**, and the share is stored as uint8, value ÷ 250, 255 nodata.
+- **How a parent tile combines its children** (share-weighted mean as cropland, or max) is chosen in task 04.
+
 ## Facts already stored
 
 - The parcel holds the source choice, the share and source bands, the merge rule, the TEMPO floor reasoning, the object paths, and the comparison boxes. The comparison page is [Built layer candidates](https://claude.ai/artifact/8D1BrG37y9qLSnH5SHevcd).
