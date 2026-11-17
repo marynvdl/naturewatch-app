@@ -36,20 +36,20 @@ No dataset showed the most recently cleared logging roads in Suriname.
 
 ## Road levels
 
-Every seed feature keeps Overture's own `class`, so roads can be reclassed later by rebuilding the sprout from the seed. The sprout and the tiles carry a derived `level`. A first proposal:
+Every seed feature keeps Overture's own `class`, so roads can be reclassed later by rebuilding the sprout from the seed. The sprout and the tiles carry a derived `level`. Approved on 17 November 2026, after task 01 checked the sample against imagery:
 
 | `level` | Value | Overture `class` |
 | --- | --- | --- |
 | `major` | 4 | `motorway`, `trunk` |
 | `main` | 3 | `primary`, `secondary`, `tertiary` |
-| `minor` | 2 | `residential`, `living_street`, `service`, `unknown`, and `unclassified` when paved |
-| `track` | 1 | `track`, and `unclassified` when unpaved or the surface is not given |
+| `minor` | 2 | `residential`, `living_street`, `service`, and `unclassified` or `unknown` when paved |
+| `track` | 1 | `track`, and `unclassified` or `unknown` when unpaved or the surface is not given |
 
 `surface` is `paved`, `unpaved`, or unknown, read from Overture `road_surface`. A road whose surface changes along its length takes the value that covers most of it.
 
 Paths are left out of this layer: `footway`, `path`, `steps`, `cycleway`, `bridleway`, and `pedestrian`.
 
-Task 01 checks the levels on the sample before anything is built globally.
+`unknown` (OSM `highway=road`) was minor in the first proposal. Every sample of it in the comparison boxes was a dirt track, so it follows `unclassified`. The level table is in `roads/README.md` in naturewatch-analysis.
 
 ## Design
 
@@ -64,7 +64,7 @@ Task 01 checks the levels on the sample before anything is built globally.
 
 Road length is not stored. A later Stats parcel can count the share of a place in road cells by level and surface, and derive distance to the nearest road from the `level` band. Task 01 decides how blocks without roads and the open sea are handled in the VRT, and checks the all-touched rule on the sample.
 
-**Tiles.** Follow the cropland version 3 design (`tiles/README.md` in naturewatch-analysis, "Version 3"): palette PNG, index 0 nodata, 512 px tiles, a pyramid where a parent's share is the weighted mean of its children. Below the top zoom, a pixel holds the share of its cells that are road cells. At the top zoom, a pixel holds the highest level in it and that road's surface. Task 01 sets the encoding, the shades, and the top zoom (11 or 12) from the sample.
+**Tiles.** Follow the cropland version 3 design (`tiles/README.md` in naturewatch-analysis, "Version 3"): palette PNG, index 0 nodata, 512 px tiles, a pyramid where a parent's share is the weighted mean of its children. Below the top zoom, a pixel holds the share of its cells that are road cells. At the top zoom, a pixel holds the highest level in it and that road's surface. Set by task 01: top zoom 11. Below it, 8 shades spaced in √(share / 0.25), so a share of 25% road cells or more is the darkest shade, because road share is small and cropland's curve left most land in the two faintest shades. At zoom 11, red = level × 4 + surface. The encoding is in the recipe.
 
 **Map.** The client paints the share like Crops, in its own colour, with opacity rising with √share. At the top zoom it colours by level and draws unpaved differently from paved. The catalog marks the layer as a snapshot, not a time series. Attribution: © OpenStreetMap contributors, Overture Maps Foundation. The transportation theme is ODbL. The sprout is a derived database, so if it is ever offered for download it goes out under ODbL.
 
@@ -89,7 +89,7 @@ Task 01 runs on the laptop. It records the sample's seed bytes, sprout bytes, ti
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. When a task has merged, move its file to `docs/archive/tasks/` in naturewatch-app, and point the tick at that copy.
 
-- [ ] [task-01-roads-recipe-and-sample.md](../tasks/task-01-roads-recipe-and-sample.md) — naturewatch-analysis
+- [x] [task-01-roads-recipe-and-sample.md](../archive/tasks/task-01-roads-recipe-and-sample.md) — naturewatch-analysis
   - *Goal:* Add the roads recipe: the release, the classes kept, the levels, the sprout grid and bands, and the tile encoding. On the laptop, build a sample seed, sprout, and tile archive for a window, such as South Africa or Chad and the Central African Republic. Check the levels against imagery, the look at globe and close zooms, and choose the top zoom. Write the expected global cost and stop for approval.
 - [ ] [task-02-roads-seed-and-sprout.md](../tasks/task-02-roads-seed-and-sprout.md) — naturewatch-analysis
   - *Goal:* After approval, write the global seed and the sprout COGs with their VRT and STAC files. Check the sample window against task 01. Record the run cost.
