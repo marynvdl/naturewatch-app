@@ -91,7 +91,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 - [x] [task-01-roads-recipe-and-sample.md](../archive/tasks/task-01-roads-recipe-and-sample.md) — naturewatch-analysis
   - *Goal:* Add the roads recipe: the release, the classes kept, the levels, the sprout grid and bands, and the tile encoding. On the laptop, build a sample seed, sprout, and tile archive for a window, such as South Africa or Chad and the Central African Republic. Check the levels against imagery, the look at globe and close zooms, and choose the top zoom. Write the expected global cost and stop for approval.
-- [ ] [task-02-roads-seed-and-sprout.md](../tasks/task-02-roads-seed-and-sprout.md) — naturewatch-analysis
+- [x] [task-02-roads-seed-and-sprout.md](../archive/tasks/task-02-roads-seed-and-sprout.md) — naturewatch-analysis
   - *Goal:* After approval, write the global seed and the sprout COGs with their VRT and STAC files. Check the sample window against task 01. Record the run cost.
 - [ ] [task-03-roads-pmtiles.md](../tasks/task-03-roads-pmtiles.md) — naturewatch-analysis
   - *Goal:* After approval, build the global raster archive from the sprout. Verify, upload with the immutable cache header, and record the run cost.
