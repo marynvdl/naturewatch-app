@@ -53,7 +53,7 @@ Objects:
 
 Google's 2023 epoch is large: 0.5 m float32 tiles over Africa, Latin America, and South and South-East Asia, about 18 TB. Task 01 chose Earth Engine: one export per 10° block of mean presence on the sprout grid, like the fire export and the earlier Africa built layer. It is about 60–90 EECU-hours on the noncommercial project. Thresholding Google's 0.5 m pixels instead would cost far more in Earth Engine or on Batch. The estimates are in `cookbook/README.md` in naturewatch-analysis.
 
-TEMPO 2023 Q4 is small tiles from one index, and a Storage Transfer Service job from a URL list can fetch them, like the cropland seed.
+TEMPO 2023 Q4 is 822,199 small tiles from one index. Writing each as its own object would cost about $8 in write charges, so task 02 fetches them in a Batch job and stores them as zoom-4 mosaics.
 
 Each billable step records its expected cost first and waits for approval. After the run it records bytes stored, wall time and peak memory in that step's README in naturewatch-analysis.
 
@@ -81,7 +81,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 - [x] [Task 01 — Recipe](../archive/tasks/task-01-buildings-2023-recipe.md) — naturewatch-analysis
   - *Goal:* Add `buildings-2023-v1.yaml`. Fix the sprout grid, the Google presence threshold, the TEMPO floor, and the merge rule. Set the TEMPO floor by comparing TEMPO with Google on empty Saharan land where both exist, including 20.8892° N, 5.8708° E, and check it against the comparison boxes. Set the threshold by comparing Google share with Overture outline area in the Google-covered comparison boxes. List the TEMPO tiles from the index. Compare the Earth Engine and Batch routes for Google and write both cost estimates. Add the comparison scripts (`compare.py`, `render.py`) under `tiles/` or a new `buildings/` folder, so the boxes can be checked again in task 03. No transfer, export or Batch job.
-- [ ] Task 02 — Seeds — naturewatch-analysis
+- [x] [Task 02 — Seeds](../archive/tasks/task-02-buildings-2023-seeds.md) — naturewatch-analysis
   - *Goal:* After approval, write both seeds by the chosen route and check them against the recipe. Record the run cost.
 - [ ] Task 03 — Sprout — naturewatch-analysis
   - *Goal:* After approval, merge the seeds into the share and source bands as Cloud Optimized GeoTIFFs, with static STAC files. Check the seven comparison boxes against the comparison figures. Record the run cost.
