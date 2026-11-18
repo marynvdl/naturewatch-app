@@ -24,6 +24,10 @@ export interface SharePaint {
   colorSatellite?: string;
   steps: number;
   solidZoom: number;
+  /** Opacity of the faintest shade. Leave out for 0.2. */
+  minOpacity?: number;
+  /** Values drawn from solidZoom, each in the layer colour at its opacity. Replaces the solid share ≥ 0.5 rule. */
+  solidClasses?: { value: number; opacity: number }[];
 }
 
 /** Colour to paint share tiles on the current basemap. */
@@ -37,6 +41,9 @@ export interface ShareRasterPaint {
   solid: RasterColorPaint;
   solidZoom: number;
 }
+
+/** Opacity of the darkest shade. */
+const MAX_OPACITY = 0.95;
 
 const RED_MIX: RasterColorPaint['raster-color-mix'] = [255, 0, 0, 0];
 
@@ -74,11 +81,13 @@ export function classRasterPaint(classes: ClassColor[]): ClassRasterPaint {
 /**
  * Paint that colours share tiles.
  * Index 0 is nodata. Shade k of `steps` stores red = 255 × (k / steps)², so the
- * shades sit evenly on √share. Opacity is 0.2 + 0.75 × √share where there is any
- * cropland, and 0 where there is none. From solidZoom the map draws share ≥ 0.5
- * solid and the rest clear. Two Mapbox layers, with maxzoom and minzoom at
- * solidZoom, because a zoom-dependent colour on one layer was not used.
- * @param spec - Colour, number of graded steps, and the zoom that turns solid.
+ * shades sit evenly on √share. Opacity rises from minOpacity (0.2 when left out)
+ * at shade 0 to 0.95 at the darkest shade, and is 0 where there is no share.
+ * From solidZoom the map draws share ≥ 0.5 solid and the rest clear, or, when
+ * solidClasses is set, each listed value at its opacity and the rest clear.
+ * Two Mapbox layers, with maxzoom and minzoom at solidZoom, because a
+ * zoom-dependent colour on one layer was not used.
+ * @param spec - Colour, graded steps, the zoom that turns solid, and optional floor and classes.
  * @returns Graded paint, solid paint, and that zoom.
  */
 export function shareRasterPaint(spec: SharePaint): ShareRasterPaint {
@@ -90,23 +99,31 @@ export function shareRasterPaint(spec: SharePaint): ShareRasterPaint {
     0,
     rgba(rgb, 0),
   ];
+  const floor = spec.minOpacity ?? 0.2;
   for (let k = 1; k <= spec.steps; k++) {
     const share = (k / spec.steps) ** 2;
     graded.push(
       Math.max(1, Math.round(share * 255)),
-      rgba(rgb, 0.2 + 0.75 * Math.sqrt(share))
+      rgba(rgb, floor + (MAX_OPACITY - floor) * Math.sqrt(share))
     );
   }
   return {
     solidZoom: spec.solidZoom,
     graded: redChannelPaint(graded),
-    solid: redChannelPaint([
-      'step',
-      ['raster-value'],
-      rgba(rgb, 0),
-      128,
-      rgba(rgb, 1),
-    ]),
+    solid: spec.solidClasses?.length
+      ? classRasterPaint(
+          spec.solidClasses.map(entry => ({
+            value: entry.value,
+            color: rgba(rgb, entry.opacity),
+          }))
+        )
+      : redChannelPaint([
+          'step',
+          ['raster-value'],
+          rgba(rgb, 0),
+          128,
+          rgba(rgb, 1),
+        ]),
   };
 }
 

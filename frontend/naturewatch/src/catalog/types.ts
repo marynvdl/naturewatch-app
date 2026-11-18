@@ -39,12 +39,14 @@ export interface CatalogLayer {
     resampling?: 'linear' | 'nearest';
     /** Class values the client colours. Unlisted classes stay transparent. */
     colorClasses?: { value: number; color: string }[];
-    /** Share tiles: red is cropland share 0–255. Graded below solidZoom, solid from it. */
+    /** Share tiles: red is a share 0–255, graded below solidZoom. From it, solid at half or by solidClasses. */
     sharePaint?: {
       color: string;
       colorSatellite?: string;
       steps: number;
       solidZoom: number;
+      minOpacity?: number;
+      solidClasses?: { value: number; opacity: number }[];
     };
     sourceLayer?: string;
     circle?: { radius: number; colorSatellite: string; colorStreets: string };

@@ -1,6 +1,6 @@
 # Task 01 — Roads recipe and sample
 
-Parcel: [Roads](../../parcels/roads.md).
+Parcel: [Roads](../parcels/roads.md).
 
 Repository: naturewatch-analysis. Start from `main`. This is the first task in the parcel.
 
