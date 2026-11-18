@@ -1,6 +1,6 @@
 # Task 02 — Roads seed and sprout
 
-Parcel: [Roads](../../parcels/roads.md).
+Parcel: [Roads](../parcels/roads.md).
 
 Repository: naturewatch-analysis. Start from `main`. Task 01 is merged.
 

@@ -1,5 +1,7 @@
 # Parcel: Roads
 
+Archived 18 November 2026. The Roads layer reads `gs://nature-watch-tiles/roads/2026-10/v1/roads.pmtiles`, painted charcoal on the monochrome basemap and light grey on satellite.
+
 The first roads pressure layer. One global snapshot of roads from Overture Maps, published as a seed, a sprout, and one raster PMTiles archive, and shown on the map as the Roads layer.
 
 *Written 11 November 2026. Revised 17 November 2026: raster instead of vector tiles, and a sprout for place stats.*
@@ -89,13 +91,13 @@ Task 01 runs on the laptop. It records the sample's seed bytes, sprout bytes, ti
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. When a task has merged, move its file to `docs/archive/tasks/` in naturewatch-app, and point the tick at that copy.
 
-- [x] [task-01-roads-recipe-and-sample.md](../archive/tasks/task-01-roads-recipe-and-sample.md) — naturewatch-analysis
+- [x] [task-01-roads-recipe-and-sample.md](../tasks/task-01-roads-recipe-and-sample.md) — naturewatch-analysis
   - *Goal:* Add the roads recipe: the release, the classes kept, the levels, the sprout grid and bands, and the tile encoding. On the laptop, build a sample seed, sprout, and tile archive for a window, such as South Africa or Chad and the Central African Republic. Check the levels against imagery, the look at globe and close zooms, and choose the top zoom. Write the expected global cost and stop for approval.
-- [x] [task-02-roads-seed-and-sprout.md](../archive/tasks/task-02-roads-seed-and-sprout.md) — naturewatch-analysis
+- [x] [task-02-roads-seed-and-sprout.md](../tasks/task-02-roads-seed-and-sprout.md) — naturewatch-analysis
   - *Goal:* After approval, write the global seed and the sprout COGs with their VRT and STAC files. Check the sample window against task 01. Record the run cost.
-- [x] [task-03-roads-pmtiles.md](../archive/tasks/task-03-roads-pmtiles.md) — naturewatch-analysis
+- [x] [task-03-roads-pmtiles.md](../tasks/task-03-roads-pmtiles.md) — naturewatch-analysis
   - *Goal:* After approval, build the global raster archive from the sprout. Verify, upload with the immutable cache header, and record the run cost.
-- [ ] [task-04-roads-on-the-map.md](../tasks/task-04-roads-on-the-map.md) — naturewatch-app
+- [x] [task-04-roads-on-the-map.md](../tasks/task-04-roads-on-the-map.md) — naturewatch-app
   - *Goal:* Add the Roads layer to the threats group in `layers.json`, painted by share and, at the top zoom, by level and surface. Add its entry to `docs/user/data.md` and its objects to `docs/blueprint.md`. Run the catalog tests. Check it in the browser at a wide and a narrow size.
 
 ## Done when
@@ -112,3 +114,5 @@ A person can turn on Roads and see the global Overture snapshot as a share zoome
 - **Roads over time.** One Overture release per year would give yearly snapshots. The change between them mostly shows mapping effort, not new roads. HeiGIT Planet 2020 → 2024 can be revisited if its change classes improve.
 - **Vector roads up close**, with names and crisp lines, if the enlarged cells past the top zoom are not good enough.
 - **Paths** as their own layer.
+- **Roads paint next to Buildings.** Revisit the charcoal and light grey, and the 0.05 opacity floor, when the global buildings layer is on the map. On satellite the world view is very faint.
+- **Attribution on the map** while a layer is on. The Mapbox attribution control is off, so the Roads info card holds the Overture and OpenStreetMap attribution.

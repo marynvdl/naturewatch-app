@@ -1,5 +1,7 @@
 # Task 04 — Roads on the map
 
+Archived. This task is not active.
+
 Parcel: [Roads](../parcels/roads.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 03 is merged in both repos, and the archive is published.
