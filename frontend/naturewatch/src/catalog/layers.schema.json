@@ -138,7 +138,7 @@
               "type": "object",
               "additionalProperties": false,
               "required": ["color", "steps", "solidZoom"],
-              "description": "Share tiles. The red channel is cropland share on a 0–255 scale. The map paints a graded orange below solidZoom and a solid class from it.",
+              "description": "Share tiles. Below solidZoom the red channel is a share on a 0–255 scale, painted graded in the layer colour. From solidZoom it is drawn solid where the share is at least half, or by solidClasses when they are set.",
               "properties": {
                 "color": {
                   "type": "string",
@@ -159,6 +159,34 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 22
+                },
+                "minOpacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.95,
+                  "description": "Opacity the graded shades start from. The darkest shade is 0.95. Leave out for 0.2."
+                },
+                "solidClasses": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "Values the tile stores in the red channel from solidZoom, each drawn in the layer colour at its opacity. Unlisted values stay clear. Leave out to draw share of at least half solid.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["value", "opacity"],
+                    "properties": {
+                      "value": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 255
+                      },
+                      "opacity": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1
+                      }
+                    }
+                  }
                 }
               }
             },

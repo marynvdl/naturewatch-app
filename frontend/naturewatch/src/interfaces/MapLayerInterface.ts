@@ -51,11 +51,13 @@ export default interface MapLayer {
   resampling?: 'linear' | 'nearest';
   /** Class values the client colours. Unlisted classes stay transparent. */
   color_classes?: { value: number; color: string }[];
-  /** Share tiles: red is cropland share 0–255. Graded below solidZoom, solid from it. */
+  /** Share tiles: red is a share 0–255, graded below solidZoom. From it, solid at half or by solidClasses. */
   share_paint?: {
     color: string;
     colorSatellite?: string;
     steps: number;
     solidZoom: number;
+    minOpacity?: number;
+    solidClasses?: { value: number; opacity: number }[];
   };
 }

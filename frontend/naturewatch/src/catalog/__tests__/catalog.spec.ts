@@ -179,6 +179,7 @@ describe('layer catalog', () => {
       'bare',
       'mines',
       'cropland',
+      'roads',
       'rivers',
       'dams',
     ]);
@@ -318,6 +319,80 @@ describe('layer catalog', () => {
     const card = buildInfoCards(catalog).find(entry => entry.title === 'Crops');
     expect(card?.content).toContain('Faint orange');
     expect(card?.content).toContain('From zoom 11');
+  });
+
+  it('paints roads share below zoom 11 and road levels from it', () => {
+    const layer = catalog.layers.find(entry => entry.id === 'roads');
+    expect(layer?.title).toBe('Roads');
+    expect(layer?.group).toBe('threats');
+    expect(layer?.status).toBe('published');
+    expect(layer?.years).toEqual({ available: [2025], meaning: 'snapshot' });
+    expect(layer?.source?.version).toBe('v1');
+    expect(layer?.display.tooltip).toContain('2026-10-21.0');
+    expect(layer?.tiles).toMatchObject({
+      url: 'https://storage.googleapis.com/nature-watch-tiles/roads/2026-10/v1/roads.pmtiles',
+      maxzoom: 11,
+      tileSize: 512,
+      resampling: 'nearest',
+      sharePaint: { steps: 8, solidZoom: 11, minOpacity: 0.05 },
+    });
+    const spec = layer?.tiles.sharePaint;
+    if (!spec) throw new Error('roads has no sharePaint');
+    expect(spec.colorSatellite).toBeDefined();
+    expect(spec.colorSatellite).not.toBe(spec.color);
+
+    // red = level × 4 + surface: levels 1–4, surface 0 unknown, 1 paved, 2 unpaved
+    const classes = spec.solidClasses ?? [];
+    expect(classes.map(entry => entry.value)).toEqual([
+      4, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 18,
+    ]);
+    const opacity = (level: number, surface: number) =>
+      classes.find(entry => entry.value === level * 4 + surface)?.opacity ?? 0;
+    for (let level = 1; level <= 4; level++) {
+      expect(opacity(level, 1)).toBeGreaterThan(opacity(level, 0));
+      expect(opacity(level, 0)).toBeGreaterThan(opacity(level, 2));
+      if (level > 1) {
+        for (let surface = 0; surface <= 2; surface++) {
+          expect(opacity(level, surface)).toBeGreaterThan(
+            opacity(level - 1, surface)
+          );
+        }
+      }
+    }
+    expect(opacity(4, 1)).toBe(1);
+
+    const paint = shareRasterPaint({ ...spec, color: '#000000' });
+    expect(paint.solidZoom).toBe(11);
+    const graded = paint.graded['raster-color'];
+    expect(graded.slice(0, 5)).toEqual([
+      'interpolate',
+      ['linear'],
+      ['raster-value'],
+      0,
+      'rgba(0,0,0,0)',
+    ]);
+    expect(graded.slice(5, 7)).toEqual([4, 'rgba(0,0,0,0.16249999999999998)']);
+    expect(graded.slice(-2)).toEqual([255, 'rgba(0,0,0,0.95)']);
+    expect(paint.solid['raster-color-range']).toEqual([0, 18]);
+    expect(paint.solid['raster-color']).toEqual([
+      'step',
+      ['raster-value'],
+      'rgba(0,0,0,0)',
+      ...classes.flatMap(entry => [
+        entry.value - 0.5,
+        `rgba(0,0,0,${entry.opacity})`,
+      ]),
+    ]);
+
+    const mapLayer = buildMapLayers(catalog).find(
+      entry => entry.title === 'Roads'
+    );
+    expect(mapLayer?.share_paint).toEqual(spec);
+    const card = buildInfoCards(catalog).find(entry => entry.title === 'Roads');
+    expect(card?.subtitle).toContain('2026-10-21.0');
+    expect(card?.content).toContain('OpenStreetMap contributors');
+    expect(card?.content).toContain('Overture Maps Foundation');
+    expect(card?.content).toContain('ODbL');
   });
 
   it('still colours class-value tiles through classRasterPaint', () => {

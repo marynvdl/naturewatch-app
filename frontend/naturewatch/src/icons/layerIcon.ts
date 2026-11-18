@@ -5,6 +5,7 @@ import {
   Droplets,
   Flame,
   Landmark,
+  Road,
   Shovel,
   Square,
   TreePine,
@@ -25,6 +26,7 @@ const layerIcons: Record<string, Component> = {
   'mdi-barley': Wheat,
   'mdi-water': Droplets,
   'mdi-bridge': Bridge,
+  'mdi-road-variant': Road,
 };
 
 /** Lucide icon for a catalog Material name, when one is mapped. */

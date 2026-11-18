@@ -194,6 +194,95 @@
       }
     },
     {
+      "id": "roads",
+      "title": "Roads",
+      "group": "threats",
+      "status": "published",
+      "display": {
+        "buttonType": "small",
+        "icon": "mdi-road-variant",
+        "color": "#2f2f2f",
+        "tooltip": "Overture 2026-10-21.0"
+      },
+      "tiles": {
+        "type": "raster",
+        "url": "https://storage.googleapis.com/nature-watch-tiles/roads/2026-10/v1/roads.pmtiles",
+        "maxzoom": 11,
+        "tileSize": 512,
+        "resampling": "nearest",
+        "sharePaint": {
+          "color": "#2f2f2f",
+          "colorSatellite": "#f0f0f0",
+          "steps": 8,
+          "solidZoom": 11,
+          "minOpacity": 0.05,
+          "solidClasses": [
+            {
+              "value": 4,
+              "opacity": 0.38
+            },
+            {
+              "value": 5,
+              "opacity": 0.45
+            },
+            {
+              "value": 6,
+              "opacity": 0.27
+            },
+            {
+              "value": 8,
+              "opacity": 0.51
+            },
+            {
+              "value": 9,
+              "opacity": 0.6
+            },
+            {
+              "value": 10,
+              "opacity": 0.36
+            },
+            {
+              "value": 12,
+              "opacity": 0.68
+            },
+            {
+              "value": 13,
+              "opacity": 0.8
+            },
+            {
+              "value": 14,
+              "opacity": 0.48
+            },
+            {
+              "value": 16,
+              "opacity": 0.85
+            },
+            {
+              "value": 17,
+              "opacity": 1.0
+            },
+            {
+              "value": 18,
+              "opacity": 0.6
+            }
+          ]
+        }
+      },
+      "years": {
+        "available": [2025],
+        "meaning": "snapshot"
+      },
+      "source": {
+        "name": "Overture Maps transportation",
+        "version": "v1",
+        "url": "https://docs.overturemaps.org/guides/transportation/"
+      },
+      "info": {
+        "subtitle": "Overture release 2026-10-21.0",
+        "content": "Mapped roads from the <a href=\"https://docs.overturemaps.org/guides/transportation/\" target=\"_blank\">Overture Maps transportation</a> theme, one global snapshot. Below zoom 11 the shade is how much of the area is crossed by a road, counted in cells of about 28 m: faint where roads are sparse, strongest where a quarter or more of the cells hold a road. From zoom 11 each cell shows its most important road: darkest for motorways and trunk roads, then main roads, minor roads, and lightest for tracks. Unpaved roads are fainter than paved ones, and roads with no known surface sit between. Footpaths, cycleways, and steps are left out. Tiles run through zoom 11, and closer zoom enlarges them. A timeline year before 2025 does not show this layer.\n    <ul>\n    <li>Clear: no mapped road, or ocean</li>\n    <li>Faint: a few roads in the area</li>\n    <li>Strong: a dense road network</li>\n    <li>From zoom 11: darker is a bigger road, fainter is unpaved</li>\n    </ul>\n    © <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\">OpenStreetMap contributors</a>, Overture Maps Foundation. Licence <a href=\"https://opendatacommons.org/licenses/odbl/\" target=\"_blank\">ODbL</a>."
+      }
+    },
+    {
       "id": "rivers",
       "title": "Rivers",
       "group": "threats",
