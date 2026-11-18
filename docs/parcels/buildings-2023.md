@@ -81,7 +81,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 - [x] [Task 01 — Recipe](../archive/tasks/task-01-buildings-2023-recipe.md) — naturewatch-analysis
   - *Goal:* Add `buildings-2023-v1.yaml`. Fix the sprout grid, the Google presence threshold, the TEMPO floor, and the merge rule. Set the TEMPO floor by comparing TEMPO with Google on empty Saharan land where both exist, including 20.8892° N, 5.8708° E, and check it against the comparison boxes. Set the threshold by comparing Google share with Overture outline area in the Google-covered comparison boxes. List the TEMPO tiles from the index. Compare the Earth Engine and Batch routes for Google and write both cost estimates. Add the comparison scripts (`compare.py`, `render.py`) under `tiles/` or a new `buildings/` folder, so the boxes can be checked again in task 03. No transfer, export or Batch job.
-- [ ] [Task 02 — Seeds](../tasks/task-02-buildings-2023-seeds.md) — naturewatch-analysis
+- [x] [Task 02 — Seeds](../archive/tasks/task-02-buildings-2023-seeds.md) — naturewatch-analysis
   - *Goal:* After approval, write both seeds by the chosen route and check them against the recipe. Record the run cost.
 - [ ] Task 03 — Sprout — naturewatch-analysis
   - *Goal:* After approval, merge the seeds into the share and source bands as Cloud Optimized GeoTIFFs, with static STAC files. Check the seven comparison boxes against the comparison figures. Record the run cost.
