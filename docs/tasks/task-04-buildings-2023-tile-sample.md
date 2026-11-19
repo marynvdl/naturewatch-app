@@ -2,6 +2,8 @@
 
 Parcel: [Buildings 2023](../parcels/buildings-2023.md).
 
+**Paused 19 November 2026.** The sample showed speckle at Kocho, from Google's mean presence with no cut, and nothing at Rebiana, where the TEMPO seed rule removed a village. [Task 03b](task-03b-buildings-2023-google-cut-test.md) tests a cut of Google presence at 0.2 in Earth Engine. This task resumes on sprout v2. Its work so far stays on its branch in naturewatch-analysis, unmerged.
+
 Repository: naturewatch-analysis. Start from `main`, after task 03 has merged.
 
 ## Goal
