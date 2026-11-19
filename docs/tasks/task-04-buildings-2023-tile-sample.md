@@ -2,7 +2,7 @@
 
 Parcel: [Buildings 2023](../parcels/buildings-2023.md).
 
-**Paused 19 November 2026.** The sample showed speckle at Kocho, from Google's mean presence with no cut, and nothing at Rebiana, where the TEMPO seed rule removed a village. [Task 03b](task-03b-buildings-2023-google-cut-test.md) tests a cut of Google presence at 0.2 in Earth Engine. This task resumes on sprout v2. Its work so far stays on its branch in naturewatch-analysis, unmerged.
+**Resumed 19 November 2026 on sprout v1.** The sample showed speckle at Kocho, from Google's mean presence with no cut. [Task 03b](../archive/tasks/task-03b-buildings-2023-google-cut-test.md) found a cut in Earth Engine too costly, so the tiles thin the speckle instead (step 3, Google speckle). Rebiana's missing village is in the parcel's Left for later.
 
 Repository: naturewatch-analysis. Start from `main`, after task 03 has merged.
 
@@ -37,10 +37,11 @@ Build the share pyramid from the published sprout on seven small windows, on the
    - Shade curve: `full` 1 (cropland) against lower values such as 0.25 (roads). Report the share of built pixels in each shade at zooms 4, 8 and 11.
    - Parent rule: the mean of the children (cropland and roads) against the maximum. Report what each does to the lone buildings at Kongoussi and to TEMPO's leftover noise in the desert window.
    - Nodata: kept apart from share 0 (cropland), or tiles with no building not stored (roads). Report both archive sizes.
+   - Google speckle, on Google cells only, from the recommended settings: a floor of 0.008, 0.012 or 0.016, and the seed rule (a Google cell within 2 km reaches 0.15). Report the cells and km² each removes in the Kocho, Bria, Kongoussi and Mueda windows. Judge them in the preview over imagery. `buildings/README.md` "Google cut test (task 03b)" has what each floor removes against the exact cut.
 4. **Check the share.** At the top zoom of each window, the built area summed from the tiles equals the sprout's km² over the same cells within rounding. The Kongoussi, Bria, Mueda and Saint-Flour boxes inside their windows match `sprout/README.md`.
 5. **Look.** Serve the samples with `roads/preview.py` or a copy of it, light grey with the share paint, on satellite and the app's monochrome basemap. Check the edge window for a seam where Google meets TEMPO, and the desert window for a haze. Write renders with `render.py` for the README.
 6. **Report and stop.** Per window and setting: tiles, bytes, wall time and peak memory. Recommend one setting for each choice in step 3, with the figures behind it. Estimate the global archive from the windows and from the cropland and roads archives, as tiles, bytes, task hours and cost, with the assumptions. Stop for approval.
-7. **Record.** After approval, write the chosen settings on the recipe (`max_zoom`, the top-zoom rule, `full`, the parent rule, and how nodata is stored). Record the sample, the figures and the approval in `buildings/README.md`. Update the Tiles row in `docs/pipelines.md`. The sample reads a few MB from the bucket and runs on the laptop: say that, with the egress figure.
+7. **Record.** After approval, write the chosen settings on the recipe (`max_zoom`, the top-zoom rule, `full`, the parent rule, how nodata is stored, and the Google speckle rule). Record the sample, the figures and the approval in `buildings/README.md`. Update the Tiles row in `docs/pipelines.md`. The sample reads a few MB from the bucket and runs on the laptop: say that, with the egress figure.
 
 ## Do not
 
