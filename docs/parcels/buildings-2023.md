@@ -85,7 +85,9 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* After approval, write both seeds by the chosen route and check them against the recipe. Record the run cost.
 - [x] [Task 03 — Sprout](../archive/tasks/task-03-buildings-2023-sprout.md) — naturewatch-analysis
   - *Goal:* After approval, merge the seeds into the share and source bands as Cloud Optimized GeoTIFFs, with static STAC files. Check the seven comparison boxes against the comparison figures. Record the run cost.
-- [ ] Task 04 — Tile sample — naturewatch-analysis
+- [ ] [Task 03b — Google cut test](../tasks/task-03b-buildings-2023-google-cut-test.md) — naturewatch-analysis
+  - *Goal:* In Earth Engine, set Google presence below 0.2 to 0 and average it into sprout cells, with the cut made on 0.5 m, 2 m and 4 m pixels. Export 28 m cells over three 10 × 10 km boxes in the Central African Republic: Kocho, a stretch of scattered huts in Chinko, and Bria. Compare speckle, lone buildings and built km² with seed v1 and Overture, and record the EECU cost of each run. Recommend how seed v2 is made. Stop for approval. No global export.
+- [ ] Task 04 — Tile sample — naturewatch-analysis. *Paused 19 November 2026 until sprout v2.*
   - *Goal:* Build the share pyramid on small windows: a rural Sahel village, Bria, Mueda, Saint-Flour, empty desert where only TEMPO exists, and the edge where Google meets TEMPO in the Sahara, on the Algeria–Libya border near 9.8° E, 27.5° N. Choose the top zoom and the top-zoom rule. Stop for approval. Do not build the global archive.
 - [ ] Task 05 — PMTiles — naturewatch-analysis
   - *Goal:* After the sample is approved, write the global archive to `buildings/2023/v1/buildings.pmtiles`. Verify, upload with the immutable cache header, and record the run cost.
