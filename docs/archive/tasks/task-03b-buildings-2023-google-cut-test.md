@@ -1,8 +1,10 @@
 # Task 03b — Buildings 2023 Google cut test
 
-Parcel: [Buildings 2023](../parcels/buildings-2023.md).
+Parcel: [Buildings 2023](../../parcels/buildings-2023.md).
 
 Repository: naturewatch-analysis. Start from `main`.
+
+**Done 19 November 2026.** The 0.5 m exports failed in Earth Engine (output too large), and the 0.5 m cut was read from the COGs instead. A global cut on 4 m pixels would take 11–12 months of the project's allowance, so the user chose not to make seed v2. The figures set the speckle rule for the tiles in task 04. They are in `buildings/README.md`, "Google cut test (task 03b)".
 
 ## Goal
 
@@ -22,7 +24,7 @@ Test whether cutting Google's `building_presence` at 0.2 before averaging into 2
 1. **Boxes.** Add three 10 × 10 km boxes to `buildings/boxes.yaml`, `kind: cut-test`:
    - `kocho-cut` at 6.30532° N, 23.859° E;
    - `bria-cut` at Bria's centre, 6.537° N, 21.987° E;
-   - `chinko-cut`, a stretch of scattered huts in Chinko picked from imagery, with its coordinates and the reason in the label.
+   - `yalinga-cut` at 6.48° N, 23.23° E: Yalinga, at Chinko's western gate, and the compounds in its fields. Chinko's bush away from Kocho has no huts: the lone Overture outlines there are bright patches and termite mounds in Esri imagery.
 
    `compare.py all` skips them, as it skips windows.
 2. **Script.** Add an `export` command to `ee_box.py`. It reuses the threshold image, so the cut is the one task 01 measured:
