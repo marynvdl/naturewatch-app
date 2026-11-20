@@ -456,7 +456,12 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         [place[0], place[1]],
         [place[2], place[3]],
       ],
-      { padding: panelPadding(mapInstance), maxZoom: 10, duration: 800 }
+      {
+        padding: panelPadding(mapInstance),
+        retainPadding: false,
+        maxZoom: 10,
+        duration: 800,
+      }
     );
   }
 

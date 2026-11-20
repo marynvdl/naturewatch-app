@@ -187,6 +187,18 @@ describe('place boundaries from tiles', () => {
     );
   });
 
+  it('does not keep the panel padding after framing a place', async () => {
+    const { map, store } = await drawPlaces();
+
+    store.selectPlace(outsideWindow);
+    await flushPromises();
+
+    expect(map.fitBounds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ retainPadding: false })
+    );
+  });
+
   it('still draws boundaries when the place store is not configured', async () => {
     vi.mocked(loadPlaceRelease).mockResolvedValue({ status: 'unconfigured' });
     vi.mocked(loadPlaceBounds).mockResolvedValue({ status: 'unconfigured' });
