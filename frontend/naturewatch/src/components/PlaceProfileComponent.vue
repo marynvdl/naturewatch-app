@@ -391,7 +391,11 @@ function onTabKey(event: KeyboardEvent, index: number) {
 <template>
   <section
     class="place-profile"
-    :class="{ 'is-list-tab': activeTab === 'related' && related.length > 0 }"
+    :class="{
+      'is-list-tab':
+        (activeTab === 'related' && related.length > 0) ||
+        activeTab === 'photos',
+    }"
     aria-label="Place"
   >
     <PlacePhotos :photos="photos" :place-name="title" />
@@ -917,7 +921,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
 }
 
 /*
- * On the Related tab only the cards scroll. The header, the tabs,
+ * On the Related and Photos tabs only the list scrolls. The header, the tabs,
  * and the source line stay where they are. A narrow screen scrolls as one.
  */
 @media (min-width: 721px) {

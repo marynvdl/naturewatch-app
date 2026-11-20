@@ -592,7 +592,7 @@ onBeforeUnmount(() => {
     <p v-else-if="status === 'error'" class="place-note">
       The photographs could not be loaded.
     </p>
-    <template v-else>
+    <div v-else class="photos-scroll">
       <p v-if="images.length === 0" class="place-note">No photographs yet.</p>
       <section
         v-for="group in grouped"
@@ -790,7 +790,7 @@ onBeforeUnmount(() => {
           </ul>
         </section>
       </section>
-    </template>
+    </div>
 
     <PlacePhotoGallery
       v-model:open="viewerOpen"
@@ -837,8 +837,21 @@ onBeforeUnmount(() => {
 <style scoped>
 .photos {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
+}
+
+/* Only the photographs scroll when the profile gives the tab a fixed height. */
+.photos-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .photos-bar {
