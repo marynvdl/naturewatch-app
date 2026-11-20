@@ -503,9 +503,9 @@ describe('Places panel', () => {
 
     expect(wrapper.findAll('button.place-result')).toHaveLength(50);
     expect(wrapper.get('.places-count').text()).toBe('50 of 941 places');
-    expect(wrapper.findAll('.place-thumb-number').map(item => item.text())).toEqual(
-      Array.from({ length: 50 }, (_, index) => String(index + 1))
-    );
+    expect(
+      wrapper.findAll('.place-thumb-number').map(item => item.text())
+    ).toEqual(Array.from({ length: 50 }, (_, index) => String(index + 1)));
     expect(wrapper.get('.place-card-name').text()).toBe('Park 01');
     expect(loadPilotPlaceWindow).toHaveBeenCalledWith(
       expect.objectContaining({ sort: 'size-desc' as PlaceSort }),
@@ -579,10 +579,9 @@ describe('Places panel', () => {
     ]);
     expect(wrapper.get('.places-count').text()).toBe('2 places');
 
-    expect(wrapper.findAll('.place-thumb-number').map(item => item.text())).toEqual([
-      '1',
-      '2',
-    ]);
+    expect(
+      wrapper.findAll('.place-thumb-number').map(item => item.text())
+    ).toEqual(['1', '2']);
 
     /**
      * Open the sort menu and choose an order.
@@ -802,7 +801,9 @@ describe('Places panel', () => {
       expect.objectContaining({ offset: 95 }),
       expect.any(AbortSignal)
     );
-    const numbers = wrapper.findAll('.place-thumb-number').map(item => item.text());
+    const numbers = wrapper
+      .findAll('.place-thumb-number')
+      .map(item => item.text());
     expect(numbers).toEqual(['96', '97']);
     expect(wrapper.text()).toContain('A small reserve');
   });

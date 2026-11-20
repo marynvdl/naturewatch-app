@@ -242,7 +242,9 @@ describe('Place status editor', () => {
     expect((input.element as HTMLInputElement).value).toBe(
       'Inside a bigger park'
     );
-    expect(button(wrapper, 0, 'Withdraw').attributes('disabled')).toBeUndefined();
+    expect(
+      button(wrapper, 0, 'Withdraw').attributes('disabled')
+    ).toBeUndefined();
     vi.useRealTimers();
     wrapper.unmount();
   });
