@@ -89,7 +89,13 @@ function choose(value: unknown) {
         @blur="onBlur"
       />
     </ComboboxAnchor>
-    <ComboboxContent class="suggest-list nw" position="popper" :side-offset="4">
+    <!-- Pressing a suggestion keeps focus in the field, so the list stays open until the click lands. -->
+    <ComboboxContent
+      class="suggest-list nw"
+      position="popper"
+      :side-offset="4"
+      @mousedown.prevent
+    >
       <ComboboxViewport>
         <ComboboxItem
           v-for="option in suggestions"

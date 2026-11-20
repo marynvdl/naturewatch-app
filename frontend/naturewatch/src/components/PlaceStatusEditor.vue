@@ -166,8 +166,8 @@ function clearFlag() {
             : 'A withdrawn place leaves the map, the list, and search, and gets no new facts.'
         }}
       </p>
-      <label class="status-field" :for="`${uid}-withdrawal-reason`">
-        <span class="status-label">Reason</span>
+      <div class="status-field">
+        <label class="status-label" :for="`${uid}-withdrawal-reason`">Reason</label>
         <PlaceSuggestInput
           :id="`${uid}-withdrawal-reason`"
           v-model="withdrawalReason"
@@ -177,7 +177,7 @@ function clearFlag() {
           :options="withdrawalReasons"
           :maxlength="STATUS_REASON_MAX"
         />
-      </label>
+      </div>
       <label class="status-field" :for="`${uid}-withdrawal-note`">
         <span class="status-label">Note (optional)</span>
         <textarea
@@ -235,8 +235,8 @@ function clearFlag() {
             : 'A flagged place is listed under Needs attention. Visitors do not see the flag.'
         }}
       </p>
-      <label class="status-field" :for="`${uid}-attention-reason`">
-        <span class="status-label">Reason</span>
+      <div class="status-field">
+        <label class="status-label" :for="`${uid}-attention-reason`">Reason</label>
         <PlaceSuggestInput
           :id="`${uid}-attention-reason`"
           v-model="attentionReason"
@@ -246,7 +246,7 @@ function clearFlag() {
           :options="attentionReasons"
           :maxlength="STATUS_REASON_MAX"
         />
-      </label>
+      </div>
       <label class="status-field" :for="`${uid}-attention-note`">
         <span class="status-label">Note (optional)</span>
         <textarea
