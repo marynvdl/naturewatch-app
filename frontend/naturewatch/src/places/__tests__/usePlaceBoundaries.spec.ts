@@ -161,6 +161,7 @@ describe('place boundaries from tiles', () => {
 
     map.fire('click', 'places-fill', {
       features: [{ properties: { id: outsideWindow } }],
+      originalEvent: { timeStamp: 0 },
     });
     expect(store.selectedId).toBe(outsideWindow);
     expect(store.selectedFrom).toBe('map');
@@ -170,6 +171,47 @@ describe('place boundaries from tiles', () => {
       )
     );
     expect(loadPlaceBounds).toHaveBeenCalledWith(outsideWindow);
+  });
+
+  it('opens a tapped place, and skips the click a browser may send after it', async () => {
+    const { map, store } = await drawPlaces();
+    const features = [{ properties: { id: outsideWindow } }];
+
+    map.fire('touchstart', 'places-fill', {
+      point: { x: 100, y: 100 },
+      originalEvent: { touches: [{}], timeStamp: 1000 },
+      features,
+    });
+    map.fire('touchend', 'places-fill', {
+      point: { x: 103, y: 101 },
+      originalEvent: { touches: [], timeStamp: 1120 },
+      features,
+    });
+    expect(store.selectedId).toBe(outsideWindow);
+
+    // The same tap as a click would close the place again
+    map.fire('click', 'places-fill', {
+      features,
+      originalEvent: { timeStamp: 1200 },
+    });
+    expect(store.selectedId).toBe(outsideWindow);
+  });
+
+  it('does not take a drag that starts on a boundary as a tap', async () => {
+    const { map, store } = await drawPlaces();
+    const features = [{ properties: { id: outsideWindow } }];
+
+    map.fire('touchstart', 'places-fill', {
+      point: { x: 100, y: 100 },
+      originalEvent: { touches: [{}], timeStamp: 1000 },
+      features,
+    });
+    map.fire('touchend', 'places-fill', {
+      point: { x: 160, y: 100 },
+      originalEvent: { touches: [], timeStamp: 1120 },
+      features,
+    });
+    expect(store.selectedId).toBeNull();
   });
 
   it('moves the map to a place chosen from the list when it is out of view', async () => {
@@ -330,6 +372,7 @@ describe('place boundaries from tiles', () => {
 
     map.fire('click', 'recognitions-fill', {
       features: [{ properties: { id: outsideWindow } }],
+      originalEvent: { timeStamp: 0 },
     });
     expect(store.selectedId).toBe(outsideWindow);
     await flushPromises();

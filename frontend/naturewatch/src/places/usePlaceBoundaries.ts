@@ -492,15 +492,66 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   }
 
   /**
-   * Select the clicked boundary, or clear it when it is already selected.
+   * Select the boundary under a click or tap, or clear it when it is already
+   * selected.
+   * @param event - The click or the end of the tap.
    */
-  function onPlaceClick(event: mapboxgl.MapMouseEvent) {
+  function choosePlace(event: mapboxgl.MapMouseEvent | mapboxgl.MapTouchEvent) {
     // A click while measuring places a point. It does not choose a place.
     if (measureStore.drawing) return;
     const id = event.features?.[0]?.properties?.id;
     if (id === undefined || id === null || id === '') return;
     const placeId = String(id);
     placesStore.selectPlace(placeId, 'map');
+  }
+
+  /** Where and when a one-finger touch on a boundary began. */
+  let touchStart: { x: number; y: number; time: number } | null = null;
+  /** When a tap last chose a place. */
+  let lastTap = -Infinity;
+  /** A tap moves less than this, in pixels, and lasts less than this, in ms. */
+  const TAP_SLOP = 10;
+  const TAP_TIME = 500;
+
+  /**
+   * Choose the clicked boundary. A click just after a tap is the browser's
+   * copy of that tap, and is skipped.
+   * @param event - The click.
+   */
+  function onPlaceClick(event: mapboxgl.MapMouseEvent) {
+    if (event.originalEvent.timeStamp - lastTap < 800) return;
+    choosePlace(event);
+  }
+
+  /**
+   * Note where a one-finger touch on a boundary began.
+   * @param event - The touch start.
+   */
+  function onPlaceTouchStart(event: mapboxgl.MapTouchEvent) {
+    touchStart =
+      event.originalEvent.touches.length === 1
+        ? {
+            x: event.point.x,
+            y: event.point.y,
+            time: event.originalEvent.timeStamp,
+          }
+        : null;
+  }
+
+  /**
+   * Choose the tapped boundary. Mapbox Draw, which Measure uses, cancels the
+   * click a browser makes from a tap, so a tap is read from the touch itself.
+   * @param event - The touch end.
+   */
+  function onPlaceTouchEnd(event: mapboxgl.MapTouchEvent) {
+    const start = touchStart;
+    touchStart = null;
+    if (!start) return;
+    const time = event.originalEvent.timeStamp;
+    const moved = Math.hypot(event.point.x - start.x, event.point.y - start.y);
+    if (moved > TAP_SLOP || time - start.time > TAP_TIME) return;
+    lastTap = time;
+    choosePlace(event);
   }
 
   /**
@@ -623,6 +674,8 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     if (!listening) {
       [PLACE_FILL, RECOGNITION_FILL].forEach(layer => {
         mapInstance.on('click', layer, onPlaceClick);
+        mapInstance.on('touchstart', layer, onPlaceTouchStart);
+        mapInstance.on('touchend', layer, onPlaceTouchEnd);
         mapInstance.on('mouseenter', layer, () => {
           mapInstance.getCanvas().style.cursor = 'pointer';
         });
