@@ -761,9 +761,6 @@ watch(
               :key="place.id"
               :data-place-id="place.id"
             >
-              <span class="place-number" aria-hidden="true">
-                {{ windowStart + index + 1 }}
-              </span>
               <PlaceCard
                 :name="place.name"
                 :iso3="place.iso3"
@@ -773,6 +770,7 @@ watch(
                 "
                 :current="placesStore.selectedId === place.id"
                 :photo="mainPhotoOf(place.id)"
+                :number="windowStart + index + 1"
                 @click="chooseResult(place)"
                 @highlight="on => placesStore.hoverPlace(place.id, on)"
               />
@@ -1034,19 +1032,5 @@ watch(
   position: relative;
   margin: 0;
   padding: 0;
-}
-
-/* The number sits in the panel padding, so the cards line up with the buttons. */
-.place-number {
-  position: absolute;
-  top: 12px;
-  right: 100%;
-  width: var(--map-panel-padding);
-  padding-right: 5px;
-  font-size: 11px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  color: var(--muted-foreground);
 }
 </style>

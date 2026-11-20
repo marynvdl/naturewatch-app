@@ -212,6 +212,43 @@ describe('Place status editor', () => {
     wrapper.unmount();
   });
 
+  it('takes a suggested reason chosen with a slow press', async () => {
+    vi.useFakeTimers();
+    const wrapper = mount(PlaceStatusEditor, {
+      props: { placeId, placeStatus: PUBLISHED },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const input = wrapper.get('input[name="withdrawal-reason"]');
+    (input.element as HTMLInputElement).focus();
+    await input.trigger('focus');
+    await flushPromises();
+    const item = [...document.querySelectorAll('.suggest-item')].find(
+      element => element.textContent?.trim() === 'Inside a bigger park'
+    ) as HTMLElement;
+
+    // The press must not take focus from the field
+    const press = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+    });
+    item.dispatchEvent(press);
+    expect(press.defaultPrevented).toBe(true);
+    vi.advanceTimersByTime(400);
+    await flushPromises();
+    item.click();
+    await flushPromises();
+
+    expect((input.element as HTMLInputElement).value).toBe(
+      'Inside a bigger park'
+    );
+    expect(
+      button(wrapper, 0, 'Withdraw').attributes('disabled')
+    ).toBeUndefined();
+    vi.useRealTimers();
+    wrapper.unmount();
+  });
+
   it('shows why a change failed', async () => {
     vi.mocked(setPlaceAttention).mockResolvedValue(
       'Only an admin can flag a place.'
