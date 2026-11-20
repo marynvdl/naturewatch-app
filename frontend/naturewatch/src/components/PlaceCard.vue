@@ -20,6 +20,8 @@ const props = defineProps<{
   photo?: string | null;
   /** A tag after the area, such as how many photographs are suggested. */
   note?: string | null;
+  /** Position in a numbered list, shown on the thumbnail's corner. */
+  number?: number | null;
 }>();
 
 defineEmits<{
@@ -51,6 +53,9 @@ const country = computed(() => countryName(props.iso3));
         loading="lazy"
       />
       <Image v-else :size="20" :stroke-width="1.25" />
+      <span v-if="number != null" class="place-thumb-number">
+        {{ number.toLocaleString('en-GB') }}
+      </span>
     </span>
     <span class="place-card-text">
       <span class="place-card-name" :title="name">
@@ -65,7 +70,9 @@ const country = computed(() => countryName(props.iso3));
           <span class="place-card-type-dot" aria-hidden="true" />
           {{ placeTypeLabel(placeTypeId) }}
         </span>
-        <span v-if="country" class="place-card-country">{{ country }}</span>
+        <span v-if="country" class="place-card-country" :title="country">
+          {{ country }}
+        </span>
       </span>
       <span v-if="areaKm2 != null || note" class="place-card-tags">
         <span v-if="areaKm2 != null" class="place-card-area">
@@ -113,6 +120,7 @@ const country = computed(() => countryName(props.iso3));
 }
 
 .place-thumb {
+  position: relative;
   display: grid;
   flex: none;
   align-self: center;
@@ -129,6 +137,20 @@ const country = computed(() => countryName(props.iso3));
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.place-thumb-number {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 88%);
+  color: #24312c;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
 }
 
 .place-card-text {
@@ -155,10 +177,20 @@ const country = computed(() => countryName(props.iso3));
 .place-card-meta {
   display: flex;
   flex-wrap: wrap;
+  max-width: 100%;
   align-items: center;
   gap: 2px 6px;
   font-size: 12px;
   color: var(--muted-foreground);
+}
+
+/* A transboundary place can list many countries. One line, cut with an ellipsis. */
+.place-card-country {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .place-card-type {
