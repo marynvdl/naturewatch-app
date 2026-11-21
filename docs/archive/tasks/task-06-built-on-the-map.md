@@ -1,6 +1,6 @@
 # Task 06 — Built on the map
 
-Parcel: [Buildings 2023](../../parcels/buildings-2023.md).
+Parcel: [Buildings 2023](../parcels/buildings-2023.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 05 is merged in both repos, and the archive is published.
 

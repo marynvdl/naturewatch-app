@@ -1,6 +1,6 @@
 # Task 03b — Buildings 2023 Google cut test
 
-Parcel: [Buildings 2023](../../parcels/buildings-2023.md).
+Parcel: [Buildings 2023](../parcels/buildings-2023.md).
 
 Repository: naturewatch-analysis. Start from `main`.
 
