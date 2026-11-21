@@ -63,7 +63,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 - [x] [Task 01 — Ecoregion places](../archive/tasks/task-01-ecoregion-places.md) — naturewatch-app
   - *Goal:* Add the `ecology` category, the `ecoregion` type, `ecoregion_details`, and the source, release, and licence rows. Extend `place_summaries`. Write `supabase/import_ecoregions.py`: download the pinned zip with a checksum, then load places, version 1 boundaries, and `eco_id` source ids. Load it locally, then on the hosted database after approval. Check the count, the areas against RESOLVE's, and that every boundary is valid.
-- [ ] [Task 02 — Ecoregion links](../tasks/task-02-ecoregion-links.md) — naturewatch-app
+- [x] [Task 02 — Ecoregion links](../archive/tasks/task-02-ecoregion-links.md) — naturewatch-app
   - *Goal:* Derive `located_in` links from conservation areas and recognitions to ecoregions, with subdivided ecoregion shapes. Write them as `proposed`. Show the user the coverage counts. Confirm the links at the threshold the user chooses.
 - [ ] Task 03 — Ecoregions PMTiles — naturewatch-analysis
   - *Goal:* Add `places-ecoregions.yaml` and build `places/ecoregions/v1/ecoregions.pmtiles` from the current boundaries of the published ecoregions. Record the run cost.

@@ -1,6 +1,6 @@
 # Task 02 — Ecoregion links
 
-Parcel: [Ecoregions](../parcels/ecoregions.md).
+Parcel: [Ecoregions](../../parcels/ecoregions.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 01 merged in #449.
 
