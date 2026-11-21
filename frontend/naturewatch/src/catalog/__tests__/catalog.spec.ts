@@ -295,7 +295,7 @@ describe('layer catalog', () => {
       255,
       'rgba(229,145,57,0.95)',
     ]);
-    expect(paint.solid['raster-color']).toEqual([
+    expect(paint.solid?.['raster-color']).toEqual([
       'step',
       ['raster-value'],
       'rgba(229,145,57,0)',
@@ -373,8 +373,8 @@ describe('layer catalog', () => {
     ]);
     expect(graded.slice(5, 7)).toEqual([4, 'rgba(0,0,0,0.16249999999999998)']);
     expect(graded.slice(-2)).toEqual([255, 'rgba(0,0,0,0.95)']);
-    expect(paint.solid['raster-color-range']).toEqual([0, 18]);
-    expect(paint.solid['raster-color']).toEqual([
+    expect(paint.solid?.['raster-color-range']).toEqual([0, 18]);
+    expect(paint.solid?.['raster-color']).toEqual([
       'step',
       ['raster-value'],
       'rgba(0,0,0,0)',
@@ -393,6 +393,52 @@ describe('layer catalog', () => {
     expect(card?.content).toContain('OpenStreetMap contributors');
     expect(card?.content).toContain('Overture Maps Foundation');
     expect(card?.content).toContain('ODbL');
+  });
+
+  it('paints built share graded at every zoom from the buildings archive', () => {
+    const layer = catalog.layers.find(entry => entry.id === 'built');
+    expect(layer?.title).toBe('Built');
+    expect(layer?.group).toBe('threats');
+    expect(layer?.status).toBe('published');
+    expect(layer?.years).toEqual({ available: [2023], meaning: 'snapshot' });
+    expect(layer?.source?.version).toBe('v1');
+    expect(layer?.tiles).toMatchObject({
+      url: 'https://storage.googleapis.com/nature-watch-tiles/buildings/2023/v1/buildings.pmtiles',
+      maxzoom: 12,
+      tileSize: 512,
+      resampling: 'nearest',
+      sharePaint: { steps: 7, minOpacity: 0.05 },
+    });
+    const spec = layer?.tiles.sharePaint;
+    if (!spec) throw new Error('built has no sharePaint');
+    expect(spec.solidZoom).toBeUndefined();
+    expect(spec.solidClasses).toBeUndefined();
+    expect(spec.colorSatellite).toBeDefined();
+    expect(spec.colorSatellite).not.toBe(spec.color);
+    expect(layer?.display.color).toBe(spec.color);
+
+    // Shade k of 7 stores red = 255 × (k / 7)², as the archive writes it.
+    const paint = shareRasterPaint({ ...spec, color: '#000000' });
+    expect(paint.solid).toBeUndefined();
+    expect(paint.solidZoom).toBeUndefined();
+    const graded = paint.graded['raster-color'];
+    const reds = graded.slice(5).filter((_, i) => i % 2 === 0);
+    expect(reds).toEqual([5, 21, 47, 83, 130, 187, 255]);
+    expect(graded.slice(5, 7)).toEqual([5, 'rgba(0,0,0,0.17857142857142855)']);
+    expect(graded.slice(-2)).toEqual([255, 'rgba(0,0,0,0.95)']);
+
+    const mapLayer = buildMapLayers(catalog).find(
+      entry => entry.title === 'Built'
+    );
+    expect(mapLayer?.share_paint).toEqual(spec);
+    expect(mapLayer?.tile_size).toBe(512);
+    expect(mapLayer?.max_zoom).toBe(12);
+    const card = buildInfoCards(catalog).find(entry => entry.title === 'Built');
+    expect(card?.content).toContain('Open Buildings 2.5D Temporal');
+    expect(card?.content).toContain('TEMPO');
+    expect(card?.content).toContain('CC BY 4.0');
+    expect(card?.content).toContain('CDLA Permissive 2.0');
+    expect(card?.content).not.toContain('GHSL');
   });
 
   it('still colours class-value tiles through classRasterPaint', () => {

@@ -17,13 +17,14 @@ export interface RasterColorPaint {
 /** Mapbox raster paint for class-value tiles. */
 export type ClassRasterPaint = RasterColorPaint;
 
-/** Share-tile paint from the catalog. Opacity follows √share below solidZoom. */
+/** Share-tile paint from the catalog. Opacity follows √share below solidZoom, or at every zoom without it. */
 export interface SharePaint {
   color: string;
   /** Lighter colour on satellite, so the layer still reads against imagery. */
   colorSatellite?: string;
   steps: number;
-  solidZoom: number;
+  /** Zoom the solid rule starts at. Leave out to stay graded at every zoom. */
+  solidZoom?: number;
   /** Opacity of the faintest shade. Leave out for 0.2. */
   minOpacity?: number;
   /** Values drawn from solidZoom, each in the layer colour at its opacity. Replaces the solid share ≥ 0.5 rule. */
@@ -35,11 +36,11 @@ export function sharePaintColor(spec: SharePaint, satellite: boolean): string {
   return satellite && spec.colorSatellite ? spec.colorSatellite : spec.color;
 }
 
-/** Graded layer below solidZoom, solid layer from it. */
+/** Graded layer below solidZoom, solid layer from it. Without solidZoom, graded only. */
 export interface ShareRasterPaint {
   graded: RasterColorPaint;
-  solid: RasterColorPaint;
-  solidZoom: number;
+  solid?: RasterColorPaint;
+  solidZoom?: number;
 }
 
 /** Opacity of the darkest shade. */
@@ -85,6 +86,7 @@ export function classRasterPaint(classes: ClassColor[]): ClassRasterPaint {
  * at shade 0 to 0.95 at the darkest shade, and is 0 where there is no share.
  * From solidZoom the map draws share ≥ 0.5 solid and the rest clear, or, when
  * solidClasses is set, each listed value at its opacity and the rest clear.
+ * Without solidZoom there is no solid paint, and the graded paint holds at every zoom.
  * Two Mapbox layers, with maxzoom and minzoom at solidZoom, because a
  * zoom-dependent colour on one layer was not used.
  * @param spec - Colour, graded steps, the zoom that turns solid, and optional floor and classes.
@@ -107,6 +109,7 @@ export function shareRasterPaint(spec: SharePaint): ShareRasterPaint {
       rgba(rgb, floor + (MAX_OPACITY - floor) * Math.sqrt(share))
     );
   }
+  if (spec.solidZoom === undefined) return { graded: redChannelPaint(graded) };
   return {
     solidZoom: spec.solidZoom,
     graded: redChannelPaint(graded),

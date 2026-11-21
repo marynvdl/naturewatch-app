@@ -620,14 +620,16 @@ function addLayerToMap(layer: MapLayer, map: mapboxgl.Map | null) {
         maxzoom?: number;
         minzoom?: number;
       }[] = share
-        ? [
-            { id: layerId, paint: share.graded, maxzoom: share.solidZoom },
-            {
-              id: `${layerId}-solid`,
-              paint: share.solid,
-              minzoom: share.solidZoom,
-            },
-          ]
+        ? share.solid
+          ? [
+              { id: layerId, paint: share.graded, maxzoom: share.solidZoom },
+              {
+                id: `${layerId}-solid`,
+                paint: share.solid,
+                minzoom: share.solidZoom,
+              },
+            ]
+          : [{ id: layerId, paint: share.graded }]
         : [
             {
               id: layerId,

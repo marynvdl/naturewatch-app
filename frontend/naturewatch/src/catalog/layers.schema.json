@@ -137,8 +137,8 @@
             "sharePaint": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["color", "steps", "solidZoom"],
-              "description": "Share tiles. Below solidZoom the red channel is a share on a 0–255 scale, painted graded in the layer colour. From solidZoom it is drawn solid where the share is at least half, or by solidClasses when they are set.",
+              "required": ["color", "steps"],
+              "description": "Share tiles. Below solidZoom the red channel is a share on a 0–255 scale, painted graded in the layer colour. From solidZoom it is drawn solid where the share is at least half, or by solidClasses when they are set. Without solidZoom it stays graded at every zoom.",
               "properties": {
                 "color": {
                   "type": "string",
@@ -157,6 +157,7 @@
                 },
                 "solidZoom": {
                   "type": "integer",
+                  "description": "Zoom the solid rule starts at. Leave out to stay graded at every zoom.",
                   "minimum": 0,
                   "maximum": 22
                 },

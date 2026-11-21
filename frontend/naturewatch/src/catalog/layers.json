@@ -43,18 +43,28 @@
       },
       "tiles": {
         "type": "raster",
-        "url": "https://storage.googleapis.com/nature-watch-tiles/built/2023/{z}/{x}/{y}.png?v=1"
+        "url": "https://storage.googleapis.com/nature-watch-tiles/buildings/2023/v1/buildings.pmtiles",
+        "maxzoom": 12,
+        "tileSize": 512,
+        "resampling": "nearest",
+        "sharePaint": {
+          "color": "#767676",
+          "colorSatellite": "#e0e0e0",
+          "steps": 7,
+          "minOpacity": 0.05
+        }
       },
       "years": {
         "available": [2023],
         "meaning": "snapshot"
       },
       "source": {
-        "name": "Google Open Buildings 2023 (confidence 0.80 or higher), with GHSL 2020 where Open Buildings has no coverage",
+        "name": "Google Open Buildings 2.5D Temporal, with Microsoft TEMPO 2023 Q4 where Google has no data",
+        "version": "v1",
         "url": "https://sites.research.google/open-buildings/"
       },
       "info": {
-        "content": "The map shows one built snapshot, for 2023. It uses <a href=\"https://sites.research.google/open-buildings/\" target=\"_blank\">Google Open Buildings (2023)</a> polygons with a confidence score of 0.80 or higher. Where that dataset has no coverage — Chad, Mali, Libya, Morocco and Western Morocco — it uses the <a href=\"https://ghsl.jrc.ec.europa.eu/ghs_buS2023.php\" target=\"_blank\">Global Human Settlement Layer</a> for 2020. A mark means the source recorded a building. It does not say how the building is used. Choosing another year on the timeline still shows this 2023 snapshot, because no other built year is published."
+        "content": "Buildings in one snapshot, for 2023. Grey is how much of each cell of about 28 m is covered by buildings: faint where buildings are sparse, strongest where a quarter or more of the cell is covered. Where it has data, the layer uses <a href=\"https://sites.research.google/open-buildings/\" target=\"_blank\">Google Open Buildings 2.5D Temporal</a>, which covers Africa, Latin America, and South and South-East Asia. Everywhere else it uses <a href=\"https://github.com/microsoft/buildings\" target=\"_blank\">Microsoft TEMPO</a> for 2023 Q4. TEMPO marks faint buildings on empty land, so a TEMPO cell is kept only near a denser one. Some small desert villages outside Google's area are missing for that reason. The layer does not say how a building is used. Tiles run through zoom 12, and closer zoom enlarges them. A later timeline year still shows this 2023 snapshot, and a year before 2023 does not show this layer.\n    <ul>\n    <li>Clear: no buildings, ocean, or missing data</li>\n    <li>Faint grey: a few buildings in the cell</li>\n    <li>Strong grey: a quarter or more of the cell is buildings</li>\n    </ul>\n    Google Open Buildings: <a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\">CC BY 4.0</a>. Microsoft TEMPO: <a href=\"https://cdla.dev/permissive-2-0/\" target=\"_blank\">CDLA Permissive 2.0</a>."
       }
     },
     {
