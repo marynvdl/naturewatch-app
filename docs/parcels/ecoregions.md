@@ -29,7 +29,7 @@ One Earth's text and photos are not copied. Its terms (updated 15 April 2026) fo
 
 **Places.** A new category, `ecology`, with the type `ecoregion` and a new `details_kind`, `ecoregion`. Each of the 846 ecoregions is one place with a version 1 boundary, from the RESOLVE polygon. Rock and Ice (ECO_ID 0) is not imported. `place_source_ids` holds `ECO_ID` with `id_kind` `eco_id`. `ecoregion_details` holds the biome and realm, provenance, and the raw source row in `source_attributes`. `place_summaries` reads `realm` from it too. The size on the profile is the current boundary's `area_km2`, as for every place.
 
-**Links.** A conservation area or a recognition is `located_in` an ecoregion, as a `derived` link, with `subject_coverage` (the share of the park inside the ecoregion) and `object_coverage`. The links are derived from the current boundaries. The ecoregion shapes are cut with `ST_Subdivide` first: one `place_overlaps()` call ran the hosted database out of memory on 12 November 2026. The user chooses the coverage at which a link is confirmed from the hosted counts, as in [Database Honing task 09](../archive/tasks/task-09-recognitions.md). Only confirmed links show as tags and in Related.
+**Links.** A conservation area or a recognition is `located_in` an ecoregion, as a `derived` link, with `subject_coverage` (the share of the park inside the ecoregion) and `object_coverage`. The links are derived from the current boundaries. They are computed on a laptop from the hosted boundaries, with the shapes cut on a 1° grid, and not in the database: one `place_overlaps()` call ran the hosted database out of memory on 12 November 2026. The user chooses the coverage at which a link is confirmed from the hosted counts, as in [Database Honing task 09](../archive/tasks/task-09-recognitions.md). Only confirmed links show as tags and in Related.
 
 **Text.** A pipeline matches each ecoregion to its Wikidata item and English Wikipedia article, and suggests the lead as the description. The suggestion is cut at a paragraph or sentence end to fit the 2,000-character limit. An admin approves or edits it in edit mode, and it is stored in `place_curations.description`. Under the text the profile shows "From Wikipedia" with the article link and the CC BY-SA licence, so the text keeps its source and licence. An unmatched ecoregion is listed for an admin to match by hand.
 
@@ -44,8 +44,8 @@ One Earth's text and photos are not copied. Its terms (updated 15 April 2026) fo
 ## Open questions
 
 - Paint: RESOLVE colour fill or outlines (task 04 shows both).
-- The confirmation coverage for `located_in` (task 02 shows the counts).
-- Whether a park tag needs a minimum share as well, so a park that only touches an ecoregion at its edge is not tagged.
+
+Answered in task 02 on 21 November 2026: a `located_in` link is confirmed when at least 10% of the park lies inside the ecoregion. That share is also the minimum for a park tag, so a park that only touches an ecoregion at its edge is not tagged.
 
 ## Deferred
 
@@ -63,7 +63,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 - [x] [Task 01 — Ecoregion places](../archive/tasks/task-01-ecoregion-places.md) — naturewatch-app
   - *Goal:* Add the `ecology` category, the `ecoregion` type, `ecoregion_details`, and the source, release, and licence rows. Extend `place_summaries`. Write `supabase/import_ecoregions.py`: download the pinned zip with a checksum, then load places, version 1 boundaries, and `eco_id` source ids. Load it locally, then on the hosted database after approval. Check the count, the areas against RESOLVE's, and that every boundary is valid.
-- [ ] Task 02 — Ecoregion links — naturewatch-app
+- [x] [Task 02 — Ecoregion links](../archive/tasks/task-02-ecoregion-links.md) — naturewatch-app
   - *Goal:* Derive `located_in` links from conservation areas and recognitions to ecoregions, with subdivided ecoregion shapes. Write them as `proposed`. Show the user the coverage counts. Confirm the links at the threshold the user chooses.
 - [ ] Task 03 — Ecoregions PMTiles — naturewatch-analysis
   - *Goal:* Add `places-ecoregions.yaml` and build `places/ecoregions/v1/ecoregions.pmtiles` from the current boundaries of the published ecoregions. Record the run cost.
