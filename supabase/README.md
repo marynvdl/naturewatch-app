@@ -68,6 +68,8 @@ On the local stack on 21 November 2026, `upload` took 22 seconds and `place_boun
 
 The hosted load runs from a laptop, with `SUPABASE_ACCESS_TOKEN` set instead of `DATABASE_URL`. The Hosted import rules below were written for the 2 GB WDPCA load. This one is 846 rows in small committed batches that continue after a dropped connection.
 
+The hosted migration ran on 21 November 2026 in about 6 seconds. `upload` then ran from a laptop in 13 minutes 34 seconds, in 67 committed batches, with no dropped connection, and `check` passed with the same totals as the local load. The database went from 3,550 MB to 3,737 MB, and `place_boundaries` from 3,455 MB to 3,642 MB. Afterwards 51,783 places were published: 846 ecoregions, 39,457 conservation areas, and 11,480 recognitions. `anon` reads all 846 ecoregions' details and summaries.
+
 ## Local database
 
 ```bash
