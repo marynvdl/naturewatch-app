@@ -70,6 +70,19 @@ The hosted load runs from a laptop, with `SUPABASE_ACCESS_TOKEN` set instead of 
 
 The hosted migration ran on 21 November 2026 in about 6 seconds. `upload` then ran from a laptop in 13 minutes 34 seconds, in 67 committed batches, with no dropped connection, and `check` passed with the same totals as the local load. The database went from 3,550 MB to 3,737 MB, and `place_boundaries` from 3,455 MB to 3,642 MB. Afterwards 51,783 places were published: 846 ecoregions, 39,457 conservation areas, and 11,480 recognitions. `anon` reads all 846 ecoregions' details and summaries.
 
+### Ecoregion links
+
+Since Ecoregions task 02, `derive_ecoregion_links.py` writes a derived `located_in` link from each published conservation area and recognition to each published ecoregion it lies in:
+
+```bash
+ECOREGIONS_WORK_DIR=/tmp/ecoregions-work DATABASE_URL=... .venv/bin/python supabase/derive_ecoregion_links.py compute
+ECOREGIONS_WORK_DIR=/tmp/ecoregions-work DATABASE_URL=... .venv/bin/python supabase/derive_ecoregion_links.py load
+DATABASE_URL=... .venv/bin/python supabase/derive_ecoregion_links.py counts
+DATABASE_URL=... .venv/bin/python supabase/derive_ecoregion_links.py confirm 0.1
+```
+
+The park is the subject and the ecoregion the object, so `subject_coverage` is the share of the park inside the ecoregion. The overlap is computed on the laptop, not in the database, because `place_overlaps()` ran the hosted Micro database out of memory (see Recognitions above). `compute` only reads the database. It reads the current boundaries of the published ecoregions, cuts each on a 1° grid (first 10°, then 1°), and projects the pieces to EPSG:6933, which is equal area. It then streams the current boundaries of the published parks in batches of 200, cuts each the same way, and intersects each piece with the ecoregion pieces of its cell. It writes `ecoregion_links.tsv`, one row per pair whose shared area is at least 1% of either place, and keeps a done file so a second start continues after the last park. `load` inserts the file as `proposed` rows in one transaction, as `derive_recognises.py load` does, and a rerun inserts nothing. `counts` prints, per park type and for 1%, 5%, 10%, 25%, and 50% of the park, the links, the parks with and without a link, and the median ecoregions per linked park. `confirm` sets `confirmed` on derived links at or above the share given.
+
 ## Local database
 
 ```bash
