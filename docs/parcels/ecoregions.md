@@ -44,8 +44,8 @@ One Earth's text and photos are not copied. Its terms (updated 15 April 2026) fo
 ## Open questions
 
 - Paint: RESOLVE colour fill or outlines (task 04 shows both).
-- The confirmation coverage for `located_in` (task 02 shows the counts).
-- Whether a park tag needs a minimum share as well, so a park that only touches an ecoregion at its edge is not tagged.
+
+Answered in task 02 on 21 November 2026: a `located_in` link is confirmed when at least 10% of the park lies inside the ecoregion. That share is also the minimum for a park tag, so a park that only touches an ecoregion at its edge is not tagged.
 
 ## Deferred
 
