@@ -1,5 +1,7 @@
 # Parcel: Buildings 2023
 
+Archived 21 November 2026. The Built layer reads `gs://nature-watch-tiles/buildings/2023/v1/buildings.pmtiles`, graded at every zoom, painted near-black on the monochrome basemap and light grey on satellite.
+
 The first global building layer. It publishes one 2023 snapshot as a seed, a sprout, and one PMTiles archive, and shows it on the map as the Built layer.
 
 *Written 10 November 2026.*
@@ -83,19 +85,19 @@ This parcel publishes 2023 only. The plan for more years:
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. Task files are written when a task starts.
 
-- [x] [Task 01 — Recipe](../archive/tasks/task-01-buildings-2023-recipe.md) — naturewatch-analysis
+- [x] [Task 01 — Recipe](../tasks/task-01-buildings-2023-recipe.md) — naturewatch-analysis
   - *Goal:* Add `buildings-2023-v1.yaml`. Fix the sprout grid, the Google presence threshold, the TEMPO floor, and the merge rule. Set the TEMPO floor by comparing TEMPO with Google on empty Saharan land where both exist, including 20.8892° N, 5.8708° E, and check it against the comparison boxes. Set the threshold by comparing Google share with Overture outline area in the Google-covered comparison boxes. List the TEMPO tiles from the index. Compare the Earth Engine and Batch routes for Google and write both cost estimates. Add the comparison scripts (`compare.py`, `render.py`) under `tiles/` or a new `buildings/` folder, so the boxes can be checked again in task 03. No transfer, export or Batch job.
-- [x] [Task 02 — Seeds](../archive/tasks/task-02-buildings-2023-seeds.md) — naturewatch-analysis
+- [x] [Task 02 — Seeds](../tasks/task-02-buildings-2023-seeds.md) — naturewatch-analysis
   - *Goal:* After approval, write both seeds by the chosen route and check them against the recipe. Record the run cost.
-- [x] [Task 03 — Sprout](../archive/tasks/task-03-buildings-2023-sprout.md) — naturewatch-analysis
+- [x] [Task 03 — Sprout](../tasks/task-03-buildings-2023-sprout.md) — naturewatch-analysis
   - *Goal:* After approval, merge the seeds into the share and source bands as Cloud Optimized GeoTIFFs, with static STAC files. Check the seven comparison boxes against the comparison figures. Record the run cost.
-- [x] [Task 03b — Google cut test](../archive/tasks/task-03b-buildings-2023-google-cut-test.md) — naturewatch-analysis
+- [x] [Task 03b — Google cut test](../tasks/task-03b-buildings-2023-google-cut-test.md) — naturewatch-analysis
   - *Goal:* In Earth Engine, set Google presence below 0.2 to 0 and average it into sprout cells, with the cut made on 0.5 m, 2 m and 4 m pixels. Export 28 m cells over three 10 × 10 km boxes in the Central African Republic: Kocho in Chinko, Yalinga at Chinko's western gate, and Bria. Compare speckle, lone buildings and built km² with seed v1 and Overture, and record the EECU cost of each run. Recommend how seed v2 is made. Stop for approval. No global export. *Result:* a global cut costs too much for now, so seed v1 stays and the tiles thin its speckle.
-- [x] [Task 04 — Tile sample](../archive/tasks/task-04-buildings-2023-tile-sample.md) — naturewatch-analysis. *Resumed on sprout v1. Approved: zoom 12, graded, and Google's speckle removed before the top zoom.*
+- [x] [Task 04 — Tile sample](../tasks/task-04-buildings-2023-tile-sample.md) — naturewatch-analysis. *Resumed on sprout v1. Approved: zoom 12, graded, and Google's speckle removed before the top zoom.*
   - *Goal:* Build the share pyramid on small windows: a rural Sahel village, Bria, Kocho, Mueda, Saint-Flour, empty desert where only TEMPO exists, and the edge where Google meets TEMPO in the Sahara, on the Algeria–Libya border near 9.8° E, 27.5° N. Choose the top zoom and the top-zoom rule. Stop for approval. Do not build the global archive.
-- [x] [Task 05 — PMTiles](../archive/tasks/task-05-buildings-2023-pmtiles.md) — naturewatch-analysis. *Published `buildings/2023/v1/buildings.pmtiles`; the render was anchored on the global cell grid after the first merge's sprout check failed.*
+- [x] [Task 05 — PMTiles](../tasks/task-05-buildings-2023-pmtiles.md) — naturewatch-analysis. *Published `buildings/2023/v1/buildings.pmtiles`; the render was anchored on the global cell grid after the first merge's sprout check failed.*
   - *Goal:* After the sample is approved, write the global archive to `buildings/2023/v1/buildings.pmtiles`. Verify, upload with the immutable cache header, and record the run cost.
-- [x] [Task 06 — Built on the map](../archive/tasks/task-06-built-on-the-map.md) — naturewatch-app
+- [x] [Task 06 — Built on the map](../tasks/task-06-built-on-the-map.md) — naturewatch-app
   - *Goal:* Point `built` at the archive with `tileSize` 512 and the chosen `maxzoom`, paint it light grey with the share paint, and update the info text, `docs/user/data.md` and `docs/blueprint.md`. Run the catalog tests. Check in the browser at a wide and a narrow size.
 
 ## Done when
