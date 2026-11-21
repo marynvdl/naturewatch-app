@@ -1,6 +1,6 @@
 # Task 04 — Buildings 2023 tile sample
 
-Parcel: [Buildings 2023](../../parcels/buildings-2023.md).
+Parcel: [Buildings 2023](../parcels/buildings-2023.md).
 
 **Resumed 19 November 2026 on sprout v1.** The sample showed speckle at Kocho, from Google's mean presence with no cut. [Task 03b](task-03b-buildings-2023-google-cut-test.md) found a cut in Earth Engine too costly, so the tiles thin the speckle instead (step 3, Google speckle). Rebiana's missing village is in the parcel's Left for later.
 

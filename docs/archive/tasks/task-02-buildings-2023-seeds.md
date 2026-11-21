@@ -1,6 +1,6 @@
 # Task 02 — Buildings 2023 seeds
 
-Parcel: [Buildings 2023](../../parcels/buildings-2023.md).
+Parcel: [Buildings 2023](../parcels/buildings-2023.md).
 
 Repository: naturewatch-analysis. Start from `main`, after task 01 has merged.
 

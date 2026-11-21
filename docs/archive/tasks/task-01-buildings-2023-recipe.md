@@ -1,6 +1,6 @@
 # Task 01 — Buildings 2023 recipe
 
-Parcel: [Buildings 2023](../../parcels/buildings-2023.md).
+Parcel: [Buildings 2023](../parcels/buildings-2023.md).
 
 Repository: naturewatch-analysis. Start from `main`. This is the first task in the parcel.
 
