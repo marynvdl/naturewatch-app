@@ -54,11 +54,15 @@ The `tch_3` tiles are the published rendering of canopy at least 3 m. The same v
 
 ## Built
 
-**Source named in the catalog.** Google Open Buildings 2023, confidence 0.80 or higher, and GHSL 2020 where Open Buildings has no coverage. The catalog names Chad, Mali, Libya, Morocco, and Western Morocco for that fill. Those country names are catalog text; the geometry of the fill is not in this repository.
+**Source named in the catalog.** Google Open Buildings 2.5D Temporal, band `building_presence`, for 2023 (CC BY 4.0), and Microsoft TEMPO 2023 Q4 (CDLA Permissive 2.0) where Google has no data. Google covers Africa, Latin America, and South and South-East Asia. In the Sahara its edge follows Libya's borders, so most of Libya, Arabia, Iran, Central Asia, Europe, North America, and inland Australia are TEMPO.
 
-**Year.** One snapshot, 2023. The tile URL has no `{year}` placeholder, so every timeline year requests the same tiles.
+**Tile address.** One PMTiles archive, `https://storage.googleapis.com/nature-watch-tiles/buildings/2023/v1/buildings.pmtiles`. 512 px tiles, zooms 0–12. A tile with no building is not stored. Beyond zoom 12 the map enlarges zoom 12 with nearest resampling.
 
-**Not in the map.** The previous About text described older built layers (Open Buildings 2021–2022 and Dynamic World). Those years are not in `years.available`.
+**Values.** Each pixel is a palette PNG. Index 0 is nodata and index 1 is no building. Indices 2–8 are seven shades of building share, the fraction of the pixel covered by buildings, stored in the red channel on a 0–255 scale. A quarter covered or more is the darkest shade. The map paints grey (`#767676` on the monochrome basemap, `#e0e0e0` on satellite), faint where the share is small and strong where it is large, at every zoom.
+
+**What is removed.** TEMPO marks faint buildings on empty land. A TEMPO cell is kept only if a cell within 2 km covers at least 0.15 of its area. That removes the haze, and also some small desert villages beyond Google's edge, such as Rebiana in Libya. Google's faint speckle on empty land is removed the same way before the tiles are drawn.
+
+**Year.** 2023 only. A later timeline year still requests 2023. A year before 2023 does not request the layer.
 
 ## Crops
 
