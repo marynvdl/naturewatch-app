@@ -95,7 +95,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* Build the share pyramid on small windows: a rural Sahel village, Bria, Kocho, Mueda, Saint-Flour, empty desert where only TEMPO exists, and the edge where Google meets TEMPO in the Sahara, on the Algeria–Libya border near 9.8° E, 27.5° N. Choose the top zoom and the top-zoom rule. Stop for approval. Do not build the global archive.
 - [x] [Task 05 — PMTiles](../archive/tasks/task-05-buildings-2023-pmtiles.md) — naturewatch-analysis. *Published `buildings/2023/v1/buildings.pmtiles`; the render was anchored on the global cell grid after the first merge's sprout check failed.*
   - *Goal:* After the sample is approved, write the global archive to `buildings/2023/v1/buildings.pmtiles`. Verify, upload with the immutable cache header, and record the run cost.
-- [ ] Task 06 — Built on the map — naturewatch-app
+- [ ] [Task 06 — Built on the map](../tasks/task-06-built-on-the-map.md) — naturewatch-app
   - *Goal:* Point `built` at the archive with `tileSize` 512 and the chosen `maxzoom`, paint it light grey with the share paint, and update the info text, `docs/user/data.md` and `docs/blueprint.md`. Run the catalog tests. Check in the browser at a wide and a narrow size.
 
 ## Done when
