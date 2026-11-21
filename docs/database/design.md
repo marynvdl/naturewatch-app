@@ -57,7 +57,7 @@ Types: `uuid`, `text`, `timestamptz`, `date`, `double precision`, `integer`, `bo
 
 ### 4.1 Places
 
-*In place* for `place_categories`, `place_types`, `places.place_type_id`, `publication_status`, `merged_into_place_id`, `place_source_ids`, and `conservation_area_details` since task 04 (`20261112100000_types_and_details.sql`). Since task 09 (`20261120100000_recognitions.sql`, `20261120110000_recognition_places.sql`) the category `recognition` and its six types, `world_heritage_site`, `ramsar_site`, `biosphere_reserve`, `natura_2000_site`, `emerald_site`, and `other_recognition`, and `recognition_details` are *in place*. Which WDPCA designations are recognitions is record 21. `recognition_type_for_designation()` is the only place that list is written, and `move_recognition_places()` moved those places out of the conservation areas, keeping their ids, boundaries, source ids, and stats. `places.submitted_by` comes with contributors, deferred in [Molding Places](../archive/parcels/molding-places.md). `place_source_ids.matched_by` comes with `confirm_source_match` in [Shaping Boundaries](../parcels/shaping-boundaries.md). `old_growth_details` comes with its records. `designation_type` is set from WDPCA `DESIG_TYPE`, and `recognition_details.criteria` from `INT_CRIT`, by `import_wdpa.py attributes` (task 09). The WDPCA fields not yet imported (`protection_kind`, `legal_status`, `status_year`, `governance_type`, `source_attributes`) stay null until the next import. A conservation area place is one WDPCA parcel (record 20). Task 05 merged the parcels of each multi-parcel site, and task 05a undid it (`unmerge_wdpa_site_parcels()`). A `proposed` `wdpa_site_id` row marks a site whose parcels a person has not yet decided to merge or keep apart. Since task 06 (`20261117100000_merge_wdpa_site.sql`) a person decides with `keep_wdpa_site_apart(site_id)` or `merge_wdpa_site(site_id, name)`. Both confirm the site row. On a site with several published places, a confirmed `wdpa_site_id` means a person kept them apart. `merge_wdpa_site` keeps the place holding the site row, gives it the union of the parcels as its next boundary version, and sets the others to `merged`. `place_merged_into(id)` returns the published place a merged place went to, so its old address still opens. The 74 sites were decided on 11 November 2026 (`20261117110000_wdpa_site_decisions.sql`). There is no unmerge function yet. Each merged parcel's superseded boundary keeps its SITE_PID. The importer's reconciliation report (record 4) is *in place* since task 05b (`supabase/import_wdpa.py reconcile`). The importer writes only when every record is `unchanged` or `reshaped`. Its writes for the other classes come with the first release or review that needs them.
+*In place* for `place_categories`, `place_types`, `places.place_type_id`, `publication_status`, `merged_into_place_id`, `place_source_ids`, and `conservation_area_details` since task 04 (`20261112100000_types_and_details.sql`). Since task 09 (`20261120100000_recognitions.sql`, `20261120110000_recognition_places.sql`) the category `recognition` and its six types, `world_heritage_site`, `ramsar_site`, `biosphere_reserve`, `natura_2000_site`, `emerald_site`, and `other_recognition`, and `recognition_details` are *in place*. Since Ecoregions task 01 (`20261127100000_ecoregions.sql`) the category `ecology`, its type `ecoregion`, and `ecoregion_details` are *in place*. `supabase/import_ecoregions.py` loads the 846 terrestrial ecoregions of RESOLVE Ecoregions 2017 as published places, each with a version 1 boundary and a confirmed `eco_id` source id. Rock and Ice is not imported. Which WDPCA designations are recognitions is record 21. `recognition_type_for_designation()` is the only place that list is written, and `move_recognition_places()` moved those places out of the conservation areas, keeping their ids, boundaries, source ids, and stats. `places.submitted_by` comes with contributors, deferred in [Molding Places](../archive/parcels/molding-places.md). `place_source_ids.matched_by` comes with `confirm_source_match` in [Shaping Boundaries](../parcels/shaping-boundaries.md). `old_growth_details` comes with its records. `designation_type` is set from WDPCA `DESIG_TYPE`, and `recognition_details.criteria` from `INT_CRIT`, by `import_wdpa.py attributes` (task 09). The WDPCA fields not yet imported (`protection_kind`, `legal_status`, `status_year`, `governance_type`, `source_attributes`) stay null until the next import. A conservation area place is one WDPCA parcel (record 20). Task 05 merged the parcels of each multi-parcel site, and task 05a undid it (`unmerge_wdpa_site_parcels()`). A `proposed` `wdpa_site_id` row marks a site whose parcels a person has not yet decided to merge or keep apart. Since task 06 (`20261117100000_merge_wdpa_site.sql`) a person decides with `keep_wdpa_site_apart(site_id)` or `merge_wdpa_site(site_id, name)`. Both confirm the site row. On a site with several published places, a confirmed `wdpa_site_id` means a person kept them apart. `merge_wdpa_site` keeps the place holding the site row, gives it the union of the parcels as its next boundary version, and sets the others to `merged`. `place_merged_into(id)` returns the published place a merged place went to, so its old address still opens. The 74 sites were decided on 11 November 2026 (`20261117110000_wdpa_site_decisions.sql`). There is no unmerge function yet. Each merged parcel's superseded boundary keeps its SITE_PID. The importer's reconciliation report (record 4) is *in place* since task 05b (`supabase/import_wdpa.py reconcile`). The importer writes only when every record is `unchanged` or `reshaped`. Its writes for the other classes come with the first release or review that needs them.
 
 **`place_categories`** — lookup.
 
@@ -72,7 +72,7 @@ Types: `uuid`, `text`, `timestamptz`, `date`, `double precision`, `integer`, `bo
 | --- | --- | --- |
 | `id` | text PK | e.g. `earth`, `continent`, `country`, `conservation_area`, `old_growth`, `ecoregion`, `world_heritage_site`, `ramsar_site` |
 | `place_category_id` | text FK → `place_categories` | `on update cascade` |
-| `details_kind` | text, null | Which details table applies: `conservation_area`, `recognition`, `old_growth`, or null |
+| `details_kind` | text, null | Which details table applies: `conservation_area`, `recognition`, `ecoregion`, `old_growth`, or null |
 | `title` | text | |
 
 **`places`** — the existing table, with its ids kept.
@@ -134,7 +134,18 @@ Unique: `(source_id, id_kind, source_record_id) where match_status = 'confirmed'
 | `realm` | text | |
 | `source_id`, `source_release_id`, `source_record_id`, `source_url`, `source_attributes` | | Provenance, as on `conservation_area_details` |
 
-The place type says the scheme, so there is no `scheme` column. `inscribed_on` comes with WDPCA `STATUS_YR`. A place has conservation area details or recognition details, never both.
+The place type says the scheme, so there is no `scheme` column. `inscribed_on` comes with WDPCA `STATUS_YR`. A place has at most one details row, in the table its type names.
+
+**`ecoregion_details`** — one row per ecoregion.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `place_id` | uuid PK, FK → `places` | |
+| `biome` | text | RESOLVE `BIOME_NAME` |
+| `realm` | text | RESOLVE `REALM`, for example `Afrotropic`. `place_summaries.realm` reads it. |
+| `source_id`, `source_release_id`, `source_record_id`, `source_url`, `source_attributes` | | Provenance. `source_record_id` is `ECO_ID`. `source_attributes` is the raw row, colours included. |
+
+The size is the current boundary's `area_km2`, as for every place. RESOLVE's `SHAPE_AREA` is in square degrees and is not used.
 
 **`old_growth_details`**: `place_id` PK, `delineation_method`, `assessed_on`, `methodology_version`, provenance columns. The source can be a publication.
 
@@ -226,7 +237,7 @@ where b.is_current
 
 ### 4.3 Sources and licences
 
-*In place* for `licences`, `sources`, and `source_releases` since task 03 (`20261111100000_sources.sql`). The provenance columns come with the tables that carry them, in later tasks. Molding Places task 04 (`20261124100000_place_images.sql`) added the photograph licences, `cc0-1.0`, `public-domain`, and `cc-by` and `cc-by-sa` in versions 2.0, 2.5, 3.0, and 4.0, and the sources `wikimedia-commons` (`platform`) and `sooty-earth-contributors` (`contributors`).
+*In place* for `licences`, `sources`, and `source_releases` since task 03 (`20261111100000_sources.sql`). The provenance columns come with the tables that carry them, in later tasks. Molding Places task 04 (`20261124100000_place_images.sql`) added the photograph licences, `cc0-1.0`, `public-domain`, and `cc-by` and `cc-by-sa` in versions 2.0, 2.5, 3.0, and 4.0, and the sources `wikimedia-commons` (`platform`) and `sooty-earth-contributors` (`contributors`). Ecoregions task 01 added the source `resolve-ecoregions` (`dataset`, licence `cc-by-4.0`) and its release `2017`.
 
 **`licences`**: `id` text PK (e.g. `cc-by-4.0`), `title`, `url`, `requires_attribution`, `share_alike`, `allows_commercial`.
 
@@ -234,7 +245,7 @@ where b.is_current
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `id` | text PK | e.g. `wdpca`, `glad-cropland`, `khan-2026`, `wikimedia-commons`, `inaturalist`, `sooty-earth-contributors` |
+| `id` | text PK | e.g. `wdpca`, `resolve-ecoregions`, `glad-cropland`, `khan-2026`, `wikimedia-commons`, `inaturalist`, `sooty-earth-contributors` |
 | `source_kind` | text | CHECK in `dataset`, `publication`, `platform`, `contributors` |
 | `title`, `publisher`, `url` | text | |
 | `doi`, `authors`, `published_year` | | For publications |
