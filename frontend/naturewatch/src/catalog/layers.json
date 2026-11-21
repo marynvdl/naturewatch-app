@@ -39,7 +39,7 @@
       "display": {
         "buttonType": "small",
         "icon": "mdi-office-building",
-        "color": "#767676"
+        "color": "#070707"
       },
       "tiles": {
         "type": "raster",
@@ -48,10 +48,10 @@
         "tileSize": 512,
         "resampling": "nearest",
         "sharePaint": {
-          "color": "#767676",
-          "colorSatellite": "#e0e0e0",
+          "color": "#070707",
+          "colorSatellite": "#ececec",
           "steps": 7,
-          "minOpacity": 0.05
+          "minOpacity": 0.2
         }
       },
       "years": {

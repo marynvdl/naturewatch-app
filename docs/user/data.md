@@ -58,7 +58,7 @@ The `tch_3` tiles are the published rendering of canopy at least 3 m. The same v
 
 **Tile address.** One PMTiles archive, `https://storage.googleapis.com/nature-watch-tiles/buildings/2023/v1/buildings.pmtiles`. 512 px tiles, zooms 0–12. A tile with no building is not stored. Beyond zoom 12 the map enlarges zoom 12 with nearest resampling.
 
-**Values.** Each pixel is a palette PNG. Index 0 is nodata and index 1 is no building. Indices 2–8 are seven shades of building share, the fraction of the pixel covered by buildings, stored in the red channel on a 0–255 scale. A quarter covered or more is the darkest shade. The map paints grey (`#767676` on the monochrome basemap, `#e0e0e0` on satellite), faint where the share is small and strong where it is large, at every zoom.
+**Values.** Each pixel is a palette PNG. Index 0 is nodata and index 1 is no building. Indices 2–8 are seven shades of building share, the fraction of the pixel covered by buildings, stored in the red channel on a 0–255 scale. A quarter covered or more is the darkest shade. The map paints grey (near-black `#070707` on the monochrome basemap, `#ececec` on satellite), faint where the share is small and strong where it is large, at every zoom.
 
 **What is removed.** TEMPO marks faint buildings on empty land. A TEMPO cell is kept only if a cell within 2 km covers at least 0.15 of its area. That removes the haze, and also some small desert villages beyond Google's edge, such as Rebiana in Libya. Google's faint speckle on empty land is removed the same way before the tiles are drawn.
 

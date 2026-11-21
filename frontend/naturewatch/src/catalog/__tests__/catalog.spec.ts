@@ -407,7 +407,7 @@ describe('layer catalog', () => {
       maxzoom: 12,
       tileSize: 512,
       resampling: 'nearest',
-      sharePaint: { steps: 7, minOpacity: 0.05 },
+      sharePaint: { steps: 7, minOpacity: 0.2 },
     });
     const spec = layer?.tiles.sharePaint;
     if (!spec) throw new Error('built has no sharePaint');
@@ -424,7 +424,7 @@ describe('layer catalog', () => {
     const graded = paint.graded['raster-color'];
     const reds = graded.slice(5).filter((_, i) => i % 2 === 0);
     expect(reds).toEqual([5, 21, 47, 83, 130, 187, 255]);
-    expect(graded.slice(5, 7)).toEqual([5, 'rgba(0,0,0,0.17857142857142855)']);
+    expect(graded.slice(5, 7)).toEqual([5, 'rgba(0,0,0,0.30714285714285716)']);
     expect(graded.slice(-2)).toEqual([255, 'rgba(0,0,0,0.95)']);
 
     const mapLayer = buildMapLayers(catalog).find(
