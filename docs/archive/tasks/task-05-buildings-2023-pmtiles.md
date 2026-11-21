@@ -1,6 +1,6 @@
 # Task 05 — Buildings 2023 PMTiles
 
-Parcel: [Buildings 2023](../parcels/buildings-2023.md).
+Parcel: [Buildings 2023](../../parcels/buildings-2023.md).
 
 Repository: naturewatch-analysis. Start from `main`. Task 04 is merged.
 
