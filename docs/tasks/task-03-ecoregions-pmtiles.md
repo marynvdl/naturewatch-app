@@ -12,7 +12,7 @@ Decided 21 November 2026 by the user:
 
 - **Properties are `id` and `area_km2` only.** RESOLVE's colour is not in the archive. If task 04 picks the colour fill, task 04 rebuilds the archive with it.
 - **Built by a Batch job**, with `submit`, as the recognitions were. Not on the laptop.
-- **Every ecoregion is written from zoom 0**, with Tippecanoe's `--detect-shared-borders`, so neighbours simplify to the same edge.
+- **Ecoregions are written from zoom 0**, with Tippecanoe's `--detect-shared-borders`, so neighbours simplify to the same edge. Changed after the first job failed its proof: the 11 island ecoregions under 30 km² start at zoom 1, because Tippecanoe dropped two of them at zoom 0.
 
 ## Facts already stored
 
@@ -29,9 +29,9 @@ From the code and the hosted database on 21 November 2026:
 
 In naturewatch-analysis:
 
-1. **Recipe `cookbook/recipes/places-ecoregions.yaml`**, following `places-recognitions.yaml`. Source: the current boundaries of published `ecoregion` places. Tiles: the path above, layer `ecoregions`, zooms 0 to 12, properties `id` and `area_km2`, one band `{ area_km2: 0, minzoom: 0 }`, `simplification: 1`, and `detect_shared_borders: true`. The header comment names RESOLVE Ecoregions 2017 and says the paint is applied in the client.
+1. **Recipe `cookbook/recipes/places-ecoregions.yaml`**, following `places-recognitions.yaml`. Source: the current boundaries of published `ecoregion` places. Tiles: the path above, layer `ecoregions`, zooms 0 to 12, properties `id` and `area_km2`, the bands `{ area_km2: 30, minzoom: 0 }` and `{ area_km2: 0, minzoom: 1 }`, `simplification: 1`, and `detect_shared_borders: true`. The header comment names RESOLVE Ecoregions 2017 and says the paint is applied in the client.
 2. **Script.** `places_contract` reads an optional boolean `tiles.detect_shared_borders`, default false, and `tippecanoe_command` adds `--detect-shared-borders` when it is true. The other two recipes build with the same flags as before. Update the module docstring: three recipes.
-3. **Tests** in `places/test_places.py`: the ecoregions recipe passes the contract, its command holds `--detect-shared-borders` and every place has minzoom 0, and the protected-area and recognition commands are unchanged. Run `python -m pytest places cookbook`.
+3. **Tests** in `places/test_places.py`: the ecoregions recipe passes the contract, its command holds `--detect-shared-borders`, and a place has minzoom 0 from 30 km² and 1 below, and the protected-area and recognition commands are unchanged. Run `python -m pytest places cookbook`.
 4. **Local proof.** Against the local Supabase stack loaded with the app's `records_fixture.sql`, run `prove --recipe cookbook/recipes/places-ecoregions.yaml --bbox=29.5,-20.5,31.5,-19.5`. It must hold the fixture ecoregion at every zoom 0 to 12.
 5. **Docs.** `places/README.md`: the third archive, its recipe and properties, the shared-borders flag, and the expected cost before the run. `docs/pipelines.md` only if it lists the places archives.
 
@@ -53,7 +53,7 @@ In naturewatch-analysis:
 
 ## Done when
 
-- `gs://nature-watch-tiles/places/ecoregions/v1/ecoregions.pmtiles` holds the 846 published ecoregions at every zoom 0 to 12, with `id` and `area_km2`, `Cache-Control: no-cache`, and a 206 answer to a range request.
+- `gs://nature-watch-tiles/places/ecoregions/v1/ecoregions.pmtiles` holds the 846 published ecoregions at every zoom 1 to 12, and those of 30 km² and more at zoom 0, with `id` and `area_km2`, `Cache-Control: no-cache`, and a 206 answer to a range request.
 - `python -m pytest places cookbook` passes.
 - `places/README.md` records the run and its cost.
 - One pull request into `main` in naturewatch-analysis, and one into `develop` here with this file and the parcel link, each linking the other, merged after their checks pass and the user approves.
