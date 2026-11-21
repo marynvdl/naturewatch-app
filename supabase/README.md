@@ -1,6 +1,6 @@
 # Records
 
-`sources`, `source_releases`, `licences`, `place_categories`, `place_types`, `places`, `place_boundaries`, `conservation_area_details`, `recognition_details`, `place_source_ids`, `place_relationship_types`, and `place_relationships` are the Sooty Earth place store, with the stats tables below. A place is one WDPCA parcel. `place_boundaries` holds its boundary versions, and one at most is current. `place_boundaries.geom` is not granted to `anon` or `authenticated`. `places` holds no geometry: Database Honing task 08 (`20261119100000_drop_old_reads.sql`) dropped `places.geom`, `places.area_km2`, the bbox columns on `places`, and their trigger and index. The reads below use the current boundary. The hosted migration ran on 12 November 2026, after the frontend that reads the generic functions had deployed, in about 5 seconds. `vacuum full public.places` then ran as `postgres` with `supabase db query --linked`, in about 3 seconds. The Supabase MCP connects as a read-only user, and a `vacuum` run there is skipped without an error. `places` went from 3,479 MB to 8.3 MB and the database from 7,000 MB to 3,529 MB. Afterwards there were 50,937 listed conservation areas, 2,823 rows in `place_stats_preferred`, and the same 941 cropland ids and percents, in the same order, as before. The disk stays at 16 GB on purpose: Supabase shrinks a disk only during a Postgres version upgrade, the extra 8 GB costs about $1 a month, and the coming places, boundary versions, and stats will use it. The FastAPI service does not read these tables.
+`sources`, `source_releases`, `licences`, `place_categories`, `place_types`, `places`, `place_boundaries`, `conservation_area_details`, `recognition_details`, `ecoregion_details`, `place_source_ids`, `place_relationship_types`, and `place_relationships` are the Sooty Earth place store, with the stats tables below. A place is one WDPCA parcel. `place_boundaries` holds its boundary versions, and one at most is current. `place_boundaries.geom` is not granted to `anon` or `authenticated`. `places` holds no geometry: Database Honing task 08 (`20261119100000_drop_old_reads.sql`) dropped `places.geom`, `places.area_km2`, the bbox columns on `places`, and their trigger and index. The reads below use the current boundary. The hosted migration ran on 12 November 2026, after the frontend that reads the generic functions had deployed, in about 5 seconds. `vacuum full public.places` then ran as `postgres` with `supabase db query --linked`, in about 3 seconds. The Supabase MCP connects as a read-only user, and a `vacuum` run there is skipped without an error. `places` went from 3,479 MB to 8.3 MB and the database from 7,000 MB to 3,529 MB. Afterwards there were 50,937 listed conservation areas, 2,823 rows in `place_stats_preferred`, and the same 941 cropland ids and percents, in the same order, as before. The disk stays at 16 GB on purpose: Supabase shrinks a disk only during a Postgres version upgrade, the extra 8 GB costs about $1 a month, and the coming places, boundary versions, and stats will use it. The FastAPI service does not read these tables.
 
 The map draws protected-area boundaries from the published PMTiles archive. The app has no polygon download.
 
@@ -51,6 +51,24 @@ WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_
 The hosted migration ran on 16 November 2026. The one approved link from task 04 was already main, so nothing else changed. The same day `fetch` found suggestions for 195 of the 207 World Heritage Sites: 3 for 186 sites, 1 or 2 for 9, and none for 12. Of the 572 rows, 37 are Wikidata images, 56 category files, and 479 search results, over 570 distinct files. `load` added 570 `images` rows, all Commons links with `uploaded_by` null, and 572 `suggested` links, in one transaction. As `anon`, no suggested link is readable, `images` still shows only the one approved photograph, and `photo_queue` cannot be called.
 
 On three sites, Wikidata had a WDPA id for one, Maloti-Drakensberg Park. Its image and two other UNESCO photographs have no licence code on Commons, and were refused. The name search supplied the rest.
+
+## Ecoregions
+
+Since Ecoregions task 01 (`20261127100000_ecoregions.sql`) a place can be an `ecoregion`, in category `ecology`, with `ecoregion_details`: the RESOLVE biome, realm, and raw source row. `place_summaries` reads its realm. The source is `resolve-ecoregions`, release `2017`, which pins the zip's URL and SHA-256 checksum.
+
+```bash
+ECOREGIONS_WORK_DIR=/tmp/ecoregions-work .venv/bin/python supabase/import_ecoregions.py build
+ECOREGIONS_WORK_DIR=/tmp/ecoregions-work DATABASE_URL=... .venv/bin/python supabase/import_ecoregions.py upload
+ECOREGIONS_WORK_DIR=/tmp/ecoregions-work DATABASE_URL=... .venv/bin/python supabase/import_ecoregions.py check
+```
+
+`build` downloads the pinned zip and stops on a checksum mismatch. It leaves out Rock and Ice (`ECO_ID` 0), repairs the 69 invalid shapes with `make_valid`, and stops if a repair changes the geodesic area by more than 0.01%. It writes `ecoregions.tsv.gz`, 846 rows of 159 MB, with each shape's geodesic km², in about 2 minutes. `upload` writes each ecoregion whole: a published place, its current version 1 boundary, a confirmed `eco_id` source id, and its details. It commits every 25 rows or 4 MB of geometry, and a second start skips the `ECO_ID`s already stored. `check` is read-only. It wants 846 published ecoregions, each with one valid current version 1 boundary, one confirmed source id, and details, and each `area_km2` within 0.01% of the file's geodesic km².
+
+On the local stack on 21 November 2026, `upload` took 22 seconds and `place_boundaries` grew to 187 MB. `check` found an area difference of at most 8e-12, and 132,239,892 km² in all.
+
+The hosted load runs from a laptop, with `SUPABASE_ACCESS_TOKEN` set instead of `DATABASE_URL`. The Hosted import rules below were written for the 2 GB WDPCA load. This one is 846 rows in small committed batches that continue after a dropped connection.
+
+The hosted migration ran on 21 November 2026 in about 6 seconds. `upload` then ran from a laptop in 13 minutes 34 seconds, in 67 committed batches, with no dropped connection, and `check` passed with the same totals as the local load. The database went from 3,550 MB to 3,737 MB, and `place_boundaries` from 3,455 MB to 3,642 MB. Afterwards 51,783 places were published: 846 ecoregions, 39,457 conservation areas, and 11,480 recognitions. `anon` reads all 846 ecoregions' details and summaries.
 
 ## Local database
 

@@ -252,8 +252,7 @@ begin
   end if;
 
   if to_regclass('public.source_releases') is null
-    or (select count(*) from public.sources) <> 2  -- WDPCA, and GLAD cropland since task 07
-    or (select count(*) from public.licences) <> 1
+    or not exists (select 1 from public.sources where id = 'wdpca' and licence_id = 'wdpa-terms')
     or not exists (
       select 1 from public.licences
       where id = 'wdpa-terms'
@@ -431,14 +430,17 @@ begin
     raise exception 'row level security is not enabled on a task 04 table';
   end if;
 
-  if (select count(*) from public.place_types where place_category_id <> 'recognition') <> 1
+  if (
+      select count(*) from public.place_types
+      where place_category_id not in ('recognition', 'ecology')
+    ) <> 1
     or not exists (
       select 1 from public.place_types
       where id = 'conservation_area'
         and place_category_id = 'conservation_area'
         and details_kind = 'conservation_area'
     ) then
-    raise exception 'place_types does not hold conservation_area beside the recognitions';
+    raise exception 'place_types does not hold conservation_area beside the recognitions and ecoregion';
   end if;
 
   if exists (
@@ -561,7 +563,7 @@ begin
   );
   if exists (select 1 from public.place_summaries where site_pid = 'fixture-draft')
     or exists (
-      select 1 from public.places_in_extent('conservation_area', 28.5, -27, 29.5, -25)
+      select 1 from public.places_in_extent(array['conservation_area'], 28.5, -27, 29.5, -25)
     )
     or exists (select 1 from public.place_bounds(pg_temp.fixture_id('fixture-draft'))) then
     raise exception 'a draft place was returned by place_summaries, the extent, or place_bounds';
@@ -594,8 +596,8 @@ begin
       raise exception '% saw % place rows, expected the 3 published ones', role_name, readable;
     end if;
 
-    if (select count(*) from public.place_categories) <> 2
-      or (select count(*) from public.place_types) <> 7
+    if (select count(*) from public.place_categories) <> 3
+      or (select count(*) from public.place_types) <> 8
       or (select count(*) from public.conservation_area_details) <> 3
       or (select count(*) from public.place_source_ids) <> 6 then
       raise exception '% cannot read the task 04 tables, or read a draft place''s rows', role_name;
@@ -624,9 +626,9 @@ begin
         null;
     end;
 
-    if (select count(*) from public.sources) <> 2
-      or (select count(*) from public.source_releases) <> 1
-      or (select count(*) from public.licences) <> 1 then
+    if not exists (select 1 from public.sources where id = 'wdpca')
+      or not exists (select 1 from public.source_releases where source_id = 'wdpca')
+      or not exists (select 1 from public.licences where id = 'wdpa-terms') then
       raise exception '% cannot read sources, source_releases, and licences', role_name;
     end if;
     if exists (
@@ -694,7 +696,7 @@ begin
   select count(*), min(total_count)
     into window_count, window_total
   from public.place_window(
-    'conservation_area', '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
+    array['conservation_area'], '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
   );
   if window_count <> 2 or window_total <> 2 then
     raise exception 'place_window returned % of %, expected 2 of 2',
@@ -703,7 +705,7 @@ begin
 
   select * into window_row
   from public.place_window(
-    'conservation_area', '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
+    array['conservation_area'], '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
   ) as listed
   where listed.name = 'Pilot Park';
   if to_jsonb(window_row) ? 'geom' then
@@ -715,7 +717,7 @@ begin
 
   select * into window_row
   from public.place_window(
-    'conservation_area', '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
+    array['conservation_area'], '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
   ) as listed
   where listed.name = 'Chobe Fixture';
   if window_row.iso3 is distinct from 'BWA' then
@@ -726,44 +728,44 @@ begin
   end if;
 
   select count(*) into extent_count
-  from public.places_in_extent('conservation_area', 26, -27, 28, -25);
+  from public.places_in_extent(array['conservation_area'], 26, -27, 28, -25);
   if extent_count <> 1 then
     raise exception 'extent that covers the park returned %', extent_count;
   end if;
   select count(*) into extent_count
-  from public.places_in_extent('conservation_area', 23.5, -21.5, 24.5, -20.5);
+  from public.places_in_extent(array['conservation_area'], 23.5, -21.5, 24.5, -20.5);
   if extent_count <> 1 then
     raise exception 'extent that covers the place outside South Africa returned %', extent_count;
   end if;
   select count(*) into extent_count
-  from public.places_in_extent('conservation_area', 0, -10, 1, -9);
+  from public.places_in_extent(array['conservation_area'], 0, -10, 1, -9);
   if extent_count <> 0 then
     raise exception 'extent that misses the park returned %', extent_count;
   end if;
 
   if public.place_window_count(
-    'conservation_area', 'Pilot', false, null, null, 0, 100, null, null, null, null
+    array['conservation_area'], 'Pilot', false, null, null, 0, 100, null, null, null, null
   ) <> 1 then
     raise exception 'name search did not match Pilot Park';
   end if;
   if public.place_window_count(
-    'conservation_area', 'zzz', false, null, null, 0, 100, null, null, null, null
+    array['conservation_area'], 'zzz', false, null, null, 0, 100, null, null, null, null
   ) <> 0 then
     raise exception 'missing name search was not empty';
   end if;
 
-  select place_count into stats_count from public.place_filter_stats('conservation_area');
+  select place_count into stats_count from public.place_filter_stats(array['conservation_area']);
   if stats_count <> 2 then
     raise exception 'filter stats counted % places, expected 2', stats_count;
   end if;
   if (
     select array_length(size_bins, 1)
-    from public.place_filter_stats('conservation_area')
+    from public.place_filter_stats(array['conservation_area'])
   ) <> 40 then
     raise exception 'filter stats did not return histogram bins';
   end if;
 
-  kept := public.place_kept_ids('conservation_area', null, null, 0, 100);
+  kept := public.place_kept_ids(array['conservation_area'], null, null, 0, 100);
   if array_length(kept, 1) <> 2 then
     raise exception 'kept ids returned %', kept;
   end if;
@@ -789,7 +791,7 @@ begin
   select count(*), min(total_count)
     into window_count, window_total
   from public.place_window(
-    'conservation_area', '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
+    array['conservation_area'], '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50
   );
   if window_count <> 50 or window_total <> 53 then
     raise exception 'capped window returned % of %, expected 50 of 53',
@@ -799,7 +801,7 @@ begin
   select count(*), min(total_count)
     into window_count, window_total
   from public.place_window(
-    'conservation_area', '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50, 50
+    array['conservation_area'], '', false, 'size-desc', null, null, 0, 100, null, null, null, null, 50, 50
   );
   if window_count <> 3 or window_total <> 53 then
     raise exception 'offset window returned % of %, expected 3 of 53',
@@ -925,7 +927,7 @@ begin
     raise exception 'place_bounds did not return the parcel box: %', bounds;
   end if;
   if not exists (
-    select 1 from public.places_in_extent('conservation_area', 30.15, -26.15, 30.25, -26.1)
+    select 1 from public.places_in_extent(array['conservation_area'], 30.15, -26.15, 30.25, -26.1)
     where id = south_id
   ) then
     raise exception 'the extent does not match the parcel box';
@@ -968,10 +970,10 @@ begin
   if exists (select 1 from public.place_summaries where site_pid = 'fixture-draft') then
     raise exception 'place_summaries returned a draft place';
   end if;
-  if exists (select 1 from public.place_window('ecoregion')) then
+  if exists (select 1 from public.place_window(array['ecoregion'])) then
     raise exception 'place_window returned a place of another type';
   end if;
-  if (select place_count from public.place_filter_stats('ecoregion')) <> 0 then
+  if (select place_count from public.place_filter_stats(array['ecoregion'])) <> 0 then
     raise exception 'place_filter_stats counted a place of another type';
   end if;
 
@@ -991,14 +993,14 @@ begin
 
   -- anon reads the generic functions and views, and never geometry.
   perform set_config('role', 'anon', true);
-  if (select max(total_count) from public.place_window('conservation_area'))
+  if (select max(total_count) from public.place_window(array['conservation_area']))
     <> (select count(*) from public.listed_places where place_type_id = 'conservation_area') then
     raise exception 'anon cannot read place_window';
   end if;
-  perform public.place_filter_stats('conservation_area');
-  perform public.place_rank('conservation_area', south_id);
-  perform public.place_window_count('conservation_area');
-  perform public.place_kept_ids('conservation_area');
+  perform public.place_filter_stats(array['conservation_area']);
+  perform public.place_rank(array['conservation_area'], south_id);
+  perform public.place_window_count(array['conservation_area']);
+  perform public.place_kept_ids(array['conservation_area']);
   perform 1 from public.place_summaries;
   perform 1 from public.place_crops_percent;
   perform set_config('role', 'postgres', true);
@@ -1602,12 +1604,12 @@ begin
     end if;
     if exists (
       select 1 from public.place_window(
-        'conservation_area', 'Fixture Falls', false, 'size-desc',
+        array['conservation_area'], 'Fixture Falls', false, 'size-desc',
         null, null, 0, 100, null, null, null, null, 50
       )
     ) or not exists (
       select 1 from public.place_window(
-        'world_heritage_site', '', false, 'size-desc',
+        array['world_heritage_site'], '', false, 'size-desc',
         null, null, 0, 100, null, null, null, null, 50
       )
     ) then
@@ -1641,6 +1643,117 @@ begin
     end;
     perform set_config('role', 'postgres', true);
   end loop;
+end $$;
+
+-- Ecoregions task 01: an ecoregion place -------------------------------------------------
+-- One ecoregion as import_ecoregions.py writes it, over the recognition fixture's park.
+
+do $$
+declare
+  release uuid;
+  eco uuid;
+  park uuid := pg_temp.fixture_id('fixture-rec-park');
+  summary record;
+begin
+  select id into release
+  from public.source_releases
+  where source_id = 'resolve-ecoregions' and version_label = '2017';
+  if release is null
+    or not exists (
+      select 1 from public.sources
+      where id = 'resolve-ecoregions' and licence_id = 'cc-by-4.0'
+    )
+    or not exists (
+      select 1 from public.place_types
+      where id = 'ecoregion' and place_category_id = 'ecology' and details_kind = 'ecoregion'
+    ) then
+    raise exception 'the ecology category, the ecoregion type, or the RESOLVE release is missing';
+  end if;
+
+  insert into public.places (name, place_type_id, publication_status)
+  values ('Fixture savanna', 'ecoregion', 'published')
+  returning id into eco;
+  insert into public.place_boundaries (
+    place_id, version_number, geom, source_id, source_release_id, source_record_id,
+    review_status, is_current
+  ) values (
+    eco, 1,
+    extensions.ST_GeomFromText(
+      'MULTIPOLYGON(((29 -21, 31 -21, 31 -19, 29 -19, 29 -21)))', 4326
+    )::extensions.geometry(MultiPolygon, 4326),
+    'resolve-ecoregions', release, '9001', 'approved', true
+  );
+  insert into public.place_source_ids (
+    place_id, source_id, id_kind, source_record_id, match_status,
+    first_seen_release_id, last_seen_release_id
+  ) values (eco, 'resolve-ecoregions', 'eco_id', '9001', 'confirmed', release, release);
+  insert into public.ecoregion_details (
+    place_id, biome, realm, source_id, source_release_id, source_record_id, source_attributes
+  ) values (
+    eco, 'Tropical & Subtropical Grasslands, Savannas & Shrublands', 'Afrotropic',
+    'resolve-ecoregions', release, '9001', '{"ECO_ID": 9001, "COLOR": "#FFA77F"}'
+  );
+
+  begin
+    insert into public.ecoregion_details (place_id, biome, realm, source_id)
+    values (park, 'x', 'x', 'resolve-ecoregions');
+    raise exception 'a conservation area got ecoregion details';
+  exception
+    when check_violation then
+      null;
+  end;
+  begin
+    insert into public.recognition_details (place_id, iso3, source_id)
+    values (eco, array['ZWE'], 'wdpca');
+    raise exception 'an ecoregion got recognition details';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  select * into summary from public.place_summaries where id = eco;
+  if summary.realm is distinct from 'Afrotropic'
+    or summary.place_type_id <> 'ecoregion'
+    or summary.source_name is distinct from 'RESOLVE Ecoregions 2017'
+    or summary.citation is null
+    or summary.site_id is not null
+    or summary.designation is not null
+    or abs(summary.area_km2 - extensions.ST_Area(
+      extensions.ST_GeomFromText(
+        'POLYGON((29 -21, 31 -21, 31 -19, 29 -19, 29 -21))', 4326
+      )::extensions.geography, true) / 1e6) > 1e-6 then
+    raise exception 'place_summaries does not read the ecoregion: %', row_to_json(summary);
+  end if;
+  if not exists (select 1 from public.listed_places where id = eco) then
+    raise exception 'a published ecoregion is not in listed_places';
+  end if;
+  if (
+    select realm from public.place_summaries where id = park
+  ) is distinct from 'Terrestrial' then
+    raise exception 'a conservation area lost its realm';
+  end if;
+
+  perform set_config('role', 'anon', true);
+  if not exists (select 1 from public.ecoregion_details where place_id = eco)
+    or not exists (select 1 from public.place_summaries where id = eco and realm = 'Afrotropic') then
+    raise exception 'anon cannot read a published ecoregion''s details';
+  end if;
+  begin
+    insert into public.ecoregion_details (place_id, biome, realm, source_id)
+    values (eco, 'x', 'x', 'resolve-ecoregions');
+    raise exception 'anon inserted ecoregion details';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+  perform set_config('role', 'postgres', true);
+
+  update public.places set publication_status = 'draft' where id = eco;
+  perform set_config('role', 'anon', true);
+  if exists (select 1 from public.ecoregion_details where place_id = eco) then
+    raise exception 'anon read the details of a draft ecoregion';
+  end if;
+  perform set_config('role', 'postgres', true);
 end $$;
 
 \echo records fixture ok
