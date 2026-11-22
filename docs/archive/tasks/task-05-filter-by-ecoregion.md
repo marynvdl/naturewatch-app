@@ -1,6 +1,6 @@
 # Task 05 — Filter by ecoregion
 
-Parcel: [Ecoregions](../parcels/ecoregions.md).
+Parcel: [Ecoregions](../../parcels/ecoregions.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 04 merged in #452.
 
