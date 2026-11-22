@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { X } from '@lucide/vue';
+import { Info, X } from '@lucide/vue';
 import {
   DialogClose,
   DialogContent,
@@ -10,12 +10,12 @@ import {
   DialogRoot,
   DialogTitle,
 } from 'reka-ui';
+import PlaceEcoregionsField from '@/components/PlaceEcoregionsField.vue';
 import { Slider } from '@/components/ui/slider';
-import { loadPilotPlaceWindowCount } from '@/places/api';
+import { loadPilotPlaceWindowCount, type EcoregionName } from '@/places/api';
 import {
-  CROPLAND_FULL,
+  ECOREGION_TYPE,
   SIZE_STEPS,
-  formatPercent,
   formatSizeInput,
   parseFigure,
   roundSize,
@@ -34,8 +34,6 @@ const props = withDefaults(
     sizeFull: FigureRange;
     /** Stored size histogram, 40 bins on a log scale. */
     sizeBins: number[];
-    /** Stored cropland histogram, 40 bins from 0 to 100. */
-    croplandBins: number[];
     /** Text typed in the list. */
     search: string;
     /** True when the list matches a name prefix. */
@@ -46,10 +44,8 @@ const props = withDefaults(
     matchedTotal: number;
     /** Stored place types the list shows. */
     placeTypes?: string[];
-    /** Leave out the cropland range, for recognitions. */
-    sizeOnly?: boolean;
   }>(),
-  { placeTypes: undefined, sizeOnly: false }
+  { placeTypes: undefined }
 );
 
 const open = defineModel<boolean>('open', { required: true });
@@ -58,16 +54,33 @@ const placesStore = usePlacesStore();
 const BINS = 40;
 
 const sizeBounds = ref<SizeBounds>([null, null]);
-const croplandKept = ref<FigureRange>([...CROPLAND_FULL]);
+const ecoregionsKept = ref<EcoregionName[]>([]);
 const keptCount = ref(props.matchedTotal);
 let countRequest = 0;
+
+/** The Ecoregion field, for every listed type but Ecoregions. */
+const showEcoregions = computed(
+  () => !(props.placeTypes ?? []).includes(ECOREGION_TYPE)
+);
 
 watch(open, isOpen => {
   if (!isOpen) return;
   sizeBounds.value = [...placesStore.sizeKept];
-  croplandKept.value = [...placesStore.croplandKept];
+  ecoregionsKept.value = [...placesStore.ecoregionsKept];
   keptCount.value = props.matchedTotal;
 });
+
+const description = computed(
+  () =>
+    `Keep the places within a size range${
+      showEcoregions.value ? ', and in the chosen ecoregions' : ''
+    }. The list and the map follow.`
+);
+
+/** The draft's ecoregions while the field shows. */
+const draftEcoregionIds = computed(() =>
+  showEcoregions.value ? ecoregionsKept.value.map(item => item.id) : []
+);
 
 const sizeKept = computed<FigureRange>(() => [
   sizeBounds.value[0] ?? props.sizeFull[0],
@@ -83,8 +96,6 @@ const sizeSteps = computed(() => [
     : sizeStep(sizeKept.value[1], props.sizeFull),
 ]);
 
-const croplandSteps = computed(() => croplandKept.value.map(Math.round));
-
 /**
  * Follow the size slider. A thumb that did not move keeps its typed size.
  * @param steps - Both thumbs, 0 to SIZE_STEPS.
@@ -96,19 +107,6 @@ function slideSize(steps: number[] | undefined) {
     if (steps[end] === (end ? SIZE_STEPS : 0)) return null;
     return roundSize(sizeAtStep(steps[end], props.sizeFull));
   }) as SizeBounds;
-}
-
-/**
- * Follow the cropland slider. A thumb that did not move keeps its typed percent.
- * @param steps - Both thumbs, in whole percent.
- */
-function slideCropland(steps: number[] | undefined) {
-  if (!steps) return;
-  croplandKept.value = [0, 1].map(end =>
-    steps[end] === croplandSteps.value[end]
-      ? croplandKept.value[end]
-      : steps[end]
-  ) as FigureRange;
 }
 
 /**
@@ -136,32 +134,13 @@ async function typeSize(end: 0 | 1, event: Event) {
   input.value = formatSizeInput(sizeKept.value[end]);
 }
 
-/**
- * Take a typed cropland percent, kept between 0 and 100.
- * @param end - 0 for the minimum, 1 for the maximum.
- * @param event - The change or Enter on the box.
- */
-async function typeCropland(end: 0 | 1, event: Event) {
-  const input = event.target as HTMLInputElement;
-  const typed = parseFigure(input.value);
-  if (typed !== null) {
-    const value = Math.min(CROPLAND_FULL[1], Math.round(typed * 10) / 10);
-    const kept: FigureRange = [...croplandKept.value];
-    kept[end] = end === 0 ? Math.min(value, kept[1]) : Math.max(value, kept[0]);
-    croplandKept.value = kept;
-  }
-  await nextTick();
-  input.value = formatPercent(croplandKept.value[end]);
-}
-
 const showText = computed(
   () => `Show ${keptCount.value} ${keptCount.value === 1 ? 'place' : 'places'}`
 );
 
 /**
- * Bars for one chart, each marked when it sits inside the kept range.
- * Heights follow the square root of the count. Most places have almost no
- * cropland, and a linear scale would leave one bar and a row of slivers.
+ * Bars for the size chart, each marked when it sits inside the kept range.
+ * Heights follow the square root of the count, so a small group still shows.
  * @param counts - Stored counts, one per bin.
  * @param kept - The kept range, 0 to 1.
  * @returns Height in percent of the tallest bar, and whether it is kept.
@@ -185,24 +164,16 @@ const sizeBars = computed(() =>
   ])
 );
 
-const croplandBars = computed(() =>
-  bars(props.croplandBins, [
-    croplandKept.value[0] / 100,
-    croplandKept.value[1] / 100,
-  ])
-);
-
 watch(
   () =>
     [
       open.value,
       sizeKept.value[0],
       sizeKept.value[1],
-      croplandKept.value[0],
-      croplandKept.value[1],
       props.search,
       props.searchPrefix,
       props.extent,
+      draftEcoregionIds.value.join(','),
     ] as const,
   async ([isOpen]) => {
     if (!isOpen) return;
@@ -212,10 +183,11 @@ watch(
       searchPrefix: props.searchPrefix,
       sizeMin: sizeBounds.value[0],
       sizeMax: sizeBounds.value[1],
-      cropMin: croplandKept.value[0],
-      cropMax: croplandKept.value[1],
+      cropMin: 0,
+      cropMax: 100,
       extent: props.extent,
       placeTypes: props.placeTypes,
+      ecoregionIds: draftEcoregionIds.value,
     });
     if (request !== countRequest) return;
     if (result.status === 'ok') keptCount.value = result.total;
@@ -225,12 +197,15 @@ watch(
 /** Return the draft to every place. The panel stays open. */
 function clearAll() {
   sizeBounds.value = [null, null];
-  croplandKept.value = [...CROPLAND_FULL];
+  ecoregionsKept.value = [];
 }
 
 /** Apply the draft to the list and the map, and close. */
 function apply() {
-  placesStore.applyFilter(sizeBounds.value, croplandKept.value);
+  placesStore.applyFilter(
+    sizeBounds.value,
+    showEcoregions.value ? ecoregionsKept.value : placesStore.ecoregionsKept
+  );
   open.value = false;
 }
 </script>
@@ -250,11 +225,7 @@ function apply() {
           </DialogClose>
         </header>
         <DialogDescription class="filter-sr">
-          {{
-            sizeOnly
-              ? 'Keep the places within a size range. The list and the map follow.'
-              : 'Keep the conservation areas within a size and cropland range. The list and the map follow.'
-          }}
+          {{ description }}
         </DialogDescription>
         <div class="filter-body">
           <section class="filter-section" aria-labelledby="filter-size-title">
@@ -307,57 +278,32 @@ function apply() {
             </div>
           </section>
           <section
-            v-if="!sizeOnly"
+            v-if="showEcoregions"
             class="filter-section"
-            aria-labelledby="filter-cropland-title"
+            aria-labelledby="filter-ecoregion-title"
           >
-            <h3 id="filter-cropland-title" class="filter-name">Cropland</h3>
-            <p class="filter-hint">Share of the place under cropland, 2024.</p>
-            <div class="filter-chart" aria-hidden="true">
-              <span
-                v-for="(bar, index) in croplandBars"
-                :key="index"
-                class="filter-bar"
-                :class="{ 'is-kept': bar.kept }"
-                :style="{ height: `${bar.height}%` }"
-              />
-            </div>
-            <Slider
-              :model-value="croplandSteps"
-              class="filter-slider"
-              :min="CROPLAND_FULL[0]"
-              :max="CROPLAND_FULL[1]"
-              :step="1"
-              :min-steps-between-thumbs="1"
-              aria-labelledby="filter-cropland-title"
-              @update:model-value="slideCropland"
-            />
-            <div class="filter-ends">
-              <div
-                v-for="end in [0, 1] as const"
-                :key="end"
-                class="filter-end"
-                :class="{ 'is-max': end === 1 }"
+            <div class="filter-name-row">
+              <h3 id="filter-ecoregion-title" class="filter-name">Ecoregion</h3>
+              <button
+                type="button"
+                class="filter-info"
+                aria-label="About the Ecoregion filter"
+                aria-describedby="filter-ecoregion-info"
               >
-                <span class="filter-end-label">
-                  {{ end ? 'Maximum' : 'Minimum' }}
+                <Info :size="16" aria-hidden="true" />
+                <span
+                  id="filter-ecoregion-info"
+                  role="tooltip"
+                  class="filter-info-text"
+                >
+                  Places with at least 10% of their area inside one of them.
                 </span>
-                <label class="filter-end-value" :for="`filter-cropland-${end}`">
-                  <input
-                    :id="`filter-cropland-${end}`"
-                    class="filter-end-input"
-                    type="text"
-                    inputmode="decimal"
-                    autocomplete="off"
-                    :aria-label="`${end ? 'Maximum' : 'Minimum'} cropland, percent`"
-                    :value="formatPercent(croplandKept[end])"
-                    @change="typeCropland(end, $event)"
-                    @keydown.enter.prevent="typeCropland(end, $event)"
-                  />
-                  <span class="filter-end-unit">%</span>
-                </label>
-              </div>
+              </button>
             </div>
+            <PlaceEcoregionsField
+              v-model="ecoregionsKept"
+              labelledby="filter-ecoregion-title"
+            />
           </section>
         </div>
         <footer class="filter-foot">
@@ -463,6 +409,64 @@ function apply() {
   margin: 4px 0 16px;
   font-size: 13px;
   color: var(--muted-foreground);
+}
+
+.filter-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+/* The hint shows beside the icon on hover or keyboard focus. */
+.filter-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: help;
+}
+
+.filter-info:hover,
+.filter-info:focus-visible {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.filter-info:focus-visible {
+  outline: 2px solid var(--foreground, #24312c);
+  outline-offset: 2px;
+}
+
+.filter-info-text {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 1;
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--foreground, #24312c);
+  color: var(--background, #fff);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.filter-info:hover .filter-info-text,
+.filter-info:focus-visible .filter-info-text {
+  opacity: 1;
 }
 
 /* Inset by half a thumb so the bars line up with the slider values. */

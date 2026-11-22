@@ -400,31 +400,15 @@ export type LngLatBounds = [number, number, number, number];
 export type TileFilter = unknown[];
 
 /**
- * Filter on the fields copied onto each place tile: `area_km2` and
- * `cropland_percent`. Matches the list query: a missing cropland figure passes
- * only while the cropland range is 0–100%.
+ * Filter on the size copied onto each place tile, `area_km2`.
  * @param size - Kept sizes in km². Null leaves that end open.
- * @param cropland - Kept cropland percent.
  * @returns The expression, or null when every place is kept.
  */
-export function placeTileFilter(
-  size: SizeBounds,
-  cropland: FigureRange
-): TileFilter | null {
+export function placeTileFilter(size: SizeBounds): TileFilter | null {
   const parts: TileFilter[] = [];
   const area = ['to-number', ['get', 'area_km2'], -1];
   if (size[0] !== null) parts.push(['>=', area, size[0]]);
   if (size[1] !== null) parts.push(['<=', area, size[1]]);
-  const cropWhole =
-    cropland[0] <= CROPLAND_FULL[0] && cropland[1] >= CROPLAND_FULL[1];
-  if (!cropWhole) {
-    const percent = ['to-number', ['get', 'cropland_percent'], -1];
-    parts.push(
-      ['has', 'cropland_percent'],
-      ['>=', percent, cropland[0]],
-      ['<=', percent, cropland[1]]
-    );
-  }
   if (parts.length === 0) return null;
   return ['all', ...parts];
 }
