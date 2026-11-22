@@ -92,6 +92,15 @@ const heritage = {
   cropland_percent: null,
   place_type_id: 'biosphere_reserve',
 };
+const ecoregion = {
+  id: '55555555-5555-5555-5555-555555555555',
+  name: 'Zambezian and Mopane woodlands',
+  designation: null,
+  iso3: null,
+  area_km2: 470000,
+  cropland_percent: null,
+  place_type_id: 'ecoregion',
+};
 const missingPlace = {
   id: '33333333-3333-3333-3333-333333333333',
   name: 'A small reserve',
@@ -299,20 +308,15 @@ describe('Places panel', () => {
     expect(wrapper.text()).toContain('No places match.');
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
 
-    await typeButton(wrapper, 'Ecoregions').trigger('click');
+    await typeButton(wrapper, 'Countries').trigger('click');
     expect(wrapper.text()).toContain(
       'Well, this is awkward. We have nothing to show.'
     );
     expect(wrapper.text()).not.toContain('Kruger National Park');
     expect(wrapper.find('.places-frame').classes()).not.toContain('has-detail');
-    expect(typeButton(wrapper, 'Ecoregions').classes()).toContain('is-on');
+    expect(typeButton(wrapper, 'Countries').classes()).toContain('is-on');
     expect(typeButton(wrapper, 'Conservation areas').classes()).not.toContain(
       'is-on'
-    );
-
-    await typeButton(wrapper, 'Countries').trigger('click');
-    expect(wrapper.text()).toContain(
-      'Well, this is awkward. We have nothing to show.'
     );
 
     await typeButton(wrapper, 'Conservation areas').trigger('click');
@@ -376,7 +380,7 @@ describe('Places panel', () => {
       'is-on'
     );
     expect(typeButton(wrapper, 'Ramsar').classes()).toContain('is-on');
-    expect(store.listingRecognitions).toBe(true);
+    expect(store.sizeOnly).toBe(true);
     // The size filter stays; cropland does not apply once a recognition is listed
     expect(store.sizeKept).toEqual([2000, null]);
     expect(store.croplandKept).toEqual([0, 100]);
@@ -404,11 +408,28 @@ describe('Places panel', () => {
     await flushPromises();
     expect(store.listTypes).toEqual(['ramsar_site', 'biosphere_reserve']);
 
-    // Ecoregions has no stored places and is on alone
+    // Ecoregions is on alone, lists ecoregions, and draws them
+    await typeButton(wrapper, 'Ecoregions').trigger('click');
+    await flushPromises();
+    expect(store.listTypes).toEqual(['ecoregion']);
+    expect(store.visible).toBe(true);
+    expect(store.sizeOnly).toBe(true);
+    expect(store.sizeKept).toEqual([2000, null]);
+    expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        placeTypes: ['ecoregion'],
+        sizeMin: 2000,
+        cropMin: 0,
+        cropMax: 100,
+      }),
+      expect.any(AbortSignal)
+    );
     await typeButton(wrapper, 'Ecoregions').trigger('click');
     await flushPromises();
     expect(store.listTypes).toEqual([]);
     expect(store.visible).toBe(false);
+    await typeButton(wrapper, 'Ecoregions').trigger('click');
+    await flushPromises();
     await typeButton(wrapper, 'UNESCO-MAB').trigger('click');
     await flushPromises();
     expect(store.listTypes).toEqual(['biosphere_reserve']);
@@ -845,6 +866,30 @@ describe('Places panel', () => {
     expect(store.visible).toBe(true);
     expect(store.listTypes).toEqual(['biosphere_reserve']);
     expect(typeButton(wrapper, 'UNESCO-MAB').classes()).toContain('is-on');
+  });
+
+  it('turns on Ecoregions when a searched ecoregion is chosen', async () => {
+    vi.mocked(loadPlaceSearchWindow).mockResolvedValueOnce({
+      status: 'ok',
+      places: [{ ...ecoregion }],
+      total: 1,
+    });
+    const pinia = createPinia();
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    const store = usePlacesStore(pinia);
+    await wrapper.get('input[aria-label="Search places"]').setValue('zam');
+    await flushPromises();
+
+    const card = wrapper.get('button.place-result');
+    expect(card.text()).toContain('Ecoregion');
+    await card.trigger('click');
+    await flushPromises();
+    expect(store.selectedId).toBe(ecoregion.id);
+    expect(store.visible).toBe(true);
+    expect(store.listTypes).toEqual(['ecoregion']);
+    expect(typeButton(wrapper, 'Ecoregions').classes()).toContain('is-on');
   });
 
   it('outlines a place on the map while its card is hovered', async () => {

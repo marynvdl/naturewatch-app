@@ -21,7 +21,7 @@ As a user, on the map, I can:
 | Boundaries, names, biome, realm | [RESOLVE Ecoregions 2017](https://ecoregions.appspot.com/) (Dinerstein et al. 2017, *BioScience*), `Ecoregions2017.zip` | CC BY 4.0 |
 | Short description | The ecoregion's English Wikipedia lead, suggested and approved by an admin | CC BY-SA 4.0 |
 | Photos | Wikimedia Commons, through the ecoregion's Wikidata item, its Commons category, and a name search | per file, from `licences` |
-| Further reading | A link to the ecoregion's page on [One Earth](https://www.oneearth.org/), for example `/ecoregions/east-sudanian-savanna/` | link only |
+| Further reading (deferred) | A link to the ecoregion's page on [One Earth](https://www.oneearth.org/), for example `/ecoregions/east-sudanian-savanna/` | link only |
 
 One Earth's text and photos are not copied. Its terms (updated 15 April 2026) forbid automated copying and give no reuse licence. Its photo credits mix unversioned "Creative Commons" with stock photos.
 
@@ -35,15 +35,17 @@ One Earth's text and photos are not copied. Its terms (updated 15 April 2026) fo
 
 **Photos.** `suggest_photos.py` takes ecoregions as well as World Heritage Sites. It finds them through the Wikidata item matched for the text. Suggestions go to the existing photo queue.
 
-**Tiles.** A third archive, `gs://nature-watch-tiles/places/ecoregions/v1/ecoregions.pmtiles`, layer `ecoregions`, from a new recipe `places-ecoregions.yaml` that follows `places-recognitions.yaml`. Its properties are `id`, `area_km2`, and whatever the chosen paint needs.
+**Tiles.** A third archive, `gs://nature-watch-tiles/places/ecoregions/v1/ecoregions.pmtiles`, layer `ecoregions`, from a new recipe `places-ecoregions.yaml` that follows `places-recognitions.yaml`. Its properties are `id` and `area_km2`.
 
-**Map.** The Ecoregions button lists ecoregions with the same cards, count, Sort, Filter, and In view as a recognition type, by size only. It draws the ecoregions archive. A click inside an ecoregion opens its profile. The paint is chosen from a local preview of two styles: a fill in RESOLVE's colour per ecoregion, or outlines only, like recognitions.
+**Map.** The Ecoregions button lists ecoregions with the same cards, count, Sort, Filter, and In view as a recognition type, by size only. It draws the ecoregions archive. A click inside an ecoregion opens its profile. It draws outlines only, in one colour, like recognitions.
 
 **Filter.** The filter dialog of every listed place type (Conservation areas and the recognition types) gets an **Ecoregion** field. You type an ecoregion's name and can choose more than one. The list, the count, and the map then keep only the places with a confirmed `located_in` link to a chosen ecoregion. This combines with the size and cropland ranges. The list reads (`place_window`, `place_window_count`, `place_rank`, `place_filter_stats`) take the chosen ecoregion ids. The map keeps the matching ids, as In view does through `shownAreaIds`. The field is kept when you switch place type, as the size filter is.
 
 ## Open questions
 
-- Paint: RESOLVE colour fill or outlines (task 04 shows both).
+None.
+
+Answered in task 04 on 22 November 2026: ecoregions are drawn as outlines only, in one colour, like recognitions. RESOLVE's colours are not read.
 
 Answered in task 02 on 21 November 2026: a `located_in` link is confirmed when at least 10% of the park lies inside the ecoregion. That share is also the minimum for a park tag, so a park that only touches an ecoregion at its edge is not tagged.
 
@@ -54,6 +56,7 @@ Answered in task 02 on 21 November 2026: a `located_in` link is confirmed when a
 - Biomes, bioregions, and realms as places.
 - Marine ecoregions, and Rock and Ice.
 - One Earth text or photos, if One Earth gives written permission.
+- The link to the ecoregion's page on One Earth. No URL is stored, and a slug made from the name is not checked against One Earth (task 04).
 - Country places.
 - A production release. App work merges into `develop` only.
 
@@ -68,7 +71,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
 - [x] [Task 03 — Ecoregions PMTiles](../archive/tasks/task-03-ecoregions-pmtiles.md) — naturewatch-analysis
   - *Goal:* Add `places-ecoregions.yaml` and build `places/ecoregions/v1/ecoregions.pmtiles` from the current boundaries of the published ecoregions. Record the run cost.
 - [ ] [Task 04 — Ecoregions on the map and profile](../tasks/task-04-ecoregions-on-the-map.md) — naturewatch-app
-  - *Goal:* The Ecoregions button lists and draws ecoregions, and a click opens a profile. The paint is chosen from a local preview. The profile shows the size and the One Earth link. Related lists the conservation areas inside, 20 at a time. A conservation area's Overview shows its ecoregions as tags that open them. Update `docs/user/using-the-map.md`, `docs/user/data.md`, and `docs/blueprint.md`. Run the tests and a browser check, and have the user evaluate the local app.
+  - *Goal:* The Ecoregions button lists and draws ecoregions, and a click opens a profile. The paint is outlines only. The profile shows the size. Related lists the conservation areas inside, 20 at a time. A conservation area's Overview shows its ecoregions as tags that open them. Update `docs/user/using-the-map.md`, `docs/user/data.md`, and `docs/blueprint.md`. Run the tests and a browser check, and have the user evaluate the local app.
 - [ ] Task 05 — Filter by ecoregion — naturewatch-app
   - *Goal:* Add a migration so the list reads take ecoregion ids. Add the Ecoregion field to the filter dialog, and filter the map to the matching places. Update `docs/user/using-the-map.md`. Run the tests and a browser check, and have the user evaluate the local app.
 - [ ] Task 06 — Ecoregion photos — naturewatch-app
@@ -78,4 +81,4 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 ## Done when
 
-A person can turn on Ecoregions, open any of the 846 ecoregions, and see its size. They can read an approved description with its Wikipedia credit, click through its approved photos, and follow the One Earth link. They can list the conservation areas inside an ecoregion and see a park's ecoregions as tags. They can filter any Places list, and the map, by one or more ecoregions. The tests pass, and every hosted write and billable run was approved first. No production deploy.
+A person can turn on Ecoregions, open any of the 846 ecoregions, and see its size. They can read an approved description with its Wikipedia credit, and click through its approved photos. They can list the conservation areas inside an ecoregion and see a park's ecoregions as tags. They can filter any Places list, and the map, by one or more ecoregions. The tests pass, and every hosted write and billable run was approved first. No production deploy.

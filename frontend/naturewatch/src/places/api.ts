@@ -29,6 +29,13 @@ export const RECOGNITION_TILES_URL =
 /** Vector layer inside the recognitions archive. */
 export const RECOGNITION_TILE_LAYER = 'recognitions';
 
+/** Published ecoregion boundaries. Each feature carries `id` (`places.id`) and `area_km2`. */
+export const ECOREGION_TILES_URL =
+  'https://storage.googleapis.com/nature-watch-tiles/places/ecoregions/v1/ecoregions.pmtiles';
+
+/** Vector layer inside the ecoregions archive. */
+export const ECOREGION_TILE_LAYER = 'ecoregions';
+
 /** Place type of the conservation areas: the default list and the release notice. */
 export const PLACE_TYPE = 'conservation_area';
 

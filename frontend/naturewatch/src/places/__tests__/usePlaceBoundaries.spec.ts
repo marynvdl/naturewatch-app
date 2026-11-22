@@ -3,6 +3,7 @@ import { flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { shallowRef } from 'vue';
 import {
+  ECOREGION_TILES_URL,
   PLACE_TILES_URL,
   RECOGNITION_TILES_URL,
   loadPlaceBounds,
@@ -43,6 +44,15 @@ class FakeMap {
   setFilter = vi.fn();
   setPaintProperty = vi.fn();
   setLayoutProperty = vi.fn();
+  /** Features under a point, by layer: none unless a test sets them. */
+  queryRenderedFeatures = vi.fn((): unknown[] => []);
+  /** The last visibility set on a layer. */
+  getLayoutProperty(layer: string, name: string) {
+    const calls = this.setLayoutProperty.mock.calls.filter(
+      call => call[0] === layer && call[1] === name
+    );
+    return calls.length ? calls[calls.length - 1][2] : undefined;
+  }
   /** False while tiles load, as Mapbox reports it. */
   tilesLoaded = true;
   /** The style itself, which is all a layer change needs. */
@@ -106,6 +116,7 @@ class FakeMap {
 }
 
 const outsideWindow = '33333333-3333-3333-3333-333333333333';
+const parkId = '11111111-1111-1111-1111-111111111111';
 
 /**
  * Mount the overlay on a fake map and show Conservation areas.
@@ -363,6 +374,68 @@ describe('place boundaries from tiles', () => {
       ['in', ['get', 'place_type_id'], ['literal', ['ramsar_site']]],
       hidden,
     ]);
+  });
+
+  it('draws ecoregion outlines only while Ecoregions is listed', async () => {
+    const { map, store } = await drawPlaces();
+    expect(map.getSource('ecoregions-tiles')).toEqual({
+      type: 'vector',
+      url: ECOREGION_TILES_URL,
+    });
+    expect(map.getLayer('ecoregions-line')).toMatchObject({
+      'source-layer': 'ecoregions',
+    });
+    // Added first, so parks and recognitions draw above
+    expect([...map.layers.keys()][0]).toBe('ecoregions-fill');
+    expect(map.getLayoutProperty('ecoregions-line', 'visibility')).toBe('none');
+
+    store.listTypes = ['ecoregion'];
+    store.applyFilter([100, null], [5, 50]);
+    await flushPromises();
+    expect(map.getLayoutProperty('ecoregions-line', 'visibility')).toBe(
+      'visible'
+    );
+    expect(map.getLayoutProperty('places-fill', 'visibility')).toBe('none');
+    expect(map.getLayoutProperty('recognitions-line', 'visibility')).toBe(
+      'none'
+    );
+    // Size only: the ecoregions archive has no cropland field
+    expect(map.setFilter).toHaveBeenCalledWith('ecoregions-line', [
+      'all',
+      ['>=', ['to-number', ['get', 'area_km2'], -1], 100],
+    ]);
+  });
+
+  it('opens a clicked ecoregion, unless a drawn park is under the click', async () => {
+    const { map, store } = await drawPlaces();
+    store.listTypes = ['ecoregion'];
+    await flushPromises();
+
+    const click = {
+      point: { x: 1, y: 1 },
+      features: [
+        { layer: { id: 'ecoregions-fill' }, properties: { id: outsideWindow } },
+      ],
+      originalEvent: { timeStamp: 0 },
+    };
+    map.fire('click', 'ecoregions-fill', click);
+    expect(store.selectedId).toBe(outsideWindow);
+    await flushPromises();
+    expect(map.setFilter).toHaveBeenCalledWith('ecoregions-select-line', [
+      '==',
+      ['get', 'id'],
+      outsideWindow,
+    ]);
+
+    store.clearSelection();
+    store.shownAreaIds = [parkId];
+    await flushPromises();
+    map.queryRenderedFeatures.mockReturnValue([{ properties: { id: parkId } }]);
+    map.fire('click', 'ecoregions-fill', {
+      ...click,
+      originalEvent: { timeStamp: 2000 },
+    });
+    expect(store.selectedId).toBeNull();
   });
 
   it('opens a clicked recognition and highlights it from its archive', async () => {

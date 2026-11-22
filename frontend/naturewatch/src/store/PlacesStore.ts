@@ -5,7 +5,7 @@ import {
   CROPLAND_FULL,
   PROTECTED_AREA_ATTRIBUTION,
   formatReleaseMonth,
-  isRecognitionButtonType,
+  isSizeOnlyType,
   placeTileFilter,
   type FigureRange,
   type LngLatBounds,
@@ -27,7 +27,8 @@ const usePlacesStore = defineStore('places', () => {
   const selectedFrom = ref<'list' | 'map' | null>(null);
   /**
    * Stored place types the list shows and the map draws: `conservation_area`
-   * and the recognition button types chosen. Empty when none is.
+   * and the recognition button types chosen, or `ecoregion` alone. Empty when
+   * none is.
    */
   const listTypes = ref<string[]>([]);
   /** Withdrawn places, which the map hides until the tiles are rebuilt. */
@@ -55,9 +56,9 @@ const usePlacesStore = defineStore('places', () => {
     if (on) hoveredId.value = id;
     else if (hoveredId.value === id) hoveredId.value = null;
   }
-  /** Whether a recognition type is listed, so the tools are size only. */
-  const listingRecognitions = computed(() =>
-    listTypes.value.some(type => isRecognitionButtonType(type))
+  /** Whether a recognition type or ecoregions are listed, so the tools are size only. */
+  const sizeOnly = computed(() =>
+    listTypes.value.some(type => isSizeOnlyType(type))
   );
   /** Applied size filter, in km². */
   const sizeKept = ref<SizeBounds>([null, null]);
@@ -76,7 +77,7 @@ const usePlacesStore = defineStore('places', () => {
   const tileFilter = computed(() =>
     placeTileFilter(
       sizeKept.value,
-      listingRecognitions.value ? CROPLAND_FULL : croplandKept.value
+      sizeOnly.value ? CROPLAND_FULL : croplandKept.value
     )
   );
 
@@ -215,7 +216,7 @@ const usePlacesStore = defineStore('places', () => {
     shownAreaIds,
     hoveredId,
     hoverPlace,
-    listingRecognitions,
+    sizeOnly,
     sizeKept,
     croplandKept,
     viewBounds,

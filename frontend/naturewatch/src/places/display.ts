@@ -352,14 +352,34 @@ export function recognitionColour(type: string, satellite = false): string {
 /** Fill of the conservation areas on the monochrome basemap, and their card label. */
 export const CONSERVATION_AREA_COLOUR = '#1f4b3a';
 
+/** Outline colour of the ecoregions on each basemap. */
+export const ECOREGION_COLOUR = {
+  monochrome: '#5b6b2f',
+  satellite: '#e3e8a0',
+} as const;
+
+/** Place type of the ecoregions. */
+export const ECOREGION_TYPE = 'ecoregion';
+
+/**
+ * Whether a listed type sorts and filters by size only: every type but the
+ * conservation areas.
+ * @param type - `place_types.id`.
+ * @returns True for the recognition types and ecoregions.
+ */
+export function isSizeOnlyType(type: string): boolean {
+  return type === ECOREGION_TYPE || isRecognitionButtonType(type);
+}
+
 /**
  * The type of a place as cards and the profile name it.
  * @param type - `place_types.id`, or null for a place that is not published.
- * @returns For example `Conservation area` or `World Heritage`.
+ * @returns For example `Conservation area`, `Ecoregion`, or `World Heritage`.
  */
 export function placeTypeLabel(type: string | null | undefined): string {
   if (!type) return 'Unpublished place';
   if (type === 'conservation_area') return 'Conservation area';
+  if (type === ECOREGION_TYPE) return 'Ecoregion';
   return RECOGNITION_LABEL[type] ?? 'Place';
 }
 
@@ -370,6 +390,7 @@ export function placeTypeLabel(type: string | null | undefined): string {
  */
 export function placeTypeColour(type: string | null | undefined): string {
   if (type === 'conservation_area') return CONSERVATION_AREA_COLOUR;
+  if (type === ECOREGION_TYPE) return ECOREGION_COLOUR.monochrome;
   return recognitionColour(type ?? '');
 }
 
