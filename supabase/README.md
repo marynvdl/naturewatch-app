@@ -54,6 +54,8 @@ The hosted migration ran on 16 November 2026. The one approved link from task 04
 
 On three sites, Wikidata had a WDPA id for one, Maloti-Drakensberg Park. Its image and two other UNESCO photographs have no licence code on Commons, and were refused. The name search supplied the rest.
 
+For ecoregions, the hosted `fetch` ran on 22 November 2026, after the matching below, and read every response from the cache of the local run the same day. The local run sent 1,900 requests, and Commons often asked it to wait under `maxlag`. It found suggestions for 823 of the 846 ecoregions, and none for 23. Of the 2,226 rows, 504 are Wikidata images, 806 category files, and 916 search results, over 2,148 distinct files. The title filter refused 2,162 files, most of them range maps. `load` added 2,129 `images` rows, reusing 19 files already stored for World Heritage Sites, and 2,226 `suggested` links. As `anon`, no ecoregion photograph is readable.
+
 ### Ecoregion Wikidata items
 
 `match_ecoregion_wikidata.py` matches each published ecoregion to its Wikidata item (Ecoregions task 06). `suggest_photos.py` reads the match, and the descriptions of task 07 will too.
@@ -67,6 +69,8 @@ WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/match_ec
 RESOLVE holds no Wikidata id or WWF code. `fetch` only reads the database: each ecoregion's name, ECO_ID, and `ECO_BIOME_`. One Wikidata query reads every item with a WWF ecoregion code (P1294), with its English label and aliases, its One Earth ecoregion ID (P12161), and its English Wikipedia article. An ecoregion matches an item when its name, in lower case without accents and punctuation, equals the label or an alias, or else when the name as a slug equals the One Earth ID, and one of the item's codes is in the ecoregion's realm. RESOLVE's realm codes `AF`, `NE`, `NO`, `IN`, and `AU` are WWF's `AT`, `NA`, `NT`, `IM`, and `AA`. Several items for one ecoregion, or one item for several, are ambiguous and left unmatched. The hand-match file `supabase/ecoregion_wikidata.tsv` (`eco_id`, `wikidata_item`, `note`) wins over the automatic match. `fetch` writes `ecoregion_wikidata.tsv` and `ecoregion_wikidata_unmatched.tsv`, with the candidates of an ambiguous ecoregion or of one whose name matches in another realm, to the work directory.
 
 `counts` reports what `load` would do. `load` inserts each match as a confirmed `wikidata` / `wikidata_item` row in `place_source_ids`, in one transaction, found by ECO_ID. A stored match is kept. A match that differs from a stored one, or an item already matched to another place, is reported and not written.
+
+On 22 November 2026, 722 ecoregions matched automatically: 628 by label, 21 by alias, and 73 by One Earth ID. 692 of the matched items have an English Wikipedia article. Of the rest, 4 were ambiguous and 6 matched an item whose WWF code is in another realm. The user confirmed those 10 in the hand-match file, which leaves 114 with no candidate, mostly ecoregions split or renamed in 2017. The hosted `load` added 732 confirmed `wikidata_item` rows.
 
 ## Ecoregions
 
