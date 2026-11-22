@@ -1,6 +1,6 @@
 # Task 03 — Ecoregions PMTiles
 
-Parcel: [Ecoregions](../parcels/ecoregions.md).
+Parcel: [Ecoregions](../../parcels/ecoregions.md).
 
 Repository: naturewatch-analysis. Start from `main` there. This task file and the parcel link are on `data/task-03-ecoregions-pmtiles` in naturewatch-app. Task 02 merged in #450.
 
