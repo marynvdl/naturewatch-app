@@ -67,7 +67,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* Derive `located_in` links from conservation areas and recognitions to ecoregions, with subdivided ecoregion shapes. Write them as `proposed`. Show the user the coverage counts. Confirm the links at the threshold the user chooses.
 - [x] [Task 03 — Ecoregions PMTiles](../archive/tasks/task-03-ecoregions-pmtiles.md) — naturewatch-analysis
   - *Goal:* Add `places-ecoregions.yaml` and build `places/ecoregions/v1/ecoregions.pmtiles` from the current boundaries of the published ecoregions. Record the run cost.
-- [ ] Task 04 — Ecoregions on the map and profile — naturewatch-app
+- [ ] [Task 04 — Ecoregions on the map and profile](../tasks/task-04-ecoregions-on-the-map.md) — naturewatch-app
   - *Goal:* The Ecoregions button lists and draws ecoregions, and a click opens a profile. The paint is chosen from a local preview. The profile shows the size and the One Earth link. Related lists the conservation areas inside, 20 at a time. A conservation area's Overview shows its ecoregions as tags that open them. Update `docs/user/using-the-map.md`, `docs/user/data.md`, and `docs/blueprint.md`. Run the tests and a browser check, and have the user evaluate the local app.
 - [ ] Task 05 — Filter by ecoregion — naturewatch-app
   - *Goal:* Add a migration so the list reads take ecoregion ids. Add the Ecoregion field to the filter dialog, and filter the map to the matching places. Update `docs/user/using-the-map.md`. Run the tests and a browser check, and have the user evaluate the local app.
