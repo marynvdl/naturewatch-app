@@ -230,9 +230,17 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     );
   }
 
-  /** Filter that keeps the places the size and cropland filter keeps. */
+  /**
+   * Filter that keeps the places the size and cropland filter keeps, and,
+   * while ecoregions are chosen, only the places linked to one of them. The
+   * tiles do not hold the links, so those places are kept by id.
+   */
   function keptFilter(): mapboxgl.FilterSpecification | null {
-    return placesStore.tileFilter as mapboxgl.FilterSpecification | null;
+    const linked = placesStore.ecoregionPlaceIds;
+    return allOf(
+      placesStore.tileFilter as mapboxgl.FilterSpecification | null,
+      linked ? ['in', ['get', 'id'], ['literal', linked]] : null
+    );
   }
 
   /**
@@ -884,6 +892,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         placesStore.tileFilter,
         placesStore.listTypes,
         placesStore.withdrawnIds,
+        placesStore.ecoregionPlaceIds,
       ] as const,
     () => {
       const mapInstance = readMap();

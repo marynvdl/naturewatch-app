@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseClient } from '@/plugins/supabase';
 import {
+  ECOREGION_TYPE,
   type FigureRange,
   type LngLatBounds,
   type PlaceSort,
@@ -119,6 +120,11 @@ export interface PlaceWindowQuery {
   offset?: number;
   /** Stored place types to list. Conservation areas when left out or empty. */
   placeTypes?: string[];
+  /**
+   * Keep only places with a confirmed `located_in` link to one of these
+   * ecoregions (`places.id`). Every place when left out or empty.
+   */
+  ecoregionIds?: string[];
 }
 
 /** Result of loading the capped list. */
@@ -217,7 +223,17 @@ function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
     p_south: query.extent?.[1] ?? null,
     p_east: query.extent?.[2] ?? null,
     p_north: query.extent?.[3] ?? null,
+    ...ecoregionArgs(query.ecoregionIds),
   };
+}
+
+/**
+ * The ecoregion argument, only when ecoregions are chosen.
+ * @param ids - Chosen ecoregions.
+ * @returns `p_ecoregion_ids`, or nothing.
+ */
+function ecoregionArgs(ids: string[] | undefined) {
+  return ids?.length ? { p_ecoregion_ids: ids } : {};
 }
 
 /**
@@ -389,18 +405,89 @@ export async function loadWithdrawnPlaceIds(): Promise<WithdrawnIdsResult> {
   return { status: 'ok', ids: data.map(String) };
 }
 
+/** Result of reading the ids the filter keeps on the map. */
+export type KeptIdsResult =
+  | { status: 'ok'; ids: string[] }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/** Place types and filters for the ids the map keeps. */
+export interface KeptIdsQuery {
+  placeTypes: string[];
+  sizeMin: number | null;
+  sizeMax: number | null;
+  cropMin: number;
+  cropMax: number;
+  ecoregionIds: string[];
+}
+
+/**
+ * Ids of the places of the given types that the size, cropland, and ecoregion
+ * filter keeps. Search and the map view do not apply.
+ * @param query - Place types and filters.
+ * @returns The ids, or why they could not be read.
+ */
+export async function loadKeptPlaceIds(
+  query: KeptIdsQuery
+): Promise<KeptIdsResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('place_kept_ids', {
+    p_place_types: query.placeTypes,
+    p_size_min: query.sizeMin,
+    p_size_max: query.sizeMax,
+    p_crop_min: query.cropMin,
+    p_crop_max: query.cropMax,
+    ...ecoregionArgs(query.ecoregionIds),
+  });
+  if (error || !Array.isArray(data)) return { status: 'error' };
+  return { status: 'ok', ids: data.map(String) };
+}
+
+/** An ecoregion the filter can choose. */
+export interface EcoregionName {
+  id: string;
+  name: string;
+}
+
+/** Result of reading the ecoregion names. */
+export type EcoregionNamesResult =
+  | { status: 'ok'; ecoregions: EcoregionName[] }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/**
+ * Every listed ecoregion's id and name, by name, for the Ecoregion filter.
+ * @returns The 846 ecoregions, or why they could not be read.
+ */
+export async function loadEcoregionNames(): Promise<EcoregionNamesResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase
+    .from('listed_places')
+    .select('id, name')
+    .eq('place_type_id', ECOREGION_TYPE)
+    .order('name')
+    .range(0, 999);
+  if (error || !data) return { status: 'error' };
+  return { status: 'ok', ecoregions: data as EcoregionName[] };
+}
+
 /**
  * Size range and histogram counts for the filter charts.
  * @param placeTypes - Stored place types. Conservation areas when left out.
+ * @param ecoregionIds - Chosen ecoregions, when the filter has any.
  * @returns The stored distribution, or why it could not be loaded.
  */
 export async function loadPilotPlaceFilterStats(
-  placeTypes: string[] = [PLACE_TYPE]
+  placeTypes: string[] = [PLACE_TYPE],
+  ecoregionIds: string[] = []
 ): Promise<PlaceFilterStatsResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase.rpc('place_filter_stats', {
     p_place_types: placeTypes,
+    ...ecoregionArgs(ecoregionIds),
   });
   if (error || !data?.[0]) return { status: 'error' };
   const row = data[0] as {

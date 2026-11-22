@@ -154,18 +154,12 @@ describe('place figures', () => {
     expect(boundsInsideFrame([31, -24.5, 33, -22], bounds)).toBe(false);
   });
 
-  it('filters tiles on the copied size and cropland fields', () => {
-    expect(placeTileFilter([null, null], [0, 100])).toBeNull();
-    expect(placeTileFilter([100, 5000], [0, 100])).toEqual([
+  it('filters tiles on the copied size field', () => {
+    expect(placeTileFilter([null, null])).toBeNull();
+    expect(placeTileFilter([100, 5000])).toEqual([
       'all',
       ['>=', ['to-number', ['get', 'area_km2'], -1], 100],
       ['<=', ['to-number', ['get', 'area_km2'], -1], 5000],
-    ]);
-    expect(placeTileFilter([null, null], [0, 10])).toEqual([
-      'all',
-      ['has', 'cropland_percent'],
-      ['>=', ['to-number', ['get', 'cropland_percent'], -1], 0],
-      ['<=', ['to-number', ['get', 'cropland_percent'], -1], 10],
     ]);
   });
 

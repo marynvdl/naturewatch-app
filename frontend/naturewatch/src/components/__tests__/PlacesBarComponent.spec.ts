@@ -58,6 +58,7 @@ vi.mock('@/places/api', () => ({
   loadPilotPlaceFilterStats: vi.fn(),
   loadPilotPlaceRank: vi.fn(),
   loadPlaceRelease: vi.fn(),
+  loadKeptPlaceIds: vi.fn(async () => ({ status: 'ok', ids: [] })),
   PLACE_LIST_LIMIT: 50,
   PLACE_TYPE: 'conservation_area',
 }));
@@ -351,7 +352,7 @@ describe('Places panel', () => {
     await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
     expect(store.listTypes).toEqual(['conservation_area']);
-    store.applyFilter([2000, null], [1, 50]);
+    store.applyFilter([2000, null]);
     await flushPromises();
 
     await wrapper.get('.place-type-more').trigger('click');
@@ -381,13 +382,12 @@ describe('Places panel', () => {
     );
     expect(typeButton(wrapper, 'Ramsar').classes()).toContain('is-on');
     expect(store.sizeOnly).toBe(true);
-    // The size filter stays; cropland does not apply once a recognition is listed
+    // The size filter stays
     expect(store.sizeKept).toEqual([2000, null]);
-    expect(store.croplandKept).toEqual([0, 100]);
-    expect(loadPilotPlaceFilterStats).toHaveBeenLastCalledWith([
-      'conservation_area',
-      'ramsar_site',
-    ]);
+    expect(loadPilotPlaceFilterStats).toHaveBeenLastCalledWith(
+      ['conservation_area', 'ramsar_site'],
+      []
+    );
     expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
       expect.objectContaining({
         placeTypes: ['conservation_area', 'ramsar_site'],
@@ -642,7 +642,7 @@ describe('Places panel', () => {
 
     const store = usePlacesStore();
     expect(store.tileFilter).toBeNull();
-    store.applyFilter([19000, null], [0, 100]);
+    store.applyFilter([19000, null]);
     await flushPromises();
     expect(names()).toEqual(['Kruger National Park']);
     expect(wrapper.get('.places-count').text()).toBe('1 place');
@@ -1016,5 +1016,47 @@ describe('Places panel', () => {
 
     expect(wrapper.text()).toContain('The places could not be loaded.');
     expect(loadPlaceRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists by the chosen ecoregions, kept across types but not for Ecoregions', async () => {
+    const wrapper = mountPlaces();
+    const store = usePlacesStore();
+    const savanna = { id: 'e1', name: 'Zambezian mopane woodlands' };
+    await typeButton(wrapper, 'Conservation areas').trigger('click');
+    await flushPromises();
+    store.applyFilter([null, null], [savanna]);
+    await flushPromises();
+    expect(store.filtering).toBe(true);
+    expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        placeTypes: ['conservation_area'],
+        ecoregionIds: ['e1'],
+      }),
+      expect.any(AbortSignal)
+    );
+    expect(loadPilotPlaceFilterStats).toHaveBeenLastCalledWith(
+      ['conservation_area'],
+      ['e1']
+    );
+
+    await wrapper.get('.place-type-more').trigger('click');
+    await typeButton(wrapper, 'Ramsar').trigger('click');
+    await flushPromises();
+    expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        placeTypes: ['conservation_area', 'ramsar_site'],
+        ecoregionIds: ['e1'],
+      }),
+      expect.any(AbortSignal)
+    );
+
+    await typeButton(wrapper, 'Ecoregions').trigger('click');
+    await flushPromises();
+    expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
+      expect.objectContaining({ placeTypes: ['ecoregion'], ecoregionIds: [] }),
+      expect.any(AbortSignal)
+    );
+    expect(store.filtering).toBe(false);
+    expect(store.ecoregionsKept).toEqual([savanna]);
   });
 });

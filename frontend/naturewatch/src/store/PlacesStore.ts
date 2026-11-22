@@ -1,13 +1,18 @@
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
-import { loadPlaceRelease, loadWithdrawnPlaceIds } from '@/places/api';
+import { computed, ref, watch } from 'vue';
+import {
+  loadKeptPlaceIds,
+  loadPlaceRelease,
+  loadWithdrawnPlaceIds,
+  type EcoregionName,
+} from '@/places/api';
 import {
   CROPLAND_FULL,
+  ECOREGION_TYPE,
   PROTECTED_AREA_ATTRIBUTION,
   formatReleaseMonth,
   isSizeOnlyType,
   placeTileFilter,
-  type FigureRange,
   type LngLatBounds,
   type SizeBounds,
 } from '@/places/display';
@@ -62,38 +67,71 @@ const usePlacesStore = defineStore('places', () => {
   );
   /** Applied size filter, in km². */
   const sizeKept = ref<SizeBounds>([null, null]);
-  /** Applied cropland filter, in percent. */
-  const croplandKept = ref<FigureRange>([...CROPLAND_FULL]);
+  /** Applied Ecoregion filter, kept across place types. */
+  const ecoregionsKept = ref<EcoregionName[]>([]);
+  /**
+   * The chosen ecoregions while they apply: to Conservation areas and the
+   * recognition types, not to Ecoregions or to a search with no type.
+   */
+  const ecoregionIds = computed(() =>
+    listTypes.value.length && !listTypes.value.includes(ECOREGION_TYPE)
+      ? ecoregionsKept.value.map(ecoregion => ecoregion.id)
+      : []
+  );
+  /**
+   * Places of the listed types linked to a chosen ecoregion, which the map
+   * keeps. Null while no ecoregion applies.
+   */
+  const ecoregionPlaceIds = ref<string[] | null>(null);
+  let keptRequest = 0;
+
+  watch(
+    () => `${listTypes.value.join(',')}|${ecoregionIds.value.join(',')}`,
+    async () => {
+      const request = ++keptRequest;
+      if (!ecoregionIds.value.length) {
+        ecoregionPlaceIds.value = null;
+        return;
+      }
+      const result = await loadKeptPlaceIds({
+        placeTypes: [...listTypes.value],
+        sizeMin: null,
+        sizeMax: null,
+        cropMin: CROPLAND_FULL[0],
+        cropMax: CROPLAND_FULL[1],
+        ecoregionIds: [...ecoregionIds.value],
+      });
+      if (request !== keptRequest || result.status !== 'ok') return;
+      ecoregionPlaceIds.value = result.ids;
+    }
+  );
   /** Current map view, west, south, east, north. */
   const viewBounds = ref<LngLatBounds | null>(null);
   const filtering = computed(
     () =>
       sizeKept.value[0] !== null ||
       sizeKept.value[1] !== null ||
-      croplandKept.value[0] > CROPLAND_FULL[0] ||
-      croplandKept.value[1] < CROPLAND_FULL[1]
+      ecoregionIds.value.length > 0
   );
-  /** Tile filter for the applied size and cropland ranges. */
-  const tileFilter = computed(() =>
-    placeTileFilter(
-      sizeKept.value,
-      sizeOnly.value ? CROPLAND_FULL : croplandKept.value
-    )
-  );
+  /** Tile filter for the applied size range. */
+  const tileFilter = computed(() => placeTileFilter(sizeKept.value));
 
   /**
    * Apply a filter to the list and the map.
    * @param size - Square kilometres.
-   * @param cropland - Cropland percent.
+   * @param ecoregions - Chosen ecoregions. Unchanged when left out.
    */
-  function applyFilter(size: SizeBounds, cropland: FigureRange) {
+  function applyFilter(
+    size: SizeBounds,
+    ecoregions: EcoregionName[] = ecoregionsKept.value
+  ) {
     sizeKept.value = [...size];
-    croplandKept.value = [...cropland];
+    ecoregionsKept.value = [...ecoregions];
   }
 
   /** Keep every place again. */
   function clearFilter() {
-    applyFilter([null, null], CROPLAND_FULL);
+    applyFilter([null, null], []);
   }
 
   /**
@@ -218,7 +256,9 @@ const usePlacesStore = defineStore('places', () => {
     hoverPlace,
     sizeOnly,
     sizeKept,
-    croplandKept,
+    ecoregionsKept,
+    ecoregionIds,
+    ecoregionPlaceIds,
     viewBounds,
     filtering,
     tileFilter,

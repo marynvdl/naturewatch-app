@@ -159,7 +159,7 @@ describe('place boundaries from tiles', () => {
     });
     expect(store.notice).toContain('October 2026');
 
-    store.applyFilter([100, null], [0, 100]);
+    store.applyFilter([100, null]);
     await flushPromises();
     expect(map.setFilter).toHaveBeenCalledWith('places-fill', [
       'all',
@@ -320,7 +320,7 @@ describe('place boundaries from tiles', () => {
 
     map.setLayoutProperty.mockClear();
     store.listTypes = ['ramsar_site'];
-    store.applyFilter([100, null], [5, 50]);
+    store.applyFilter([100, null]);
     await flushPromises();
     expect(map.setLayoutProperty).toHaveBeenCalledWith(
       'places-fill',
@@ -376,6 +376,32 @@ describe('place boundaries from tiles', () => {
     ]);
   });
 
+  it('keeps only the places linked to the chosen ecoregions, by id', async () => {
+    const { map, store } = await drawPlaces();
+    store.listTypes = ['conservation_area', 'ramsar_site'];
+    store.applyFilter([100, null]);
+    await flushPromises();
+    // As the store sets it once the linked places are read
+    store.ecoregionPlaceIds = [outsideWindow];
+    await flushPromises();
+    const size = ['all', ['>=', ['to-number', ['get', 'area_km2'], -1], 100]];
+    const linked = ['in', ['get', 'id'], ['literal', [outsideWindow]]];
+    expect(map.setFilter).toHaveBeenCalledWith('places-fill', [
+      'all',
+      size,
+      linked,
+    ]);
+    expect(map.setFilter).toHaveBeenLastCalledWith('recognitions-line', [
+      'all',
+      ['in', ['get', 'place_type_id'], ['literal', ['ramsar_site']]],
+      ['all', size, linked],
+    ]);
+
+    store.ecoregionPlaceIds = null;
+    await flushPromises();
+    expect(map.setFilter).toHaveBeenCalledWith('places-fill', size);
+  });
+
   it('draws ecoregion outlines only while Ecoregions is listed', async () => {
     const { map, store } = await drawPlaces();
     expect(map.getSource('ecoregions-tiles')).toEqual({
@@ -390,7 +416,7 @@ describe('place boundaries from tiles', () => {
     expect(map.getLayoutProperty('ecoregions-line', 'visibility')).toBe('none');
 
     store.listTypes = ['ecoregion'];
-    store.applyFilter([100, null], [5, 50]);
+    store.applyFilter([100, null]);
     await flushPromises();
     expect(map.getLayoutProperty('ecoregions-line', 'visibility')).toBe(
       'visible'

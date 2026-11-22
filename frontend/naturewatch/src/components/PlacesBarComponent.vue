@@ -91,14 +91,9 @@ watch(
   listedKey,
   () => {
     placesStore.listTypes = [...listedTypes.value];
-    if (!placesStore.sizeOnly) return;
-    // Only the size filter applies to recognitions and ecoregions. It stays; cropland is cleared.
-    if (
-      placesStore.croplandKept[0] !== CROPLAND_FULL[0] ||
-      placesStore.croplandKept[1] !== CROPLAND_FULL[1]
-    )
-      placesStore.applyFilter(placesStore.sizeKept, CROPLAND_FULL);
-    if (sort.value.startsWith('cropland')) sort.value = 'size-desc';
+    // Recognitions and ecoregions have no cropland figure to sort by.
+    if (placesStore.sizeOnly && sort.value.startsWith('cropland'))
+      sort.value = 'size-desc';
   },
   { flush: 'sync' }
 );
@@ -111,11 +106,10 @@ const places = ref<PlaceSummary[]>([]);
 const windowStart = ref(0);
 const matchTotal = ref(0);
 const storedCount = ref(0);
-/** The place types whose filter charts are loaded, as `listedKey`. */
+/** The place types and ecoregions whose filter charts are loaded, as `statsFor`. */
 const statsKey = ref<string | null>(null);
 const sizeFull = ref<FigureRange>([1, 1]);
 const sizeBins = ref<number[]>([]);
-const croplandBins = ref<number[]>([]);
 const query = ref('');
 const listInView = ref(false);
 const resultsList = ref<HTMLElement | null>(null);
@@ -229,11 +223,12 @@ function listQuery(offset = 0): PlaceWindowQuery {
     sort: sort.value,
     sizeMin: placesStore.sizeKept[0],
     sizeMax: placesStore.sizeKept[1],
-    cropMin: placesStore.sizeOnly ? 0 : placesStore.croplandKept[0],
-    cropMax: placesStore.sizeOnly ? 100 : placesStore.croplandKept[1],
+    cropMin: CROPLAND_FULL[0],
+    cropMax: CROPLAND_FULL[1],
     extent: listExtent.value,
     offset,
     placeTypes: listedTypes.value.length ? listedTypes.value : [PLACE_TYPE],
+    ecoregionIds: placesStore.ecoregionIds,
   };
 }
 
@@ -297,17 +292,26 @@ function hideBoundaries() {
   if (placesStore.visible) placesStore.toggle();
 }
 
-/** Load the stored size range and chart counts once per listed type. */
+/** The listed types and the chosen ecoregions, which the filter charts follow. */
+const statsFor = computed(() =>
+  listedKey.value
+    ? `${listedKey.value}|${placesStore.ecoregionIds.join(',')}`
+    : ''
+);
+
+/** Load the stored size range and chart counts once per listed type and ecoregions. */
 async function ensureStats() {
-  const key = listedKey.value;
+  const key = statsFor.value;
   if (!key || statsKey.value === key) return;
-  const result = await loadPilotPlaceFilterStats([...listedTypes.value]);
-  if (result.status !== 'ok' || listedKey.value !== key) return;
+  const result = await loadPilotPlaceFilterStats(
+    [...listedTypes.value],
+    [...placesStore.ecoregionIds]
+  );
+  if (result.status !== 'ok' || statsFor.value !== key) return;
   statsKey.value = key;
   storedCount.value = result.stats.placeCount;
   sizeFull.value = result.stats.sizeFull;
   sizeBins.value = result.stats.sizeBins;
-  croplandBins.value = result.stats.croplandBins;
 }
 
 /** Load the names that match the current list query. */
@@ -454,21 +458,20 @@ watch(
       sort.value,
       placesStore.sizeKept[0],
       placesStore.sizeKept[1],
-      placesStore.croplandKept[0],
-      placesStore.croplandKept[1],
       listInView.value,
       listExtent.value,
+      placesStore.ecoregionIds.join(','),
     ] as const,
   (next, previous) => {
     if (!showList.value && !searchingAll.value) return;
     const moved =
-      previous != null && next[8] === previous[8] && next[9] !== previous[9];
+      previous != null && next[6] === previous[6] && next[7] !== previous[7];
     const typed =
       previous != null &&
       next[1] !== previous[1] &&
       next[0] === previous[0] &&
       next[3] === previous[3] &&
-      next[8] === previous[8];
+      next[6] === previous[6];
     if (moved || typed) scheduleList();
     else void refreshList();
   }
@@ -728,13 +731,11 @@ watch(
             v-model:open="filterOpen"
             :size-full="sizeFull"
             :size-bins="sizeBins"
-            :cropland-bins="croplandBins"
             :search="needle"
             :search-prefix="searchingAll"
             :extent="listExtent"
             :matched-total="matchTotal"
             :place-types="listedTypes"
-            :size-only="placesStore.sizeOnly"
           />
         </div>
         <div v-if="anyType && !showList" class="places-list">

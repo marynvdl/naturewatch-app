@@ -17,6 +17,15 @@ import usePlacesStore from '@/store/PlacesStore';
 
 vi.mock('@/places/api', () => ({
   loadPilotPlaceWindowCount: vi.fn(),
+  loadKeptPlaceIds: vi.fn(async () => ({ status: 'ok', ids: [] })),
+  loadEcoregionNames: vi.fn(async () => ({
+    status: 'ok',
+    ecoregions: [
+      { id: 'e1', name: 'Zambezian mopane woodlands' },
+      { id: 'e2', name: 'Zambezian Baikiaea woodlands' },
+      { id: 'e3', name: 'Kalahari xeric savanna' },
+    ],
+  })),
 }));
 
 vi.stubGlobal(
@@ -27,6 +36,9 @@ vi.stubGlobal(
     disconnect = vi.fn();
   }
 );
+
+// The combobox scrolls its highlighted item into view.
+Element.prototype.scrollIntoView = vi.fn();
 
 const places = [
   {
@@ -48,13 +60,13 @@ let wrapper: VueWrapper | null = null;
  * Mount the dialog closed, then open it as the list does.
  * @returns The mounted dialog.
  */
-async function mountDialog() {
+async function mountDialog(placeTypes?: string[]) {
   const mounted = mount(PlacesFilterDialog, {
     props: {
+      placeTypes,
       open: false,
       sizeFull,
       sizeBins: emptyBins,
-      croplandBins: emptyBins,
       search: '',
       searchPrefix: false,
       extent: null,
@@ -112,26 +124,26 @@ describe('Places filter dialog', () => {
 
     expect(body().text()).toContain('Filters');
     expect(button('Show 2 places').exists()).toBe(true);
-    expect(body().findAll('.filter-chart')).toHaveLength(2);
+    // The size range only: cropland is not a filter
+    expect(body().findAll('.filter-chart')).toHaveLength(1);
+    expect(body().text()).not.toContain('Cropland');
 
-    const croplandMin = body().findAll('[role="slider"]')[2];
-    await croplandMin.trigger('focus');
-    await croplandMin.trigger('keydown', { key: 'ArrowRight' });
+    await body().get('input[aria-label="Minimum size, km²"]').setValue('2000');
     await flushPromises();
     expect(loadPilotPlaceWindowCount).toHaveBeenLastCalledWith(
-      expect.objectContaining({ cropMin: 1, cropMax: 100 })
+      expect.objectContaining({ sizeMin: 2000, cropMin: 0, cropMax: 100 })
     );
-    expect(button('Show 0 places').exists()).toBe(true);
+    expect(button('Show 1 place').exists()).toBe(true);
     expect(store.filtering).toBe(false);
 
-    await button('Show 0 places').trigger('click');
+    await button('Show 1 place').trigger('click');
     await flushPromises();
-    expect(store.croplandKept).toEqual([1, 100]);
+    expect(store.sizeKept).toEqual([2000, null]);
     expect(store.filtering).toBe(true);
     expect(dialog.props('open')).toBe(false);
   });
 
-  it('filters on exactly the size and cropland typed', async () => {
+  it('filters on exactly the size typed', async () => {
     const store = usePlacesStore();
     await mountDialog();
     const box = (label: string) =>
@@ -154,16 +166,13 @@ describe('Places filter dialog', () => {
     await type('Maximum size, km²', '50000');
     expect(box('Maximum size, km²').element.value).toBe('19,485.2');
 
-    await type('Minimum cropland, percent', '0.5');
-    await type('Maximum cropland, percent', '1 %');
-    expect(box('Maximum cropland, percent').element.value).toBe('1.0');
+    await type('Maximum size, km²', '5000');
     expect(button('Show 0 places').exists()).toBe(true);
     await type('Minimum size, km²', '0');
     expect(button('Show 1 place').exists()).toBe(true);
 
     await button('Show 1 place').trigger('click');
-    expect(store.sizeKept).toEqual([null, null]);
-    expect(store.croplandKept).toEqual([0.5, 1]);
+    expect(store.sizeKept).toEqual([null, 5000]);
     expect(store.filtering).toBe(true);
   });
 
@@ -186,18 +195,96 @@ describe('Places filter dialog', () => {
 
   it('discards the draft when closed, and clears it from Clear all', async () => {
     const store = usePlacesStore();
-    store.applyFilter([0, 100], [50, 100]);
+    store.applyFilter([2000, 3000]);
     const dialog = await mountDialog();
 
     expect(button('Show 0 places').exists()).toBe(true);
     await button('Clear all').trigger('click');
     await flushPromises();
     expect(button('Show 2 places').exists()).toBe(true);
-    expect(store.croplandKept).toEqual([50, 100]);
+    expect(store.sizeKept).toEqual([2000, 3000]);
 
     await body().get('button[aria-label="Close filters"]').trigger('click');
     await flushPromises();
     expect(dialog.props('open')).toBe(false);
-    expect(store.croplandKept).toEqual([50, 100]);
+    expect(store.sizeKept).toEqual([2000, 3000]);
+  });
+
+  it('chooses ecoregions by name, counts them, and applies them', async () => {
+    const store = usePlacesStore();
+    store.listTypes = ['conservation_area'];
+    await mountDialog(['conservation_area']);
+    const input = body().get<HTMLInputElement>(
+      'input[aria-labelledby="filter-ecoregion-title"]'
+    );
+    expect(body().text()).toContain('Ecoregion');
+
+    await input.setValue('zambez');
+    await flushPromises();
+    const items = body().findAll('.ecoregions-item');
+    expect(items.map(item => item.text())).toEqual([
+      'Zambezian Baikiaea woodlands',
+      'Zambezian mopane woodlands',
+    ]);
+    await items[1].trigger('click');
+    await flushPromises();
+    await input.setValue('kalahari');
+    await flushPromises();
+    await body().get('.ecoregions-item').trigger('click');
+    await flushPromises();
+
+    expect(
+      body()
+        .findAll('.ecoregions-chip')
+        .map(chip => chip.text())
+    ).toEqual(['Zambezian mopane woodlands', 'Kalahari xeric savanna']);
+    expect(loadPilotPlaceWindowCount).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ecoregionIds: ['e1', 'e3'] })
+    );
+    await body()
+      .get('button[aria-label="Remove Kalahari xeric savanna"]')
+      .trigger('click');
+    await flushPromises();
+    expect(loadPilotPlaceWindowCount).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ecoregionIds: ['e1'] })
+    );
+    expect(store.ecoregionsKept).toEqual([]);
+
+    await button('Show 2 places').trigger('click');
+    expect(store.ecoregionsKept).toEqual([
+      { id: 'e1', name: 'Zambezian mopane woodlands' },
+    ]);
+    expect(store.ecoregionIds).toEqual(['e1']);
+    expect(store.filtering).toBe(true);
+  });
+
+  it('clears the ecoregions from Clear all', async () => {
+    const store = usePlacesStore();
+    store.applyFilter(
+      [null, null],
+      [{ id: 'e1', name: 'Zambezian mopane woodlands' }]
+    );
+    await mountDialog(['conservation_area']);
+    expect(body().findAll('.ecoregions-chip')).toHaveLength(1);
+    await button('Clear all').trigger('click');
+    await flushPromises();
+    expect(body().findAll('.ecoregions-chip')).toHaveLength(0);
+    await button('Show 2 places').trigger('click');
+    expect(store.ecoregionsKept).toEqual([]);
+  });
+
+  it('has no Ecoregion field for Ecoregions, and keeps the chosen ones', async () => {
+    const store = usePlacesStore();
+    const chosen = [{ id: 'e1', name: 'Zambezian mopane woodlands' }];
+    store.applyFilter([null, null], chosen);
+    await mountDialog(['ecoregion']);
+    expect(
+      body().find('input[aria-labelledby="filter-ecoregion-title"]').exists()
+    ).toBe(false);
+    expect(loadPilotPlaceWindowCount).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ecoregionIds: [] })
+    );
+    await button('Show 2 places').trigger('click');
+    expect(store.ecoregionsKept).toEqual(chosen);
   });
 });

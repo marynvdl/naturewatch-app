@@ -8,6 +8,12 @@ Repository: naturewatch-app. Start from `develop`. Task 04 merged in #452.
 
 The filter dialog of Conservation areas and of each recognition type gets an **Ecoregion** field. You type an ecoregion's name and choose one or more. The list, its count, the filter charts, and the map then keep only the places with a confirmed `located_in` link to a chosen ecoregion, together with the size and cropland ranges. The chosen ecoregions are kept when you switch place type, as the size range is.
 
+Decided 22 November 2026 by the user, during the evaluation of the local app:
+
+- **The cropland range leaves the filter dialog**, for every place type, as the cropland figures are only useful in South Africa. The cropland sort stays. The list reads keep their cropland parameters, which the app now leaves at 0–100%.
+- **The suggestions list inside the dialog**, under the field. The dialog grows and scrolls to show them.
+- **The Ecoregion hint shows on hover** of a small info icon beside the field's name.
+
 ## Facts already stored
 
 From the code and the hosted database on 22 November 2026:
