@@ -344,12 +344,18 @@ class PlaceImagesLocalTest(unittest.TestCase):
         )
 
     def queue(self, user_id: str | None = "admin") -> list[dict]:
-        rows = self.call(
-            "select place_id::text as place_id, name, place_type_id, suggested_count, "
-            "total_count from public.photo_queue(200, 0)",
-            (),
-            user_id,
-        )
+        # Page through the whole queue: the local database can hold many suggestions.
+        rows: list[dict] = []
+        while True:
+            page = self.call(
+                "select place_id::text as place_id, name, place_type_id, suggested_count, "
+                "total_count from public.photo_queue(200, %s)",
+                (len(rows),),
+                user_id,
+            )
+            rows += page
+            if len(page) < 200:
+                break
         return [r for r in rows if r["place_id"] in (self.park, self.other)]
 
     def test_photo_queue_lists_places_with_suggestions(self):

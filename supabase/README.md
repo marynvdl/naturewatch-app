@@ -36,21 +36,37 @@ On 12 November 2026 `derive` inserted 1,162 hosted links for 875 recognitions be
 
 ## Photo suggestions
 
-`suggest_photos.py` suggests Wikimedia Commons photographs for the published World Heritage Sites (Molding Places task 05). It never approves one. An admin reviews them from the Photo queue in the account panel.
+`suggest_photos.py` suggests Wikimedia Commons photographs for the published World Heritage Sites (Molding Places task 05) and ecoregions (Ecoregions task 06). It never approves one. An admin reviews them from the Photo queue in the account panel.
 
 ```bash
-WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_photos.py fetch
+WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_photos.py fetch [world_heritage_site | ecoregion]
 WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_photos.py counts
 WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_photos.py load
 ```
 
 `fetch` only reads the database: each site's display name and its confirmed `wdpa_site_id`. One Wikidata query finds the items whose WDPA id (P809) matches, with their image (P18) and Commons category (P373). For each site it then takes the P18 file, up to 50 files in the category, and up to 30 results of a Commons search in the File namespace by the place's name, in that order. It keeps JPEG, PNG, and WebP files at least 1,000 px wide, under a licence in `licences`, with a creator, whose title has none of the words map, logo, flag, or locator, and stops at 3 per site. The score is 1.0 for P18, 0.7 for a category file, and 0.4 for a search result, less 0.01 for each file kept before it from the same origin. The alt text is the first sentence of the Commons description, or the file name. The caption is the same first sentence, so a card shows one line, not a paragraph. It writes `suggest_photos.tsv` and caches every API response in `suggest_photos_cache/` in the work directory, so a second start sends no request twice. It pauses half a second between requests, sends `maxlag=5` to Commons, and waits at most 2 minutes on a `Retry-After`. The Wikidata query service limited clients to one query a minute on 14 November 2026, so all sites go in one query. The User-Agent is `suggest-photos/1`, or `SUGGEST_PHOTOS_USER_AGENT` when set.
 
+`fetch` reads both place types, or only the one given. An ecoregion's item is its confirmed `wikidata_item` source id (below), and its P18 and P373 are read by item id, 150 items a query, as a longer query address is refused. An ecoregion with no item gets the Commons search only. For an ecoregion, a title with the word ecoregion or a WWF code such as `PA1219` is refused too, as those files are range maps. An ecoregion's row carries its ECO_ID, and `counts` and `load` find the place by it, so a file fetched from one database loads into another.
+
 `counts` reports how many rows of the file `load` would add. `load` writes them in one transaction: a Commons file already in `images` is reused, otherwise it is inserted with `uploaded_by` null, and the place gets a `suggested` link with `suggested_by_pipeline` `suggest_photos/1`, the score, the alt text, and the caption. A place that already has a link to the file, in any status, is skipped, so a rerun adds nothing and a rejected photograph stays rejected.
 
 The hosted migration ran on 16 November 2026. The one approved link from task 04 was already main, so nothing else changed. The same day `fetch` found suggestions for 195 of the 207 World Heritage Sites: 3 for 186 sites, 1 or 2 for 9, and none for 12. Of the 572 rows, 37 are Wikidata images, 56 category files, and 479 search results, over 570 distinct files. `load` added 570 `images` rows, all Commons links with `uploaded_by` null, and 572 `suggested` links, in one transaction. As `anon`, no suggested link is readable, `images` still shows only the one approved photograph, and `photo_queue` cannot be called.
 
 On three sites, Wikidata had a WDPA id for one, Maloti-Drakensberg Park. Its image and two other UNESCO photographs have no licence code on Commons, and were refused. The name search supplied the rest.
+
+### Ecoregion Wikidata items
+
+`match_ecoregion_wikidata.py` matches each published ecoregion to its Wikidata item (Ecoregions task 06). `suggest_photos.py` reads the match, and the descriptions of task 07 will too.
+
+```bash
+WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/match_ecoregion_wikidata.py fetch
+WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/match_ecoregion_wikidata.py counts
+WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/match_ecoregion_wikidata.py load
+```
+
+RESOLVE holds no Wikidata id or WWF code. `fetch` only reads the database: each ecoregion's name, ECO_ID, and `ECO_BIOME_`. One Wikidata query reads every item with a WWF ecoregion code (P1294), with its English label and aliases, its One Earth ecoregion ID (P12161), and its English Wikipedia article. An ecoregion matches an item when its name, in lower case without accents and punctuation, equals the label or an alias, or else when the name as a slug equals the One Earth ID, and one of the item's codes is in the ecoregion's realm. RESOLVE's realm codes `AF`, `NE`, `NO`, `IN`, and `AU` are WWF's `AT`, `NA`, `NT`, `IM`, and `AA`. Several items for one ecoregion, or one item for several, are ambiguous and left unmatched. The hand-match file `supabase/ecoregion_wikidata.tsv` (`eco_id`, `wikidata_item`, `note`) wins over the automatic match. `fetch` writes `ecoregion_wikidata.tsv` and `ecoregion_wikidata_unmatched.tsv`, with the candidates of an ambiguous ecoregion or of one whose name matches in another realm, to the work directory.
+
+`counts` reports what `load` would do. `load` inserts each match as a confirmed `wikidata` / `wikidata_item` row in `place_source_ids`, in one transaction, found by ECO_ID. A stored match is kept. A match that differs from a stored one, or an item already matched to another place, is reported and not written.
 
 ## Ecoregions
 

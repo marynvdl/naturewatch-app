@@ -1,21 +1,30 @@
 #!/usr/bin/env python3
-"""Suggest Wikimedia Commons photographs for World Heritage Sites (Molding Places task 05).
+"""Suggest Wikimedia Commons photographs for World Heritage Sites (Molding Places
+task 05) and ecoregions (Ecoregions task 06).
 
-  fetch   Read-only on the database. For each published World Heritage Site,
-          find its Wikidata item by WDPA id (P809), then take, in order, the
-          item's image (P18), the files in its Commons category (P373), and a
-          Commons search by the place's name. Keep JPEG, PNG, and WebP files at
-          least 1,000 px wide, under a licence in `licences`, with a creator,
-          whose title does not name a map, logo, flag, or locator. Keep the
-          first 3 per site. Write suggest_photos.tsv to the work directory.
-          API responses are cached there, so a second start reads no page twice.
+  fetch [TYPE]
+          Read-only on the database. For each published World Heritage Site
+          and ecoregion, or only those of TYPE (world_heritage_site or
+          ecoregion), find its Wikidata item: by WDPA id (P809) for a site, by
+          the confirmed wikidata_item source id for an ecoregion. Then take, in
+          order, the item's image (P18), the files in its Commons category
+          (P373), and a Commons search by the place's name. An ecoregion with no
+          item gets the search only. Keep JPEG, PNG, and WebP files at least
+          1,000 px wide, under a licence in `licences`, with a creator, whose
+          title does not name a map, logo, flag, or locator. For an ecoregion,
+          a title with the word ecoregion or a WWF code such as PA1219 is a
+          range map and is refused too. Keep the first 3 per place. Write
+          suggest_photos.tsv to the work directory. API responses are cached
+          there, so a second start reads no page twice.
   counts  Read-only. How many rows of the file load would add, and how many it
           would skip because the place already has a link to that file.
   load    Write the file in one transaction: reuse the images row of a Commons
           file already stored or insert one, and link it to the place as
           suggested, with the pipeline name and the score. A place that already
           has a link to the image, in any status, is skipped, so a rerun adds
-          nothing and a rejected photograph stays rejected.
+          nothing and a rejected photograph stays rejected. An ecoregion's row
+          is found by its ECO_ID, so a file fetched from one database loads into
+          another.
 
 Pipelines only suggest. An admin approves (decisions.md record 23).
 
@@ -58,6 +67,9 @@ MIN_WIDTH = 1000
 IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
 # A title with one of these words is rarely a photograph of the place.
 EXCLUDED_WORDS = ("map", "logo", "flag", "locator")
+# For an ecoregion, a range map: "Ecoregion PA1219.png", "AT1007 map.svg".
+ECOREGION_WORDS = ("ecoregion", "ecoregions")
+WWF_CODE = re.compile(r"(?<![A-Za-z0-9])[A-Z]{2}[0-9]{4}(?![0-9])")
 TEXT_MAX = 300
 # Score by where a file was found, less SCORE_STEP for each file before it there.
 ORIGIN_SCORES = {"wikidata": 1.0, "category": 0.7, "search": 0.4}
@@ -67,8 +79,12 @@ SEARCH_LIMIT = 30
 INFO_BATCH = 50
 # One request covers every site: the query service can limit a client to one a minute.
 SPARQL_BATCH = 500
+# Item ids by value: 500 make an address longer than the query service accepts (HTTP 431).
+ITEM_BATCH = 150
 PAUSE_SECONDS = 0.5
 ATTEMPTS = 5
+# API errors worth a retry: replication lag, and a busy search cluster.
+RETRY_ERRORS = ("maxlag", "cirrussearch-too-busy-error")
 # Longest wait for a Retry-After.
 MAX_WAIT_SECONDS = 120
 
@@ -77,14 +93,14 @@ WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
 OUTPUT_NAME = "suggest_photos.tsv"
 CACHE_NAME = "suggest_photos_cache"
 COLUMNS = (
-    "place_id", "site_id", "place_name", "origin", "title", "page_url", "file_url",
+    "place_id", "place_type_id", "site_id", "eco_id", "place_name", "origin", "title", "page_url", "file_url",
     "width", "height", "creator", "licence_id", "score", "alt_text", "caption",
 )
 
 SITES = """
-select places.id::text as place_id,
+select places.id::text as place_id, places.place_type_id,
   coalesce(curations.display_name, places.name) as name,
-  ids.source_record_id as site_id
+  ids.source_record_id as site_id, null::text as eco_id, null::text as wikidata_item
 from public.places
 join public.place_source_ids as ids
   on ids.place_id = places.id
@@ -96,6 +112,29 @@ where places.place_type_id = 'world_heritage_site'
   and places.publication_status = 'published'
 order by name, places.id
 """
+
+ECOREGIONS = """
+select places.id::text as place_id, places.place_type_id,
+  coalesce(curations.display_name, places.name) as name,
+  null::text as site_id, ids.source_record_id as eco_id, items.source_record_id as wikidata_item
+from public.places
+join public.place_source_ids as ids
+  on ids.place_id = places.id
+  and ids.source_id = 'resolve-ecoregions'
+  and ids.id_kind = 'eco_id'
+  and ids.match_status = 'confirmed'
+left join public.place_source_ids as items
+  on items.place_id = places.id
+  and items.source_id = 'wikidata'
+  and items.id_kind = 'wikidata_item'
+  and items.match_status = 'confirmed'
+left join public.place_curations as curations on curations.place_id = places.id
+where places.place_type_id = 'ecoregion'
+  and places.publication_status = 'published'
+order by name, places.id
+"""
+
+PLACE_QUERIES = {"world_heritage_site": SITES, "ecoregion": ECOREGIONS}
 
 
 # --- text --------------------------------------------------------------------
@@ -163,9 +202,14 @@ def commons_licence_id(code: str | None, licences: set[str]) -> str | None:
     return value if value in licences else None
 
 
-def excluded_title(title: str) -> bool:
-    words = re.split(r"[^a-z]+", file_name(title).lower())
-    return any(word in EXCLUDED_WORDS for word in words)
+def excluded_title(title: str, place_type_id: str = "world_heritage_site") -> bool:
+    name = file_name(title)
+    words = re.split(r"[^a-z]+", name.lower())
+    if any(word in EXCLUDED_WORDS for word in words):
+        return True
+    if place_type_id == "ecoregion":
+        return any(word in ECOREGION_WORDS for word in words) or bool(WWF_CODE.search(name))
+    return False
 
 
 def normal_title(name: str) -> str:
@@ -214,7 +258,7 @@ def read_imageinfo(body: dict, licences: set[str]) -> dict[str, CommonsFile]:
     return files
 
 
-def refusal(file: CommonsFile | None) -> str | None:
+def refusal(file: CommonsFile | None, place_type_id: str = "world_heritage_site") -> str | None:
     """Why a file is not suggested, or None to keep it."""
     if file is None:
         return "missing"
@@ -226,7 +270,7 @@ def refusal(file: CommonsFile | None) -> str | None:
         return "licence"
     if not file.creator:
         return "creator"
-    if excluded_title(file.title):
+    if excluded_title(file.title, place_type_id):
         return "title"
     return None
 
@@ -250,7 +294,7 @@ def choose(
             continue
         seen.add(title)
         file = files.get(title)
-        reason = refusal(file)
+        reason = refusal(file, site.get("place_type_id") or "world_heritage_site")
         if reason:
             refused[reason] = refused.get(reason, 0) + 1
             continue
@@ -258,7 +302,9 @@ def choose(
         kept_by_origin[origin] = rank + 1
         rows.append({
             "place_id": site["place_id"],
-            "site_id": site["site_id"],
+            "place_type_id": site.get("place_type_id") or "world_heritage_site",
+            "site_id": site.get("site_id") or "",
+            "eco_id": site.get("eco_id") or "",
             "place_name": site["name"],
             "origin": origin,
             "title": file.title,
@@ -275,12 +321,15 @@ def choose(
     return rows, refused
 
 
-def read_sparql(body: dict) -> dict[str, dict]:
-    """Per WDPA id, the Wikidata items, images (P18), and categories (P373)."""
+def read_sparql(body: dict, by: str = "wdpa") -> dict[str, dict]:
+    """Per WDPA id, or per item id with `by` "item", the Wikidata items,
+    images (P18), and categories (P373)."""
     found: dict[str, dict] = {}
     for binding in (body.get("results") or {}).get("bindings") or []:
-        wdpa = binding["wdpa"]["value"]
-        entry = found.setdefault(wdpa, {"items": [], "images": [], "categories": []})
+        value = binding[by]["value"]
+        if by == "item":
+            value = value.rsplit("/", 1)[-1]
+        entry = found.setdefault(value, {"items": [], "images": [], "categories": []})
         for key, field in (("item", "items"), ("image", "images"), ("category", "categories")):
             value = (binding.get(key) or {}).get("value")
             if value and value not in entry[field]:
@@ -346,7 +395,7 @@ class Client:
                 error = body.get("error") if isinstance(body, dict) else None
                 if not error:
                     return body
-                if error.get("code") != "maxlag" or attempt == ATTEMPTS:
+                if error.get("code") not in RETRY_ERRORS or attempt == ATTEMPTS:
                     raise SystemExit(f"API error {error.get('code')}: {error.get('info')}")
                 wait = delay
             print(f"waiting {wait:.0f} s before retry {attempt}", flush=True)
@@ -372,6 +421,22 @@ def wikidata_items(client: Client, site_ids: list[str]) -> dict[str, dict]:
             "OPTIONAL { ?item wdt:P18 ?image } OPTIONAL { ?item wdt:P373 ?category } }"
         )
         found.update(read_sparql(client.get(WIKIDATA_SPARQL, {"query": query, "format": "json"})))
+    return found
+
+
+def items_by_id(client: Client, qids: list[str]) -> dict[str, dict]:
+    """Per item id, its images (P18) and categories (P373)."""
+    found: dict[str, dict] = {}
+    for start in range(0, len(qids), ITEM_BATCH):
+        values = " ".join(f"wd:{q}" for q in qids[start : start + ITEM_BATCH])
+        query = (
+            "SELECT ?item ?image ?category WHERE { "
+            f"VALUES ?item {{ {values} }} "
+            "OPTIONAL { ?item wdt:P18 ?image } OPTIONAL { ?item wdt:P373 ?category } }"
+        )
+        found.update(read_sparql(
+            client.get(WIKIDATA_SPARQL, {"query": query, "format": "json"}), by="item"
+        ))
     return found
 
 
@@ -402,22 +467,30 @@ def work_dir() -> Path:
     return path
 
 
-def fetch(conn, work: Path, client: Client | None = None) -> dict:
-    sites = conn.execute(SITES).fetchall()
+def fetch(conn, work: Path, client: Client | None = None,
+          place_types: tuple[str, ...] = tuple(PLACE_QUERIES)) -> dict:
+    sites = [row for t in place_types for row in conn.execute(PLACE_QUERIES[t]).fetchall()]
     licences = {r["id"] for r in conn.execute("select id from public.licences").fetchall()}
     conn.rollback()
     client = client or Client(work / CACHE_NAME)
-    items = wikidata_items(client, sorted({s["site_id"] for s in sites}))
+    by_wdpa = wikidata_items(client, sorted({s["site_id"] for s in sites if s["site_id"]}))
+    by_item = items_by_id(client, sorted({s["wikidata_item"] for s in sites if s["wikidata_item"]}))
 
     stats = {
-        "sites": len(sites), "with_item": 0, "found": {}, "kept": {},
-        "refused": {}, "sites_without": 0, "rows": 0,
+        t: {"places": 0, "with_item": 0, "found": {}, "kept": {}, "refused": {},
+            "places_without": 0, "rows": 0}
+        for t in place_types
     }
     rows: list[dict] = []
     for number, site in enumerate(sites, 1):
-        entry = items.get(site["site_id"], {"images": [], "categories": []})
-        if entry.get("items"):
-            stats["with_item"] += 1
+        if site["site_id"]:
+            entry = by_wdpa.get(site["site_id"], {"images": [], "categories": []})
+        else:
+            entry = by_item.get(site["wikidata_item"] or "", {"images": [], "categories": []})
+        type_stats = stats[site["place_type_id"]]
+        type_stats["places"] += 1
+        if entry.get("items") or site["wikidata_item"]:
+            type_stats["with_item"] += 1
         candidates = [("wikidata", t) for t in entry["images"]]
         for category in entry["categories"]:
             body = commons(
@@ -431,27 +504,26 @@ def fetch(conn, work: Path, client: Client | None = None) -> dict:
         )
         candidates += [("search", t) for t in search_titles(body)]
         for origin, _ in candidates:
-            stats["found"][origin] = stats["found"].get(origin, 0) + 1
+            type_stats["found"][origin] = type_stats["found"].get(origin, 0) + 1
 
         titles = list(dict.fromkeys(t for _, t in candidates))
         chosen, refused = choose(site, candidates, file_infos(client, titles, licences))
         for reason, count in refused.items():
-            stats["refused"][reason] = stats["refused"].get(reason, 0) + count
+            type_stats["refused"][reason] = type_stats["refused"].get(reason, 0) + count
         for row in chosen:
-            stats["kept"][row["origin"]] = stats["kept"].get(row["origin"], 0) + 1
+            type_stats["kept"][row["origin"]] = type_stats["kept"].get(row["origin"], 0) + 1
         if not chosen:
-            stats["sites_without"] += 1
+            type_stats["places_without"] += 1
+        type_stats["rows"] += len(chosen)
         rows += chosen
         if number % 20 == 0:
-            print(f"{number} of {len(sites)} sites, {len(rows)} photographs", flush=True)
+            print(f"{number} of {len(sites)} places, {len(rows)} photographs", flush=True)
 
     with open(work / OUTPUT_NAME, "w", newline="", encoding="utf-8") as out:
         writer = csv.DictWriter(out, fieldnames=COLUMNS, delimiter="\t")
         writer.writeheader()
         writer.writerows(rows)
-    stats["rows"] = len(rows)
-    stats["requests"] = client.requests
-    return stats
+    return {**stats, "rows": len(rows), "requests": client.requests}
 
 
 def read_output(work: Path) -> list[dict]:
@@ -470,21 +542,35 @@ select exists (
   where place_images.place_id = %s::uuid
     and images.source_id = %s
     and images.source_record_id = %s
-) as linked,
-exists (select 1 from public.places where id = %s::uuid) as place_exists
+) as linked
 """
+
+ECOREGION_PLACE = """
+select place_id::text from public.place_source_ids
+where source_id = 'resolve-ecoregions' and id_kind = 'eco_id'
+  and match_status = 'confirmed' and source_record_id = %s
+"""
+
+
+def place_of(conn, row: dict) -> str | None:
+    """The row's place in this database: by ECO_ID for an ecoregion."""
+    if row.get("eco_id"):
+        found = conn.execute(ECOREGION_PLACE, (row["eco_id"],)).fetchone()
+        return found["place_id"] if found else None
+    found = conn.execute(
+        "select id::text from public.places where id = %s::uuid", (row["place_id"],)
+    ).fetchone()
+    return found["id"] if found else None
 
 
 def counts(conn, work: Path) -> dict:
     result = {"rows": 0, "would_add": 0, "already_linked": 0, "missing_place": 0}
     for row in read_output(work):
         result["rows"] += 1
-        found = conn.execute(
-            LINKED, (row["place_id"], SOURCE_ID, row["title"], row["place_id"])
-        ).fetchone()
-        if not found["place_exists"]:
+        place_id = place_of(conn, row)
+        if place_id is None:
             result["missing_place"] += 1
-        elif found["linked"]:
+        elif conn.execute(LINKED, (place_id, SOURCE_ID, row["title"])).fetchone()["linked"]:
             result["already_linked"] += 1
         else:
             result["would_add"] += 1
@@ -498,9 +584,8 @@ def load(conn, work: Path) -> dict:
               "already_linked": 0, "missing_place": 0}
     with conn.transaction():
         for row in rows:
-            if not conn.execute(
-                "select 1 from public.places where id = %s::uuid", (row["place_id"],)
-            ).fetchone():
+            place_id = place_of(conn, row)
+            if place_id is None:
                 result["missing_place"] += 1
                 continue
             image = conn.execute(
@@ -529,7 +614,7 @@ def load(conn, work: Path) -> dict:
                 on conflict (place_id, image_id) do nothing
                 returning image_id
                 """,
-                (row["place_id"], image["id"], PIPELINE, float(row["score"]),
+                (place_id, image["id"], PIPELINE, float(row["score"]),
                  row["caption"] or None, row["alt_text"]),
             ).fetchone()
             if added:
@@ -541,12 +626,20 @@ def load(conn, work: Path) -> dict:
 
 def main() -> None:
     command = sys.argv[1] if len(sys.argv) > 1 else ""
-    if command not in ("fetch", "counts", "load"):
-        raise SystemExit("usage: suggest_photos.py fetch | counts | load")
+    place_types = tuple(sys.argv[2:]) or tuple(PLACE_QUERIES)
+    if command not in ("fetch", "counts", "load") or any(
+        t not in PLACE_QUERIES for t in place_types
+    ) or (command != "fetch" and len(sys.argv) > 2):
+        raise SystemExit(
+            "usage: suggest_photos.py fetch [world_heritage_site | ecoregion] | counts | load"
+        )
     conn = import_wdpa.open_connection()
     try:
         work = work_dir()
-        result = {"fetch": fetch, "counts": counts, "load": load}[command](conn, work)
+        if command == "fetch":
+            result = fetch(conn, work, place_types=place_types)
+        else:
+            result = {"counts": counts, "load": load}[command](conn, work)
         print(json.dumps(result, indent=2), flush=True)
     finally:
         conn.close()
