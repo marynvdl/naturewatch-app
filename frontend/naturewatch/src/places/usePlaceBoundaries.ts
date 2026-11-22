@@ -9,9 +9,13 @@ import {
   PLACE_TILE_LAYER,
   RECOGNITION_TILES_URL,
   RECOGNITION_TILE_LAYER,
+  ECOREGION_TILES_URL,
+  ECOREGION_TILE_LAYER,
   loadPlaceBounds,
 } from './api';
 import {
+  ECOREGION_COLOUR,
+  ECOREGION_TYPE,
   RECOGNITION_COLOUR,
   boundsInsideFrame,
   isRecognitionButtonType,
@@ -29,6 +33,26 @@ const RECOGNITION_FILL = 'recognitions-fill';
 const RECOGNITION_LINE = 'recognitions-line';
 const RECOGNITION_SELECT_LINE = 'recognitions-select-line';
 const RECOGNITION_HOVER_LINE = 'recognitions-hover-line';
+const ECOREGION_SOURCE = 'ecoregions-tiles';
+const ECOREGION_FILL = 'ecoregions-fill';
+const ECOREGION_LINE = 'ecoregions-line';
+const ECOREGION_SELECT_LINE = 'ecoregions-select-line';
+const ECOREGION_HOVER_LINE = 'ecoregions-hover-line';
+
+/** Outline width of recognitions and ecoregions, by zoom. */
+const OUTLINE_WIDTH = [
+  'interpolate',
+  ['linear'],
+  ['zoom'],
+  3,
+  0.8,
+  6,
+  1.4,
+  9,
+  2,
+  12,
+  2.6,
+] as mapboxgl.ExpressionSpecification;
 
 const PLACE_FILL_OPACITY = [
   'interpolate',
@@ -112,22 +136,30 @@ function recognitionPaint(satellite: boolean) {
   ] as mapboxgl.ExpressionSpecification;
   return {
     fill: { 'fill-color': '#000000', 'fill-opacity': 0 },
-    line: {
-      'line-color': colour,
-      'line-width': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        3,
-        0.8,
-        6,
-        1.4,
-        9,
-        2,
-        12,
-        2.6,
-      ],
-    },
+    line: { 'line-color': colour, 'line-width': OUTLINE_WIDTH },
+    selectedLine: { 'line-color': colour, 'line-width': 2.5 },
+    hoverLine: { 'line-color': colour, 'line-width': 2 },
+  } satisfies {
+    fill: mapboxgl.FillLayer['paint'];
+    line: mapboxgl.LineLayer['paint'];
+    selectedLine: mapboxgl.LineLayer['paint'];
+    hoverLine: mapboxgl.LineLayer['paint'];
+  };
+}
+
+/**
+ * Ecoregions are outlines only, in one colour, like recognitions. The fill is
+ * transparent and only catches clicks.
+ * @param satellite - Whether the satellite basemap is shown.
+ * @returns Paint for each ecoregion layer.
+ */
+function ecoregionPaint(satellite: boolean) {
+  const colour = satellite
+    ? ECOREGION_COLOUR.satellite
+    : ECOREGION_COLOUR.monochrome;
+  return {
+    fill: { 'fill-color': '#000000', 'fill-opacity': 0 },
+    line: { 'line-color': colour, 'line-width': OUTLINE_WIDTH },
     selectedLine: { 'line-color': colour, 'line-width': 2.5 },
     hoverLine: { 'line-color': colour, 'line-width': 2 },
   } satisfies {
@@ -190,10 +222,12 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * @param mapInstance - The map.
    */
   function highlightHover(mapInstance: mapboxgl.Map) {
-    [PLACE_HOVER_LINE, RECOGNITION_HOVER_LINE].forEach(layer => {
-      if (mapInstance.getLayer(layer))
-        mapInstance.setFilter(layer, hoverFilter());
-    });
+    [ECOREGION_HOVER_LINE, PLACE_HOVER_LINE, RECOGNITION_HOVER_LINE].forEach(
+      layer => {
+        if (mapInstance.getLayer(layer))
+          mapInstance.setFilter(layer, hoverFilter());
+      }
+    );
   }
 
   /** Filter that keeps the places the size and cropland filter keeps. */
@@ -245,8 +279,9 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   /**
    * Hide the boundaries the size and cropland filter leaves out, and withdrawn
    * places. Conservation areas draw while they are listed, or while no
-   * recognition type is. Each listed recognition type draws. A selected
-   * place's outline always draws.
+   * recognition type and no ecoregion is. Each listed recognition type draws.
+   * Ecoregions draw while they are listed. A selected place's outline always
+   * draws.
    * While a profile's Related tab is open, the conservation areas it lists
    * draw instead, whatever the list and the filter show. While an admin list
    * is open, only the selected and hovered outlines draw.
@@ -259,11 +294,12 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       withdrawnFilter()
     );
     const queueOnly = placesStore.adminList !== null && !placesStore.visible;
-    const recognitions = placesStore.listingRecognitions && !queueOnly;
+    const recognitions = listedRecognitions().length > 0 && !queueOnly;
+    const ecoregions =
+      placesStore.listTypes.includes(ECOREGION_TYPE) && !queueOnly;
     const conservationAreas =
       !queueOnly &&
-      (placesStore.listTypes.includes(PLACE_TYPE) ||
-        !placesStore.listingRecognitions);
+      (placesStore.listTypes.includes(PLACE_TYPE) || !placesStore.sizeOnly);
     [PLACE_FILL, PLACE_LINE].forEach(layer => {
       if (!mapInstance.getLayer(layer)) return;
       mapInstance.setFilter(layer, filter);
@@ -271,6 +307,16 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         layer,
         'visibility',
         areas || conservationAreas ? 'visible' : 'none'
+      );
+    });
+    const ecoregionFilter = allOf(keptFilter(), withdrawnFilter());
+    [ECOREGION_FILL, ECOREGION_LINE].forEach(layer => {
+      if (!mapInstance.getLayer(layer)) return;
+      mapInstance.setFilter(layer, ecoregionFilter);
+      mapInstance.setLayoutProperty(
+        layer,
+        'visibility',
+        ecoregions ? 'visible' : 'none'
       );
     });
     [RECOGNITION_FILL, RECOGNITION_LINE].forEach(layer => {
@@ -323,10 +369,12 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
 
   /** Highlight the selected boundary, from whichever archive holds it. */
   function highlightSelection(mapInstance: mapboxgl.Map) {
-    [PLACE_SELECT_LINE, RECOGNITION_SELECT_LINE].forEach(layer => {
-      if (mapInstance.getLayer(layer))
-        mapInstance.setFilter(layer, selectionFilter());
-    });
+    [ECOREGION_SELECT_LINE, PLACE_SELECT_LINE, RECOGNITION_SELECT_LINE].forEach(
+      layer => {
+        if (mapInstance.getLayer(layer))
+          mapInstance.setFilter(layer, selectionFilter());
+      }
+    );
   }
 
   /** Whether the satellite basemap is shown. */
@@ -341,7 +389,11 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   function applyBasemapPaint(mapInstance: mapboxgl.Map) {
     const paint = placePaint(onSatellite());
     const recognition = recognitionPaint(onSatellite());
+    const ecoregion = ecoregionPaint(onSatellite());
     const layers: [string, Record<string, unknown>][] = [
+      [ECOREGION_LINE, ecoregion.line],
+      [ECOREGION_SELECT_LINE, ecoregion.selectedLine],
+      [ECOREGION_HOVER_LINE, ecoregion.hoverLine],
       [PLACE_FILL, paint.fill],
       [PLACE_LINE, paint.line],
       [PLACE_SELECT_LINE, paint.selectedLine],
@@ -472,9 +524,13 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     void frameSelectedPlace(mapInstance, true);
   }
 
-  /** Remove the place and recognition boundaries. */
+  /** Remove the place, recognition, and ecoregion boundaries. */
   function removePlaceOverlay(mapInstance: mapboxgl.Map) {
     [
+      ECOREGION_HOVER_LINE,
+      ECOREGION_SELECT_LINE,
+      ECOREGION_LINE,
+      ECOREGION_FILL,
       RECOGNITION_HOVER_LINE,
       PLACE_HOVER_LINE,
       RECOGNITION_SELECT_LINE,
@@ -486,7 +542,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     ].forEach(layer => {
       if (mapInstance.getLayer(layer)) mapInstance.removeLayer(layer);
     });
-    [RECOGNITION_SOURCE, PLACE_SOURCE].forEach(source => {
+    [RECOGNITION_SOURCE, PLACE_SOURCE, ECOREGION_SOURCE].forEach(source => {
       if (mapInstance.getSource(source)) mapInstance.removeSource(source);
     });
   }
@@ -499,10 +555,34 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   function choosePlace(event: mapboxgl.MapMouseEvent | mapboxgl.MapTouchEvent) {
     // A click while measuring places a point. It does not choose a place.
     if (measureStore.drawing) return;
+    // An ecoregion lies under the parks drawn inside it. A click on a park opens the park.
+    if (event.features?.[0]?.layer?.id === ECOREGION_FILL && drawnAbove(event))
+      return;
     const id = event.features?.[0]?.properties?.id;
     if (id === undefined || id === null || id === '') return;
     const placeId = String(id);
     placesStore.selectPlace(placeId, 'map');
+  }
+
+  /**
+   * Whether a drawn conservation area or recognition is under the event.
+   * @param event - The click or the end of the tap.
+   * @returns True when one is.
+   */
+  function drawnAbove(
+    event: mapboxgl.MapMouseEvent | mapboxgl.MapTouchEvent
+  ): boolean {
+    const mapInstance = readMap();
+    if (!mapInstance) return false;
+    const layers = [PLACE_FILL, RECOGNITION_FILL].filter(
+      layer =>
+        mapInstance.getLayer(layer) &&
+        mapInstance.getLayoutProperty(layer, 'visibility') !== 'none'
+    );
+    if (!layers.length) return false;
+    return (
+      mapInstance.queryRenderedFeatures(event.point, { layers }).length > 0
+    );
   }
 
   /** Where and when a one-finger touch on a boundary began. */
@@ -561,12 +641,13 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   function onMapError(event: mapboxgl.ErrorEvent & { sourceId?: string }) {
     if (
       event.sourceId === PLACE_SOURCE ||
-      event.sourceId === RECOGNITION_SOURCE
+      event.sourceId === RECOGNITION_SOURCE ||
+      event.sourceId === ECOREGION_SOURCE
     )
       placesStore.status = 'error';
   }
 
-  /** Draw or clear the conservation-area boundaries. */
+  /** Draw or clear the conservation-area, recognition, and ecoregion boundaries. */
   function syncPlaceOverlay(mapInstance: mapboxgl.Map) {
     if (
       !placesStore.visible &&
@@ -578,6 +659,53 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     }
     const before = firstSymbolId(mapInstance);
     const onStandard = !!mapInstance.getStyle()?.imports?.length;
+    // Ecoregions are added first, so parks and recognitions draw above them.
+    if (!mapInstance.getSource(ECOREGION_SOURCE)) {
+      mapInstance.addSource(ECOREGION_SOURCE, {
+        type: 'vector',
+        url: ECOREGION_TILES_URL,
+      });
+      const paint = ecoregionPaint(onSatellite());
+      const layers: (mapboxgl.FillLayer | mapboxgl.LineLayer)[] = [
+        {
+          id: ECOREGION_FILL,
+          type: 'fill',
+          source: ECOREGION_SOURCE,
+          'source-layer': ECOREGION_TILE_LAYER,
+          paint: paint.fill,
+        },
+        {
+          id: ECOREGION_LINE,
+          type: 'line',
+          source: ECOREGION_SOURCE,
+          'source-layer': ECOREGION_TILE_LAYER,
+          layout: { 'line-join': 'round' },
+          paint: paint.line,
+        },
+        {
+          id: ECOREGION_SELECT_LINE,
+          type: 'line',
+          source: ECOREGION_SOURCE,
+          'source-layer': ECOREGION_TILE_LAYER,
+          filter: selectionFilter(),
+          layout: { 'line-join': 'round' },
+          paint: paint.selectedLine,
+        },
+        {
+          id: ECOREGION_HOVER_LINE,
+          type: 'line',
+          source: ECOREGION_SOURCE,
+          'source-layer': ECOREGION_TILE_LAYER,
+          filter: hoverFilter(),
+          layout: { 'line-join': 'round' },
+          paint: paint.hoverLine,
+        },
+      ];
+      layers.forEach(layer => {
+        if (onStandard) layer.slot = 'top';
+        mapInstance.addLayer(layer, onStandard ? undefined : before);
+      });
+    }
     if (!mapInstance.getSource(PLACE_SOURCE)) {
       mapInstance.addSource(PLACE_SOURCE, {
         type: 'vector',
@@ -672,7 +800,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       });
     }
     if (!listening) {
-      [PLACE_FILL, RECOGNITION_FILL].forEach(layer => {
+      [PLACE_FILL, RECOGNITION_FILL, ECOREGION_FILL].forEach(layer => {
         mapInstance.on('click', layer, onPlaceClick);
         mapInstance.on('touchstart', layer, onPlaceTouchStart);
         mapInstance.on('touchend', layer, onPlaceTouchEnd);

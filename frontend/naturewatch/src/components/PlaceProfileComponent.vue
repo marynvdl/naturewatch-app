@@ -27,6 +27,7 @@ import {
 } from '@/places/api';
 import {
   CROPLAND_NOT_CALCULATED,
+  ECOREGION_TYPE,
   RECOGNITION_LABEL,
   recognitionColour,
   SPECIES_NOTHING_YET,
@@ -175,12 +176,35 @@ watch(
   }
 );
 /**
+ * The ecoregions the place lies in, shown as tags in Overview, largest share
+ * of the place first.
+ */
+const ecoregions = computed(() =>
+  related.value
+    .filter(
+      link =>
+        link.outward &&
+        link.typeId === 'located_in' &&
+        link.otherTypeId === ECOREGION_TYPE
+    )
+    .sort(
+      (a, b) =>
+        (b.coverage ?? 0) - (a.coverage ?? 0) ||
+        (a.otherName ?? '').localeCompare(b.otherName ?? '')
+    )
+);
+
+/**
  * The Related tab's cards grouped by relationship, in a fixed order. The
- * recognitions already shown as badges under the title are left out.
+ * recognitions shown as badges under the title, and the ecoregions shown as
+ * tags in Overview, are left out.
  */
 const relatedGroups = computed(() => {
   const groups = new Map<string, PlaceLink[]>();
-  const badged = new Set(recognitions.value.map(item => item.id));
+  const badged = new Set([
+    ...recognitions.value.map(item => item.id),
+    ...ecoregions.value.map(link => link.otherId),
+  ]);
   for (const link of related.value) {
     if (badged.has(link.otherId)) continue;
     const label = linkLabel(link.typeId, link.outward);
@@ -590,6 +614,24 @@ function onTabKey(event: KeyboardEvent, index: number) {
                   </dd>
                 </div>
               </PlaceEditField>
+              <div v-if="ecoregions.length" class="place-fact">
+                <dt>
+                  {{ ecoregions.length > 1 ? 'Ecoregions' : 'Ecoregion' }}
+                </dt>
+                <dd>
+                  <ul class="place-countries">
+                    <li v-for="link in ecoregions" :key="link.id">
+                      <button
+                        type="button"
+                        class="place-country place-ecoregion"
+                        @click="$emit('open', link.otherId)"
+                      >
+                        {{ link.otherName }}
+                      </button>
+                    </li>
+                  </ul>
+                </dd>
+              </div>
               <div v-if="place.areaKm2 != null" class="place-fact">
                 <dt>Area</dt>
                 <dd>{{ formatKm2(place.areaKm2) }} km²</dd>
@@ -875,6 +917,23 @@ function onTabKey(event: KeyboardEvent, index: number) {
   color: var(--foreground);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.place-ecoregion {
+  border: 0;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.place-ecoregion:hover {
+  background: var(--secondary);
+}
+
+.place-ecoregion:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
 }
 
 .place-related {

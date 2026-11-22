@@ -28,6 +28,7 @@ import {
 } from '@/places/api';
 import {
   CROPLAND_FULL,
+  ECOREGION_TYPE,
   RECOGNITION_BUTTONS,
   isRecognitionButtonType,
   type RecognitionButtonType,
@@ -64,7 +65,7 @@ const placeListKind = computed(() =>
     ? placesStore.adminList
     : null
 );
-/** Ecoregions and Countries list nothing yet, and are chosen on their own. */
+/** Ecoregions and Countries are chosen on their own. Countries lists nothing yet. */
 const ALONE: PlaceTypeId[] = ['ecoregion', 'country'];
 
 /** The type buttons that are on, in the order they were chosen. */
@@ -78,6 +79,7 @@ const listedTypes = computed<string[]>(() =>
     .filter(id => placeTypes.value.includes(id))
     .flatMap(id => {
       if (id === 'protected_area') return [PLACE_TYPE];
+      if (id === 'ecoregion') return [ECOREGION_TYPE];
       if (isRecognitionButtonType(id)) return [id];
       return [];
     })
@@ -89,8 +91,8 @@ watch(
   listedKey,
   () => {
     placesStore.listTypes = [...listedTypes.value];
-    if (!placesStore.listingRecognitions) return;
-    // Only the size filter applies to recognitions. It stays; cropland is cleared.
+    if (!placesStore.sizeOnly) return;
+    // Only the size filter applies to recognitions and ecoregions. It stays; cropland is cleared.
     if (
       placesStore.croplandKept[0] !== CROPLAND_FULL[0] ||
       placesStore.croplandKept[1] !== CROPLAND_FULL[1]
@@ -149,9 +151,9 @@ const allSortOptions: { id: PlaceSort; label: string }[] = [
   { id: 'cropland-desc', label: 'Cropland %, highest first' },
   { id: 'cropland-asc', label: 'Cropland %, lowest first' },
 ];
-/** Recognition lists sort by name and size only. */
+/** Recognition and ecoregion lists sort by name and size only. */
 const sortOptions = computed(() =>
-  placesStore.listingRecognitions
+  placesStore.sizeOnly
     ? allSortOptions.filter(option => !option.id.startsWith('cropland'))
     : allSortOptions
 );
@@ -227,10 +229,8 @@ function listQuery(offset = 0): PlaceWindowQuery {
     sort: sort.value,
     sizeMin: placesStore.sizeKept[0],
     sizeMax: placesStore.sizeKept[1],
-    cropMin: placesStore.listingRecognitions ? 0 : placesStore.croplandKept[0],
-    cropMax: placesStore.listingRecognitions
-      ? 100
-      : placesStore.croplandKept[1],
+    cropMin: placesStore.sizeOnly ? 0 : placesStore.croplandKept[0],
+    cropMax: placesStore.sizeOnly ? 100 : placesStore.croplandKept[1],
     extent: listExtent.value,
     offset,
     placeTypes: listedTypes.value.length ? listedTypes.value : [PLACE_TYPE],
@@ -268,6 +268,7 @@ function chooseResult(place: PlaceSummary) {
     if (!anyType.value) {
       const type = place.place_type_id ?? PLACE_TYPE;
       if (type === PLACE_TYPE) placeTypes.value = ['protected_area'];
+      else if (type === ECOREGION_TYPE) placeTypes.value = ['ecoregion'];
       else if (isRecognitionButtonType(type)) {
         showMore.value = true;
         placeTypes.value = [type];
@@ -484,8 +485,8 @@ function clearPlaces() {
 /**
  * Turn a place type on, or off when it is on. Conservation areas and the
  * recognition types can be on together: the list holds them all, and the map
- * draws them all. Ecoregions and Countries have no stored places and are on
- * alone. Turning a type off closes the open place.
+ * draws them all. Ecoregions and Countries are on alone. Countries has no
+ * stored places. Turning a type off closes the open place.
  */
 function selectPlaceType(type: PlaceTypeId) {
   placesStore.adminList = null;
@@ -499,7 +500,8 @@ function selectPlaceType(type: PlaceTypeId) {
   if (ALONE.includes(type)) {
     placeTypes.value = [type];
     placesStore.clearSelection();
-    hideBoundaries();
+    if (showList.value) showBoundaries();
+    else hideBoundaries();
     return;
   }
   placeTypes.value = [
@@ -732,7 +734,7 @@ watch(
             :extent="listExtent"
             :matched-total="matchTotal"
             :place-types="listedTypes"
-            :size-only="placesStore.listingRecognitions"
+            :size-only="placesStore.sizeOnly"
           />
         </div>
         <div v-if="anyType && !showList" class="places-list">

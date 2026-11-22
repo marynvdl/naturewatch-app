@@ -475,6 +475,63 @@ describe('Place profile', () => {
       expect(wrapper.text().split('Kruger to Canyons').length - 1).toBe(0);
     });
 
+    it('shows the ecoregions a place lies in as tags that open them, not in Related', async () => {
+      const savanna = '12121212-1212-1212-1212-121212121212';
+      const woodland = '13131313-1313-1313-1313-131313131313';
+      vi.mocked(loadRelatedPlaces).mockResolvedValue({
+        status: 'ok',
+        links: [
+          link({
+            id: 'e1',
+            typeId: 'located_in',
+            outward: true,
+            otherId: woodland,
+            otherName: 'Zambezian and Mopane woodlands',
+            otherTypeId: 'ecoregion',
+            status: 'confirmed',
+            coverage: 0.3,
+          }),
+          link({
+            id: 'e2',
+            typeId: 'located_in',
+            outward: true,
+            otherId: savanna,
+            otherName: 'Southern Africa bushveld',
+            otherTypeId: 'ecoregion',
+            status: 'confirmed',
+            coverage: 0.7,
+          }),
+          link({
+            id: 'c',
+            typeId: 'located_in',
+            outward: false,
+            otherId: parkId,
+            otherName: 'Makuleke Contract Park',
+            otherTypeId: 'conservation_area',
+            status: 'confirmed',
+          }),
+        ],
+      });
+      const wrapper = await mountProfile(kruger);
+      const panel = wrapper.get('[role="tabpanel"]');
+      expect(panel.text()).toContain('Ecoregions');
+      const tags = panel.findAll('.place-ecoregion');
+      // Largest share of the park first
+      expect(tags.map(tag => tag.text())).toEqual([
+        'Southern Africa bushveld',
+        'Zambezian and Mopane woodlands',
+      ]);
+      await tags[0].trigger('click');
+      expect(wrapper.emitted('open')).toEqual([[savanna]]);
+
+      await openTab(wrapper, 'Related');
+      const groups = wrapper.findAll('.place-related-group');
+      expect(groups.map(group => group.attributes('aria-label'))).toEqual([
+        'Contains',
+      ]);
+      expect(wrapper.text()).not.toContain('Southern Africa bushveld');
+    });
+
     it('groups related places by relationship as cards with a type label', async () => {
       const parks = Array.from({ length: 23 }, (_, index) =>
         link({
