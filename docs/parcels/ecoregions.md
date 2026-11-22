@@ -74,7 +74,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* The Ecoregions button lists and draws ecoregions, and a click opens a profile. The paint is outlines only. The profile shows the size. Related lists the conservation areas inside, 20 at a time. A conservation area's Overview shows its ecoregions as tags that open them. Update `docs/user/using-the-map.md`, `docs/user/data.md`, and `docs/blueprint.md`. Run the tests and a browser check, and have the user evaluate the local app.
 - [x] [Task 05 — Filter by ecoregion](../archive/tasks/task-05-filter-by-ecoregion.md) — naturewatch-app
   - *Goal:* Add a migration so the list reads take ecoregion ids. Add the Ecoregion field to the filter dialog, and filter the map to the matching places. Update `docs/user/using-the-map.md`. Run the tests and a browser check, and have the user evaluate the local app.
-- [ ] Task 06 — Ecoregion photos — naturewatch-app
+- [ ] [Task 06 — Ecoregion photos](../tasks/task-06-ecoregion-photos.md) — naturewatch-app
   - *Goal:* Match each ecoregion to its Wikidata item. Extend `suggest_photos.py` to ecoregions, and load the suggestions on the hosted database after approval. The admin reviews them in the photo queue.
 - [ ] Task 07 — Ecoregion descriptions — naturewatch-app
   - *Goal:* Suggest each ecoregion's Wikipedia lead as its description. An admin approves or edits it in edit mode. The profile shows the Wikipedia source and the CC BY-SA licence under the text.
