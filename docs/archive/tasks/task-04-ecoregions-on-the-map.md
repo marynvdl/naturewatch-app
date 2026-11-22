@@ -1,6 +1,6 @@
 # Task 04 — Ecoregions on the map and profile
 
-Parcel: [Ecoregions](../parcels/ecoregions.md).
+Parcel: [Ecoregions](../../parcels/ecoregions.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 03 merged in #451 here and naturewatch-analysis#43.
 
