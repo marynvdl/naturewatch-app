@@ -97,6 +97,16 @@ class TextTest(unittest.TestCase):
         self.assertFalse(suggest_photos.excluded_title("File:Mapungubwe hill.jpg"))
         self.assertFalse(suggest_photos.excluded_title("File:Flagstaff ridge.jpg"))
 
+    def test_range_maps_refused_for_ecoregions(self):
+        for title in ("File:Ecoregion PA1219.png", "File:AT1007 map.svg",
+                      "File:Ecoregions of Africa.jpg", "File:NT0303 forest.jpg"):
+            self.assertTrue(suggest_photos.excluded_title(title, "ecoregion"), title)
+        self.assertFalse(suggest_photos.excluded_title("File:NT0303 forest.jpg"))
+        self.assertFalse(suggest_photos.excluded_title("File:Ecoregion walk.jpg"))
+        for title in ("File:Namib dunes 2019.jpg", "File:IMG 20190412 1200.jpg",
+                      "File:Dunes DSC01234.jpg"):
+            self.assertFalse(suggest_photos.excluded_title(title, "ecoregion"), title)
+
     def test_normal_title_from_p18(self):
         self.assertEqual(
             suggest_photos.normal_title(
@@ -130,6 +140,16 @@ class ReadTest(unittest.TestCase):
         self.assertEqual(found["2010"]["images"], ["File:Falls 1.jpg"])
         self.assertEqual(found["2010"]["categories"], ["Victoria Falls", "Mosi-oa-Tunya"])
         self.assertEqual(found["3000"]["images"], [])
+
+    def test_sparql_by_item(self):
+        body = {"results": {"bindings": [
+            {"item": {"value": "http://www.wikidata.org/entity/Q131377"},
+             "image": {"value": "http://commons.wikimedia.org/wiki/Special:FilePath/Namib.jpg"},
+             "category": {"value": "Namib Desert"}},
+        ]}}
+        found = suggest_photos.read_sparql(body, by="item")
+        self.assertEqual(found["Q131377"]["images"], ["File:Namib.jpg"])
+        self.assertEqual(found["Q131377"]["categories"], ["Namib Desert"])
 
 
 class ChooseTest(unittest.TestCase):
@@ -176,6 +196,88 @@ class ChooseTest(unittest.TestCase):
                                         infos(page("File:P18.jpg")))
         self.assertEqual(rows[0]["alt_text"], "Spray over the falls.")
         self.assertEqual(rows[0]["caption"], "Spray over the falls.")
+
+
+class FakeClient:
+    """Answers from stored responses: Wikidata by the request's form, Commons
+    by its list or prop."""
+
+    def __init__(self, files):
+        self.files = files
+        self.requests = 0
+        self.asked: list[dict] = []
+
+    def get(self, url, params):
+        self.requests += 1
+        self.asked.append(params)
+        if url == suggest_photos.WIKIDATA_SPARQL:
+            query = params["query"]
+            bindings = []
+            if "wd:Q131377" in query:
+                bindings.append({
+                    "item": {"value": "http://www.wikidata.org/entity/Q131377"},
+                    "image": {"value": "http://commons.wikimedia.org/wiki/Special:FilePath/"
+                                       "Ecoregion%20AT1315.png"},
+                    "category": {"value": "Namib Desert"},
+                })
+            return {"results": {"bindings": bindings}}
+        if params.get("list") == "categorymembers":
+            return {"query": {"categorymembers": [{"title": "File:Namib dunes.jpg"}]}}
+        if params.get("list") == "search":
+            return {"query": {"search": [{"title": "File:Search result.jpg"}]}}
+        titles = params["titles"].split("|")
+        return {"query": {"pages": [self.files[t] for t in titles if t in self.files]}}
+
+
+class FakeConn:
+    def __init__(self, places):
+        self.places = places
+
+    def execute(self, query, params=None):
+        rows = self.places.get(query, []) if "place_type_id = '" in query else [
+            {"id": l} for l in LICENCES
+        ]
+        return mock.Mock(fetchall=lambda: rows)
+
+    def rollback(self):
+        pass
+
+
+class FetchEcoregionTest(unittest.TestCase):
+    def fetch(self, eco):
+        files = {t: page(t) for t in ("File:Ecoregion AT1315.png", "File:Namib dunes.jpg",
+                                      "File:Search result.jpg")}
+        client = FakeClient(files)
+        conn = FakeConn({suggest_photos.ECOREGIONS: [eco]})
+        with tempfile.TemporaryDirectory() as work:
+            stats = suggest_photos.fetch(conn, Path(work), client, place_types=("ecoregion",))
+            with open(Path(work) / suggest_photos.OUTPUT_NAME, encoding="utf-8") as source:
+                rows = list(csv.DictReader(source, delimiter="\t"))
+        return stats, rows, client
+
+    def test_ecoregion_by_item(self):
+        stats, rows, client = self.fetch({
+            "place_id": "p1", "place_type_id": "ecoregion", "name": "Namib desert",
+            "site_id": None, "eco_id": "101", "wikidata_item": "Q131377",
+        })
+        self.assertEqual([(r["origin"], r["title"]) for r in rows],
+                         [("category", "File:Namib dunes.jpg"),
+                          ("search", "File:Search result.jpg")])
+        self.assertEqual({r["eco_id"] for r in rows}, {"101"})
+        self.assertEqual({r["place_type_id"] for r in rows}, {"ecoregion"})
+        self.assertEqual(stats["ecoregion"]["refused"], {"title": 1})
+        self.assertEqual(stats["ecoregion"]["with_item"], 1)
+        # No WDPA query: the ecoregion is read by its item id only.
+        self.assertFalse(any("P809" in a.get("query", "") for a in client.asked))
+
+    def test_ecoregion_without_item_uses_search(self):
+        stats, rows, client = self.fetch({
+            "place_id": "p2", "place_type_id": "ecoregion", "name": "Adelie Land tundra",
+            "site_id": None, "eco_id": "117", "wikidata_item": None,
+        })
+        self.assertEqual([r["origin"] for r in rows], ["search"])
+        self.assertEqual(stats["ecoregion"]["with_item"], 0)
+        self.assertFalse(any(a.get("list") == "categorymembers" for a in client.asked))
 
 
 class LoadLocalTest(unittest.TestCase):
@@ -262,6 +364,31 @@ class LoadLocalTest(unittest.TestCase):
         self.assertEqual(second["already_linked"], 3)
         statuses = {(l["place_id"], l["source_record_id"]): l["status"] for l in self.links()}
         self.assertEqual(statuses[(self.falls, "File:Test only 2.jpg")], "rejected")
+
+    def test_ecoregion_row_found_by_eco_id(self):
+        place = self.conn.execute(
+            "insert into public.places (name, place_type_id, publication_status) "
+            "values ('Test ecoregion', 'ecoregion', 'published') returning id::text as id"
+        ).fetchone()["id"]
+        self.conn.execute(
+            "insert into public.place_source_ids (place_id, source_id, id_kind, "
+            "source_record_id, match_status) values (%s, 'resolve-ecoregions', 'eco_id', "
+            "'99999', 'confirmed')",
+            (place,),
+        )
+        eco = {"place_id": "00000000-0000-0000-0000-00000000beef", "place_type_id": "ecoregion",
+               "eco_id": "99999", "name": "Test ecoregion"}
+        rows, _ = suggest_photos.choose(eco, [("search", "File:Test eco.jpg")],
+                                        infos(page("File:Test eco.jpg")))
+        self.write(rows)
+        self.assertEqual(suggest_photos.counts(self.conn, self.work)["would_add"], 1)
+        self.assertEqual(suggest_photos.load(self.conn, self.work)["links_added"], 1)
+        linked = self.conn.execute(
+            "select count(*) as n from public.place_images where place_id = %s and status = "
+            "'suggested'", (place,)
+        ).fetchone()["n"]
+        self.assertEqual(linked, 1)
+        self.assertEqual(suggest_photos.load(self.conn, self.work)["links_added"], 0)
 
     def test_missing_place_is_skipped(self):
         self.write([self.row("00000000-0000-0000-0000-00000000dead", "File:Test x.jpg")])
