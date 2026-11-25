@@ -17,6 +17,32 @@ import {
   type SizeBounds,
 } from '@/places/display';
 
+/** A set of conservation areas drawn on the map and shown as a chip. */
+export interface MapSet {
+  id: string;
+  label: string;
+  /** Where the set comes from. Today only a profile's Related tab. */
+  kind: 'related';
+  /** The place the set belongs to. Its chip opens it. */
+  ownerId: string;
+  /** That place's name, shortened to initials on the chip. */
+  ownerName: string;
+  placeIds: string[];
+  /** A pinned set stays while other places are opened. */
+  pinned: boolean;
+}
+
+/** A place opened before the open one. */
+export interface HistoryEntry {
+  id: string;
+  name: string;
+  /** The profile tab it was on. */
+  tab: string;
+}
+
+/** Places the back button can step through. */
+const HISTORY_LIMIT = 20;
+
 const usePlacesStore = defineStore('places', () => {
   const visible = ref(false);
   /**
@@ -45,10 +71,89 @@ const usePlacesStore = defineStore('places', () => {
     if (result.status === 'ok') withdrawnIds.value = result.ids;
   }
   /**
-   * Conservation areas a profile's Related tab lists. The map draws them
-   * while the tab is open. Null otherwise.
+   * Sets of conservation areas drawn on the map, each shown as a chip. Today
+   * the only kind is a profile's Related set. At most one is temporary: it
+   * goes when a place outside it is opened. A pinned set stays until removed.
    */
-  const shownAreaIds = ref<string[] | null>(null);
+  const mapSets = ref<MapSet[]>([]);
+  /**
+   * Every conservation area the map sets hold, which the map draws whatever
+   * the list and the filter show. Null while there is no set.
+   */
+  const shownAreaIds = computed<string[] | null>(() => {
+    const ids = new Set(mapSets.value.flatMap(set => set.placeIds));
+    return ids.size ? [...ids] : null;
+  });
+  /** The temporary set, if there is one. */
+  const temporarySet = computed(
+    () => mapSets.value.find(set => !set.pinned) ?? null
+  );
+
+  /**
+   * The open Related tab lists these conservation areas, or none. The first
+   * creates or replaces the temporary set. None removes the temporary set only
+   * when the place that made it reports it, so opening one of its places keeps it.
+   * @param ownerId - The place whose Related tab it is.
+   * @param name - That place's name, for the chip.
+   * @param ids - The conservation areas, or null.
+   */
+  function showRelated(ownerId: string, name: string, ids: string[] | null) {
+    const temporary = temporarySet.value;
+    if (!ids) {
+      if (temporary?.ownerId === ownerId) removeSet(temporary.id);
+      return;
+    }
+    const kept = mapSets.value.filter(
+      set => set.pinned || set.ownerId !== ownerId
+    );
+    // A pinned set of the same place already draws them.
+    if (kept.some(set => set.ownerId === ownerId)) {
+      mapSets.value = kept;
+      return;
+    }
+    mapSets.value = [
+      ...kept.filter(set => set.pinned),
+      {
+        id: `related:${ownerId}`,
+        label: `Related to ${name}`,
+        kind: 'related',
+        ownerId,
+        ownerName: name,
+        placeIds: [...ids],
+        pinned: false,
+      },
+    ];
+  }
+
+  /**
+   * Keep a set on the map while other places are opened.
+   * @param id - The set.
+   */
+  function pinSet(id: string) {
+    mapSets.value = mapSets.value.map(set =>
+      set.id === id ? { ...set, pinned: true } : set
+    );
+  }
+
+  /**
+   * Stop keeping a pinned set, so it goes like a temporary one. Any other
+   * temporary set is removed, as there is at most one.
+   * @param id - The set.
+   */
+  function unpinSet(id: string) {
+    mapSets.value = mapSets.value
+      .filter(set => set.pinned || set.id === id)
+      .map(set => (set.id === id ? { ...set, pinned: false } : set));
+  }
+
+  /**
+   * Take a set off the map.
+   * @param id - The set.
+   */
+  function removeSet(id: string) {
+    mapSets.value = mapSets.value.filter(set => set.id !== id);
+  }
+
   /** The place whose card the pointer or focus is on, outlined on the map. */
   const hoveredId = ref<string | null>(null);
 
@@ -61,6 +166,12 @@ const usePlacesStore = defineStore('places', () => {
     if (on) hoveredId.value = id;
     else if (hoveredId.value === id) hoveredId.value = null;
   }
+
+  /**
+   * The name shown beside the pointer after it rests on a place on the map,
+   * where it rests, in pixels from the map's corner. Null otherwise.
+   */
+  const mapTip = ref<{ name: string; x: number; y: number } | null>(null);
   /** Whether a recognition type or ecoregions are listed, so the tools are size only. */
   const sizeOnly = computed(() =>
     listTypes.value.some(type => isSizeOnlyType(type))
@@ -134,27 +245,94 @@ const usePlacesStore = defineStore('places', () => {
     applyFilter([null, null], []);
   }
 
+  /** The open profile tab. It is kept when another place opens. */
+  const profileTab = ref<string>('overview');
+  /** The open place's name, once its profile has read it. */
+  const selectedName = ref('');
+  /** The places opened before the open one, oldest first. */
+  const history = ref<HistoryEntry[]>([]);
+
+  /**
+   * Show a place, noting the open one in the history.
+   * @param id - The place.
+   * @param source - Where it was chosen.
+   * @param tab - The tab to open it on. The open tab is kept when left out.
+   */
+  function open(id: string, source: 'list' | 'map', tab?: string) {
+    hoveredId.value = null;
+    const temporary = temporarySet.value;
+    const inSet = !!temporary?.placeIds.includes(id);
+    if (temporary && !inSet && temporary.ownerId !== id)
+      removeSet(temporary.id);
+    if (selectedId.value)
+      history.value = [
+        ...history.value,
+        {
+          id: selectedId.value,
+          name: selectedName.value,
+          tab: profileTab.value,
+        },
+      ].slice(-HISTORY_LIMIT);
+    // Opening one of the drawn Related places drills down, on Overview.
+    profileTab.value = tab ?? (inSet ? 'overview' : profileTab.value);
+    selectedName.value = '';
+    selectedId.value = id;
+    selectedFrom.value = source;
+  }
+
   /**
    * Select a place, or clear it when that place is already selected.
    * @param id - The stored place id.
    * @param source - Where the click happened. The list is the default.
    */
   function selectPlace(id: string, source: 'list' | 'map' = 'list') {
-    hoveredId.value = null;
     if (selectedId.value === id) {
-      selectedId.value = null;
-      selectedFrom.value = null;
+      clearSelection();
       return;
     }
-    selectedId.value = id;
-    selectedFrom.value = source;
+    open(id, source);
   }
 
-  /** Close the place column. */
+  /**
+   * Open the place whose set a chip shows, on its Related tab.
+   * @param id - The set.
+   */
+  function openSetOwner(id: string) {
+    const set = mapSets.value.find(item => item.id === id);
+    if (!set || selectedId.value === set.ownerId) return;
+    open(set.ownerId, 'list', 'related');
+  }
+
+  /**
+   * Step back to an earlier place, on the tab it was on.
+   * @param index - Its place in the history. The last one is the default.
+   */
+  function goBack(index = history.value.length - 1) {
+    const entry = history.value[index];
+    if (!entry) return;
+    hoveredId.value = null;
+    const temporary = temporarySet.value;
+    if (
+      temporary &&
+      temporary.ownerId !== entry.id &&
+      !temporary.placeIds.includes(entry.id)
+    )
+      removeSet(temporary.id);
+    history.value = history.value.slice(0, index);
+    profileTab.value = entry.tab;
+    selectedName.value = entry.name;
+    selectedId.value = entry.id;
+    selectedFrom.value = 'list';
+  }
+
+  /** Close the place column. Pinned sets stay on the map. */
   function clearSelection() {
     hoveredId.value = null;
     selectedId.value = null;
     selectedFrom.value = null;
+    selectedName.value = '';
+    history.value = [];
+    mapSets.value = mapSets.value.filter(set => set.pinned);
   }
 
   /**
@@ -199,8 +377,6 @@ const usePlacesStore = defineStore('places', () => {
   const photoQueueIndex = ref(0);
   /** Goes up after a photograph is reviewed, so the queue reads its counts again. */
   const photoQueueVersion = ref(0);
-  /** The profile tab to open the next selected place on. Cleared once used. */
-  const startTab = ref<'photos' | 'status' | null>(null);
 
   /** The place after the open one in the queue, or null at its end. */
   const nextInPhotoQueue = computed<string | null>(() => {
@@ -218,10 +394,7 @@ const usePlacesStore = defineStore('places', () => {
     const index = photoQueueIds.value.indexOf(id);
     if (index >= 0) photoQueueIndex.value = index;
     if (selectedId.value === id) return;
-    hoveredId.value = null;
-    startTab.value = 'photos';
-    selectedId.value = id;
-    selectedFrom.value = 'list';
+    open(id, 'list', 'photos');
   }
 
   /**
@@ -230,10 +403,7 @@ const usePlacesStore = defineStore('places', () => {
    */
   function openFromAdminList(id: string) {
     if (selectedId.value === id) return;
-    hoveredId.value = null;
-    startTab.value = 'status';
-    selectedId.value = id;
-    selectedFrom.value = 'list';
+    open(id, 'list', 'status');
   }
 
   /** Show or hide the boundaries on the map. */
@@ -251,8 +421,15 @@ const usePlacesStore = defineStore('places', () => {
     listTypes,
     withdrawnIds,
     loadWithdrawn,
+    mapSets,
     shownAreaIds,
+    temporarySet,
+    showRelated,
+    pinSet,
+    unpinSet,
+    removeSet,
     hoveredId,
+    mapTip,
     hoverPlace,
     sizeOnly,
     sizeKept,
@@ -266,7 +443,12 @@ const usePlacesStore = defineStore('places', () => {
     clearFilter,
     load,
     toggle,
+    profileTab,
+    selectedName,
+    history,
     selectPlace,
+    openSetOwner,
+    goBack,
     clearSelection,
     adminList,
     adminListVersion,
@@ -274,7 +456,6 @@ const usePlacesStore = defineStore('places', () => {
     photoQueueOpen,
     photoQueueIds,
     photoQueueVersion,
-    startTab,
     nextInPhotoQueue,
     openFromPhotoQueue,
   };

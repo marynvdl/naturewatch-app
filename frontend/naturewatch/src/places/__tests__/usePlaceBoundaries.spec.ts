@@ -17,6 +17,7 @@ vi.mock('@/places/api', async importOriginal => ({
   ...(await importOriginal<typeof import('@/places/api')>()),
   loadPlaceBounds: vi.fn(),
   loadPlaceRelease: vi.fn(),
+  loadPlaceName: vi.fn(async (id: string) => `Name of ${id}`),
 }));
 
 vi.stubGlobal(
@@ -454,7 +455,7 @@ describe('place boundaries from tiles', () => {
     ]);
 
     store.clearSelection();
-    store.shownAreaIds = [parkId];
+    store.showRelated(outsideWindow, 'Ecoregion', [parkId]);
     await flushPromises();
     map.queryRenderedFeatures.mockReturnValue([{ properties: { id: parkId } }]);
     map.fire('click', 'ecoregions-fill', {
@@ -551,7 +552,7 @@ describe('place boundaries from tiles', () => {
     expect(map.getSource('places-tiles')).toBeUndefined();
 
     map.setLayoutProperty.mockClear();
-    store.shownAreaIds = [outsideWindow];
+    store.showRelated(parkId, 'Park', [outsideWindow]);
     await flushPromises();
     expect(map.getSource('places-tiles')).toBeDefined();
     expect(map.setFilter).toHaveBeenCalledWith('places-fill', [
@@ -565,7 +566,37 @@ describe('place boundaries from tiles', () => {
       'visible'
     );
 
-    store.shownAreaIds = null;
+    store.showRelated(parkId, 'Park', null);
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeUndefined();
+  });
+
+  it('draws a set with the listed conservation areas, outlined above them', async () => {
+    const { map, store } = await drawPlaces();
+    store.listTypes = ['conservation_area'];
+    await flushPromises();
+    store.selectPlace(parkId);
+    store.showRelated(parkId, 'Park', [outsideWindow]);
+    store.pinSet(`related:${parkId}`);
+    await flushPromises();
+    const inSet = ['in', ['get', 'id'], ['literal', [outsideWindow]]];
+    expect(map.getLayer('places-set-line')).toBeDefined();
+    expect(map.setFilter).toHaveBeenCalledWith('places-set-line', inSet);
+    expect(map.setFilter).toHaveBeenCalledWith('places-fill', [
+      'any',
+      ['literal', true],
+      inSet,
+    ]);
+    expect(map.getLayoutProperty('places-set-line', 'visibility')).toBe(
+      'visible'
+    );
+
+    // With Places closed, only the pinned set draws.
+    store.toggle();
+    await flushPromises();
+    expect(map.setFilter).toHaveBeenCalledWith('places-fill', inSet);
+
+    store.removeSet(`related:${parkId}`);
     await flushPromises();
     expect(map.getSource('places-tiles')).toBeUndefined();
   });
@@ -632,6 +663,40 @@ describe('place boundaries from tiles', () => {
       ['get', 'id'],
       '',
     ]);
+  });
+
+  it('names the place the pointer rests on, park before ecoregion', async () => {
+    const { map, store } = await drawPlaces();
+    vi.useFakeTimers();
+    map.queryRenderedFeatures.mockReturnValue([
+      { layer: { id: 'ecoregions-fill' }, properties: { id: outsideWindow } },
+      { layer: { id: 'places-fill' }, properties: { id: parkId } },
+    ]);
+    map.fire('mousemove', undefined, { point: { x: 40, y: 50 } });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(store.mapTip).toBeNull();
+    // A small move keeps waiting.
+    map.fire('mousemove', undefined, { point: { x: 42, y: 51 } });
+    await vi.advanceTimersByTimeAsync(400);
+    expect(store.mapTip).toEqual({ name: `Name of ${parkId}`, x: 40, y: 50 });
+    // The card is not highlighted.
+    expect(store.hoveredId).toBeNull();
+
+    map.fire('mousemove', undefined, { point: { x: 90, y: 90 } });
+    expect(store.mapTip).toBeNull();
+    map.queryRenderedFeatures.mockReturnValue([]);
+    await vi.advanceTimersByTimeAsync(700);
+    expect(store.mapTip).toBeNull();
+
+    map.queryRenderedFeatures.mockReturnValue([
+      { layer: { id: 'places-fill' }, properties: { id: parkId } },
+    ]);
+    map.fire('mousemove', undefined, { point: { x: 10, y: 10 } });
+    await vi.advanceTimersByTimeAsync(700);
+    expect(store.mapTip).not.toBeNull();
+    map.fire('mouseout', undefined, {});
+    expect(store.mapTip).toBeNull();
+    vi.useRealTimers();
   });
 
   it('reports a failed tile read', async () => {

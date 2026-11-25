@@ -30,6 +30,7 @@ import {
 import { PHOTOS_NONE } from '@/places/photos';
 import { loadPlaceStatus } from '@/places/status';
 import useAuthStore from '@/store/AuthStore';
+import usePlacesStore from '@/store/PlacesStore';
 
 vi.mock('@/places/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/places/api')>();
@@ -532,6 +533,35 @@ describe('Place profile', () => {
       expect(wrapper.text()).not.toContain('Southern Africa bushveld');
     });
 
+    it('reports the newly selected place when one of its Related places opens', async () => {
+      vi.mocked(loadRelatedPlaces).mockResolvedValue({
+        status: 'ok',
+        links: [
+          link({
+            id: 'c',
+            typeId: 'located_in',
+            outward: false,
+            otherId: parkId,
+            otherName: 'Makuleke Contract Park',
+            otherTypeId: 'conservation_area',
+            status: 'confirmed',
+          }),
+        ],
+      });
+      const store = usePlacesStore();
+      store.profileTab = 'related';
+      const wrapper = await mountProfile(kruger);
+      expect(wrapper.emitted('areas')?.at(-1)?.[0]).toBe(placeId);
+      // The store switches to Overview before the profile reads the park.
+      store.profileTab = 'overview';
+      await wrapper.setProps({ placeId: parkId });
+      expect(wrapper.emitted('areas')?.at(-1)).toEqual([
+        parkId,
+        kruger.name,
+        null,
+      ]);
+    });
+
     it('groups related places by relationship as cards with a type label', async () => {
       const parks = Array.from({ length: 23 }, (_, index) =>
         link({
@@ -592,10 +622,18 @@ describe('Place profile', () => {
       expect(wrapper.emitted('open')).toEqual([[parkId]]);
       // The map draws the listed conservation areas only while the tab is open
       expect(wrapper.emitted('areas')?.at(-1)).toEqual([
+        placeId,
+        kruger.name,
         [...parks.map(park => park.otherId), parkId],
       ]);
+      // The source line ends the list and scrolls with it.
+      expect(wrapper.find('.place-related .place-source').exists()).toBe(true);
       await openTab(wrapper, 'Overview');
-      expect(wrapper.emitted('areas')?.at(-1)).toEqual([null]);
+      expect(wrapper.emitted('areas')?.at(-1)).toEqual([
+        placeId,
+        kruger.name,
+        null,
+      ]);
       wrapper.unmount();
     });
 
@@ -895,11 +933,11 @@ describe('Place profile', () => {
         status: 'ok',
         place: kruger,
       });
+      usePlacesStore().profileTab = 'photos';
       const wrapper = mount(PlaceProfileComponent, {
-        props: { placeId: kruger.id, startTab: 'photos', hasNext: true },
+        props: { placeId: kruger.id, hasNext: true },
       });
       await flushPromises();
-      expect(wrapper.emitted('started')).toHaveLength(1);
       const selected = wrapper.get('[aria-selected="true"]');
       expect(selected.text()).toBe('Photos');
       expect(actions(wrapper, 's')).toEqual(['Approve', 'Reject']);
@@ -922,14 +960,12 @@ describe('Place profile', () => {
       await wrapper.setProps({ placeId: next2.id, hasNext: false });
       await flushPromises();
       expect(wrapper.get('[aria-selected="true"]').text()).toBe('Photos');
-      expect(wrapper.emitted('started')).toHaveLength(2);
       expect(wrapper.text()).not.toContain('Next place');
     });
 
     it('opens on Overview without a start tab, with no Next place', async () => {
       const wrapper = await openPhotos();
       expect(wrapper.text()).not.toContain('Next place');
-      expect(wrapper.emitted('started')).toBeUndefined();
     });
 
     it('reviews suggestions in the photo viewer, one after another', async () => {
@@ -1279,6 +1315,43 @@ describe('Place profile', () => {
     expect(wrapper.find('.place-recognitions').exists()).toBe(false);
   });
 
+  it('steps back from the back button and the breadcrumb', async () => {
+    const store = usePlacesStore();
+    store.selectPlace('eco');
+    store.selectedName = 'Atlantic mixed forests';
+    store.selectPlace('park1');
+    store.selectedName = 'Park one';
+    store.selectPlace(placeId);
+    const wrapper = await mountProfile(kruger);
+    expect(store.selectedName).toBe(kruger.name);
+    const steps = wrapper.findAll('.place-breadcrumb-step');
+    expect(steps.map(step => step.text())).toEqual([
+      'Atlantic mixed forests',
+      'Park one',
+    ]);
+    const back = wrapper.get('.place-back');
+    expect(back.attributes('aria-label')).toBe('Back to Park one');
+    await back.trigger('click');
+    expect(store.selectedId).toBe('park1');
+    await steps[0].trigger('click');
+    expect(store.selectedId).toBe('eco');
+  });
+
+  it('has no back button without places before it', async () => {
+    const wrapper = await mountProfile(kruger);
+    expect(wrapper.find('.place-back').exists()).toBe(false);
+    expect(wrapper.find('.place-breadcrumb').exists()).toBe(false);
+  });
+
+  it('opens on the stored tab, or on Overview when the place has none', async () => {
+    usePlacesStore().profileTab = 'related';
+    const wrapper = await mountProfile(kruger);
+    expect(wrapper.get('[aria-selected="true"]').text()).toBe('Related');
+    usePlacesStore().profileTab = 'status';
+    await flushPromises();
+    expect(wrapper.get('[aria-selected="true"]').text()).toBe('Overview');
+  });
+
   it('says when a place has no related places', async () => {
     const wrapper = await mountProfile({
       ...kruger,
@@ -1352,11 +1425,11 @@ describe('Place profile', () => {
       status: 'ok',
       place: kruger,
     });
+    usePlacesStore().profileTab = 'status';
     const wrapper = mount(PlaceProfileComponent, {
-      props: { placeId: kruger.id, startTab: 'status' },
+      props: { placeId: kruger.id },
     });
     await flushPromises();
-    expect(wrapper.emitted('started')).toHaveLength(1);
     expect(wrapper.find('.status').exists()).toBe(true);
   });
 

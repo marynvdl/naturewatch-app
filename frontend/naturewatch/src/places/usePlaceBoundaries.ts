@@ -12,6 +12,7 @@ import {
   ECOREGION_TILES_URL,
   ECOREGION_TILE_LAYER,
   loadPlaceBounds,
+  loadPlaceName,
 } from './api';
 import {
   ECOREGION_COLOUR,
@@ -23,10 +24,18 @@ import {
   type LngLatBounds,
 } from './display';
 
+/** A point on the map, in pixels from its top left corner. */
+interface ScreenPoint {
+  x: number;
+  y: number;
+}
+
 const PLACE_SOURCE = 'places-tiles';
 const PLACE_FILL = 'places-fill';
 const PLACE_LINE = 'places-line';
 const PLACE_SELECT_LINE = 'places-select-line';
+/** Outlines the conservation areas of the sets on the map, above the list's. */
+const PLACE_SET_LINE = 'places-set-line';
 const PLACE_HOVER_LINE = 'places-hover-line';
 const RECOGNITION_SOURCE = 'recognitions-tiles';
 const RECOGNITION_FILL = 'recognitions-fill';
@@ -104,9 +113,25 @@ function placePaint(satellite: boolean) {
     },
     selectedLine: { 'line-color': colour.selected, 'line-width': 2 },
     hoverLine: { 'line-color': colour.selected, 'line-width': 1.75 },
+    setLine: {
+      'line-color': colour.selected,
+      'line-opacity': 0.9,
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        3,
+        0.8,
+        8,
+        1.4,
+        12,
+        2,
+      ],
+    },
   } satisfies {
     fill: mapboxgl.FillLayer['paint'];
     line: mapboxgl.LineLayer['paint'];
+    setLine: mapboxgl.LineLayer['paint'];
     selectedLine: mapboxgl.LineLayer['paint'];
     hoverLine: mapboxgl.LineLayer['paint'];
   };
@@ -290,17 +315,17 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * recognition type and no ecoregion is. Each listed recognition type draws.
    * Ecoregions draw while they are listed. A selected place's outline always
    * draws.
-   * While a profile's Related tab is open, the conservation areas it lists
-   * draw instead, whatever the list and the filter show. While an admin list
+   * The conservation areas of the sets on the map (a Related tab, or a pinned
+   * set) also draw, whatever the list and the filter show, with a darker
+   * outline above the list's. With Places closed only they draw. While an admin list
    * is open, only the selected and hovered outlines draw.
    * @param mapInstance - The map.
    */
   function applyKeptFilter(mapInstance: mapboxgl.Map) {
     const areas = placesStore.shownAreaIds;
-    const filter = allOf(
-      areas ? ['in', ['get', 'id'], ['literal', areas]] : keptFilter(),
-      withdrawnFilter()
-    );
+    const inSets: mapboxgl.FilterSpecification | null = areas
+      ? ['in', ['get', 'id'], ['literal', areas]]
+      : null;
     const queueOnly = placesStore.adminList !== null && !placesStore.visible;
     const recognitions = listedRecognitions().length > 0 && !queueOnly;
     const ecoregions =
@@ -308,6 +333,26 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     const conservationAreas =
       !queueOnly &&
       (placesStore.listTypes.includes(PLACE_TYPE) || !placesStore.sizeOnly);
+    // The list's places and the sets' places draw together. With Places
+    // closed, only the sets draw.
+    const listed = keptFilter() ?? ['literal', true];
+    const filter = allOf(
+      inSets && conservationAreas && placesStore.visible
+        ? ['any', listed, inSets]
+        : (inSets ?? keptFilter()),
+      withdrawnFilter()
+    );
+    if (mapInstance.getLayer(PLACE_SET_LINE)) {
+      mapInstance.setFilter(
+        PLACE_SET_LINE,
+        allOf(inSets ?? ['literal', false], withdrawnFilter())
+      );
+      mapInstance.setLayoutProperty(
+        PLACE_SET_LINE,
+        'visibility',
+        areas ? 'visible' : 'none'
+      );
+    }
     [PLACE_FILL, PLACE_LINE].forEach(layer => {
       if (!mapInstance.getLayer(layer)) return;
       mapInstance.setFilter(layer, filter);
@@ -405,6 +450,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       [PLACE_FILL, paint.fill],
       [PLACE_LINE, paint.line],
       [PLACE_SELECT_LINE, paint.selectedLine],
+      [PLACE_SET_LINE, paint.setLine],
       [PLACE_HOVER_LINE, paint.hoverLine],
       [RECOGNITION_LINE, recognition.line],
       [RECOGNITION_SELECT_LINE, recognition.selectedLine],
@@ -545,6 +591,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       RECOGNITION_LINE,
       RECOGNITION_FILL,
       PLACE_SELECT_LINE,
+      PLACE_SET_LINE,
       PLACE_LINE,
       PLACE_FILL,
     ].forEach(layer => {
@@ -591,6 +638,75 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     return (
       mapInstance.queryRenderedFeatures(event.point, { layers }).length > 0
     );
+  }
+
+  /** The pointer rests this long, in ms, before a place's name shows. */
+  const TIP_DELAY = 600;
+  /** A move under this many pixels does not restart the wait. */
+  const TIP_SLOP = 4;
+  let tipTimer: ReturnType<typeof setTimeout> | null = null;
+  let tipPoint: ScreenPoint | null = null;
+
+  /**
+   * The drawn place under a point: a conservation area or recognition before
+   * the ecoregion under it, as for a click.
+   * @param mapInstance - The map.
+   * @param point - The point, in pixels.
+   * @returns The place id, or null.
+   */
+  function placeAt(
+    mapInstance: mapboxgl.Map,
+    point: ScreenPoint
+  ): string | null {
+    const layers = [PLACE_FILL, RECOGNITION_FILL, ECOREGION_FILL].filter(
+      layer =>
+        mapInstance.getLayer(layer) &&
+        mapInstance.getLayoutProperty(layer, 'visibility') !== 'none'
+    );
+    if (!layers.length) return null;
+    const features = mapInstance.queryRenderedFeatures([point.x, point.y], {
+      layers,
+    });
+    const top =
+      features.find(feature => feature.layer?.id !== ECOREGION_FILL) ??
+      features[0];
+    const id = top?.properties?.id;
+    return id === undefined || id === null || id === '' ? null : String(id);
+  }
+
+  /** Hide the name and stop waiting to show one. */
+  function hideTip() {
+    if (tipTimer) clearTimeout(tipTimer);
+    tipTimer = null;
+    tipPoint = null;
+    placesStore.mapTip = null;
+  }
+
+  /**
+   * Show the name of the place under the pointer once it has rested there.
+   * @param event - The pointer move.
+   */
+  function onMapMouseMove(event: mapboxgl.MapMouseEvent) {
+    const point: ScreenPoint = { x: event.point.x, y: event.point.y };
+    if (
+      tipPoint &&
+      Math.abs(point.x - tipPoint.x) < TIP_SLOP &&
+      Math.abs(point.y - tipPoint.y) < TIP_SLOP
+    )
+      return;
+    hideTip();
+    if (measureStore.drawing) return;
+    tipPoint = point;
+    tipTimer = setTimeout(async () => {
+      tipTimer = null;
+      const mapInstance = readMap();
+      if (!mapInstance || tipPoint !== point) return;
+      const id = placeAt(mapInstance, point);
+      if (!id) return;
+      const name = await loadPlaceName(id);
+      if (name && tipPoint === point)
+        placesStore.mapTip = { name, x: point.x, y: point.y };
+    }, TIP_DELAY);
   }
 
   /** Where and when a one-finger touch on a boundary began. */
@@ -734,6 +850,15 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         'source-layer': PLACE_TILE_LAYER,
         paint: paint.line,
       };
+      const setLine: mapboxgl.LineLayer = {
+        id: PLACE_SET_LINE,
+        type: 'line',
+        source: PLACE_SOURCE,
+        'source-layer': PLACE_TILE_LAYER,
+        filter: ['literal', false],
+        layout: { visibility: 'none' },
+        paint: paint.setLine,
+      };
       const selectedLine: mapboxgl.LineLayer = {
         id: PLACE_SELECT_LINE,
         type: 'line',
@@ -753,11 +878,13 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       if (onStandard) {
         fill.slot = 'top';
         line.slot = 'top';
+        setLine.slot = 'top';
         selectedLine.slot = 'top';
         hoverLine.slot = 'top';
       }
       mapInstance.addLayer(fill, onStandard ? undefined : before);
       mapInstance.addLayer(line, onStandard ? undefined : before);
+      mapInstance.addLayer(setLine, onStandard ? undefined : before);
       mapInstance.addLayer(selectedLine, onStandard ? undefined : before);
       mapInstance.addLayer(hoverLine, onStandard ? undefined : before);
     }
@@ -819,6 +946,10 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
           mapInstance.getCanvas().style.cursor = '';
         });
       });
+      mapInstance.on('mousemove', onMapMouseMove);
+      mapInstance.on('mouseout', hideTip);
+      mapInstance.on('movestart', hideTip);
+      mapInstance.on('mousedown', hideTip);
       mapInstance.on('error', onMapError);
       listening = true;
     }

@@ -11,6 +11,7 @@ import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
 import DrawerComponent from '@/components/DrawerComponent.vue';
 import MeasureComponent from './MeasureComponent.vue';
+import MapSetChips from '@/components/MapSetChips.vue';
 import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
 import PlacesBarComponent from '@/components/PlacesBarComponent.vue';
 import BlobButton from '@/components/ui/blob-button/BlobButton.vue';
@@ -168,6 +169,49 @@ watch(
   { flush: 'post' }
 );
 onMounted(observeProfile);
+
+/**
+ * Where the map set chips start, in pixels from the map's top, while the
+ * Landscape panel is open: just under it. Null keeps them under the circle.
+ */
+const setsTop = ref<number | null>(null);
+let layersObserver: ResizeObserver | null = null;
+let layersTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Put the chips under the open Landscape panel, if there is room. */
+function measureLayersPanel() {
+  const panel = document.getElementById('layers-panel');
+  const container = document.querySelector('.map-container');
+  if (
+    !drawerVisible.value ||
+    !(panel instanceof HTMLElement) ||
+    !(container instanceof HTMLElement)
+  ) {
+    setsTop.value = null;
+    return;
+  }
+  const box = container.getBoundingClientRect();
+  const top = panel.getBoundingClientRect().bottom - box.top + 12;
+  // A panel that fills the height leaves no room. The chips stay under it.
+  setsTop.value = top < box.height - 48 ? top : null;
+}
+
+/** Follow the Landscape panel as it opens, grows, or closes. */
+function observeLayersPanel() {
+  layersObserver?.disconnect();
+  layersObserver = null;
+  if (layersTimer) clearTimeout(layersTimer);
+  measureLayersPanel();
+  if (!drawerVisible.value) return;
+  // Measure again once the panel has slid open.
+  layersTimer = setTimeout(measureLayersPanel, 350);
+  const panel = document.getElementById('layers-panel');
+  if (typeof ResizeObserver === 'undefined' || !panel) return;
+  layersObserver = new ResizeObserver(measureLayersPanel);
+  layersObserver.observe(panel);
+}
+
+watch(drawerVisible, observeLayersPanel, { flush: 'post' });
 
 // Determine layer color to use
 const layerColorKey = computed(() => {
@@ -380,6 +424,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   profileObserver?.disconnect();
+  layersObserver?.disconnect();
+  if (layersTimer) clearTimeout(layersTimer);
   timelineStore.bindTileWait(() => Promise.resolve());
 });
 
@@ -712,6 +758,17 @@ function addSourceAndLayer(
     >
       <div class="map-container">
         <div id="mapDiv" />
+        <p
+          v-if="placesStore.mapTip"
+          class="map-place-tip"
+          role="tooltip"
+          :style="{
+            left: `${placesStore.mapTip.x}px`,
+            top: `${placesStore.mapTip.y}px`,
+          }"
+        >
+          {{ placesStore.mapTip.name }}
+        </p>
         <div class="map-logo">
           <img :src="mark" alt="Nature Watch" />
         </div>
@@ -740,6 +797,10 @@ function addSourceAndLayer(
         >
           <DrawerComponent />
         </BlobButton>
+        <MapSetChips
+          class="map-sets"
+          :style="setsTop !== null ? { top: `${setsTop}px` } : undefined"
+        />
         <BlobButton
           class="blob-measure"
           label="Measure"
@@ -765,9 +826,7 @@ function addSourceAndLayer(
             v-if="placesStore.selectedId"
             class="map-place map-panel nw"
             :place-id="placesStore.selectedId"
-            :start-tab="placesStore.startTab"
             :has-next="placesStore.nextInPhotoQueue !== null"
-            @started="placesStore.startTab = null"
             @photos-changed="placesStore.photoQueueVersion += 1"
             @next="
               placesStore.nextInPhotoQueue &&
@@ -776,7 +835,7 @@ function addSourceAndLayer(
             @close="placesStore.clearSelection()"
             @zoom="zoomToSelectedPlace"
             @open="id => placesStore.selectPlace(id, 'list')"
-            @areas="ids => (placesStore.shownAreaIds = ids)"
+            @areas="(id, name, ids) => placesStore.showRelated(id, name, ids)"
             @highlight="(id, on) => placesStore.hoverPlace(id, on)"
             @moved="
               id =>
@@ -983,6 +1042,31 @@ function addSourceAndLayer(
   --panel-inset-right: 12px;
 }
 
+/* A place's name, above the pointer that rests on it. */
+.map-place-tip {
+  position: absolute;
+  z-index: 12;
+  max-width: 280px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--map-control-radius);
+  background: var(--background);
+  color: var(--map-control-text);
+  font-size: 12px;
+  line-height: 1.3;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 12px));
+}
+
+/* Under the Landscape circle, or under the Landscape panel while it is open. */
+.map-sets {
+  position: absolute;
+  top: 256px;
+  right: 12px;
+  z-index: 13;
+}
+
 .blob-measure {
   /* Two thirds of the 112px circle. */
   --blob-size: 74.667px;
@@ -1043,6 +1127,24 @@ function addSourceAndLayer(
   .blob-measure {
     right: 12px;
     bottom: 192px;
+  }
+
+  /* The strip beside an open column fits only the chips' buttons. */
+  .has-list .map-sets,
+  .has-place .map-sets {
+    top: 204px;
+    right: 4px;
+    z-index: 15;
+  }
+
+  .has-list .map-sets :deep(.map-set-label),
+  .has-place .map-sets :deep(.map-set-label) {
+    display: none;
+  }
+
+  .has-list .map-sets :deep(.map-set-chip),
+  .has-place .map-sets :deep(.map-set-chip) {
+    padding: 0 3px;
   }
 
   .has-list .blob-layers,

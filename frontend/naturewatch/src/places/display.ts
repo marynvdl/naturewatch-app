@@ -4,6 +4,40 @@ import { COUNTRY_NAMES } from './countryNames';
 export const PROTECTED_AREA_ATTRIBUTION =
   'UNEP-WCMC and IUCN. World Database on Protected and Conserved Areas.';
 
+/** Short words left out of a place's initials. */
+const MINOR_WORDS = new Set([
+  'and',
+  'of',
+  'the',
+  'de',
+  'du',
+  'des',
+  'la',
+  'le',
+  'et',
+  'y',
+  'da',
+  'do',
+  'di',
+]);
+
+/**
+ * A place's initials for a chip, such as SSD for South Sahara desert.
+ * @param name - The place's name.
+ * @returns Up to three capital letters, or the first three letters of a one-word name.
+ */
+export function initials(name: string): string {
+  const words = name.split(/[\s\-–/,()]+/).filter(word => /\p{L}/u.test(word));
+  const kept = words.filter(word => !MINOR_WORDS.has(word.toLowerCase()));
+  const used = kept.length ? kept : words;
+  if (used.length === 1) return used[0].slice(0, 3).toUpperCase();
+  return used
+    .slice(0, 3)
+    .map(word => word.match(/\p{L}/u)?.[0] ?? '')
+    .join('')
+    .toUpperCase();
+}
+
 /**
  * Cropland square kilometres, to one hectare.
  * @param km2 - Stored area.

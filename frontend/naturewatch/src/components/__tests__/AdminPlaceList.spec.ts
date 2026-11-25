@@ -72,7 +72,7 @@ describe('Admin place list', () => {
     await wrapper.findAll('.place-result')[1].trigger('click');
     expect(useAuthStore().editMode).toBe(true);
     expect(places.selectedId).toBe('b');
-    expect(places.startTab).toBe('status');
+    expect(places.profileTab).toBe('status');
   });
 
   it('reads the list again after a change, and says when it is empty', async () => {

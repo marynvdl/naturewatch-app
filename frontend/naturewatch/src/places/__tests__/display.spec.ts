@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  initials,
   SIZE_STEPS,
   binCounts,
   countryName,
@@ -189,5 +190,17 @@ describe('place figures', () => {
     expect(popup.querySelector('a')?.getAttribute('href')).toBe(
       'https://www.protectedplanet.net/873'
     );
+  });
+});
+
+describe('initials', () => {
+  it('takes the first letter of up to three words, leaving out short ones', () => {
+    expect(initials('South Sahara desert')).toBe('SSD');
+    expect(initials('Amsterdam-Saint Paul Islands temperate grasslands')).toBe(
+      'ASP'
+    );
+    expect(initials('Parc National de la Pendjari')).toBe('PNP');
+    expect(initials('Cerrado')).toBe('CER');
+    expect(initials('Área De Proteção Ambiental')).toBe('ÁPA');
   });
 });
