@@ -58,7 +58,7 @@ For ecoregions, the hosted `fetch` ran on 22 November 2026, after the matching b
 
 ### Ecoregion Wikidata items
 
-`match_ecoregion_wikidata.py` matches each published ecoregion to its Wikidata item (Ecoregions task 06). `suggest_photos.py` reads the match, and the descriptions of task 07 will too.
+`match_ecoregion_wikidata.py` matches each published ecoregion to its Wikidata item (Ecoregions task 06). `suggest_photos.py` reads the match. Descriptions from Wikipedia, which would read it too, are deferred (Ecoregions parcel).
 
 ```bash
 WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/match_ecoregion_wikidata.py fetch
