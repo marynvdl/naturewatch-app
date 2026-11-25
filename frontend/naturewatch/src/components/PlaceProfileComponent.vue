@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { ArrowRight, ChevronRight, LocateFixed, X } from '@lucide/vue';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ChevronRight,
+  LocateFixed,
+  X,
+} from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
 import PlaceLinksEditor from '@/components/PlaceLinksEditor.vue';
 import PlaceEditField, {
@@ -10,6 +16,7 @@ import PlacePhotos from '@/components/PlacePhotos.vue';
 import PlacePhotosEditor from '@/components/PlacePhotosEditor.vue';
 import PlaceStatusEditor from '@/components/PlaceStatusEditor.vue';
 import useAuthStore from '@/store/AuthStore';
+import usePlacesStore from '@/store/PlacesStore';
 import {
   PLACE_TYPE,
   applyCuration,
@@ -49,12 +56,10 @@ const props = withDefaults(
     placeId: string;
     /** Shown while the stored record loads. */
     name?: string;
-    /** The tab to open the place on, instead of Overview. */
-    startTab?: 'photos' | 'status' | null;
     /** Whether the photo queue has a place after this one. Shows Next place on the Photos tab. */
     hasNext?: boolean;
   }>(),
-  { name: undefined, startTab: null, hasNext: false }
+  { name: undefined, hasNext: false }
 );
 
 const emit = defineEmits<{
@@ -65,14 +70,12 @@ const emit = defineEmits<{
   /** A recognition badge or a related place was chosen. Open it. */
   open: [id: string];
   /**
-   * The conservation areas the open Related tab lists, or null when it is
-   * closed or lists none.
+   * The conservation areas the open Related tab of this place lists, or null
+   * when it is closed or lists none.
    */
-  areas: [ids: string[] | null];
+  areas: [placeId: string, name: string, ids: string[] | null];
   /** The pointer or focus entered or left a card on the Related tab. */
   highlight: [id: string, on: boolean];
-  /** The place opened on `startTab`. */
-  started: [];
   /** A photograph was added, reviewed, or moved. */
   photosChanged: [];
   /** Next place was chosen on the Photos tab. */
@@ -81,6 +84,8 @@ const emit = defineEmits<{
 
 /** Admins turn Edit mode on in the Profile panel. */
 const auth = useAuthStore();
+/** The open tab, the history, and the Related sets live in the store. */
+const placesStore = usePlacesStore();
 
 type TabId =
   | 'overview'
@@ -117,7 +122,29 @@ const RELATED_ORDER = [
   'Has part',
   'Overlaps',
 ];
-const activeTab = ref<TabId>('overview');
+/**
+ * The open tab, kept in the store so it stays when another place opens. A tab
+ * this place does not have shows Overview.
+ */
+const activeTab = computed<TabId>({
+  get: () =>
+    tabs.value.some(tab => tab.id === placesStore.profileTab)
+      ? (placesStore.profileTab as TabId)
+      : 'overview',
+  set: tab => {
+    placesStore.profileTab = tab;
+  },
+});
+/** The places before this one in the breadcrumb, most recent last. */
+const BREADCRUMB_STEPS = 2;
+const breadcrumb = computed(() =>
+  placesStore.history
+    .map((entry, index) => ({ ...entry, index }))
+    .slice(-BREADCRUMB_STEPS)
+);
+const previous = computed(
+  () => placesStore.history[placesStore.history.length - 1] ?? null
+);
 /** Curated values of the place, read in edit mode. */
 const curation = ref<PlaceCuration | null>(null);
 const curationStatus = ref<'idle' | 'loading' | 'ok' | 'error'>('idle');
@@ -171,8 +198,8 @@ const VIEW_TAB: Partial<Record<TabId, TabId>> = {
 watch(
   () => auth.isAdmin && auth.editMode,
   on => {
-    const next = (on ? EDIT_TAB : VIEW_TAB)[activeTab.value];
-    if (next) activeTab.value = next;
+    const next = (on ? EDIT_TAB : VIEW_TAB)[placesStore.profileTab as TabId];
+    if (next) placesStore.profileTab = next;
   }
 );
 /**
@@ -313,8 +340,6 @@ async function load(id: string) {
   related.value = [];
   relatedStatus.value = 'loading';
   relatedShown.value = {};
-  activeTab.value = props.startTab ?? 'overview';
-  if (props.startTab) emit('started');
   curation.value = null;
   curationStatus.value = 'idle';
   placeStatus.value = null;
@@ -323,6 +348,7 @@ async function load(id: string) {
   status.value = result.status;
   if (result.status !== 'ok') return;
   place.value = result.place;
+  placesStore.selectedName = result.place.name;
   void loadCuration();
   if (result.place.id !== id) {
     emit('moved', result.place.id);
@@ -394,11 +420,14 @@ watch(
     return ids.length ? ids : null;
   },
   (ids, before) => {
-    if (ids?.join() !== before?.join()) emit('areas', ids);
+    // The selected place, not the one still loaded: opening one of the listed
+    // places switches the tab before the profile has read the new place.
+    if (ids?.join() !== before?.join())
+      emit('areas', props.placeId, title.value, ids);
   }
 );
 
-onBeforeUnmount(() => emit('areas', null));
+onBeforeUnmount(() => emit('areas', props.placeId, '', null));
 
 /** Move between tabs with the arrow keys. */
 function onTabKey(event: KeyboardEvent, index: number) {
@@ -431,8 +460,40 @@ function onTabKey(event: KeyboardEvent, index: number) {
     >
       <X :size="16" :stroke-width="2.25" aria-hidden="true" />
     </button>
+    <button
+      v-if="previous"
+      type="button"
+      class="place-close place-back"
+      :aria-label="previous.name ? `Back to ${previous.name}` : 'Back'"
+      :title="previous.name ? `Back to ${previous.name}` : 'Back'"
+      @click="placesStore.goBack()"
+    >
+      <ArrowLeft :size="16" :stroke-width="2.25" aria-hidden="true" />
+    </button>
 
     <div class="place-body">
+      <nav
+        v-if="breadcrumb.length"
+        class="place-breadcrumb"
+        aria-label="Places opened before"
+      >
+        <template v-for="entry in breadcrumb" :key="entry.index">
+          <button
+            type="button"
+            class="place-breadcrumb-step"
+            :title="entry.name"
+            @click="placesStore.goBack(entry.index)"
+          >
+            {{ entry.name || 'Place' }}
+          </button>
+          <ChevronRight
+            class="place-breadcrumb-sep"
+            :size="12"
+            :stroke-width="2.25"
+            aria-hidden="true"
+          />
+        </template>
+      </nav>
       <p v-if="auth.editMode && curationStatus === 'error'" class="place-note">
         The curated values could not be read, so editing is off.
       </p>
@@ -707,6 +768,8 @@ function onTabKey(event: KeyboardEvent, index: number) {
                       :area-km2="link.otherAreaKm2"
                       :place-type-id="link.otherTypeId"
                       :photo="mainPhotoOf(link.otherId)"
+                      :highlighted="placesStore.hoveredId === link.otherId"
+                      :reveal="placesStore.hoveredFrom === 'map'"
                       @click="$emit('open', link.otherId)"
                       @highlight="on => $emit('highlight', link.otherId, on)"
                     />
@@ -732,6 +795,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
                   </li>
                 </ul>
               </section>
+              <p class="place-source">{{ source }}</p>
             </div>
           </template>
 
@@ -752,9 +816,14 @@ function onTabKey(event: KeyboardEvent, index: number) {
 
           <p v-else class="place-note">{{ SPECIES_NOTHING_YET }}</p>
         </div>
+        <p
+          v-if="!(activeTab === 'related' && related.length > 0)"
+          class="place-source"
+        >
+          {{ source }}
+        </p>
       </template>
     </div>
-    <p v-if="place" class="place-source">{{ source }}</p>
   </section>
 </template>
 
@@ -1088,24 +1157,67 @@ function onTabKey(event: KeyboardEvent, index: number) {
   font-variant-numeric: tabular-nums;
 }
 
+/* The source line ends the content and scrolls with it. */
 .place-source {
   flex: none;
-  margin: auto 0 0;
-  padding: 12px var(--map-panel-padding) 16px;
-  border-top: 1px solid var(--border);
+  margin: 8px 0 0;
   font-size: 10px;
   line-height: 1.5;
   color: var(--muted-foreground);
+}
+
+.place-back {
+  right: auto;
+  left: 12px;
+}
+
+/* One line of the places opened before, above the title. Long names are cut short. */
+.place-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0 0 -8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.place-breadcrumb-step {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.place-breadcrumb-step:hover {
+  color: var(--foreground);
+}
+
+.place-breadcrumb-step:focus-visible {
+  outline: 2px solid var(--foreground, #24312c);
+  outline-offset: 2px;
+}
+
+.place-breadcrumb-sep {
+  flex: none;
 }
 
 @media (max-width: 720px) {
   .place-body {
     gap: 12px;
     padding: 16px;
-  }
-
-  .place-source {
-    padding: 10px 16px 12px;
   }
 
   .place-title {

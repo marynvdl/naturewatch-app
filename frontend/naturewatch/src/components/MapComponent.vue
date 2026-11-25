@@ -11,6 +11,7 @@ import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
 import DrawerComponent from '@/components/DrawerComponent.vue';
 import MeasureComponent from './MeasureComponent.vue';
+import MapSetChips from '@/components/MapSetChips.vue';
 import PlaceProfileComponent from '@/components/PlaceProfileComponent.vue';
 import PlacesBarComponent from '@/components/PlacesBarComponent.vue';
 import BlobButton from '@/components/ui/blob-button/BlobButton.vue';
@@ -740,6 +741,7 @@ function addSourceAndLayer(
         >
           <DrawerComponent />
         </BlobButton>
+        <MapSetChips class="map-sets" />
         <BlobButton
           class="blob-measure"
           label="Measure"
@@ -765,9 +767,7 @@ function addSourceAndLayer(
             v-if="placesStore.selectedId"
             class="map-place map-panel nw"
             :place-id="placesStore.selectedId"
-            :start-tab="placesStore.startTab"
             :has-next="placesStore.nextInPhotoQueue !== null"
-            @started="placesStore.startTab = null"
             @photos-changed="placesStore.photoQueueVersion += 1"
             @next="
               placesStore.nextInPhotoQueue &&
@@ -776,7 +776,7 @@ function addSourceAndLayer(
             @close="placesStore.clearSelection()"
             @zoom="zoomToSelectedPlace"
             @open="id => placesStore.selectPlace(id, 'list')"
-            @areas="ids => (placesStore.shownAreaIds = ids)"
+            @areas="(id, name, ids) => placesStore.showRelated(id, name, ids)"
             @highlight="(id, on) => placesStore.hoverPlace(id, on)"
             @moved="
               id =>
@@ -983,6 +983,14 @@ function addSourceAndLayer(
   --panel-inset-right: 12px;
 }
 
+/* Under the Landscape circle. An open Landscape panel covers them. */
+.map-sets {
+  position: absolute;
+  top: 256px;
+  right: 12px;
+  z-index: 13;
+}
+
 .blob-measure {
   /* Two thirds of the 112px circle. */
   --blob-size: 74.667px;
@@ -1043,6 +1051,24 @@ function addSourceAndLayer(
   .blob-measure {
     right: 12px;
     bottom: 192px;
+  }
+
+  /* The strip beside an open column fits only the chips' buttons. */
+  .has-list .map-sets,
+  .has-place .map-sets {
+    top: 204px;
+    right: 4px;
+    z-index: 15;
+  }
+
+  .has-list .map-sets :deep(.map-set-label),
+  .has-place .map-sets :deep(.map-set-label) {
+    display: none;
+  }
+
+  .has-list .map-sets :deep(.map-set-chip),
+  .has-place .map-sets :deep(.map-set-chip) {
+    padding: 0 3px;
   }
 
   .has-list .blob-layers,

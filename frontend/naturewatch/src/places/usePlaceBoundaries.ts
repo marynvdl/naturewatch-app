@@ -593,6 +593,70 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     );
   }
 
+  /** The place the pointer is over on the map, whose card is highlighted. */
+  let mapHovered: string | null = null;
+  /** A pointer move waiting for the next frame. */
+  let hoverFrame = 0;
+  let hoverPoint: mapboxgl.Point | null = null;
+
+  /**
+   * The drawn place under a point: a conservation area or recognition before
+   * the ecoregion under it, as for a click.
+   * @param mapInstance - The map.
+   * @param point - The point, in pixels.
+   * @returns The place id, or null.
+   */
+  function placeAt(
+    mapInstance: mapboxgl.Map,
+    point: mapboxgl.Point
+  ): string | null {
+    const layers = [PLACE_FILL, RECOGNITION_FILL, ECOREGION_FILL].filter(
+      layer =>
+        mapInstance.getLayer(layer) &&
+        mapInstance.getLayoutProperty(layer, 'visibility') !== 'none'
+    );
+    if (!layers.length) return null;
+    const features = mapInstance.queryRenderedFeatures(point, { layers });
+    const top =
+      features.find(feature => feature.layer?.id !== ECOREGION_FILL) ??
+      features[0];
+    const id = top?.properties?.id;
+    return id === undefined || id === null || id === '' ? null : String(id);
+  }
+
+  /**
+   * Highlight the card of the place under the pointer.
+   * @param id - The place, or null when there is none.
+   */
+  function hoverFromMap(id: string | null) {
+    if (id === mapHovered && (!id || placesStore.hoveredId === id)) return;
+    if (mapHovered) placesStore.hoverPlace(mapHovered, false);
+    mapHovered = id;
+    if (id) placesStore.hoverPlace(id, true, 'map');
+  }
+
+  /**
+   * Note the pointer, and look up the place under it once per frame.
+   * @param event - The pointer move.
+   */
+  function onMapMouseMove(event: mapboxgl.MapMouseEvent) {
+    if (measureStore.drawing) return;
+    hoverPoint = event.point;
+    if (hoverFrame) return;
+    hoverFrame = requestAnimationFrame(() => {
+      hoverFrame = 0;
+      const mapInstance = readMap();
+      if (!mapInstance || !hoverPoint) return;
+      hoverFromMap(placeAt(mapInstance, hoverPoint));
+    });
+  }
+
+  /** The pointer left the map. */
+  function onMapMouseOut() {
+    hoverPoint = null;
+    hoverFromMap(null);
+  }
+
   /** Where and when a one-finger touch on a boundary began. */
   let touchStart: { x: number; y: number; time: number } | null = null;
   /** When a tap last chose a place. */
@@ -819,6 +883,8 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
           mapInstance.getCanvas().style.cursor = '';
         });
       });
+      mapInstance.on('mousemove', onMapMouseMove);
+      mapInstance.on('mouseout', onMapMouseOut);
       mapInstance.on('error', onMapError);
       listening = true;
     }

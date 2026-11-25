@@ -84,7 +84,7 @@ describe('Photo queue list', () => {
     await wrapper.findAll('.place-result')[1].trigger('click');
     expect(auth.editMode).toBe(true);
     expect(places.selectedId).toBe('b');
-    expect(places.startTab).toBe('photos');
+    expect(places.profileTab).toBe('photos');
     expect(places.nextInPhotoQueue).toBe('c');
     expect(wrapper.findAll('.place-result')[1].attributes('aria-current')).toBe(
       'true'

@@ -84,3 +84,111 @@ describe('Places store, Ecoregion filter', () => {
     expect(store.filtering).toBe(false);
   });
 });
+
+describe('Places store, navigation', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  /** Open an ecoregion on its Related tab, listing two parks. */
+  function ecoregionOnRelated() {
+    const store = usePlacesStore();
+    store.selectPlace('eco');
+    store.selectedName = 'Atlantic mixed forests';
+    store.profileTab = 'related';
+    store.showRelated('eco', 'Atlantic mixed forests', ['park1', 'park2']);
+    return store;
+  }
+
+  it('keeps the tab when another place opens', () => {
+    const store = ecoregionOnRelated();
+    store.selectPlace('eco2', 'map');
+    expect(store.profileTab).toBe('related');
+    // A place outside the set removes it.
+    expect(store.mapSets).toEqual([]);
+    expect(store.shownAreaIds).toBeNull();
+  });
+
+  it('opens a place of the drawn set on Overview and keeps the set', () => {
+    const store = ecoregionOnRelated();
+    store.selectPlace('park1', 'map');
+    expect(store.profileTab).toBe('overview');
+    expect(store.shownAreaIds).toEqual(['park1', 'park2']);
+    // The park's own profile says it lists nothing. The ecoregion's set stays.
+    store.showRelated('park1', 'Park one', null);
+    expect(store.shownAreaIds).toEqual(['park1', 'park2']);
+    expect(store.temporarySet?.label).toBe('Related to Atlantic mixed forests');
+  });
+
+  it('steps back on the tab each place was on', () => {
+    const store = ecoregionOnRelated();
+    store.selectPlace('park1', 'map');
+    store.selectedName = 'Park one';
+    store.selectPlace('park2', 'list');
+    expect(store.history.map(entry => entry.id)).toEqual(['eco', 'park1']);
+
+    store.goBack();
+    expect(store.selectedId).toBe('park1');
+    expect(store.profileTab).toBe('overview');
+    store.goBack();
+    expect(store.selectedId).toBe('eco');
+    expect(store.profileTab).toBe('related');
+    expect(store.history).toEqual([]);
+    expect(store.shownAreaIds).toEqual(['park1', 'park2']);
+  });
+
+  it('steps back several places from the breadcrumb', () => {
+    const store = ecoregionOnRelated();
+    store.selectPlace('park1');
+    store.selectPlace('park2');
+    store.goBack(0);
+    expect(store.selectedId).toBe('eco');
+    expect(store.history).toEqual([]);
+  });
+
+  it('empties the history and the temporary set on close, and keeps pinned sets', () => {
+    const store = ecoregionOnRelated();
+    store.pinSet('related:eco');
+    store.selectPlace('eco2');
+    store.profileTab = 'related';
+    store.showRelated('eco2', 'Kalahari', ['park3']);
+    expect(store.shownAreaIds).toEqual(['park1', 'park2', 'park3']);
+
+    store.clearSelection();
+    expect(store.history).toEqual([]);
+    expect(store.mapSets.map(set => set.id)).toEqual(['related:eco']);
+    expect(store.shownAreaIds).toEqual(['park1', 'park2']);
+
+    store.removeSet('related:eco');
+    expect(store.shownAreaIds).toBeNull();
+  });
+
+  it('opens a chip’s place on its Related tab', () => {
+    const store = ecoregionOnRelated();
+    store.pinSet('related:eco');
+    store.selectPlace('park9');
+    store.profileTab = 'overview';
+    store.openSetOwner('related:eco');
+    expect(store.selectedId).toBe('eco');
+    expect(store.profileTab).toBe('related');
+  });
+
+  it('keeps at most one temporary set, replaced by the next Related tab', () => {
+    const store = ecoregionOnRelated();
+    store.selectPlace('park1');
+    store.profileTab = 'related';
+    store.showRelated('park1', 'Park one', ['park7']);
+    expect(store.mapSets.map(set => set.id)).toEqual(['related:park1']);
+    store.unpinSet('related:park1');
+    expect(store.mapSets).toHaveLength(1);
+  });
+
+  it('opens the queue and admin lists on their tab', () => {
+    const store = usePlacesStore();
+    store.openFromPhotoQueue('p1');
+    expect(store.profileTab).toBe('photos');
+    store.openFromAdminList('p2');
+    expect(store.profileTab).toBe('status');
+    expect(store.history.map(entry => entry.tab)).toEqual(['photos']);
+  });
+});

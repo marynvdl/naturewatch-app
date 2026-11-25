@@ -454,7 +454,7 @@ describe('place boundaries from tiles', () => {
     ]);
 
     store.clearSelection();
-    store.shownAreaIds = [parkId];
+    store.showRelated(outsideWindow, 'Ecoregion', [parkId]);
     await flushPromises();
     map.queryRenderedFeatures.mockReturnValue([{ properties: { id: parkId } }]);
     map.fire('click', 'ecoregions-fill', {
@@ -551,7 +551,7 @@ describe('place boundaries from tiles', () => {
     expect(map.getSource('places-tiles')).toBeUndefined();
 
     map.setLayoutProperty.mockClear();
-    store.shownAreaIds = [outsideWindow];
+    store.showRelated(parkId, 'Park', [outsideWindow]);
     await flushPromises();
     expect(map.getSource('places-tiles')).toBeDefined();
     expect(map.setFilter).toHaveBeenCalledWith('places-fill', [
@@ -565,7 +565,7 @@ describe('place boundaries from tiles', () => {
       'visible'
     );
 
-    store.shownAreaIds = null;
+    store.showRelated(parkId, 'Park', null);
     await flushPromises();
     expect(map.getSource('places-tiles')).toBeUndefined();
   });
@@ -632,6 +632,36 @@ describe('place boundaries from tiles', () => {
       ['get', 'id'],
       '',
     ]);
+  });
+
+  it('highlights the card of the place under the pointer, park before ecoregion', async () => {
+    const { map, store } = await drawPlaces();
+    // Run each frame at once. It has finished by the time its id is returned.
+    const frame = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation(run => {
+        run(0);
+        return 0;
+      });
+    map.queryRenderedFeatures.mockReturnValue([
+      { layer: { id: 'ecoregions-fill' }, properties: { id: outsideWindow } },
+      { layer: { id: 'places-fill' }, properties: { id: parkId } },
+    ]);
+    map.fire('mousemove', undefined, { point: { x: 4, y: 4 } });
+    expect(store.hoveredId).toBe(parkId);
+    expect(store.hoveredFrom).toBe('map');
+
+    map.queryRenderedFeatures.mockReturnValue([]);
+    map.fire('mousemove', undefined, { point: { x: 5, y: 5 } });
+    expect(store.hoveredId).toBeNull();
+
+    map.queryRenderedFeatures.mockReturnValue([
+      { layer: { id: 'places-fill' }, properties: { id: parkId } },
+    ]);
+    map.fire('mousemove', undefined, { point: { x: 4, y: 4 } });
+    map.fire('mouseout', undefined, {});
+    expect(store.hoveredId).toBeNull();
+    frame.mockRestore();
   });
 
   it('reports a failed tile read', async () => {
