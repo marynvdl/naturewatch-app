@@ -25,6 +25,8 @@ export interface MapSet {
   kind: 'related';
   /** The place the set belongs to. Its chip opens it. */
   ownerId: string;
+  /** That place's name, shortened to initials on the chip. */
+  ownerName: string;
   placeIds: string[];
   /** A pinned set stays while other places are opened. */
   pinned: boolean;
@@ -116,6 +118,7 @@ const usePlacesStore = defineStore('places', () => {
         label: `Related to ${name}`,
         kind: 'related',
         ownerId,
+        ownerName: name,
         placeIds: [...ids],
         pinned: false,
       },
@@ -153,22 +156,22 @@ const usePlacesStore = defineStore('places', () => {
 
   /** The place whose card the pointer or focus is on, outlined on the map. */
   const hoveredId = ref<string | null>(null);
-  /** Whether the pointer is on the card or on the map. */
-  const hoveredFrom = ref<'list' | 'map'>('list');
 
   /**
-   * Outline a place while its card is hovered, or highlight its card while
-   * the place is hovered on the map.
+   * Outline a place while its card is hovered.
    * @param id - The place.
-   * @param on - Whether the pointer entered or left it.
-   * @param from - Where the pointer is. A card is the default.
+   * @param on - Whether the pointer entered or left the card.
    */
-  function hoverPlace(id: string, on: boolean, from: 'list' | 'map' = 'list') {
-    if (on) {
-      hoveredId.value = id;
-      hoveredFrom.value = from;
-    } else if (hoveredId.value === id) hoveredId.value = null;
+  function hoverPlace(id: string, on: boolean) {
+    if (on) hoveredId.value = id;
+    else if (hoveredId.value === id) hoveredId.value = null;
   }
+
+  /**
+   * The name shown beside the pointer after it rests on a place on the map,
+   * where it rests, in pixels from the map's corner. Null otherwise.
+   */
+  const mapTip = ref<{ name: string; x: number; y: number } | null>(null);
   /** Whether a recognition type or ecoregions are listed, so the tools are size only. */
   const sizeOnly = computed(() =>
     listTypes.value.some(type => isSizeOnlyType(type))
@@ -426,7 +429,7 @@ const usePlacesStore = defineStore('places', () => {
     unpinSet,
     removeSet,
     hoveredId,
-    hoveredFrom,
+    mapTip,
     hoverPlace,
     sizeOnly,
     sizeKept,

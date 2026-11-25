@@ -20,7 +20,10 @@ describe('MapSetChips', () => {
     store.showRelated('eco', 'Atlantic mixed forests', ['park1']);
     const wrapper = mount(MapSetChips);
     const chip = wrapper.get('.map-set-chip');
-    expect(chip.text()).toContain('Related to Atlantic mixed forests');
+    expect(chip.text()).toContain('AMF');
+    expect(wrapper.get('.map-set-label').attributes('title')).toBe(
+      'Related to Atlantic mixed forests'
+    );
     expect(chip.classes()).not.toContain('is-on');
 
     await wrapper

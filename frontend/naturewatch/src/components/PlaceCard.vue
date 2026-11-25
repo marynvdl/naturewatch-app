@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Image } from '@lucide/vue';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import {
   countryName,
   formatAreaTag,
@@ -22,10 +22,6 @@ const props = defineProps<{
   note?: string | null;
   /** Position in a numbered list, shown on the thumbnail's corner. */
   number?: number | null;
-  /** The place is hovered on the map or its card. Gives the hover look. */
-  highlighted?: boolean;
-  /** Scroll the card into its list when it becomes highlighted. */
-  reveal?: boolean;
 }>();
 
 defineEmits<{
@@ -35,23 +31,12 @@ defineEmits<{
 }>();
 
 const country = computed(() => countryName(props.iso3));
-const card = ref<HTMLButtonElement | null>(null);
-
-/** A place hovered on the map brings its card into view, if the list hides it. */
-watch(
-  () => props.highlighted && props.reveal,
-  on => {
-    if (on) card.value?.scrollIntoView?.({ block: 'nearest' });
-  }
-);
 </script>
 
 <template>
   <button
-    ref="card"
     type="button"
     class="place-result"
-    :class="{ 'is-highlighted': highlighted }"
     :aria-current="current ? 'true' : undefined"
     @click="$emit('click')"
     @mouseenter="$emit('highlight', true)"
@@ -120,8 +105,7 @@ watch(
   cursor: pointer;
 }
 
-.place-result:hover,
-.place-result.is-highlighted {
+.place-result:hover {
   background: var(--accent);
 }
 

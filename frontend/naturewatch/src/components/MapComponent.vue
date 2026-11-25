@@ -713,6 +713,17 @@ function addSourceAndLayer(
     >
       <div class="map-container">
         <div id="mapDiv" />
+        <p
+          v-if="placesStore.mapTip"
+          class="map-place-tip"
+          role="tooltip"
+          :style="{
+            left: `${placesStore.mapTip.x}px`,
+            top: `${placesStore.mapTip.y}px`,
+          }"
+        >
+          {{ placesStore.mapTip.name }}
+        </p>
         <div class="map-logo">
           <img :src="mark" alt="Nature Watch" />
         </div>
@@ -981,6 +992,23 @@ function addSourceAndLayer(
   /* The card used to sit under the chevron, which started at 72px. */
   --panel-inset-top: 116px;
   --panel-inset-right: 12px;
+}
+
+/* A place's name, above the pointer that rests on it. */
+.map-place-tip {
+  position: absolute;
+  z-index: 12;
+  max-width: 280px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--map-control-radius);
+  background: var(--background);
+  color: var(--map-control-text);
+  font-size: 12px;
+  line-height: 1.3;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 12px));
 }
 
 /* Under the Landscape circle. An open Landscape panel covers them. */

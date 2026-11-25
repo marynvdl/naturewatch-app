@@ -17,6 +17,7 @@ vi.mock('@/places/api', async importOriginal => ({
   ...(await importOriginal<typeof import('@/places/api')>()),
   loadPlaceBounds: vi.fn(),
   loadPlaceRelease: vi.fn(),
+  loadPlaceName: vi.fn(async (id: string) => `Name of ${id}`),
 }));
 
 vi.stubGlobal(
@@ -634,34 +635,38 @@ describe('place boundaries from tiles', () => {
     ]);
   });
 
-  it('highlights the card of the place under the pointer, park before ecoregion', async () => {
+  it('names the place the pointer rests on, park before ecoregion', async () => {
     const { map, store } = await drawPlaces();
-    // Run each frame at once. It has finished by the time its id is returned.
-    const frame = vi
-      .spyOn(window, 'requestAnimationFrame')
-      .mockImplementation(run => {
-        run(0);
-        return 0;
-      });
+    vi.useFakeTimers();
     map.queryRenderedFeatures.mockReturnValue([
       { layer: { id: 'ecoregions-fill' }, properties: { id: outsideWindow } },
       { layer: { id: 'places-fill' }, properties: { id: parkId } },
     ]);
-    map.fire('mousemove', undefined, { point: { x: 4, y: 4 } });
-    expect(store.hoveredId).toBe(parkId);
-    expect(store.hoveredFrom).toBe('map');
-
-    map.queryRenderedFeatures.mockReturnValue([]);
-    map.fire('mousemove', undefined, { point: { x: 5, y: 5 } });
+    map.fire('mousemove', undefined, { point: { x: 40, y: 50 } });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(store.mapTip).toBeNull();
+    // A small move keeps waiting.
+    map.fire('mousemove', undefined, { point: { x: 42, y: 51 } });
+    await vi.advanceTimersByTimeAsync(400);
+    expect(store.mapTip).toEqual({ name: `Name of ${parkId}`, x: 40, y: 50 });
+    // The card is not highlighted.
     expect(store.hoveredId).toBeNull();
+
+    map.fire('mousemove', undefined, { point: { x: 90, y: 90 } });
+    expect(store.mapTip).toBeNull();
+    map.queryRenderedFeatures.mockReturnValue([]);
+    await vi.advanceTimersByTimeAsync(700);
+    expect(store.mapTip).toBeNull();
 
     map.queryRenderedFeatures.mockReturnValue([
       { layer: { id: 'places-fill' }, properties: { id: parkId } },
     ]);
-    map.fire('mousemove', undefined, { point: { x: 4, y: 4 } });
+    map.fire('mousemove', undefined, { point: { x: 10, y: 10 } });
+    await vi.advanceTimersByTimeAsync(700);
+    expect(store.mapTip).not.toBeNull();
     map.fire('mouseout', undefined, {});
-    expect(store.hoveredId).toBeNull();
-    frame.mockRestore();
+    expect(store.mapTip).toBeNull();
+    vi.useRealTimers();
   });
 
   it('reports a failed tile read', async () => {

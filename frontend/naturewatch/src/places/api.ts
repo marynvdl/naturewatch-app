@@ -1059,3 +1059,27 @@ export async function loadPlaceRelease(): Promise<PlaceReleaseResult> {
   if (error) return { status: 'error' };
   return { status: 'ok', releaseMonth: data?.release_month ?? null };
 }
+
+/** Names already read for the map's tooltip, by place id. */
+const placeNames = new Map<string, string | null>();
+
+/**
+ * A place's name, for the tooltip over the map. Each name is read once.
+ * @param id - `places.id`.
+ * @returns The name, or null when it cannot be read.
+ */
+export async function loadPlaceName(id: string): Promise<string | null> {
+  if (placeNames.has(id)) return placeNames.get(id) ?? null;
+  if (!PLACE_ID.test(id)) return null;
+  const supabase = placesClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('place_summaries')
+    .select('name')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) return null;
+  const name = (data as { name: string } | null)?.name ?? null;
+  placeNames.set(id, name);
+  return name;
+}

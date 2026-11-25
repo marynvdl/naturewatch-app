@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Pin, PinOff, X } from '@lucide/vue';
+import { Link, Pin, PinOff, X } from '@lucide/vue';
+import { initials } from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
 
 /** The sets of places drawn on the map, one chip each, under Landscape. */
@@ -22,9 +23,11 @@ const placesStore = usePlacesStore();
         type="button"
         class="map-set-label"
         :title="set.label"
+        :aria-label="set.label"
         @click="placesStore.openSetOwner(set.id)"
       >
-        {{ set.label }}
+        <Link :size="14" :stroke-width="2.25" aria-hidden="true" />
+        <span class="map-set-initials">{{ initials(set.ownerName) }}</span>
       </button>
       <button
         type="button"
@@ -68,13 +71,15 @@ const placesStore = usePlacesStore();
 }
 
 .map-set-chip {
-  max-width: 260px;
   gap: 2px;
   padding: 0 4px 0 12px;
 }
 
 .map-set-label {
+  display: inline-flex;
   flex: 0 1 auto;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
   margin: 0 4px 0 0;
   padding: 0;
@@ -86,6 +91,11 @@ const placesStore = usePlacesStore();
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+}
+
+.map-set-initials {
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 
 .map-set-icon {

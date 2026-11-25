@@ -768,8 +768,6 @@ function onTabKey(event: KeyboardEvent, index: number) {
                       :area-km2="link.otherAreaKm2"
                       :place-type-id="link.otherTypeId"
                       :photo="mainPhotoOf(link.otherId)"
-                      :highlighted="placesStore.hoveredId === link.otherId"
-                      :reveal="placesStore.hoveredFrom === 'map'"
                       @click="$emit('open', link.otherId)"
                       @highlight="on => $emit('highlight', link.otherId, on)"
                     />

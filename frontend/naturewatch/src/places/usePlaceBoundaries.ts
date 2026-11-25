@@ -12,6 +12,7 @@ import {
   ECOREGION_TILES_URL,
   ECOREGION_TILE_LAYER,
   loadPlaceBounds,
+  loadPlaceName,
 } from './api';
 import {
   ECOREGION_COLOUR,
@@ -593,11 +594,12 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     );
   }
 
-  /** The place the pointer is over on the map, whose card is highlighted. */
-  let mapHovered: string | null = null;
-  /** A pointer move waiting for the next frame. */
-  let hoverFrame = 0;
-  let hoverPoint: mapboxgl.Point | null = null;
+  /** The pointer rests this long, in ms, before a place's name shows. */
+  const TIP_DELAY = 600;
+  /** A move under this many pixels does not restart the wait. */
+  const TIP_SLOP = 4;
+  let tipTimer: ReturnType<typeof setTimeout> | null = null;
+  let tipPoint: { x: number; y: number } | null = null;
 
   /**
    * The drawn place under a point: a conservation area or recognition before
@@ -608,7 +610,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    */
   function placeAt(
     mapInstance: mapboxgl.Map,
-    point: mapboxgl.Point
+    point: { x: number; y: number }
   ): string | null {
     const layers = [PLACE_FILL, RECOGNITION_FILL, ECOREGION_FILL].filter(
       layer =>
@@ -616,7 +618,9 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         mapInstance.getLayoutProperty(layer, 'visibility') !== 'none'
     );
     if (!layers.length) return null;
-    const features = mapInstance.queryRenderedFeatures(point, { layers });
+    const features = mapInstance.queryRenderedFeatures([point.x, point.y], {
+      layers,
+    });
     const top =
       features.find(feature => feature.layer?.id !== ECOREGION_FILL) ??
       features[0];
@@ -624,37 +628,39 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     return id === undefined || id === null || id === '' ? null : String(id);
   }
 
-  /**
-   * Highlight the card of the place under the pointer.
-   * @param id - The place, or null when there is none.
-   */
-  function hoverFromMap(id: string | null) {
-    if (id === mapHovered && (!id || placesStore.hoveredId === id)) return;
-    if (mapHovered) placesStore.hoverPlace(mapHovered, false);
-    mapHovered = id;
-    if (id) placesStore.hoverPlace(id, true, 'map');
+  /** Hide the name and stop waiting to show one. */
+  function hideTip() {
+    if (tipTimer) clearTimeout(tipTimer);
+    tipTimer = null;
+    tipPoint = null;
+    placesStore.mapTip = null;
   }
 
   /**
-   * Note the pointer, and look up the place under it once per frame.
+   * Show the name of the place under the pointer once it has rested there.
    * @param event - The pointer move.
    */
   function onMapMouseMove(event: mapboxgl.MapMouseEvent) {
+    const point = { x: event.point.x, y: event.point.y };
+    if (
+      tipPoint &&
+      Math.abs(point.x - tipPoint.x) < TIP_SLOP &&
+      Math.abs(point.y - tipPoint.y) < TIP_SLOP
+    )
+      return;
+    hideTip();
     if (measureStore.drawing) return;
-    hoverPoint = event.point;
-    if (hoverFrame) return;
-    hoverFrame = requestAnimationFrame(() => {
-      hoverFrame = 0;
+    tipPoint = point;
+    tipTimer = setTimeout(async () => {
+      tipTimer = null;
       const mapInstance = readMap();
-      if (!mapInstance || !hoverPoint) return;
-      hoverFromMap(placeAt(mapInstance, hoverPoint));
-    });
-  }
-
-  /** The pointer left the map. */
-  function onMapMouseOut() {
-    hoverPoint = null;
-    hoverFromMap(null);
+      if (!mapInstance || tipPoint !== point) return;
+      const id = placeAt(mapInstance, point);
+      if (!id) return;
+      const name = await loadPlaceName(id);
+      if (name && tipPoint === point)
+        placesStore.mapTip = { name, x: point.x, y: point.y };
+    }, TIP_DELAY);
   }
 
   /** Where and when a one-finger touch on a boundary began. */
@@ -884,7 +890,9 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         });
       });
       mapInstance.on('mousemove', onMapMouseMove);
-      mapInstance.on('mouseout', onMapMouseOut);
+      mapInstance.on('mouseout', hideTip);
+      mapInstance.on('movestart', hideTip);
+      mapInstance.on('mousedown', hideTip);
       mapInstance.on('error', onMapError);
       listening = true;
     }

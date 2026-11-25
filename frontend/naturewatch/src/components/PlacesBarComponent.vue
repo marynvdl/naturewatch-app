@@ -774,8 +774,6 @@ watch(
                 :current="placesStore.selectedId === place.id"
                 :photo="mainPhotoOf(place.id)"
                 :number="windowStart + index + 1"
-                :highlighted="placesStore.hoveredId === place.id"
-                :reveal="placesStore.hoveredFrom === 'map'"
                 @click="chooseResult(place)"
                 @highlight="on => placesStore.hoverPlace(place.id, on)"
               />

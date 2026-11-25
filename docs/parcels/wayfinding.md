@@ -10,7 +10,7 @@ As a user, on the map, I can:
 
 - open a place, go to Related, open a related place from the map or the list, and step back with a back button;
 - keep the related places drawn while I open one of them, and pin that set so it stays while I move on;
-- hover a place on the map and see its card highlighted in the list;
+- rest the pointer on a place on the map and see its name;
 - open another place on the same tab I was on;
 - turn on Ecoregions together with other place types, and open Filter before choosing a type;
 - see the globe centred in the space the panels leave free;
@@ -31,11 +31,11 @@ As an admin, I can:
 
 **Sets on the map.** The store holds a list of `mapSets`, each `{id, label, kind, placeIds, pinned}`. Today the only kind is `related`. `shownAreaIds` becomes the union of all sets, so the map filter does not change.
 
-- A temporary set appears while a place's Related tab is drawn. Its chip reads "Related to <place>". It stays while you open places inside the set, from the map or from its cards. It goes when you open a place outside it, clear the selection, or press ×. There is one temporary set at most.
+- A temporary set appears while a place's Related tab is drawn. Its chip shows a link icon and the place's initials, such as SSD, and reads "Related to <place>" on hover. It stays while you open places inside the set, from the map or from its cards. It goes when you open a place outside it, clear the selection, or press ×. There is one temporary set at most.
 - A pin on the chip makes the set pinned. A pinned set stays until you press ×. There can be several.
 - The chips sit on the right, under Landscape, in the Landscape and Measure panel style. The type buttons stay the only place that shows which place types are on.
 
-**Hover both ways.** A hover over a place on the map sets `hoveredId`, as a hover over a card already does. The card is highlighted and scrolled into view.
+**Names on the map.** Resting the pointer on a drawn place shows its name in a tooltip. Cards are not highlighted from the map: the user found that inconsistent (task 01).
 
 **Edit mode.** Edit mode shows the view tabs and adds Photos and Status. Related keeps its cards, map drawing, and hover in edit mode, with the link editor on top. The tab mapping between the two modes goes.
 
@@ -75,6 +75,7 @@ This waits for Shaping Boundaries, which decides which boundaries are eligible f
 
 - A higher Built floor through a tile rebuild, or Google's 0.2 presence cutoff. Task 06 records the false positives instead.
 - A button for photo suggestions.
+- Chip icons per place type, such as one for ecoregions and one for conservation areas, as a visual system for the sets on the map.
 - The Attention and Withdrawn admin lists as filters on the places list, like the photo queue.
 - The query builder, until its open question is settled.
 - A production release. App work merges into `develop` only.
@@ -84,7 +85,7 @@ This waits for Shaping Boundaries, which decides which boundaries are eligible f
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. Task files are written when a task starts.
 
 - [ ] [Task 01 — Profile navigation](../tasks/task-01-profile-navigation.md) — naturewatch-app
-  - *Goal:* Keep the tab between places, add back and the breadcrumb, keep the Related set while opening its places, add temporary and pinned chips, highlight a card on map hover, and let the citation scroll with the content. Update `docs/user/using-the-map.md`. Run the tests and a browser check, and have the user evaluate the local app.
+  - *Goal:* Keep the tab between places, add back and the breadcrumb, keep the Related set while opening its places, add temporary and pinned chips, name a place when the pointer rests on it, and let the citation scroll with the content. Update `docs/user/using-the-map.md`. Run the tests and a browser check, and have the user evaluate the local app.
 - [ ] [Task 02 — Edit mode on view mode](../tasks/task-02-edit-mode-on-view-mode.md) — naturewatch-app
   - *Goal:* Edit mode shows the view tabs plus Photos and Status. Related keeps its cards, map drawing, and hover, with the link editor on top.
 - [ ] [Task 03 — Places bar and globe](../tasks/task-03-places-bar-and-globe.md) — naturewatch-app
