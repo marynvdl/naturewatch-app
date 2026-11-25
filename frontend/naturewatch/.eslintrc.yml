@@ -53,6 +53,13 @@ rules:
     - html:
         void: always
   vue/multi-word-component-names: warn
+  # A label names its control with `for`, or wraps it. The suggestion input
+  # passes its id to the input inside it.
+  vuejs-accessibility/label-has-for:
+    - error
+    - required:
+        some: [nesting, id]
+      controlComponents: [PlaceSuggestInput]
 overrides:
   - files:
       - '*.json'
