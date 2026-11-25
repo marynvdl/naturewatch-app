@@ -29,7 +29,7 @@ As an admin, I can:
 
 **Back.** `PlacesStore` keeps a history of `{id, tab, sets}`. Each selection adds to it. A back button in the profile header returns to the previous entry. A short breadcrumb shows the last two or three places.
 
-**Sets on the map.** The store holds a list of `mapSets`, each `{id, label, kind, placeIds, pinned}`. Today the only kind is `related`. `shownAreaIds` becomes the union of all sets, so the map filter does not change.
+**Sets on the map.** The store holds a list of `mapSets`, each `{id, label, kind, placeIds, pinned}`. Today the only kind is `related`. `shownAreaIds` is the union of all sets. The sets draw together with the list's places, with a darker outline above them. With Places closed, only the sets draw.
 
 - A temporary set appears while a place's Related tab is drawn. Its chip shows a link icon and the place's initials, such as SSD, and reads "Related to <place>" on hover. It stays while you open places inside the set, from the map or from its cards. It goes when you open a place outside it, clear the selection, or press ×. There is one temporary set at most.
 - A pin on the chip makes the set pinned. A pinned set stays until you press ×. There can be several.

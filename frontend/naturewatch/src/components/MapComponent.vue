@@ -170,6 +170,49 @@ watch(
 );
 onMounted(observeProfile);
 
+/**
+ * Where the map set chips start, in pixels from the map's top, while the
+ * Landscape panel is open: just under it. Null keeps them under the circle.
+ */
+const setsTop = ref<number | null>(null);
+let layersObserver: ResizeObserver | null = null;
+let layersTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Put the chips under the open Landscape panel, if there is room. */
+function measureLayersPanel() {
+  const panel = document.getElementById('layers-panel');
+  const container = document.querySelector('.map-container');
+  if (
+    !drawerVisible.value ||
+    !(panel instanceof HTMLElement) ||
+    !(container instanceof HTMLElement)
+  ) {
+    setsTop.value = null;
+    return;
+  }
+  const box = container.getBoundingClientRect();
+  const top = panel.getBoundingClientRect().bottom - box.top + 12;
+  // A panel that fills the height leaves no room. The chips stay under it.
+  setsTop.value = top < box.height - 48 ? top : null;
+}
+
+/** Follow the Landscape panel as it opens, grows, or closes. */
+function observeLayersPanel() {
+  layersObserver?.disconnect();
+  layersObserver = null;
+  if (layersTimer) clearTimeout(layersTimer);
+  measureLayersPanel();
+  if (!drawerVisible.value) return;
+  // Measure again once the panel has slid open.
+  layersTimer = setTimeout(measureLayersPanel, 350);
+  const panel = document.getElementById('layers-panel');
+  if (typeof ResizeObserver === 'undefined' || !panel) return;
+  layersObserver = new ResizeObserver(measureLayersPanel);
+  layersObserver.observe(panel);
+}
+
+watch(drawerVisible, observeLayersPanel, { flush: 'post' });
+
 // Determine layer color to use
 const layerColorKey = computed(() => {
   return currentBasemap.value.title === 'Satellite'
@@ -381,6 +424,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   profileObserver?.disconnect();
+  layersObserver?.disconnect();
+  if (layersTimer) clearTimeout(layersTimer);
   timelineStore.bindTileWait(() => Promise.resolve());
 });
 
@@ -752,7 +797,10 @@ function addSourceAndLayer(
         >
           <DrawerComponent />
         </BlobButton>
-        <MapSetChips class="map-sets" />
+        <MapSetChips
+          class="map-sets"
+          :style="setsTop !== null ? { top: `${setsTop}px` } : undefined"
+        />
         <BlobButton
           class="blob-measure"
           label="Measure"
@@ -1011,7 +1059,7 @@ function addSourceAndLayer(
   transform: translate(-50%, calc(-100% - 12px));
 }
 
-/* Under the Landscape circle. An open Landscape panel covers them. */
+/* Under the Landscape circle, or under the Landscape panel while it is open. */
 .map-sets {
   position: absolute;
   top: 256px;

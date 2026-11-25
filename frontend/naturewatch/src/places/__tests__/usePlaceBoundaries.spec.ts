@@ -571,6 +571,36 @@ describe('place boundaries from tiles', () => {
     expect(map.getSource('places-tiles')).toBeUndefined();
   });
 
+  it('draws a set with the listed conservation areas, outlined above them', async () => {
+    const { map, store } = await drawPlaces();
+    store.listTypes = ['conservation_area'];
+    await flushPromises();
+    store.selectPlace(parkId);
+    store.showRelated(parkId, 'Park', [outsideWindow]);
+    store.pinSet(`related:${parkId}`);
+    await flushPromises();
+    const inSet = ['in', ['get', 'id'], ['literal', [outsideWindow]]];
+    expect(map.getLayer('places-set-line')).toBeDefined();
+    expect(map.setFilter).toHaveBeenCalledWith('places-set-line', inSet);
+    expect(map.setFilter).toHaveBeenCalledWith('places-fill', [
+      'any',
+      ['literal', true],
+      inSet,
+    ]);
+    expect(map.getLayoutProperty('places-set-line', 'visibility')).toBe(
+      'visible'
+    );
+
+    // With Places closed, only the pinned set draws.
+    store.toggle();
+    await flushPromises();
+    expect(map.setFilter).toHaveBeenCalledWith('places-fill', inSet);
+
+    store.removeSet(`related:${parkId}`);
+    await flushPromises();
+    expect(map.getSource('places-tiles')).toBeUndefined();
+  });
+
   it('outlines only the selected place while the photo queue is open', async () => {
     const { map, store } = await drawPlaces();
     store.toggle();

@@ -13,6 +13,7 @@ Decided 25 November 2026 by the user:
 - **Drilling down opens Overview.** Opening a place that belongs to the drawn Related set, from the map or from a card, opens it on Overview and keeps the set drawn. Opening any other place keeps the open tab. Back returns to the previous place on the tab it was on.
 - **Chips: temporary and pinned.** A temporary set goes when you leave it. A pinned set stays until you remove it.
 - **Chip label, changed during evaluation.** A link icon and the owner's initials, such as SSD. The full "Related to South Sahara desert" shows on hover. Icons per place type are for later.
+- **Sets and the list draw together, decided during evaluation.** The list's conservation areas draw as before, and the sets' places draw with them, with a darker outline on a `places-set-line` layer above. With Places closed, only the sets draw. The chips move under the Landscape panel while it is open.
 - **Map hover, changed during evaluation.** Hovering the map no longer highlights or scrolls cards. After the pointer rests on a place for 600 ms, a tooltip names it. The name is read from `place_summaries`, once per place.
 
 ## Facts already stored
