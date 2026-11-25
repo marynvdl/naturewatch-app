@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link, Pin, PinOff, X } from '@lucide/vue';
+import { Link as LinkIcon, Pin, PinOff, X } from '@lucide/vue';
 import { initials } from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
 
@@ -26,7 +26,7 @@ const placesStore = usePlacesStore();
         :aria-label="set.label"
         @click="placesStore.openSetOwner(set.id)"
       >
-        <Link :size="14" :stroke-width="2.25" aria-hidden="true" />
+        <LinkIcon :size="14" :stroke-width="2.25" aria-hidden="true" />
         <span class="map-set-initials">{{ initials(set.ownerName) }}</span>
       </button>
       <button
