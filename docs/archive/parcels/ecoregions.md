@@ -4,6 +4,8 @@ The terrestrial ecoregions of RESOLVE Ecoregions 2017, stored as Places and show
 
 *Written 21 November 2026.*
 
+Archived 25 November 2026. Tasks 01 to 06 are merged into `develop`, and their hosted steps are done. Task 07, ecoregion descriptions, was not done and is in Deferred.
+
 ## Goal
 
 As a user, on the map, I can:
@@ -29,7 +31,7 @@ One Earth's text and photos are not copied. Its terms (updated 15 April 2026) fo
 
 **Places.** A new category, `ecology`, with the type `ecoregion` and a new `details_kind`, `ecoregion`. Each of the 846 ecoregions is one place with a version 1 boundary, from the RESOLVE polygon. Rock and Ice (ECO_ID 0) is not imported. `place_source_ids` holds `ECO_ID` with `id_kind` `eco_id`. `ecoregion_details` holds the biome and realm, provenance, and the raw source row in `source_attributes`. `place_summaries` reads `realm` from it too. The size on the profile is the current boundary's `area_km2`, as for every place.
 
-**Links.** A conservation area or a recognition is `located_in` an ecoregion, as a `derived` link, with `subject_coverage` (the share of the park inside the ecoregion) and `object_coverage`. The links are derived from the current boundaries. They are computed on a laptop from the hosted boundaries, with the shapes cut on a 1° grid, and not in the database: one `place_overlaps()` call ran the hosted database out of memory on 12 November 2026. The user chooses the coverage at which a link is confirmed from the hosted counts, as in [Database Honing task 09](../archive/tasks/task-09-recognitions.md). Only confirmed links show as tags and in Related.
+**Links.** A conservation area or a recognition is `located_in` an ecoregion, as a `derived` link, with `subject_coverage` (the share of the park inside the ecoregion) and `object_coverage`. The links are derived from the current boundaries. They are computed on a laptop from the hosted boundaries, with the shapes cut on a 1° grid, and not in the database: one `place_overlaps()` call ran the hosted database out of memory on 12 November 2026. The user chooses the coverage at which a link is confirmed from the hosted counts, as in [Database Honing task 09](../tasks/task-09-recognitions.md). Only confirmed links show as tags and in Related.
 
 **Text.** A pipeline matches each ecoregion to its Wikidata item and English Wikipedia article, and suggests the lead as the description. The suggestion is cut at a paragraph or sentence end to fit the 2,000-character limit. An admin approves or edits it in edit mode, and it is stored in `place_curations.description`. Under the text the profile shows "From Wikipedia" with the article link and the CC BY-SA licence, so the text keeps its source and licence. An unmatched ecoregion is listed for an admin to match by hand.
 
@@ -51,6 +53,8 @@ Answered in task 02 on 21 November 2026: a `located_in` link is confirmed when a
 
 ## Deferred
 
+- Ecoregion descriptions, the former task 07: suggest each ecoregion's English Wikipedia lead, found through its confirmed `wikidata_item`, as its description. An admin approves or edits it in edit mode, and the profile shows "From Wikipedia" with the article link and the CC BY-SA licence under the text.
+- Wikidata items for the 114 ecoregions with no match (task 06), added by hand to `supabase/ecoregion_wikidata.tsv`.
 - Biome and realm shown on the profile, or used as filters.
 - Stats per ecoregion, such as cropland. They wait for the parcel that resumes Stats.
 - Biomes, bioregions, and realms as places.
@@ -64,19 +68,19 @@ Answered in task 02 on 21 November 2026: a `located_in` link is confirmed when a
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. Task files are written when a task starts.
 
-- [x] [Task 01 — Ecoregion places](../archive/tasks/task-01-ecoregion-places.md) — naturewatch-app
+- [x] [Task 01 — Ecoregion places](../tasks/task-01-ecoregion-places.md) — naturewatch-app
   - *Goal:* Add the `ecology` category, the `ecoregion` type, `ecoregion_details`, and the source, release, and licence rows. Extend `place_summaries`. Write `supabase/import_ecoregions.py`: download the pinned zip with a checksum, then load places, version 1 boundaries, and `eco_id` source ids. Load it locally, then on the hosted database after approval. Check the count, the areas against RESOLVE's, and that every boundary is valid.
-- [x] [Task 02 — Ecoregion links](../archive/tasks/task-02-ecoregion-links.md) — naturewatch-app
+- [x] [Task 02 — Ecoregion links](../tasks/task-02-ecoregion-links.md) — naturewatch-app
   - *Goal:* Derive `located_in` links from conservation areas and recognitions to ecoregions, with subdivided ecoregion shapes. Write them as `proposed`. Show the user the coverage counts. Confirm the links at the threshold the user chooses.
-- [x] [Task 03 — Ecoregions PMTiles](../archive/tasks/task-03-ecoregions-pmtiles.md) — naturewatch-analysis
+- [x] [Task 03 — Ecoregions PMTiles](../tasks/task-03-ecoregions-pmtiles.md) — naturewatch-analysis
   - *Goal:* Add `places-ecoregions.yaml` and build `places/ecoregions/v1/ecoregions.pmtiles` from the current boundaries of the published ecoregions. Record the run cost.
-- [x] [Task 04 — Ecoregions on the map and profile](../archive/tasks/task-04-ecoregions-on-the-map.md) — naturewatch-app
+- [x] [Task 04 — Ecoregions on the map and profile](../tasks/task-04-ecoregions-on-the-map.md) — naturewatch-app
   - *Goal:* The Ecoregions button lists and draws ecoregions, and a click opens a profile. The paint is outlines only. The profile shows the size. Related lists the conservation areas inside, 20 at a time. A conservation area's Overview shows its ecoregions as tags that open them. Update `docs/user/using-the-map.md`, `docs/user/data.md`, and `docs/blueprint.md`. Run the tests and a browser check, and have the user evaluate the local app.
-- [x] [Task 05 — Filter by ecoregion](../archive/tasks/task-05-filter-by-ecoregion.md) — naturewatch-app
+- [x] [Task 05 — Filter by ecoregion](../tasks/task-05-filter-by-ecoregion.md) — naturewatch-app
   - *Goal:* Add a migration so the list reads take ecoregion ids. Add the Ecoregion field to the filter dialog, and filter the map to the matching places. Update `docs/user/using-the-map.md`. Run the tests and a browser check, and have the user evaluate the local app.
-- [x] [Task 06 — Ecoregion photos](../archive/tasks/task-06-ecoregion-photos.md) — naturewatch-app
+- [x] [Task 06 — Ecoregion photos](../tasks/task-06-ecoregion-photos.md) — naturewatch-app
   - *Goal:* Match each ecoregion to its Wikidata item. Extend `suggest_photos.py` to ecoregions, and load the suggestions on the hosted database after approval. The admin reviews them in the photo queue.
-- [ ] Task 07 — Ecoregion descriptions — naturewatch-app
+- [ ] Task 07 — Ecoregion descriptions — naturewatch-app — not done
   - *Goal:* Suggest each ecoregion's Wikipedia lead as its description. An admin approves or edits it in edit mode. The profile shows the Wikipedia source and the CC BY-SA licence under the text.
 
 ## Done when

@@ -1,6 +1,6 @@
 # Task 06 — Ecoregion photos
 
-Parcel: [Ecoregions](../../parcels/ecoregions.md).
+Parcel: [Ecoregions](../parcels/ecoregions.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 05 merged in #453.
 

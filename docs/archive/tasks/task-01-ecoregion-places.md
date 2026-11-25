@@ -1,6 +1,6 @@
 # Task 01 — Ecoregion places
 
-Parcel: [Ecoregions](../../parcels/ecoregions.md).
+Parcel: [Ecoregions](../parcels/ecoregions.md).
 
 Repository: naturewatch-app. Start from `develop`. This is the parcel's first task. The parcel merged in #446.
 
