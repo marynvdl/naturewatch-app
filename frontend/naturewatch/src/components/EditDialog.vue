@@ -46,7 +46,9 @@ const emit = defineEmits<{ submit: [] }>();
               <X aria-hidden="true" />
             </DialogClose>
           </header>
-          <DialogDescription class="edit-sr">{{ description }}</DialogDescription>
+          <DialogDescription class="edit-sr">
+            {{ description }}
+          </DialogDescription>
           <div class="edit-body">
             <slot />
             <p v-if="error" class="edit-error" role="alert">{{ error }}</p>

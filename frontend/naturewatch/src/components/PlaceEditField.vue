@@ -48,6 +48,7 @@ const hasLineBreak = computed(
   () => props.kind === 'line' && /[\r\n]/.test(draft.value)
 );
 
+/** Open the field with its current value, and focus it. */
 async function open() {
   const value = props.curated ?? props.start;
   if (props.kind === 'countries')
@@ -61,11 +62,16 @@ async function open() {
   root.value?.querySelector<HTMLElement>('input, textarea')?.focus();
 }
 
+/** Close the field without saving. */
 function cancel() {
   editing.value = false;
   error.value = '';
 }
 
+/**
+ * Save a value, and close the field unless the save failed.
+ * @param value - The value to store.
+ */
 async function submit(value: CuratedValue) {
   saving.value = true;
   error.value = (await props.save(value)) ?? '';
@@ -73,6 +79,7 @@ async function submit(value: CuratedValue) {
   if (!error.value) editing.value = false;
 }
 
+/** Save the draft, unless it is too long or breaks a single line. */
 function onSave() {
   if (tooLong.value || hasLineBreak.value) return;
   void submit(props.kind === 'countries' ? draftCodes.value : draft.value);

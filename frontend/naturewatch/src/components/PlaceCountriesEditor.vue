@@ -37,12 +37,20 @@ const suggestions = computed(() => {
     .slice(0, SUGGESTION_LIMIT);
 });
 
+/**
+ * Add a chosen country, and clear the search.
+ * @param code - The country code from the list.
+ */
 function add(code: unknown) {
   if (typeof code !== 'string' || codes.value.includes(code)) return;
   codes.value = [...codes.value, code];
   search.value = '';
 }
 
+/**
+ * Remove a country.
+ * @param code - Its code.
+ */
 function remove(code: string) {
   codes.value = codes.value.filter(item => item !== code);
 }

@@ -207,7 +207,9 @@ function clearFlag() {
             type="button"
             size="sm"
             variant="outline"
-            :disabled="!withdrawalReason.trim() || !withdrawalEdited || busy !== null"
+            :disabled="
+              !withdrawalReason.trim() || !withdrawalEdited || busy !== null
+            "
             @click="withdraw"
           >
             Save
@@ -276,7 +278,9 @@ function clearFlag() {
             type="button"
             size="sm"
             variant="outline"
-            :disabled="!attentionReason.trim() || !attentionEdited || busy !== null"
+            :disabled="
+              !attentionReason.trim() || !attentionEdited || busy !== null
+            "
             @click="flag"
           >
             Save
