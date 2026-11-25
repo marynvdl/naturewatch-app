@@ -84,7 +84,7 @@ This waits for Shaping Boundaries, which decides which boundaries are eligible f
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. Task files are written when a task starts.
 
-- [ ] [Task 01 — Profile navigation](../tasks/task-01-profile-navigation.md) — naturewatch-app
+- [x] [Task 01 — Profile navigation](../archive/tasks/task-01-profile-navigation.md) — naturewatch-app
   - *Goal:* Keep the tab between places, add back and the breadcrumb, keep the Related set while opening its places, add temporary and pinned chips, name a place when the pointer rests on it, and let the citation scroll with the content. Update `docs/user/using-the-map.md`. Run the tests and a browser check, and have the user evaluate the local app.
 - [ ] [Task 02 — Edit mode on view mode](../tasks/task-02-edit-mode-on-view-mode.md) — naturewatch-app
   - *Goal:* Edit mode shows the view tabs plus Photos and Status. Related keeps its cards, map drawing, and hover, with the link editor on top.

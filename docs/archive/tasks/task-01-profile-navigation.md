@@ -1,6 +1,6 @@
 # Task 01 — Profile navigation
 
-Parcel: [Wayfinding](../parcels/wayfinding.md).
+Parcel: [Wayfinding](../../parcels/wayfinding.md).
 
 Repository: naturewatch-app. Start from `develop`. The parcel merged in #456.
 
