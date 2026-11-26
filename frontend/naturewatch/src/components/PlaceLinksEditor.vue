@@ -11,9 +11,12 @@ import {
 } from 'reka-ui';
 import { Plus } from '@lucide/vue';
 import EditDialog from '@/components/EditDialog.vue';
+import PlaceCard from '@/components/PlaceCard.vue';
 import { Button } from '@/components/ui/button';
 import {
   LINK_CHOICES,
+  groupByRelationship,
+  largestFirst,
   linkLabel,
   loadPlaceLinks,
   searchPlaces,
@@ -23,6 +26,7 @@ import {
   type PlaceSummary,
 } from '@/places/api';
 import { formatPercent, placeTypeLabel } from '@/places/display';
+import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 
 const props = defineProps<{ placeId: string }>();
 
@@ -31,6 +35,8 @@ const emit = defineEmits<{
   changed: [];
   /** The other place of a link was chosen. Open it. */
   open: [id: string];
+  /** The pointer or focus entered or left a link's card. */
+  highlight: [id: string, on: boolean];
 }>();
 
 /** Links shown at once in each group. */
@@ -38,12 +44,20 @@ const LINK_STEP = 20;
 /** Wait this long after typing before searching. */
 const SEARCH_DELAY_MS = 250;
 
-const GROUPS: { status: LinkStatus; label: string }[] = [
-  { status: 'proposed', label: 'Proposed' },
-  { status: 'confirmed', label: 'Confirmed' },
-  { status: 'rejected', label: 'Rejected' },
-  { status: 'retired', label: 'Retired' },
-];
+/** How each origin reads under a card. */
+const ORIGIN_LABEL: Record<PlaceLink['origin'], string> = {
+  manual: 'Added by an admin',
+  derived: 'Derived from the boundaries',
+  imported: 'Imported',
+};
+
+/** One group of the list: a status, or one relationship of the confirmed links. */
+interface LinkGroup {
+  key: string;
+  label: string;
+  status: LinkStatus;
+  links: PlaceLink[];
+}
 
 /** The actions each status offers, in order. */
 const ACTIONS: Record<LinkStatus, { status: LinkStatus; label: string }[]> = {
@@ -64,7 +78,8 @@ const ACTIONS: Record<LinkStatus, { status: LinkStatus; label: string }[]> = {
 
 const links = ref<PlaceLink[]>([]);
 const status = ref<'loading' | 'ok' | 'error'>('loading');
-const shown = ref<Record<LinkStatus, number>>(initialShown());
+/** Cards shown in each group, by its key. */
+const shown = ref<Record<string, number>>({});
 /** The link being saved, so its buttons are disabled. */
 const busyId = ref<string | null>(null);
 const linkError = ref<{ id: string; message: string } | null>(null);
@@ -81,21 +96,69 @@ const addError = ref('');
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 let searchAbort: AbortController | null = null;
 
-const grouped = computed(() =>
-  GROUPS.map(group => ({
-    ...group,
-    links: links.value.filter(link => link.status === group.status),
-  })).filter(group => group.links.length > 0)
+/**
+ * Proposed links first, then the confirmed ones in the Related tab's groups,
+ * then the rejected and the retired ones. Each link appears once.
+ */
+const grouped = computed<LinkGroup[]>(() => {
+  const byStatus = (status: LinkStatus, label: string): LinkGroup => ({
+    key: status,
+    label,
+    status,
+    links: links.value
+      .filter(link => link.status === status)
+      .sort(largestFirst),
+  });
+  return [
+    byStatus('proposed', 'Proposed'),
+    ...groupByRelationship(
+      links.value.filter(link => link.status === 'confirmed')
+    ).map(group => ({
+      key: `confirmed:${group.label}`,
+      label: group.label,
+      status: 'confirmed' as const,
+      links: group.links,
+    })),
+    byStatus('rejected', 'Rejected'),
+    byStatus('retired', 'Retired'),
+  ].filter(group => group.links.length > 0);
+});
+
+/**
+ * Cards shown in one group.
+ * @param key - The group's key.
+ * @returns How many cards to show.
+ */
+function shownIn(key: string): number {
+  return shown.value[key] ?? LINK_STEP;
+}
+
+/** Read the main photographs of the cards shown. */
+watch(
+  () =>
+    grouped.value.flatMap(group =>
+      group.links
+        .slice(0, shownIn(group.key))
+        .filter(link => link.otherName)
+        .map(link => link.otherId)
+    ),
+  ids => requestMainPhotos(ids)
 );
 
-/** Every group starts with one step of links shown. */
-function initialShown(): Record<LinkStatus, number> {
-  return {
-    proposed: LINK_STEP,
-    confirmed: LINK_STEP,
-    rejected: LINK_STEP,
-    retired: LINK_STEP,
-  };
+/**
+ * The line under a card: the relationship outside the confirmed groups, the
+ * origin, and the share of this place inside the other.
+ */
+function noteOf(link: PlaceLink, group: LinkGroup): string {
+  return [
+    group.status === 'confirmed' ? null : linkLabel(link.typeId, link.outward),
+    ORIGIN_LABEL[link.origin] ?? link.origin,
+    link.coverage != null
+      ? `${formatPercent(link.coverage * 100)}% of this place inside`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /** Read every link of the place. */
@@ -116,7 +179,7 @@ watch(
   () => {
     status.value = 'loading';
     links.value = [];
-    shown.value = initialShown();
+    shown.value = {};
     linkError.value = null;
     resetForm();
     void load();
@@ -325,38 +388,36 @@ onBeforeUnmount(() => {
     <section
       v-for="group in grouped"
       v-else
-      :key="group.status"
+      :key="group.key"
       class="links-group"
       :aria-label="group.label"
       :data-status="group.status"
     >
       <p class="map-section links-heading">
-        {{ group.label }} ({{ group.links.length.toLocaleString('en-GB') }})
+        {{ group.label }}
+        <span class="links-count">
+          {{ group.links.length.toLocaleString('en-GB') }}
+        </span>
       </p>
       <ul class="links-list">
         <li
-          v-for="link in group.links.slice(0, shown[group.status])"
+          v-for="link in group.links.slice(0, shownIn(group.key))"
           :key="link.id"
           class="links-item"
           :data-link="link.id"
         >
-          <p class="links-label">{{ linkLabel(link.typeId, link.outward) }}</p>
-          <button
+          <PlaceCard
             v-if="link.otherName"
-            type="button"
-            class="links-name"
+            :name="link.otherName"
+            :iso3="link.otherIso3"
+            :area-km2="link.otherAreaKm2"
+            :place-type-id="link.otherTypeId"
+            :photo="mainPhotoOf(link.otherId)"
             @click="emit('open', link.otherId)"
-          >
-            {{ link.otherName }}
-          </button>
-          <p v-else class="links-name is-plain">{{ link.otherId }}</p>
-          <p class="links-note">
-            {{ placeTypeLabel(link.otherTypeId) }} ·
-            {{ link.origin === 'manual' ? 'Added by an admin' : link.origin }}
-            <template v-if="link.coverage != null">
-              · {{ formatPercent(link.coverage * 100) }}% of this place inside
-            </template>
-          </p>
+            @highlight="on => emit('highlight', link.otherId, on)"
+          />
+          <p v-else class="links-name">{{ link.otherId }}</p>
+          <p class="links-note">{{ noteOf(link, group) }}</p>
           <p
             v-if="linkError?.id === link.id"
             class="links-note is-error"
@@ -378,14 +439,14 @@ onBeforeUnmount(() => {
             </Button>
           </div>
         </li>
-        <li v-if="shown[group.status] < group.links.length">
+        <li v-if="shownIn(group.key) < group.links.length">
           <button
             type="button"
             class="links-more map-control"
-            @click="shown[group.status] += LINK_STEP"
+            @click="shown[group.key] = shownIn(group.key) + LINK_STEP"
           >
             Show
-            {{ Math.min(LINK_STEP, group.links.length - shown[group.status]) }}
+            {{ Math.min(LINK_STEP, group.links.length - shownIn(group.key)) }}
             more
           </button>
         </li>
@@ -439,8 +500,7 @@ onBeforeUnmount(() => {
   font-size: 14px;
 }
 
-.links-input:focus-visible,
-.links-name:focus-visible {
+.links-input:focus-visible {
   outline: 2px solid var(--foreground, #24312c);
   outline-offset: 2px;
 }
@@ -461,10 +521,21 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
+.links-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.links-count {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
 .links-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -474,34 +545,13 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--background);
 }
 
 .links-name {
   margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--foreground);
-  font: inherit;
   font-size: 14px;
-  font-weight: 600;
-  text-align: left;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-}
-
-.links-name:hover {
-  text-decoration: underline;
-}
-
-.links-name.is-plain {
-  font-weight: 400;
   color: var(--muted-foreground);
-  cursor: default;
+  overflow-wrap: anywhere;
 }
 
 .links-note {
@@ -520,10 +570,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 4px;
 }
 
 .links-more {
   width: 100%;
+  cursor: pointer;
 }
 </style>
