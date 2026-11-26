@@ -27,6 +27,7 @@ From the code on 26 November 2026:
 - **Years go back to 2000 on every layer**, from 2000 to the layer's latest year, even where the layer has no data yet. An admin may know that a field was never cropland, and the record is useful later. 2000 is `FIRST_CORRECTION_YEAR` in `src/corrections/form.ts`. The catalog `yearly` flag from task 01 goes, because every layer now has the same year picker.
 - **Years are a range with checkboxes.** From and To set the range, with every year inside it checked. Unchecking a year drops it, for example a fire in 2019 and 2021 but not 2020. Both start at the year the layer shows for the timeline year, or its latest.
 - **The action labels** are "Remove here" (`remove`), "Add here" (`add`), and "Change kind" (`reclassify`).
+- **Messages sit above the Measure panel**, in a small panel of their own, so a message never widens the panel. Found in the browser check, where a wider panel covered the timeline. On a narrow screen in Edit mode, the heading sits above the five buttons, so it is not pushed off the edge.
 - **The polygon is not measured.** A correction polygon gets no area label, and it is deleted from the draw tool when the form saves or closes.
 
 ## Do this

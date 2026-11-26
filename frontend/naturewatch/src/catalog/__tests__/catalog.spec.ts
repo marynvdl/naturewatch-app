@@ -499,14 +499,6 @@ describe('layer corrections', () => {
     });
   });
 
-  it('makes a correction yearly only on a layer with more than one year', () => {
-    layers.forEach(layer => {
-      if (layer.corrections?.yearly) {
-        expect(layer.years.available.length, layer.id).toBeGreaterThan(1);
-      }
-    });
-  });
-
   it('rejects an unknown action, or a value with both a kind and options', () => {
     const ajv = new Ajv({ allErrors: true });
     const validate = ajv.compile(schema);
