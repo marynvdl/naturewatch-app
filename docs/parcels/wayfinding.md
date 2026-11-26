@@ -61,18 +61,9 @@ As an admin, I can:
 
 - **A query builder.** The user suggested building a query in the Places panel and pinning it with "Add to map" as a chip under Landscape. A query is types, filters, and In view, or a place's Related set. Typing a name must still show the list straight away. A pinned query would be another kind of `mapSets`. A left click picks the last pinned layer. A right click adds "Places here" to the copy-coordinates menu, listing every place under the point. Still open: a colour per chip, and whether the unpinned query still draws.
 
-## Notes for the parcel that resumes Stats
-
-Every sprout is on one grid (EPSG:4326, 0.00025°, in blocks). One Batch pass per boundary can read each block once and work out cropland, Built (with the speckle rule), and roads together.
-- Cut boundaries into 1° pieces first, as for the ecoregion links.
-- Size the job from the 941-place cropland run (872 s on Batch).
-- Treat the 198 boundaries with over 100,000 vertices on their own.
-
-This waits for Shaping Boundaries, which decides which boundaries are eligible for Stats.
-
 ## Deferred
 
-- A higher Built floor through a tile rebuild, or Google's 0.2 presence cutoff. Task 06 records the false positives instead.
+- A higher Built floor through a tile rebuild, or Google's 0.2 presence cutoff. Task 06 records the false positives instead. The cleaned sprout is task 1 of [Stats Ledger](stats-ledger.md).
 - A button for photo suggestions.
 - Chip icons per place type, such as one for ecoregions and one for conservation areas, as a visual system for the sets on the map.
 - The Attention and Withdrawn admin lists as filters on the places list, like the photo queue.
