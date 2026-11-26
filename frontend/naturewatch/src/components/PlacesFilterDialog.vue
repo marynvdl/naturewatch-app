@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { Info, X } from '@lucide/vue';
+import { Info, Scan, X } from '@lucide/vue';
 import {
   DialogClose,
   DialogContent,
@@ -207,13 +207,22 @@ function clearAll() {
   ecoregionsKept.value = [];
 }
 
-/** Apply the draft to the list and the map, and close. */
+/**
+ * Apply the draft to the list and the map, and close. With a type on, the map
+ * then flies to the places the filter keeps.
+ */
 function apply() {
   placesStore.applyFilter(
     sizeBounds.value,
     showEcoregions.value ? ecoregionsKept.value : placesStore.ecoregionsKept
   );
+  if (!props.noType) placesStore.fitToKept();
   open.value = false;
+}
+
+/** Limit the list to the map view, or not. It applies at once, not on Apply. */
+function toggleInView() {
+  placesStore.listInView = !placesStore.listInView;
 }
 </script>
 
@@ -235,6 +244,24 @@ function apply() {
           {{ description }}
         </DialogDescription>
         <div class="filter-body">
+          <section class="filter-section" aria-labelledby="filter-view-title">
+            <h3 id="filter-view-title" class="filter-name">Map view</h3>
+            <p class="filter-hint">
+              List only the places in the current map view. The map still draws
+              every place the filter keeps.
+            </p>
+            <button
+              type="button"
+              class="filter-view-toggle map-control"
+              :class="{ 'is-on': placesStore.listInView }"
+              :aria-pressed="placesStore.listInView"
+              aria-label="Limit list to the map view"
+              @click="toggleInView"
+            >
+              <Scan :size="16" aria-hidden="true" />
+              In view
+            </button>
+          </section>
           <section class="filter-section" aria-labelledby="filter-size-title">
             <h3 id="filter-size-title" class="filter-name">Size</h3>
             <p class="filter-hint">Area of the place, in km².</p>
@@ -416,6 +443,10 @@ function apply() {
   margin: 4px 0 16px;
   font-size: 13px;
   color: var(--muted-foreground);
+}
+
+.filter-view-toggle {
+  gap: 6px;
 }
 
 .filter-name-row {

@@ -1,12 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import {
-  ArrowDownUp,
-  Check,
-  Scan,
-  Search,
-  SlidersHorizontal,
-} from '@lucide/vue';
+import { ArrowDownUp, Check, Search, SlidersHorizontal } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
 import PhotoQueueList from '@/components/PhotoQueueList.vue';
 import AdminPlaceList from '@/components/AdminPlaceList.vue';
@@ -111,7 +105,6 @@ const statsKey = ref<string | null>(null);
 const sizeFull = ref<FigureRange>([1, 1]);
 const sizeBins = ref<number[]>([]);
 const query = ref('');
-const listInView = ref(true);
 const resultsList = ref<HTMLElement | null>(null);
 const moreSentinel = ref<HTMLElement | null>(null);
 const earlierSentinel = ref<HTMLElement | null>(null);
@@ -178,11 +171,6 @@ function chooseSort(id: PlaceSort) {
   sortOpen.value = false;
 }
 
-/** Limit the list to the current map view, or show the worldwide window. */
-function toggleListInView() {
-  listInView.value = !listInView.value;
-}
-
 const shown = computed(() => places.value);
 
 /** Read the main photographs of the cards shown. */
@@ -208,7 +196,7 @@ const countText = computed(() => {
 });
 const showNames = computed(() => showList.value || searchingAll.value);
 const listExtent = computed(() =>
-  listInView.value ? placesStore.viewBounds : null
+  placesStore.listInView ? placesStore.viewBounds : null
 );
 
 /**
@@ -466,7 +454,7 @@ watch(
       sort.value,
       placesStore.sizeKept[0],
       placesStore.sizeKept[1],
-      listInView.value,
+      placesStore.listInView,
       listExtent.value,
       placesStore.ecoregionIds.join(','),
     ] as const,
@@ -488,7 +476,7 @@ watch(
 /** Return to the panel with no list and no drawn boundaries. */
 function clearPlaces() {
   placeTypes.value = [];
-  listInView.value = true;
+  placesStore.listInView = true;
   placesStore.clearSelection();
   hideBoundaries();
 }
@@ -691,17 +679,6 @@ watch(
           >
             <SlidersHorizontal :size="16" aria-hidden="true" />
             Filter
-          </button>
-          <button
-            type="button"
-            class="places-tool places-extent-toggle map-control"
-            :class="{ 'is-on': listInView }"
-            :aria-pressed="listInView"
-            aria-label="Limit list to the map view"
-            @click="toggleListInView"
-          >
-            <Scan :size="16" aria-hidden="true" />
-            In view
           </button>
         </div>
         <p v-if="showCount" class="places-count">{{ countText }}</p>

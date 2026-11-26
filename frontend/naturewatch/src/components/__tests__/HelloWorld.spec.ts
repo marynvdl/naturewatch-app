@@ -32,6 +32,12 @@ vi.mock('mapbox-gl', () => {
     getBounds() {
       return null;
     }
+    getCanvas() {
+      return document.createElement('canvas');
+    }
+    getPadding() {
+      return { top: 0, right: 0, bottom: 0, left: 0 };
+    }
   }
   class NavigationControl {}
   class GeolocateControl {}

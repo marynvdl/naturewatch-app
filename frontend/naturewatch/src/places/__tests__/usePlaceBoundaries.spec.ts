@@ -7,6 +7,7 @@ import {
   PLACE_TILES_URL,
   RECOGNITION_TILES_URL,
   loadPlaceBounds,
+  loadPlaceExtent,
   loadPlaceRelease,
 } from '@/places/api';
 import { usePlaceBoundaries } from '@/places/usePlaceBoundaries';
@@ -16,6 +17,7 @@ import usePlacesStore from '@/store/PlacesStore';
 vi.mock('@/places/api', async importOriginal => ({
   ...(await importOriginal<typeof import('@/places/api')>()),
   loadPlaceBounds: vi.fn(),
+  loadPlaceExtent: vi.fn(),
   loadPlaceRelease: vi.fn(),
   loadPlaceName: vi.fn(async (id: string) => `Name of ${id}`),
 }));
@@ -50,6 +52,7 @@ class FakeMap {
     )
       this.padding = options.padding;
   });
+  flyTo = vi.fn();
   jumpTo = vi.fn((options: { padding?: FakeMap['padding'] }) => {
     if (options.padding) this.padding = options.padding;
   });
@@ -195,13 +198,6 @@ function addPanel(
   const panel = document.createElement('div');
   if (attributes.className) panel.className = attributes.className;
   if (attributes.id) panel.id = attributes.id;
-  if (attributes.id === 'layers-panel') {
-    // The Landscape panel is measured by its content.
-    const content = document.createElement('div');
-    content.className = 'layer-panel';
-    content.getBoundingClientRect = () => panelBox(box);
-    panel.append(content);
-  }
   panel.getBoundingClientRect = () => panelBox(box);
   document.body.append(panel);
   return panel;
@@ -251,8 +247,8 @@ describe('place boundaries from tiles', () => {
     expect(store.selectedId).toBe(outsideWindow);
     expect(store.selectedFrom).toBe('map');
     await vi.waitFor(() =>
-      expect(map.easeTo).toHaveBeenCalledWith(
-        expect.objectContaining({ center: [40.5, -9.5] })
+      expect(map.flyTo).toHaveBeenCalledWith(
+        expect.objectContaining({ center: [40.5, -9.5], speed: 0.5 })
       )
     );
     expect(loadPlaceBounds).toHaveBeenCalledWith(outsideWindow);
@@ -808,7 +804,7 @@ describe('map padding from the open panels', () => {
     });
   });
 
-  it('eases to the Places columns on the left and Landscape on the right', async () => {
+  it('eases to the Places columns on the left, and leaves Landscape out', async () => {
     const { map, followPanels } = await drawPlaces();
     addPanel({ className: 'places-frame' }, { left: 0, right: 360 });
     addPanel({ id: 'layers-panel' }, { left: 960, right: 1200 });
@@ -817,19 +813,23 @@ describe('map padding from the open panels', () => {
 
     expect(map.easeTo).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        padding: { top: 0, right: 240, bottom: 0, left: 360 },
+        padding: { top: 0, right: 0, bottom: 0, left: 360 },
+        duration: 900,
       })
     );
   });
 
-  it('leaves out a hidden panel, and returns to no padding when they close', async () => {
+  it('leaves out a hidden column, and returns to no padding when they close', async () => {
     const { map, followPanels } = await drawPlaces();
     const list = addPanel(
       { className: 'places-frame' },
       { left: 0, right: 360 }
     );
-    const layers = addPanel({ id: 'layers-panel' }, { left: 960, right: 1200 });
-    layers.style.visibility = 'hidden';
+    const profile = addPanel(
+      { className: 'place-profile' },
+      { left: 360, right: 740 }
+    );
+    profile.style.visibility = 'hidden';
 
     await followPanels();
     expect(map.padding).toEqual({ top: 0, right: 0, bottom: 0, left: 360 });
@@ -859,7 +859,7 @@ describe('map padding from the open panels', () => {
     );
   });
 
-  it('fits a place with the panels and a margin, without keeping that padding', async () => {
+  it('flies to a place with the panels and a margin, without keeping that padding', async () => {
     const { map, store } = await drawPlaces();
     addPanel({ className: 'places-frame' }, { left: 0, right: 360 });
     addPanel({ id: 'layers-panel' }, { left: 960, right: 1200 });
@@ -870,9 +870,42 @@ describe('map padding from the open panels', () => {
     expect(map.fitBounds).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        padding: { top: 72, right: 312, bottom: 72, left: 384 },
+        padding: { top: 72, right: 72, bottom: 72, left: 384 },
         retainPadding: false,
+        speed: 0.5,
+        curve: 1.6,
       })
+    );
+  });
+
+  it('flies to the places the filter keeps once it is applied', async () => {
+    vi.mocked(loadPlaceExtent).mockResolvedValue({
+      status: 'ok',
+      bounds: [10, -95, 50, 20],
+    });
+    const { map, store } = await drawPlaces();
+
+    // No type listed: nothing to fly to
+    store.fitToKept();
+    await flushPromises();
+    expect(loadPlaceExtent).not.toHaveBeenCalled();
+
+    store.listTypes = ['conservation_area'];
+    store.applyFilter([2000, null]);
+    store.fitToKept();
+    await flushPromises();
+    expect(loadPlaceExtent).toHaveBeenCalledWith({
+      placeTypes: ['conservation_area'],
+      sizeMin: 2000,
+      sizeMax: null,
+      ecoregionIds: [],
+    });
+    expect(map.fitBounds).toHaveBeenLastCalledWith(
+      [
+        [10, -85],
+        [50, 20],
+      ],
+      expect.objectContaining({ retainPadding: false, speed: 0.5 })
     );
   });
 });

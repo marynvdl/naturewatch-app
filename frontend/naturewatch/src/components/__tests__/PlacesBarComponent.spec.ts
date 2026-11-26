@@ -676,10 +676,8 @@ describe('Places panel', () => {
     const store = usePlacesStore();
     store.viewBounds = [20, -30, 40, -20];
     await flushPromises();
-    const extent = () => wrapper.get('button.places-extent-toggle');
     // On before a type is chosen
-    expect(extent().classes()).toContain('is-on');
-    expect(extent().attributes('aria-pressed')).toBe('true');
+    expect(store.listInView).toBe(true);
 
     await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
@@ -699,9 +697,9 @@ describe('Places panel', () => {
       expect.any(AbortSignal)
     );
 
-    await extent().trigger('click');
+    // The Filter window turns it off
+    store.listInView = false;
     await flushPromises();
-    expect(extent().classes()).not.toContain('is-on');
     expect(names()).toEqual([
       'Kruger National Park',
       'Addo Elephant National Park',
@@ -714,16 +712,16 @@ describe('Places panel', () => {
     // Clearing the list turns it back on
     await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
-    expect(extent().classes()).toContain('is-on');
+    expect(store.listInView).toBe(true);
   });
 
-  it('shows Sort, Filter, and In view before a type, and Filter applies for later', async () => {
+  it('shows Sort and Filter before a type, and Filter applies for later', async () => {
     const wrapper = mountPlaces();
     const store = usePlacesStore();
     await flushPromises();
 
     const tools = wrapper.findAll('.places-tool').map(tool => tool.text());
-    expect(tools).toEqual(['Sort', 'Filter', 'In view']);
+    expect(tools).toEqual(['Sort', 'Filter']);
     expect(wrapper.find('.places-count').exists()).toBe(false);
 
     await wrapper.get('button.places-filter-toggle').trigger('click');

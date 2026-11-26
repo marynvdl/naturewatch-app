@@ -245,6 +245,16 @@ const usePlacesStore = defineStore('places', () => {
     applyFilter([null, null], []);
   }
 
+  /** Whether the list is limited to the current map view. On at the start. */
+  const listInView = ref(true);
+  /** Counts the requests to fit the map to the places the filter keeps. */
+  const fitRequest = ref(0);
+
+  /** Ask the map to fit the places the filter keeps, after it is applied. */
+  function fitToKept() {
+    fitRequest.value += 1;
+  }
+
   /** The open profile tab. It is kept when another place opens. */
   const profileTab = ref<string>('overview');
   /** The open place's name, once its profile has read it. */
@@ -441,6 +451,9 @@ const usePlacesStore = defineStore('places', () => {
     tileFilter,
     applyFilter,
     clearFilter,
+    listInView,
+    fitRequest,
+    fitToKept,
     load,
     toggle,
     profileTab,

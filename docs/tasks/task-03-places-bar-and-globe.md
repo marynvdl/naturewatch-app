@@ -11,9 +11,16 @@ Ecoregions combine with the other place types and draw below them. The list star
 Decided 26 November 2026 by the user:
 
 - **Tools before a type.** The whole tools row, Sort, Filter, and In view, always shows under the type buttons. The count shows only once a list loads. With no type on, Filter edits the kept size range and ecoregions, and its button reads **Apply** instead of a count.
-- **Panels.** The padding leaves room for the Places columns on the left (list and profile) and the Landscape panel on the right while it is open. Measure, and the stacked column on a narrow screen, add no padding.
-- **Camera.** When a panel opens or closes, the map eases for about 300 ms to the new padding, so its centre stays in the middle of the free space. The zoom stays.
-- **Ecoregion filter.** While Ecoregions is on, with or without other types, the Ecoregion field is hidden and the chosen ecoregions do not apply. That is today's rule. No database change.
+- **Panels.** The padding leaves room for the Places columns on the left (list and profile). Measure, and the stacked column on a narrow screen, add no padding. (Landscape was included at first; see below.)
+- **Camera.** When a panel opens or closes, the map eases to the new padding, so its centre stays in the middle of the free space. The zoom stays.
+- **Ecoregion filter.** While Ecoregions is on, with or without other types, the Ecoregion field is hidden and the chosen ecoregions do not apply. That is today's rule.
+
+Changed 26 November 2026 by the user, after evaluating the local app:
+
+- **In view moves into the Filter window**, as a **Map view** section at the top. The tools row is Sort and Filter. In view acts at once, not on Apply, and does not make the Filter button charcoal.
+- **After Apply, the map flies to the kept places.** A new read-only function, `place_extent`, returns the box around the listed places of the types that are on that the size and ecoregion filter keeps. It is a migration, applied to the hosted database after the user approves. With no type on, Apply does not move the map.
+- **Landscape adds no padding.** Only the Places columns do.
+- **Slower, smoother moves.** Fits and pans fly (`flyTo`, speed 0.5, curve 1.6), rising and coming down on a long move. The padding slide takes 900 ms, slow at both ends. A reduced-motion setting still skips the flights.
 
 ## Facts already stored
 
@@ -42,8 +49,8 @@ From the code on 26 November 2026:
    - With no type on, Filter opens the dialog with the size range and the Ecoregion field. It reads no count and no chart, and its button reads **Apply**. Applying keeps the size range and ecoregions in the store, so they apply when a type is chosen.
    - While an admin list or a search with no type is shown, the row stays as it is in that view today, apart from showing.
 5. **Map padding.**
-   - The map's padding is the Places cover on the left (as `panelCover` measures it) and, while Landscape is open on a screen wider than 720 px, the Landscape panel's width on the right. It is 0 on the right otherwise, and 0 on the left at 720 px and below.
-   - It follows the panels as they open, close, and resize. When it changes, the map eases for about 300 ms to the new padding, keeping the zoom.
+   - The map's padding is the Places cover on the left (as `panelCover` measures it), and 0 at 720 px and below.
+   - It follows the panels as they open, close, and resize. When it changes, the map eases to the new padding, keeping the zoom.
    - `fitBounds` and `centreCoveredPlace` pass the panels' padding, with the 72 px margin for a fit, and keep `retainPadding: false`, because Mapbox otherwise keeps a fit's padding, margin included, as the map's own. A move under way when the panels change takes the new padding when it ends, keeping the view where it is. A place fitted or clicked lands in the middle of the free space, as today.
 6. **Docs.** In `docs/user/using-the-map.md`, rewrite the sentences on Ecoregions being on alone, conservation areas not drawn while it is on, In view being off at the start, and when the tools show. Add one sentence that the map centres in the space the open panels leave free.
 7. **Tests.**
@@ -60,11 +67,11 @@ From the code on 26 November 2026:
 
 ## Do not
 
-- Do not change the database, a migration, an RPC, or a tile archive.
+- Do not change the database beyond `place_extent`, and do not apply it to the hosted database before the user approves. Do not change a tile archive.
 - Do not change the ecoregion line paint. Task 04 does.
 - Do not apply the Ecoregion filter while Ecoregions is on.
 - Do not make In view follow the padded area. It stays the whole map view.
-- Do not pad for Measure or for the narrow stacked column.
+- Do not pad for Landscape, Measure, or the narrow stacked column.
 - Do not change the photo queue or the admin lists. Task 05a does.
 - Do not build the query builder. It is deferred.
 - Do not open the pull request before the user has evaluated the local app.
@@ -73,11 +80,12 @@ From the code on 26 November 2026:
 ## Done when
 
 - Ecoregions combine with the other types and draw below them, and a park inside an ecoregion opens the park.
-- The list starts with In view on, and Sort, Filter, and In view show before a type is chosen.
-- The globe is centred in the free space beside the open panels, and fits land there, with no console errors in the browser check.
+- The list starts with In view on, in the Filter window, and Sort and Filter show before a type is chosen. After Apply the map flies to the kept places.
+- The globe is centred in the free space beside the Places columns, and fits land there, with no console errors in the browser check.
 - The tests, type check, and lint pass.
 - The user has evaluated the local app and approved it.
 - `using-the-map.md` matches the result.
+- `place_extent` is applied to the hosted database, after approval, and the fit after Apply works against it.
 - One pull request into `develop`, merged after its checks pass and the user approves.
 
 ## How to work

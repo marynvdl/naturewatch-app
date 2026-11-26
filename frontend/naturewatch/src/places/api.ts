@@ -1082,6 +1082,46 @@ export async function loadPlaceBounds(id: string): Promise<PlaceBoundsResult> {
 }
 
 /**
+ * West, south, east, north around the listed places of the given types that
+ * the size and ecoregion filter keeps, so the map can fit them.
+ * @param query - The listed types and the applied filter.
+ * @param query.placeTypes - Stored place types.
+ * @param query.sizeMin - Smallest kept size, in km², or null.
+ * @param query.sizeMax - Largest kept size, in km², or null.
+ * @param query.ecoregionIds - Chosen ecoregions, when any apply.
+ * @returns The extent, `missing` when no place is kept, or why it could not be read.
+ */
+export async function loadPlaceExtent(query: {
+  placeTypes: string[];
+  sizeMin: number | null;
+  sizeMax: number | null;
+  ecoregionIds: string[];
+}): Promise<PlaceBoundsResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('place_extent', {
+    p_place_types: query.placeTypes,
+    p_size_min: query.sizeMin,
+    p_size_max: query.sizeMax,
+    ...ecoregionArgs(query.ecoregionIds),
+  });
+  if (error || !data) return { status: 'error' };
+  const row = (
+    data as {
+      west: number;
+      south: number;
+      east: number;
+      north: number;
+    }[]
+  )[0];
+  if (!row) return { status: 'missing' };
+  return {
+    status: 'ok',
+    bounds: [row.west, row.south, row.east, row.north],
+  };
+}
+
+/**
  * WDPCA release month of the stored conservation areas, for the map notice.
  * @returns The month, or why it could not be read.
  */

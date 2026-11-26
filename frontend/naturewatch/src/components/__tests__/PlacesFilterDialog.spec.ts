@@ -305,5 +305,25 @@ describe('Places filter dialog', () => {
     await button('Apply').trigger('click');
     await flushPromises();
     expect(store.sizeKept).toEqual([5000, null]);
+    expect(store.fitRequest).toBe(0);
+  });
+
+  it('turns In view on and off at once, and flies to the kept places on Apply', async () => {
+    await mountDialog(['conservation_area']);
+    const store = usePlacesStore();
+    const fits = store.fitRequest;
+    const inView = body().get(
+      'button[aria-label="Limit list to the map view"]'
+    );
+    expect(inView.attributes('aria-pressed')).toBe('true');
+
+    await inView.trigger('click');
+    expect(store.listInView).toBe(false);
+    expect(inView.attributes('aria-pressed')).toBe('false');
+    expect(store.fitRequest).toBe(fits);
+
+    await button('Show 2 places').trigger('click');
+    await flushPromises();
+    expect(store.fitRequest).toBe(fits + 1);
   });
 });

@@ -171,9 +171,9 @@ watch(
   observeProfile,
   { flush: 'post' }
 );
-/** Centre the map in the space the Places columns and Landscape leave free. */
+/** Centre the map in the space the Places columns leave free. */
 watch(
-  () => [!!placesStore.selectedId, placesOpen.value, drawerVisible.value],
+  () => [!!placesStore.selectedId, placesOpen.value],
   () => void followPanels(),
   { flush: 'post' }
 );
