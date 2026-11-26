@@ -6,6 +6,7 @@ import {
   ECOREGION_TILES_URL,
   PLACE_TILES_URL,
   RECOGNITION_TILES_URL,
+  loadEcoregionColours,
   loadPlaceBounds,
   loadPlaceExtent,
   loadPlaceRelease,
@@ -16,6 +17,7 @@ import usePlacesStore from '@/store/PlacesStore';
 
 vi.mock('@/places/api', async importOriginal => ({
   ...(await importOriginal<typeof import('@/places/api')>()),
+  loadEcoregionColours: vi.fn(),
   loadPlaceBounds: vi.fn(),
   loadPlaceExtent: vi.fn(),
   loadPlaceRelease: vi.fn(),
@@ -215,6 +217,7 @@ describe('place boundaries from tiles', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    vi.mocked(loadEcoregionColours).mockResolvedValue({ status: 'error' });
     vi.mocked(loadPlaceRelease).mockResolvedValue({
       status: 'ok',
       releaseMonth: '2026-10-01',
@@ -476,23 +479,23 @@ describe('place boundaries from tiles', () => {
     expect(map.setFilter).toHaveBeenCalledWith('places-fill', size);
   });
 
-  it('draws ecoregion outlines only while Ecoregions is listed', async () => {
+  it('draws ecoregions only while Ecoregions is listed', async () => {
     const { map, store } = await drawPlaces();
     expect(map.getSource('ecoregions-tiles')).toEqual({
       type: 'vector',
       url: ECOREGION_TILES_URL,
     });
-    expect(map.getLayer('ecoregions-line')).toMatchObject({
+    expect(map.getLayer('ecoregions-fill')).toMatchObject({
       'source-layer': 'ecoregions',
     });
     // Added first, so parks and recognitions draw above
     expect([...map.layers.keys()][0]).toBe('ecoregions-fill');
-    expect(map.getLayoutProperty('ecoregions-line', 'visibility')).toBe('none');
+    expect(map.getLayoutProperty('ecoregions-fill', 'visibility')).toBe('none');
 
     store.listTypes = ['ecoregion'];
     store.applyFilter([100, null]);
     await flushPromises();
-    expect(map.getLayoutProperty('ecoregions-line', 'visibility')).toBe(
+    expect(map.getLayoutProperty('ecoregions-fill', 'visibility')).toBe(
       'visible'
     );
     expect(map.getLayoutProperty('places-fill', 'visibility')).toBe('none');
@@ -500,7 +503,7 @@ describe('place boundaries from tiles', () => {
       'none'
     );
     // Size only: the ecoregions archive has no cropland field
-    expect(map.setFilter).toHaveBeenCalledWith('ecoregions-line', [
+    expect(map.setFilter).toHaveBeenCalledWith('ecoregions-fill', [
       'all',
       ['>=', ['to-number', ['get', 'area_km2'], -1], 100],
     ]);
@@ -511,7 +514,7 @@ describe('place boundaries from tiles', () => {
     store.listTypes = ['conservation_area', 'ecoregion', 'ramsar_site'];
     await flushPromises();
 
-    expect(map.getLayoutProperty('ecoregions-line', 'visibility')).toBe(
+    expect(map.getLayoutProperty('ecoregions-fill', 'visibility')).toBe(
       'visible'
     );
     expect(map.getLayoutProperty('places-fill', 'visibility')).toBe('visible');
@@ -568,6 +571,107 @@ describe('place boundaries from tiles', () => {
       ['get', 'id'],
       outsideWindow,
     ]);
+  });
+
+  it('fills ecoregions with no outline and marks a selection in grey', async () => {
+    const { map } = await drawPlaces();
+    expect(map.getLayer('ecoregions-fill')).toMatchObject({
+      paint: {
+        'fill-color': '#5b6b2f',
+        'fill-opacity': 0.35,
+        'fill-antialias': false,
+      },
+    });
+    expect(map.getLayer('ecoregions-line')).toBeUndefined();
+    expect(map.getLayer('ecoregions-select-line')).toMatchObject({
+      paint: { 'line-color': '#6b6a65', 'line-width': 1.5 },
+    });
+    expect(map.getLayer('ecoregions-hover-line')).toMatchObject({
+      paint: { 'line-color': '#6b6a65', 'line-width': 1.25 },
+    });
+
+    useBasemapStore().toggleBasemap();
+    await flushPromises();
+    expect(map.setPaintProperty).toHaveBeenCalledWith(
+      'ecoregions-fill',
+      'fill-opacity',
+      0.35
+    );
+    expect(map.setPaintProperty).toHaveBeenCalledWith(
+      'ecoregions-select-line',
+      'line-color',
+      '#e4e4e2'
+    );
+    // Recognitions keep their own outline
+    expect(map.getLayer('recognitions-line')).toMatchObject({
+      paint: {
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          3,
+          0.8,
+          6,
+          1.4,
+          9,
+          2,
+          12,
+          2.6,
+        ],
+      },
+    });
+  });
+
+  it("fills each ecoregion in RESOLVE's colour once the colours are read", async () => {
+    vi.mocked(loadEcoregionColours).mockResolvedValue({
+      status: 'ok',
+      colours: { 'eco-a': '#A87001', 'eco-b': '#63CFAB' },
+    });
+    const { map } = await drawPlaces();
+    await flushPromises();
+    expect(loadEcoregionColours).toHaveBeenCalledTimes(1);
+    expect(map.setPaintProperty).toHaveBeenCalledWith(
+      'ecoregions-fill',
+      'fill-color',
+      [
+        'match',
+        ['get', 'id'],
+        'eco-a',
+        '#ceaf72',
+        'eco-b',
+        '#abdfc7',
+        '#5b6b2f',
+      ]
+    );
+
+    // Over imagery the colours are not mixed towards paper
+    useBasemapStore().toggleBasemap();
+    await flushPromises();
+    expect(map.setPaintProperty).toHaveBeenCalledWith(
+      'ecoregions-fill',
+      'fill-color',
+      [
+        'match',
+        ['get', 'id'],
+        'eco-a',
+        '#A87001',
+        'eco-b',
+        '#63CFAB',
+        '#e3e8a0',
+      ]
+    );
+    expect(loadEcoregionColours).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the outline colour as the fill when the colours cannot be read', async () => {
+    const { map } = await drawPlaces();
+    await flushPromises();
+    expect(loadEcoregionColours).toHaveBeenCalledTimes(1);
+    expect(map.setPaintProperty).not.toHaveBeenCalledWith(
+      'ecoregions-fill',
+      'fill-color',
+      expect.arrayContaining(['match'])
+    );
   });
 
   it('colours recognitions by group and lightens them on satellite', async () => {

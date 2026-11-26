@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   initials,
+  softenColour,
   SIZE_STEPS,
   binCounts,
   countryName,
@@ -202,5 +203,16 @@ describe('initials', () => {
     expect(initials('Parc National de la Pendjari')).toBe('PNP');
     expect(initials('Cerrado')).toBe('CER');
     expect(initials('Área De Proteção Ambiental')).toBe('ÁPA');
+  });
+});
+
+describe('softenColour', () => {
+  it('mixes a colour halfway towards the paper tone', () => {
+    expect(softenColour('#A87001')).toBe('#ceaf72');
+    expect(softenColour('#000000')).toBe('#7a7771');
+  });
+
+  it('leaves a value that is not #RRGGBB as it is', () => {
+    expect(softenColour('red')).toBe('red');
   });
 });

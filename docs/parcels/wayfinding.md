@@ -14,7 +14,7 @@ As a user, on the map, I can:
 - open another place on the same tab I was on;
 - turn on Ecoregions together with other place types, and open Filter before choosing a type;
 - see the globe centred in the space the panels leave free;
-- see ecoregion outlines that stay light when zoomed out.
+- see ecoregions as soft fills in their RESOLVE colours, which stay calm when zoomed out.
 
 As an admin, I can:
 
@@ -60,7 +60,6 @@ As an admin, I can:
 ## Open questions
 
 - **A query builder.** The user suggested building a query in the Places panel and pinning it with "Add to map" as a chip under Landscape. A query is types, filters, and In view, or a place's Related set. Typing a name must still show the list straight away. A pinned query would be another kind of `mapSets`. A left click picks the last pinned layer. A right click adds "Places here" to the copy-coordinates menu, listing every place under the point. Still open: a colour per chip, and whether the unpinned query still draws.
-- **Aldabra and Amsterdam–Saint Paul.** Their ecoregion shapes do not line up with the basemap. Task 04 finds out whether the RESOLVE polygon or the tiles are at fault.
 
 ## Notes for the parcel that resumes Stats
 
@@ -78,6 +77,7 @@ This waits for Shaping Boundaries, which decides which boundaries are eligible f
 - Chip icons per place type, such as one for ecoregions and one for conservation areas, as a visual system for the sets on the map.
 - The Attention and Withdrawn admin lists as filters on the places list, like the photo queue.
 - The query builder, until its open question is settled.
+- Generalised ecoregion tiles: drop small parts and fill small holes at low zoom, in zoom bands written by the places script, with stronger Visvalingam simplification. Task 04 found Zambezian Baikiaea woodlands has 470 parts, 387 under 10 km², and chose fills over a rebuild.
 - A production release. App work merges into `develop` only.
 
 ## Tasks
@@ -90,8 +90,8 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* Edit mode shows the view tabs plus Photos and Status. Related keeps its cards, map drawing, and hover, with the link editor on top.
 - [x] [Task 03 — Places bar and globe](../archive/tasks/task-03-places-bar-and-globe.md) — naturewatch-app
   - *Goal:* Ecoregions combine with other types, the list defaults to In view, Filter is always shown, and the map's padding follows the open panels so the globe is centred.
-- [ ] [Task 04 — Ecoregion lines](../tasks/task-04-ecoregion-lines.md) — naturewatch-app, and naturewatch-analysis only if the tiles need a rebuild
-  - *Goal:* Give ecoregions a thinner, lighter outline when zoomed out, picked by the user on the dev server. Find out why Aldabra and Amsterdam–Saint Paul are misplaced, and fix it in the recipe or record it. A tile rebuild is costed and approved first.
+- [x] [Task 04 — Ecoregion lines](../archive/tasks/task-04-ecoregion-lines.md) — naturewatch-app, and naturewatch-analysis only if the tiles need a rebuild
+  - *Goal:* Draw ecoregions as fills in RESOLVE's colours with no outline, read through `ecoregion_colours()`, in the paint the user picked on the dev server. Keep the Labels toggle off the place outlines. Record why Aldabra and Amsterdam–Saint Paul are misplaced.
 - [ ] [Task 05a — Photo queue and licences](../tasks/task-05a-photo-queue-and-licences.md) — naturewatch-app
   - *Goal:* Make the queue a filter on the places list, hide rejected photos, purge old rejected links into `photo_refusals`, and accept every CC BY and CC BY-SA version.
 - [ ] [Task 05b — Better photo suggestions](../tasks/task-05b-better-photo-suggestions.md) — naturewatch-app
@@ -101,4 +101,4 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 ## Done when
 
-A person can move from a place to its related places and back without losing what is drawn, and pin a set to keep it. Edit mode does everything view mode does. Ecoregions combine with other types, and their outlines stay light when zoomed out. An admin works through photo suggestions like any places list and no longer sees rejected photos, maps, or signboards. The tests pass, and every hosted write and billable run was approved first. No production deploy.
+A person can move from a place to its related places and back without losing what is drawn, and pin a set to keep it. Edit mode does everything view mode does. Ecoregions combine with other types, and draw as soft fills that stay calm when zoomed out. An admin works through photo suggestions like any places list and no longer sees rejected photos, maps, or signboards. The tests pass, and every hosted write and billable run was approved first. No production deploy.

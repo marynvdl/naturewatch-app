@@ -33,6 +33,7 @@ import {
 import { rasterSourceSpec } from '@/catalog/rasterSource';
 import usePlacesStore from '@/store/PlacesStore';
 import { usePlaceBoundaries } from '@/places/usePlaceBoundaries';
+import { togglesWithLabels } from '@/components/mapLabels';
 import useDrawerStore from '@/store/DrawerStore';
 import SideButtonsComponent from '@/components/SideButtonsComponent.vue';
 import CoordinatesComponent from '@/components/CoordinatesComponent.vue';
@@ -509,23 +510,12 @@ function setLabels(map: mapboxgl.Map | null) {
       map.setConfigProperty('basemap', 'showTransitLabels', visible);
     }
     if (style && style.layers) {
-      style.layers.forEach(function (layer) {
-        if (
-          (layer.type === 'symbol' || layer.type === 'line') &&
-          // Keep labels added with the MeasureComponent
-          !layer.id.includes('measure-label') &&
-          // Keep lines and polygons added with the MeasureComponent
-          !layer.id.includes('gl-draw') &&
-          // Keep the place outlines, which Places controls
-          !layer.id.startsWith('places-')
-        ) {
-          // Toggle visibility
-          if (areLabelsVisible.value) {
-            map.setLayoutProperty(layer.id, 'visibility', 'visible');
-          } else {
-            map.setLayoutProperty(layer.id, 'visibility', 'none');
-          }
-        }
+      style.layers.filter(togglesWithLabels).forEach(layer => {
+        map.setLayoutProperty(
+          layer.id,
+          'visibility',
+          areLabelsVisible.value ? 'visible' : 'none'
+        );
       });
     }
   }

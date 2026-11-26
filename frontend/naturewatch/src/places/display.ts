@@ -392,6 +392,35 @@ export const ECOREGION_COLOUR = {
   satellite: '#e3e8a0',
 } as const;
 
+/** Warm paper tone the ecoregion fills are mixed towards. */
+const PAPER = '#f3eee2';
+
+/** Share of the paper tone in a softened ecoregion fill. */
+const PAPER_SHARE = 0.5;
+
+/**
+ * Mute and lighten a RESOLVE colour towards a warm paper tone, for a
+ * watercolour-like fill.
+ * @param hex - A `#RRGGBB` colour.
+ * @returns The softened `#rrggbb` colour, or the input when it is not `#RRGGBB`.
+ */
+export function softenColour(hex: string): string {
+  const channels = (colour: string) =>
+    [1, 3, 5].map(start => parseInt(colour.slice(start, start + 2), 16));
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+  const paper = channels(PAPER);
+  return (
+    '#' +
+    channels(hex)
+      .map((value, index) =>
+        Math.round(value + (paper[index] - value) * PAPER_SHARE)
+          .toString(16)
+          .padStart(2, '0')
+      )
+      .join('')
+  );
+}
+
 /** Place type of the ecoregions. */
 export const ECOREGION_TYPE = 'ecoregion';
 
