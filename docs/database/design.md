@@ -47,6 +47,7 @@ Different questions get different fields. No single `status` mixes them.
 | Which boundary is in use? | `is_current` | Boundary |
 | Is the shape trustworthy? | `qc_status`: `unchecked`, `passed`, `flagged`, `accepted` | Boundary |
 | May Stats use it? | `stats_eligibility`: `pending`, `eligible`, `excluded` | Boundary |
+| Is this correction accepted? | `review_status`: `submitted`, `approved`, `rejected` | Layer correction |
 | Does it need attention? | A row in `place_attention`, set by an admin with a reason they write. Derived findings, such as boundary checks, come with Shaping Boundaries. | Place |
 
 An example: a Canadian protected area with over a hundred small parts is `published`. Its boundary is `approved` and current, `flagged` by the `small_components` check, and `pending` for Stats until an editor decides.
@@ -516,7 +517,31 @@ Supabase Auth does all sign-in. There are no password, session, or identity tabl
 
 Approving copies the text, as the reviewer edited it, into `place_curations.tagline`.
 
-**`audit_log`**: `id` bigint identity, `table_name`, `row_id`, `action`, `actor` (from `auth.uid()`), `changed_at`, `old_values` jsonb, `new_values` jsonb. Filled by trigger on `places`, `place_curations`, `place_boundaries` (without `geom`), `place_source_ids`, `place_relationships`, `images`, `place_images`, `place_tagline_suggestions`, `user_roles`, `stat_selections`. Each trigger is added with the first screen that edits its table. Not on `place_stats` or `boundary_checks`, which are append-only already.
+**`audit_log`**: `id` bigint identity, `table_name`, `row_id`, `action`, `actor` (from `auth.uid()`), `changed_at`, `old_values` jsonb, `new_values` jsonb. Filled by trigger on `places`, `place_curations`, `place_boundaries` (without `geom`), `place_source_ids`, `place_relationships`, `images`, `place_images`, `place_tagline_suggestions`, `user_roles`, `stat_selections`, `layer_corrections`. Each trigger is added with the first screen that edits its table. Not on `place_stats` or `boundary_checks`, which are append-only already.
+
+### 4.7 Corrections
+
+*In place* since Corrections task 01 (`20261204100000_corrections.sql`). An admin records that a layer is wrong inside a polygon. A correction is an overlay: the sprout is not edited, and only approved corrections are applied. Which actions and values a layer accepts is in its `corrections` block in `layers.json`, which the form follows. The database checks only the rules every layer shares. Applying corrections belongs to the [Stats Ledger](../parcels/stats-ledger.md).
+
+**`layer_corrections`**
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid PK | |
+| `layer_id` | text | The catalog layer id. No FK: the catalog is not in the database. |
+| `layer_version` | text, null | The catalog `source.version` when submitted |
+| `geom` | geometry(MultiPolygon, 4326) | GiST index. Valid, not empty, at most 5,000 vertices. |
+| `years` | integer[] | Not empty |
+| `action` | text | CHECK in `remove`, `add`, `reclassify` |
+| `value` | jsonb, null | An object, such as `{"share": 0.5}` or `{"level": 3, "surface": 1}`. Null for `remove`. |
+| `note` | text, null | At most 1,000 characters |
+| `photo_paths` | text[] | Object paths in the private Storage bucket `correction-photos` |
+| `review_status` | text | CHECK in `submitted`, `approved`, `rejected`. Default `submitted`. Index with `layer_id`. |
+| `submitted_by`, `reviewed_by` | uuid FK → `profiles`, null | `on delete set null` |
+| `reviewed_at`, `review_note` | | Review note at most 500 characters |
+| `created_at`, `updated_at` | timestamptz | |
+
+Admins write it only through `submit_correction(layer_id, layer_version, geojson, years, action, value, note)`, which reads a GeoJSON Polygon or MultiPolygon and returns the new id, and `review_correction(id, status, note)`, which approves or rejects a correction, or sets it back to `submitted`. Only admins read it. The bucket `correction-photos` is private: JPEG, PNG, or WebP, at most 10 MB, and only admins read and write it. `audit_row()` is on the table.
 
 ## 5. Diagrams
 
@@ -698,6 +723,7 @@ erDiagram
   profiles ||--o{ user_roles : has
   profiles |o--o{ images : uploaded
   profiles |o--o{ place_boundaries : "submitted or reviewed"
+  profiles |o--o{ layer_corrections : "submitted or reviewed"
 
   place_relationships {
     uuid id PK
@@ -734,6 +760,13 @@ erDiagram
     uuid user_id PK
     text role PK
   }
+  layer_corrections {
+    uuid id PK
+    text layer_id
+    text action
+    text review_status
+    uuid submitted_by FK
+  }
 ```
 
 ## 6. Access and row-level security
@@ -750,7 +783,7 @@ Rules:
 - **`geom` is never granted** to `anon` or `authenticated`. Grants on `place_boundaries` list the other columns. Map shapes come from PMTiles. `place_bounds` reads the bbox columns.
 - **Every table**: enable RLS, `revoke all … from public, anon, authenticated`, then grant what is needed. Supabase grants new objects in `public` to `anon` and `authenticated` by default.
 - **Every function**: `revoke execute … from public`, then grant to the roles that need it. Postgres grants new functions to `public`.
-- **Privileged RPCs** (`curate_place`, `set_place_relationship`, `add_place_image`, `link_place_image`, `set_place_image`, `order_place_images`, `purge_rejected_photos`, `set_place_publication`, `set_place_attention`, `place_status_reasons`, `admin_place_list`, `approve_boundary`, `set_stats_eligibility`, `confirm_source_match`, `review_overlap`, `submit_boundary`): `security definer`, `set search_path = ''`, check `has_role()` inside, execute granted to `authenticated` only.
+- **Privileged RPCs** (`curate_place`, `set_place_relationship`, `add_place_image`, `link_place_image`, `set_place_image`, `order_place_images`, `purge_rejected_photos`, `set_place_publication`, `set_place_attention`, `place_status_reasons`, `admin_place_list`, `submit_correction`, `review_correction`, `approve_boundary`, `set_stats_eligibility`, `confirm_source_match`, `review_overlap`, `submit_boundary`): `security definer`, `set search_path = ''`, check `has_role()` inside, execute granted to `authenticated` only.
 - **Views** use `security_invoker = true`. Supabase's linter flags views that run as their owner. The tables under each view need their own public policy.
 - **Policies** wrap `auth.uid()` as `(select auth.uid())` so it runs once per query. Columns used in policies are indexed.
 

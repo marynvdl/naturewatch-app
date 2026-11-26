@@ -25,6 +25,7 @@ From the code on 26 November 2026:
   - Geometry is `extensions.geometry(MultiPolygon, 4326)`. `submit_boundary` is planned to take GeoJSON through an RPC, because PostGIS does not read GeoJSON on insert (design.md §6).
   - Local database tests in `supabase/tests/test_*_local.py` each run in a transaction that is rolled back, through `connect` in `test_reconcile_local.py`.
   - Migrations reach the hosted database through `supabase db push --linked`.
+  - Task 05b's `20261203100000_photo_suggested_from.sql` is applied to the local and hosted databases but not merged, so this migration is `20261204100000`.
 
 ## The `corrections` block
 
@@ -64,7 +65,7 @@ Reclassifying to another year is left out. For tree loss and fire, remove in one
 
 ## Do this
 
-1. **Migration `20261203100000_corrections.sql`.**
+1. **Migration `20261204100000_corrections.sql`.**
    - **`layer_corrections`.**
      - `id` uuid.
      - `layer_id` text: the catalog id, with no foreign key, because the catalog is not in the database.
