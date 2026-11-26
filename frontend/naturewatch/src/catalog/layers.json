@@ -67,7 +67,6 @@
         "content": "Buildings in one snapshot, for 2023. Grey is how much of each cell of about 28 m is covered by buildings: faint where buildings are sparse, strongest where a quarter or more of the cell is covered. Where it has data, the layer uses <a href=\"https://sites.research.google/open-buildings/\" target=\"_blank\">Google Open Buildings 2.5D Temporal</a>, which covers Africa, Latin America, and South and South-East Asia. Everywhere else it uses <a href=\"https://github.com/microsoft/buildings\" target=\"_blank\">Microsoft TEMPO</a> for 2023 Q4. TEMPO marks faint buildings on empty land, so a TEMPO cell is kept only near a denser one. Some small desert villages outside Google's area are missing for that reason. The layer does not say how a building is used. Tiles run through zoom 12, and closer zoom enlarges them. A later timeline year still shows this 2023 snapshot, and a year before 2023 does not show this layer.\n    <ul>\n    <li>Clear: no buildings, ocean, or missing data</li>\n    <li>Faint grey: a few buildings in the cell</li>\n    <li>Strong grey: a quarter or more of the cell is buildings</li>\n    </ul>\n    Google Open Buildings: <a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\">CC BY 4.0</a>. Microsoft TEMPO: <a href=\"https://cdla.dev/permissive-2-0/\" target=\"_blank\">CDLA Permissive 2.0</a>."
       },
       "corrections": {
-        "yearly": false,
         "actions": ["remove", "add"],
         "values": [
           {
@@ -109,7 +108,6 @@
         "content": "Tree cover loss from 2001 through the selected year, from University of Maryland GLAD version 1.13, drawn from <a href=\"https://www.globalforestwatch.org/\" target=\"_blank\">Global Forest Watch</a> tiles. Loss means the dataset recorded a stand-replacing disturbance, which includes fire and forestry as well as clearing. It is not a measure of deforestation by itself. Version 1.13 adds 2025 and also revises earlier years, so a past year can look different from an older copy of this map. This app does not set a tree-cover density cutoff in the tile request."
       },
       "corrections": {
-        "yearly": true,
         "actions": ["remove", "add"]
       }
     },
@@ -145,7 +143,6 @@
         "image": "fire_legend"
       },
       "corrections": {
-        "yearly": true,
         "actions": ["remove", "add"]
       }
     },
@@ -222,7 +219,6 @@
         "content": "Crops for 2024 from the <a href=\"https://glad.umd.edu/dataset/annual-croplands\" target=\"_blank\">UMD GLAD annual cropland</a> dataset. The snapshot is global 2024. Orange is how much of each cell is cropland: faint where sparse, strong where dense. From zoom 11 the map draws a cell solid if at least half of it is cropland. Other land and missing data stay clear. It does not show crop type or yield. Tiles come from one archive and run through zoom 11, and closer zoom enlarges them. A timeline year before 2024 does not show this layer.\n    <ul>\n    <li>Clear: no cropland, ocean, or missing data</li>\n    <li>Faint orange: a small share of the cell is cropland</li>\n    <li>Strong orange: most of the cell is cropland</li>\n    <li>From zoom 11: orange is cropland, clear is not</li>\n    </ul>"
       },
       "corrections": {
-        "yearly": false,
         "actions": ["remove", "add"],
         "values": [
           {
@@ -322,7 +318,6 @@
         "content": "Mapped roads from the <a href=\"https://docs.overturemaps.org/guides/transportation/\" target=\"_blank\">Overture Maps transportation</a> theme, one global snapshot. Below zoom 11 the shade is how much of the area is crossed by a road, counted in cells of about 28 m: faint where roads are sparse, strongest where a quarter or more of the cells hold a road. From zoom 11 each cell shows its most important road: darkest for motorways and trunk roads, then main roads, minor roads, and lightest for tracks. Unpaved roads are fainter than paved ones, and roads with no known surface sit between. Footpaths, cycleways, and steps are left out. Tiles run through zoom 11, and closer zoom enlarges them. A timeline year before 2025 does not show this layer.\n    <ul>\n    <li>Clear: no mapped road, or ocean</li>\n    <li>Faint: a few roads in the area</li>\n    <li>Strong: a dense road network</li>\n    <li>From zoom 11: darker is a bigger road, fainter is unpaved</li>\n    </ul>\n    © <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\">OpenStreetMap contributors</a>, Overture Maps Foundation. Licence <a href=\"https://opendatacommons.org/licenses/odbl/\" target=\"_blank\">ODbL</a>."
       },
       "corrections": {
-        "yearly": false,
         "actions": ["remove", "add", "reclassify"],
         "values": [
           {
@@ -419,7 +414,6 @@
         "content": "The same dam points are drawn for every year from 2016 through 2022. Moving the timeline does not change them. This catalog does not name the source dataset."
       },
       "corrections": {
-        "yearly": false,
         "actions": ["remove", "add"]
       }
     },

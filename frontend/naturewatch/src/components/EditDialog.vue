@@ -24,6 +24,8 @@ defineProps<{
   busy?: boolean;
   /** Why the last save failed. */
   error?: string;
+  /** Keep one height whatever the form shows, and scroll the body. */
+  fixedHeight?: boolean;
 }>();
 
 const open = defineModel<boolean>('open', { required: true });
@@ -35,7 +37,10 @@ const emit = defineEmits<{ submit: [] }>();
   <DialogRoot v-model:open="open">
     <DialogPortal>
       <DialogOverlay class="edit-overlay" />
-      <DialogContent class="edit-dialog nw">
+      <DialogContent
+        class="edit-dialog nw"
+        :class="{ 'is-fixed': fixedHeight }"
+      >
         <form class="edit-form" @submit.prevent="emit('submit')">
           <header class="edit-head">
             <DialogTitle class="edit-title">{{ title }}</DialogTitle>
@@ -94,6 +99,14 @@ const emit = defineEmits<{ submit: [] }>();
   border-radius: 16px;
   background: var(--background);
   transform: translate(-50%, -50%);
+}
+
+.edit-dialog.is-fixed {
+  height: min(640px, calc(100dvh - 32px));
+}
+
+.edit-dialog.is-fixed .edit-form {
+  flex: 1 1 auto;
 }
 
 .edit-dialog:focus-visible {

@@ -75,8 +75,6 @@ export type CatalogCorrectionValue =
 
 /** What an admin can record where the layer is wrong. */
 export interface CatalogCorrections {
-  /** true: the correction names some of years.available. false: the layer's one year. */
-  yearly: boolean;
   actions: CatalogCorrectionAction[];
   values?: CatalogCorrectionValue[];
 }

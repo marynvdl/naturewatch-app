@@ -287,13 +287,9 @@
         "corrections": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["yearly", "actions"],
+          "required": ["actions"],
           "description": "What an admin can record where the layer is wrong. The correction form is built from it.",
           "properties": {
-            "yearly": {
-              "type": "boolean",
-              "description": "true: the form asks which of years.available the correction applies to. false: it applies to the layer's one year."
-            },
             "actions": {
               "type": "array",
               "minItems": 1,
