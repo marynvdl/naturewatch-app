@@ -1,6 +1,6 @@
 # Task 04 — Ecoregion lines
 
-Parcel: [Wayfinding](../parcels/wayfinding.md).
+Parcel: [Wayfinding](../../parcels/wayfinding.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 03 merged in #460.
 
