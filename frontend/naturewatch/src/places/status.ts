@@ -155,7 +155,7 @@ export async function setPlaceAttention(
   return error ? error.message : null;
 }
 
-/** The admin lists of places, besides the photo queue. */
+/** The admin lists of places: those that need attention, and those withdrawn. */
 export type AdminPlaceListKind = 'attention' | 'withdrawn';
 
 /** Places an admin list loads at once. */

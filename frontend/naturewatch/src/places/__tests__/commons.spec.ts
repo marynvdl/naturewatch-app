@@ -54,14 +54,18 @@ describe('Commons licences', () => {
     expect(commonsLicenceId('cc-by-sa-4.0')).toBe('cc-by-sa-4.0');
     expect(commonsLicenceId('pd')).toBe('public-domain');
     expect(commonsLicenceId('cc0')).toBe('cc0-1.0');
-    expect(commonsLicenceId('cc-by-sa-3.0-de')).toBeNull();
+    expect(commonsLicenceId('cc-by-sa-3.0-de')).toBe('cc-by-sa-3.0-de');
+    expect(commonsLicenceId('cc-by-1.0')).toBe('cc-by-1.0');
+    expect(commonsLicenceId('cc-by-2.5-scotland')).toBe('cc-by-2.5-scotland');
     expect(commonsLicenceId('cc-by-nc-4.0')).toBeNull();
+    expect(commonsLicenceId('cc-by-nd-3.0-de')).toBeNull();
     expect(commonsLicenceId(undefined)).toBeNull();
   });
 
   it('gives short names for credits', () => {
     expect(licenceShortName('cc-by-sa-4.0')).toBe('CC BY-SA 4.0');
     expect(licenceShortName('cc-by-2.0')).toBe('CC BY 2.0');
+    expect(licenceShortName('cc-by-sa-3.0-de')).toBe('CC BY-SA 3.0 DE');
     expect(licenceShortName('cc0-1.0')).toBe('CC0');
     expect(licenceShortName('public-domain')).toBe('Public domain');
   });
@@ -92,14 +96,14 @@ describe('Commons file details', () => {
     const body = withInfo({
       extmetadata: {
         ...fixture.query.pages[0].imageinfo[0].extmetadata,
-        License: { value: 'cc-by-sa-3.0-de' },
-        LicenseShortName: { value: 'CC BY-SA 3.0 de' },
+        License: { value: 'cc-by-nc-sa-3.0-de' },
+        LicenseShortName: { value: 'CC BY-NC-SA 3.0 de' },
       },
     });
     expect(readCommonsFile(body)).toEqual({
       status: 'error',
       message:
-        'Commons lists this file under CC BY-SA 3.0 de, which is not one of the accepted licences.',
+        'Commons lists this file under CC BY-NC-SA 3.0 de, which is not one of the accepted licences.',
     });
   });
 

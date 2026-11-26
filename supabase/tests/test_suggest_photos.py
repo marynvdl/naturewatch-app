@@ -365,6 +365,24 @@ class LoadLocalTest(unittest.TestCase):
         statuses = {(l["place_id"], l["source_record_id"]): l["status"] for l in self.links()}
         self.assertEqual(statuses[(self.falls, "File:Test only 2.jpg")], "rejected")
 
+    def test_load_purges_old_rejections_and_keeps_them_refused(self):
+        self.write([self.row(self.falls, "File:Test refused.jpg")])
+        suggest_photos.load(self.conn, self.work)
+        self.conn.execute(
+            """
+            update public.place_images set status = 'rejected',
+              reviewed_at = now() - interval '31 days'
+            where place_id = %s
+            """,
+            (self.falls,),
+        )
+        result = suggest_photos.load(self.conn, self.work)
+        self.assertEqual(result["purged"]["links_deleted"], 1)
+        self.assertEqual(result["purged"]["refusals_added"], 1)
+        self.assertEqual((result["refused"], result["links_added"]), (1, 0))
+        self.assertEqual(self.links(), [])
+        self.assertEqual(suggest_photos.counts(self.conn, self.work)["refused"], 1)
+
     def test_ecoregion_row_found_by_eco_id(self):
         place = self.conn.execute(
             "insert into public.places (name, place_type_id, publication_status) "

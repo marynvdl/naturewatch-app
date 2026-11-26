@@ -17,6 +17,7 @@ import {
   type PlaceSort,
 } from '@/places/display';
 import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
+import { loadSuggestedCounts } from '@/places/images';
 import usePlacesStore from '@/store/PlacesStore';
 import useAuthStore from '@/store/AuthStore';
 
@@ -47,8 +48,12 @@ vi.mock('@/places/mainPhotos', () => ({
   mainPhotoOf: vi.fn(() => null),
 }));
 
-vi.mock('@/components/PhotoQueueList.vue', () => ({
-  default: { name: 'PhotoQueueList', template: '<div class="queue-stub" />' },
+vi.mock('@/components/AdminPlaceList.vue', () => ({
+  default: { name: 'AdminPlaceList', template: '<div class="queue-stub" />' },
+}));
+
+vi.mock('@/places/images', () => ({
+  loadSuggestedCounts: vi.fn(),
 }));
 
 vi.mock('@/places/api', () => ({
@@ -203,46 +208,110 @@ describe('Places panel', () => {
     });
   });
 
-  it('lists the photo queue opened from the Profile panel, and closes it for a type or a search', async () => {
+  it('lists an admin list opened from the Profile panel, and closes it for a type or a search', async () => {
     const pinia = createPinia();
     const wrapper = mount(PlacesBarComponent, {
       global: { plugins: [pinia] },
     });
     await flushPromises();
-    const types = () =>
-      wrapper.findAll('button.place-type').map(item => item.text());
     const auth = useAuthStore(pinia);
     const store = usePlacesStore(pinia);
     auth.isAdmin = true;
     await flushPromises();
-    expect(types()).not.toContain('Photo queue');
 
     await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
-    store.photoQueueOpen = true;
+    store.adminList = 'attention';
     await flushPromises();
     expect(wrapper.find('.queue-stub').exists()).toBe(true);
     expect(wrapper.text()).not.toContain('Addo Elephant National Park');
 
     await typeButton(wrapper, 'Conservation areas').trigger('click');
     await flushPromises();
-    expect(store.photoQueueOpen).toBe(false);
+    expect(store.adminList).toBeNull();
     expect(wrapper.find('.queue-stub').exists()).toBe(false);
 
-    store.photoQueueOpen = true;
+    store.adminList = 'attention';
     await flushPromises();
     await wrapper.get('input[type="search"]').setValue('Kru');
     await flushPromises();
-    expect(store.photoQueueOpen).toBe(false);
+    expect(store.adminList).toBeNull();
 
-    store.photoQueueOpen = true;
+    store.adminList = 'attention';
     await flushPromises();
     const search = wrapper.get<HTMLInputElement>('input[type="search"]');
     expect(search.element.value).toBe('');
     auth.isAdmin = false;
     await flushPromises();
-    expect(store.photoQueueOpen).toBe(false);
+    expect(store.adminList).toBeNull();
     expect(wrapper.find('.queue-stub').exists()).toBe(false);
+  });
+
+  it('lists the places with photo suggestions, with their counts, for an admin in Edit mode', async () => {
+    const pinia = createPinia();
+    const auth = useAuthStore(pinia);
+    const store = usePlacesStore(pinia);
+    auth.isAdmin = true;
+    auth.editMode = true;
+    let counts: Record<string, number> = {
+      [places[0].id]: 2,
+      [places[1].id]: 1,
+    };
+    vi.mocked(loadSuggestedCounts).mockImplementation(async () => ({
+      status: 'ok',
+      counts: { ...counts },
+    }));
+    vi.mocked(loadPilotPlaceWindow).mockImplementation(async query => {
+      const list = query.photoSuggestions
+        ? places.map(place => ({
+            ...place,
+            place_type_id: 'conservation_area',
+          }))
+        : [];
+      return { status: 'ok', places: list, total: list.length };
+    });
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    await flushPromises();
+    expect(wrapper.find('.place-result').exists()).toBe(false);
+
+    store.applyFilter([null, null], [], true);
+    await flushPromises();
+    // With no type on, every type with a button is listed.
+    const query = vi.mocked(loadPilotPlaceWindow).mock.calls.at(-1)![0];
+    expect(query.photoSuggestions).toBe(true);
+    expect(query.placeTypes).toEqual(
+      expect.arrayContaining([
+        'conservation_area',
+        'ecoregion',
+        'world_heritage_site',
+      ])
+    );
+    const cards = wrapper.findAll('.place-result');
+    expect(cards.map(card => card.find('.place-card-note').text())).toEqual([
+      '2 suggested',
+      '1 suggested',
+    ]);
+    expect(store.photoListIds).toEqual([places[0].id, places[1].id]);
+
+    await cards[1].trigger('click');
+    await flushPromises();
+    expect(store.selectedId).toBe(places[1].id);
+    expect(store.profileTab).toBe('photos');
+    expect(store.listTypes).toEqual([]);
+
+    // The last suggestion of the open place is reviewed: it leaves the list and stays open.
+    counts = { [places[0].id]: 2 };
+    store.photoCountsVersion += 1;
+    await flushPromises();
+    expect(wrapper.findAll('.place-result')).toHaveLength(1);
+    expect(store.selectedId).toBe(places[1].id);
+
+    auth.editMode = false;
+    await flushPromises();
+    expect(store.photoSuggestions).toBe(false);
+    expect(wrapper.find('.place-card-note').exists()).toBe(false);
   });
 
   it('shows the main photograph on a card that has one', async () => {

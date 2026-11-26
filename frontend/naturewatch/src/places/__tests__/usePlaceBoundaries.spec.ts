@@ -459,7 +459,7 @@ describe('place boundaries from tiles', () => {
     store.applyFilter([100, null]);
     await flushPromises();
     // As the store sets it once the linked places are read
-    store.ecoregionPlaceIds = [outsideWindow];
+    store.keptPlaceIds = [outsideWindow];
     await flushPromises();
     const size = ['all', ['>=', ['to-number', ['get', 'area_km2'], -1], 100]];
     const linked = ['in', ['get', 'id'], ['literal', [outsideWindow]]];
@@ -474,7 +474,7 @@ describe('place boundaries from tiles', () => {
       ['all', size, linked],
     ]);
 
-    store.ecoregionPlaceIds = null;
+    store.keptPlaceIds = null;
     await flushPromises();
     expect(map.setFilter).toHaveBeenCalledWith('places-fill', size);
   });
@@ -792,14 +792,14 @@ describe('place boundaries from tiles', () => {
     expect(map.getSource('places-tiles')).toBeUndefined();
   });
 
-  it('outlines only the selected place while the photo queue is open', async () => {
+  it('outlines only the selected place while an admin list is open', async () => {
     const { map, store } = await drawPlaces();
     store.toggle();
     await flushPromises();
     expect(map.getSource('places-tiles')).toBeUndefined();
 
     map.setLayoutProperty.mockClear();
-    store.photoQueueOpen = true;
+    store.adminList = 'attention';
     await flushPromises();
     expect(map.getSource('places-tiles')).toBeDefined();
     expect(map.getSource('recognitions-tiles')).toBeDefined();
@@ -816,7 +816,7 @@ describe('place boundaries from tiles', () => {
       )
     );
 
-    store.openFromPhotoQueue(outsideWindow);
+    store.openFromAdminList(outsideWindow);
     await flushPromises();
     const selection = ['==', ['get', 'id'], outsideWindow];
     expect(map.setFilter).toHaveBeenCalledWith('places-select-line', selection);
@@ -825,7 +825,7 @@ describe('place boundaries from tiles', () => {
       selection
     );
 
-    store.photoQueueOpen = false;
+    store.adminList = null;
     await flushPromises();
     expect(map.getSource('places-tiles')).toBeUndefined();
   });
@@ -1016,6 +1016,7 @@ describe('map padding from the open panels', () => {
       sizeMin: 2000,
       sizeMax: null,
       ecoregionIds: [],
+      photoSuggestions: false,
     });
     expect(map.cameraForBounds).toHaveBeenLastCalledWith(
       [

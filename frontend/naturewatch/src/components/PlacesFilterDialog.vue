@@ -12,6 +12,7 @@ import {
 } from 'reka-ui';
 import PlaceEcoregionsField from '@/components/PlaceEcoregionsField.vue';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { loadPilotPlaceWindowCount, type EcoregionName } from '@/places/api';
 import {
   ECOREGION_TYPE,
@@ -27,6 +28,7 @@ import {
   type SizeBounds,
 } from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
+import useAuthStore from '@/store/AuthStore';
 
 const props = withDefaults(
   defineProps<{
@@ -56,10 +58,15 @@ const props = withDefaults(
 const open = defineModel<boolean>('open', { required: true });
 
 const placesStore = usePlacesStore();
+const auth = useAuthStore();
 const BINS = 40;
 
 const sizeBounds = ref<SizeBounds>([null, null]);
 const ecoregionsKept = ref<EcoregionName[]>([]);
+/** The draft photo filter. */
+const photosKept = ref(false);
+/** The photo filter, for admins in Edit mode. */
+const showPhotos = computed(() => auth.isAdmin && auth.editMode);
 const keptCount = ref(props.matchedTotal);
 let countRequest = 0;
 
@@ -72,6 +79,7 @@ watch(open, isOpen => {
   if (!isOpen) return;
   sizeBounds.value = [...placesStore.sizeKept];
   ecoregionsKept.value = [...placesStore.ecoregionsKept];
+  photosKept.value = placesStore.photoSuggestions;
   keptCount.value = props.matchedTotal;
 });
 
@@ -180,6 +188,7 @@ watch(
       props.extent,
       draftEcoregionIds.value.join(','),
       (props.countTypes ?? props.placeTypes ?? []).join(','),
+      photosKept.value,
     ] as const,
   async ([isOpen]) => {
     if (!isOpen) return;
@@ -194,6 +203,7 @@ watch(
       extent: props.extent,
       placeTypes: props.countTypes ?? props.placeTypes,
       ecoregionIds: draftEcoregionIds.value,
+      photoSuggestions: showPhotos.value && photosKept.value,
     });
     if (request !== countRequest) return;
     if (result.status === 'ok') keptCount.value = result.total;
@@ -204,6 +214,7 @@ watch(
 function clearAll() {
   sizeBounds.value = [null, null];
   ecoregionsKept.value = [];
+  photosKept.value = false;
 }
 
 /**
@@ -213,7 +224,8 @@ function clearAll() {
 function apply() {
   placesStore.applyFilter(
     sizeBounds.value,
-    showEcoregions.value ? ecoregionsKept.value : placesStore.ecoregionsKept
+    showEcoregions.value ? ecoregionsKept.value : placesStore.ecoregionsKept,
+    showPhotos.value && photosKept.value
   );
   placesStore.fitToKept();
   open.value = false;
@@ -320,6 +332,23 @@ function apply() {
               v-model="ecoregionsKept"
               labelledby="filter-ecoregion-title"
             />
+          </section>
+          <section
+            v-if="showPhotos"
+            class="filter-section"
+            aria-labelledby="filter-photos-title"
+          >
+            <h3 id="filter-photos-title" class="filter-name filter-name-spaced">
+              Photos
+            </h3>
+            <div class="filter-switch">
+              <label for="filter-photos">Has photo suggestions</label>
+              <Switch
+                id="filter-photos"
+                v-model="photosKept"
+                class="nw:data-[state=checked]:bg-foreground"
+              />
+            </div>
           </section>
         </div>
         <footer class="filter-foot">
@@ -429,6 +458,14 @@ function apply() {
 
 .filter-name-spaced {
   margin-bottom: 16px;
+}
+
+.filter-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
 }
 
 .filter-name-row {

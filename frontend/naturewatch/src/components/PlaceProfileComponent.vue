@@ -56,7 +56,7 @@ const props = withDefaults(
     placeId: string;
     /** Shown while the stored record loads. */
     name?: string;
-    /** Whether the photo queue has a place after this one. Shows Next place on the Photos tab. */
+    /** Whether the photo-filtered list has a place after this one. Shows Next place on the Photos tab. */
     hasNext?: boolean;
   }>(),
   { name: undefined, hasNext: false }

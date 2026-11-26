@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Archive, Flag, Images, LogOut, Pencil, UserRound } from '@lucide/vue';
+import { Archive, Flag, LogOut, Pencil, UserRound } from '@lucide/vue';
 import {
   Popover,
   PopoverContent,
@@ -11,8 +11,8 @@ import usePlacesStore from '@/store/PlacesStore';
 
 /**
  * Shown only while someone is signed in. Visitors see nothing. An admin's
- * controls are here: Edit mode, and in Edit mode the Photo queue, Needs
- * attention, and Withdrawn lists.
+ * controls are here: Edit mode, and in Edit mode the Needs attention and
+ * Withdrawn lists. The photo filter is in the places list's Filter window.
  */
 const auth = useAuthStore();
 const placesStore = usePlacesStore();
@@ -26,7 +26,6 @@ function toggleEditMode() {
 
 /** The admin lists, in the order their buttons show. */
 const lists = [
-  { id: 'photos', label: 'Photo queue', icon: Images },
   { id: 'attention', label: 'Needs attention', icon: Flag },
   { id: 'withdrawn', label: 'Withdrawn', icon: Archive },
 ] as const;

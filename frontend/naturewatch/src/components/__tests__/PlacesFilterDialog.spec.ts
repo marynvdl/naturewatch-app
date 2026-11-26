@@ -14,6 +14,7 @@ import {
   type FigureRange,
 } from '@/places/display';
 import usePlacesStore from '@/store/PlacesStore';
+import useAuthStore from '@/store/AuthStore';
 
 vi.mock('@/places/api', () => ({
   loadPilotPlaceWindowCount: vi.fn(),
@@ -117,6 +118,43 @@ describe('Places filter dialog', () => {
   afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
+  });
+
+  it('offers the photo filter to admins in Edit mode only, and applies it', async () => {
+    const store = usePlacesStore();
+    const auth = useAuthStore();
+    await mountDialog();
+    expect(body().find('#filter-photos').exists()).toBe(false);
+    wrapper?.unmount();
+
+    auth.isAdmin = true;
+    await mountDialog();
+    expect(body().find('#filter-photos').exists()).toBe(false);
+    wrapper?.unmount();
+
+    auth.editMode = true;
+    await mountDialog();
+    expect(body().get('label[for="filter-photos"]').text()).toBe(
+      'Has photo suggestions'
+    );
+    await body().get('#filter-photos').trigger('click');
+    await flushPromises();
+    expect(loadPilotPlaceWindowCount).toHaveBeenLastCalledWith(
+      expect.objectContaining({ photoSuggestions: true })
+    );
+    expect(store.photoSuggestions).toBe(false);
+    await button('Show 2 places').trigger('click');
+    await flushPromises();
+    expect(store.photoSuggestions).toBe(true);
+    expect(store.filtering).toBe(true);
+    wrapper?.unmount();
+
+    await mountDialog();
+    await button('Clear all').trigger('click');
+    await flushPromises();
+    await button('Show 2 places').trigger('click');
+    await flushPromises();
+    expect(store.photoSuggestions).toBe(false);
   });
 
   it('counts the draft, and applies it only from the show button', async () => {
