@@ -204,6 +204,77 @@ class CorrectionsLocalTest(unittest.TestCase):
         correction = self.submit(shape=ring(4999))
         self.assertTrue(correction)
 
+    def listed(self, statuses: list[str], limit: int = 50, offset: int = 0, user_id="admin"):
+        return self.call(
+            "select id::text as id, review_status, geojson, total_count "
+            "from public.admin_correction_list(%s, %s, %s)",
+            (statuses, limit, offset),
+            user_id,
+        )
+
+    def test_lists_by_status_newest_first(self):
+        before = {row["id"] for row in self.listed(["submitted", "approved", "rejected"], 1000)}
+        first = self.submit()
+        second = self.submit()
+        third = self.submit()
+        self.review(third, "approved")
+        submitted = [row for row in self.listed(["submitted"], 1000) if row["id"] not in before]
+        self.assertEqual([row["id"] for row in submitted], [second, first])
+        self.assertEqual(submitted[0]["geojson"]["type"], "MultiPolygon")
+        both = self.listed(["submitted", "approved"], 1000)
+        self.assertEqual(
+            {row["id"] for row in both} - before, {first, second, third}
+        )
+        page = self.listed(["submitted", "approved"], 1, 1)
+        self.assertEqual(len(page), 1)
+        self.assertEqual(page[0]["total_count"], len(both))
+        self.raises(self.errors.InvalidParameterValue, self.listed, ["withdrawn"])
+        self.raises(self.errors.InvalidParameterValue, self.listed, [])
+        self.raises(self.errors.InvalidParameterValue, self.listed, ["submitted"], 1001)
+        self.raises(
+            self.errors.InsufficientPrivilege, self.listed, ["submitted"], user_id=self.other
+        )
+
+    def set_photos(self, correction: str, paths: list[str], user_id="admin"):
+        return self.call(
+            "select public.set_correction_photos(%s, %s) as paths",
+            (correction, paths),
+            user_id,
+        )[0]["paths"]
+
+    def test_sets_photos_under_the_correction(self):
+        correction = self.submit()
+        paths = [f"{correction}/a.jpg", f"{correction}/b.webp"]
+        self.assertEqual(self.set_photos(correction, paths), paths)
+        self.assertEqual(self.set_photos(correction, []), [])
+        self.raises(
+            self.errors.InvalidParameterValue,
+            self.set_photos,
+            correction,
+            [f"{correction}/{n}.jpg" for n in range(7)],
+        )
+        self.raises(
+            self.errors.InvalidParameterValue,
+            self.set_photos,
+            correction,
+            [f"{uuid.uuid4()}/a.jpg"],
+        )
+        self.raises(
+            self.errors.InvalidParameterValue,
+            self.set_photos,
+            correction,
+            [f"{correction}/deeper/a.jpg"],
+        )
+        self.raises(
+            self.errors.InsufficientPrivilege,
+            self.set_photos,
+            correction,
+            [f"{correction}/a.jpg"],
+            self.other,
+        )
+        missing = str(uuid.uuid4())
+        self.raises(self.errors.NoDataFound, self.set_photos, missing, [f"{missing}/a.jpg"])
+
     def test_photo_bucket_is_private(self):
         row = self.conn.execute(
             "select public, file_size_limit, allowed_mime_types "

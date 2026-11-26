@@ -153,3 +153,46 @@ export function shapeProblem(polygon: Polygon): string | null {
   }
   return null;
 }
+
+/**
+ * Years as a reader says them, with runs joined.
+ * @param years - The years, in any order.
+ * @returns For example "2003–2025" or "2019, 2021".
+ */
+export function yearsText(years: number[]): string {
+  const sorted = [...new Set(years)].sort((a, b) => a - b);
+  const runs: string[] = [];
+  let start = sorted[0];
+  for (let index = 1; index <= sorted.length; index += 1) {
+    const year = sorted[index];
+    const previous = sorted[index - 1];
+    if (year === previous + 1) continue;
+    runs.push(start === previous ? `${start}` : `${start}–${previous}`);
+    start = year;
+  }
+  return runs.join(', ');
+}
+
+/**
+ * A stored value as words, with each catalog label.
+ * @param block - The layer's corrections block, if the layer is still in the catalog.
+ * @param value - The stored value, or null.
+ * @returns For example "Cropland share 40%" or "Road level: Primary · Surface: Paved", or empty.
+ */
+export function valueText(
+  block: CatalogCorrections | undefined,
+  value: Record<string, number> | null
+): string {
+  if (!value) return '';
+  return Object.entries(value)
+    .map(([id, stored]) => {
+      const field = block?.values?.find(item => item.id === id);
+      if (!field) return `${id}: ${stored}`;
+      if (field.kind === 'share') {
+        return `${field.label} ${Math.round(stored * 1000) / 10}%`;
+      }
+      const option = field.options.find(item => item.value === stored);
+      return `${field.label}: ${option?.label ?? stored}`;
+    })
+    .join(' · ');
+}

@@ -8,8 +8,10 @@ import {
   correctableLayers,
   defaultYear,
   shapeProblem,
+  valueText,
   yearRange,
   yearsBetween,
+  yearsText,
 } from '../form';
 
 const layer = (id: string) => {
@@ -99,5 +101,26 @@ describe('correction form helpers', () => {
     expect(
       shapeProblem({ type: 'Polygon', coordinates: [[...ring, ring[0]]] })
     ).toMatch(/more than 5,000 vertices/);
+  });
+});
+
+describe('yearsText', () => {
+  it('joins runs and lists gaps', () => {
+    expect(yearsText([2024])).toBe('2024');
+    expect(yearsText([2005, 2003, 2004])).toBe('2003–2005');
+    expect(yearsText([2019, 2021, 2022, 2023])).toBe('2019, 2021–2023');
+  });
+});
+
+describe('valueText', () => {
+  it('names each value with its catalog label', () => {
+    expect(valueText(layer('cropland').corrections, { share: 0.4 })).toBe(
+      'Cropland share 40%'
+    );
+    expect(
+      valueText(layer('roads').corrections, { level: 3, surface: 1 })
+    ).toMatch(/^Road level: Main · Surface: /);
+    expect(valueText(layer('fire').corrections, null)).toBe('');
+    expect(valueText(undefined, { share: 0.4 })).toBe('share: 0.4');
   });
 });

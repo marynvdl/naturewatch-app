@@ -38,6 +38,7 @@ This parcel is the capture side: drawing, the form, photos, and a review queue. 
 - Corrections from the public, not only admins.
 - Editing single road segments.
 - `corrections` blocks for layers that are not published yet: mines, pipelines, railways.
+- Clicking an outline on the map to open its correction.
 
 ## Tasks
 
@@ -47,7 +48,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* Add the corrections table, its submit and review RPCs with admin-only access, and a Storage bucket for photos. Add a `corrections` block to each published threat layer in `layers.json` (built, treeloss, fire, cropland, roads, dams), with its schema and catalog tests. Apply the migration to the hosted database after approval.
 - [x] [Task 02 — Draw and record a correction](../archive/tasks/task-02-draw-a-correction.md) — naturewatch-app
   - *Goal:* In edit mode, a button in the Measure panel draws a polygon and opens a form built from the catalog, with a layer picker that lists the threat layers on the map, then saves the correction as `submitted`. Update `docs/user/using-the-map.md`. Run the tests and a browser check.
-- [ ] Task 03 — Review queue, map outlines, and photos — naturewatch-app
+- [x] [Task 03 — Review queue, map outlines, and photos](../archive/tasks/task-03-review-corrections.md) — naturewatch-app
   - *Goal:* An admin list of corrections to approve or reject, the approved corrections outlined on the map, and photos added to a correction. Run the tests and a browser check.
 
 ## Done when

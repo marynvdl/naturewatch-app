@@ -541,7 +541,7 @@ Approving copies the text, as the reviewer edited it, into `place_curations.tagl
 | `reviewed_at`, `review_note` | | Review note at most 500 characters |
 | `created_at`, `updated_at` | timestamptz | |
 
-Admins write it only through `submit_correction(layer_id, layer_version, geojson, years, action, value, note)`, which reads a GeoJSON Polygon or MultiPolygon and returns the new id, and `review_correction(id, status, note)`, which approves or rejects a correction, or sets it back to `submitted`. Only admins read it. The bucket `correction-photos` is private: JPEG, PNG, or WebP, at most 10 MB, and only admins read and write it. `audit_row()` is on the table.
+Admins write it only through `submit_correction(layer_id, layer_version, geojson, years, action, value, note)`, which reads a GeoJSON Polygon or MultiPolygon and returns the new id, and `review_correction(id, status, note)`, which approves or rejects a correction, or sets it back to `submitted`, and `set_correction_photos(id, paths)`, which replaces `photo_paths` with at most 6 paths, each `<id>/<file>` (since task 03, `20261205100000_correction_queue.sql`). Only admins read it, directly or through `admin_correction_list(statuses, limit, offset)`, which returns the corrections with any of the statuses, newest first, with each polygon as GeoJSON and the total. The bucket `correction-photos` is private: JPEG, PNG, or WebP, at most 10 MB, and only admins read and write it. `audit_row()` is on the table.
 
 ## 5. Diagrams
 
@@ -783,7 +783,7 @@ Rules:
 - **`geom` is never granted** to `anon` or `authenticated`. Grants on `place_boundaries` list the other columns. Map shapes come from PMTiles. `place_bounds` reads the bbox columns.
 - **Every table**: enable RLS, `revoke all … from public, anon, authenticated`, then grant what is needed. Supabase grants new objects in `public` to `anon` and `authenticated` by default.
 - **Every function**: `revoke execute … from public`, then grant to the roles that need it. Postgres grants new functions to `public`.
-- **Privileged RPCs** (`curate_place`, `set_place_relationship`, `add_place_image`, `link_place_image`, `set_place_image`, `order_place_images`, `purge_rejected_photos`, `set_place_publication`, `set_place_attention`, `place_status_reasons`, `admin_place_list`, `submit_correction`, `review_correction`, `approve_boundary`, `set_stats_eligibility`, `confirm_source_match`, `review_overlap`, `submit_boundary`): `security definer`, `set search_path = ''`, check `has_role()` inside, execute granted to `authenticated` only.
+- **Privileged RPCs** (`curate_place`, `set_place_relationship`, `add_place_image`, `link_place_image`, `set_place_image`, `order_place_images`, `purge_rejected_photos`, `set_place_publication`, `set_place_attention`, `place_status_reasons`, `admin_place_list`, `submit_correction`, `review_correction`, `set_correction_photos`, `admin_correction_list`, `approve_boundary`, `set_stats_eligibility`, `confirm_source_match`, `review_overlap`, `submit_boundary`): `security definer`, `set search_path = ''`, check `has_role()` inside, execute granted to `authenticated` only.
 - **Views** use `security_invoker = true`. Supabase's linter flags views that run as their owner. The tables under each view need their own public policy.
 - **Policies** wrap `auth.uid()` as `(select auth.uid())` so it runs once per query. Columns used in policies are indexed.
 

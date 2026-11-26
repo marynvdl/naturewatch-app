@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Archive, Flag, LogOut, Pencil, UserRound } from '@lucide/vue';
+import {
+  Archive,
+  Flag,
+  LogOut,
+  Pencil,
+  SquareDashed,
+  UserRound,
+} from '@lucide/vue';
 import {
   Popover,
   PopoverContent,
@@ -11,8 +18,8 @@ import usePlacesStore from '@/store/PlacesStore';
 
 /**
  * Shown only while someone is signed in. Visitors see nothing. An admin's
- * controls are here: Edit mode, and in Edit mode the Needs attention and
- * Withdrawn lists. The photo filter is in the places list's Filter window.
+ * controls are here: Edit mode, and in Edit mode the Needs attention,
+ * Withdrawn, and Corrections lists. The photo filter is in the places list's Filter window.
  */
 const auth = useAuthStore();
 const placesStore = usePlacesStore();
@@ -28,6 +35,7 @@ function toggleEditMode() {
 const lists = [
   { id: 'attention', label: 'Needs attention', icon: Flag },
   { id: 'withdrawn', label: 'Withdrawn', icon: Archive },
+  { id: 'corrections', label: 'Corrections', icon: SquareDashed },
 ] as const;
 
 /**

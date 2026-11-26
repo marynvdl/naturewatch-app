@@ -54,6 +54,14 @@ describe('Account button', () => {
     await listButton()!.trigger('click');
     await flushPromises();
     expect(places.adminList).toBe('attention');
+    await wrapper.get('button[aria-label="Account"]').trigger('click');
+    await flushPromises();
+    await body
+      .findAll('button')
+      .find(button => button.text() === 'Corrections')!
+      .trigger('click');
+    await flushPromises();
+    expect(places.adminList).toBe('corrections');
 
     // Turning Edit mode off closes the list.
     await wrapper.get('button[aria-label="Account"]').trigger('click');
