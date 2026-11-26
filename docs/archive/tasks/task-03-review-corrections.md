@@ -29,6 +29,8 @@ With the user, 26 November 2026:
 - **Photos in both places.** The Flag form takes photos before Save. In the list, a chosen correction shows its photos, and an admin can add or remove them.
 - **Photo paths** are `<correction id>/<sha256>.<ext>`. Form photos are uploaded after `submit_correction` returns the id. If an upload fails, the correction is still saved, and the notice says how many photos were not added. A correction holds at most 6 photos.
 - **Photos are shown through signed URLs** valid for one hour, because the bucket is private.
+- **Outlines are blue (`#3d5afe`) on a white casing.** Found in the browser check: orange disappeared into Crops. No pressure layer is blue, and the casing keeps the outline visible on Built's black.
+- **A chosen correction flies the map to it, up to zoom 15**, through a `flyToBox` that `usePlaceBoundaries` now returns, so the open panels are left clear. Places fly no closer than zoom 10, which is too far out for a field.
 
 ## Do this
 
