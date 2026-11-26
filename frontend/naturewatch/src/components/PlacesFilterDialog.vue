@@ -239,10 +239,9 @@ function apply() {
         </DialogDescription>
         <div class="filter-body">
           <section class="filter-section" aria-labelledby="filter-types-title">
-            <h3 id="filter-types-title" class="filter-name">Place types</h3>
-            <p class="filter-hint">
-              The same buttons as the Places panel. They apply at once.
-            </p>
+            <h3 id="filter-types-title" class="filter-name filter-name-spaced">
+              Place types
+            </h3>
             <slot name="types" />
           </section>
           <section class="filter-section" aria-labelledby="filter-size-title">
@@ -426,6 +425,10 @@ function apply() {
   margin: 4px 0 16px;
   font-size: 13px;
   color: var(--muted-foreground);
+}
+
+.filter-name-spaced {
+  margin-bottom: 16px;
 }
 
 .filter-name-row {
