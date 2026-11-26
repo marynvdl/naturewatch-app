@@ -462,3 +462,69 @@ describe('layer catalog', () => {
     });
   });
 });
+
+describe('layer corrections', () => {
+  const layers = (rawCatalog as Catalog).layers;
+
+  it('gives every published threat layer a corrections block, and no other layer', () => {
+    layers.forEach(layer => {
+      const expected =
+        layer.group === 'threats' && layer.status === 'published';
+      expect(Boolean(layer.corrections), layer.id).toBe(expected);
+    });
+  });
+
+  it('asks for values only when an action other than remove is listed', () => {
+    layers.forEach(layer => {
+      const block = layer.corrections;
+      if (!block?.values) return;
+      expect(
+        block.actions.some(action => action !== 'remove'),
+        layer.id
+      ).toBe(true);
+    });
+  });
+
+  it('keeps value ids and option values unique', () => {
+    layers.forEach(layer => {
+      const values = layer.corrections?.values ?? [];
+      const ids = values.map(value => value.id);
+      expect(new Set(ids).size, layer.id).toBe(ids.length);
+      values.forEach(value => {
+        const options = (value.options ?? []).map(option => option.value);
+        expect(new Set(options).size, `${layer.id}.${value.id}`).toBe(
+          options.length
+        );
+      });
+    });
+  });
+
+  it('makes a correction yearly only on a layer with more than one year', () => {
+    layers.forEach(layer => {
+      if (layer.corrections?.yearly) {
+        expect(layer.years.available.length, layer.id).toBeGreaterThan(1);
+      }
+    });
+  });
+
+  it('rejects an unknown action, or a value with both a kind and options', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const validate = ajv.compile(schema);
+    const broken = JSON.parse(JSON.stringify(rawCatalog));
+    const roads = broken.layers.find(
+      (layer: { id: string }) => layer.id === 'roads'
+    );
+    roads.corrections.actions.push('move');
+    expect(validate(broken)).toBe(false);
+
+    const both = JSON.parse(JSON.stringify(rawCatalog));
+    const cropland = both.layers.find(
+      (layer: { id: string }) => layer.id === 'cropland'
+    );
+    cropland.corrections.values[0].options = [
+      { value: 0, label: 'None' },
+      { value: 1, label: 'All' },
+    ];
+    expect(validate(both)).toBe(false);
+  });
+});

@@ -283,8 +283,64 @@
               "description": "Image key, registered in assets.ts."
             }
           }
+        },
+        "corrections": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["yearly", "actions"],
+          "description": "What an admin can record where the layer is wrong. The correction form is built from it.",
+          "properties": {
+            "yearly": {
+              "type": "boolean",
+              "description": "true: the form asks which of years.available the correction applies to. false: it applies to the layer's one year."
+            },
+            "actions": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "enum": ["remove", "add", "reclassify"] },
+              "description": "remove: not this here. add: this here, with values. reclassify: this here, but with other values."
+            },
+            "values": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/definitions/correctionValue" },
+              "description": "Asked for on add and reclassify. remove takes no value."
+            }
+          }
         }
       }
+    },
+    "correctionValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Key in the correction's value object."
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": {
+          "const": "share",
+          "description": "A number from 0 to 1."
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": { "type": "integer" },
+              "label": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      },
+      "oneOf": [{ "required": ["kind"] }, { "required": ["options"] }]
     }
   }
 }

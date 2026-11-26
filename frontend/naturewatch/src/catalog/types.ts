@@ -58,6 +58,27 @@ export interface CatalogLayer {
   };
   source?: { name: string; version?: string; url?: string };
   info?: { subtitle?: string; content?: string; image?: string };
+  corrections?: CatalogCorrections;
+}
+
+export type CatalogCorrectionAction = 'remove' | 'add' | 'reclassify';
+
+/** A value asked for on add and reclassify: a share from 0 to 1, or one of the options. */
+export type CatalogCorrectionValue =
+  | { id: string; label: string; kind: 'share'; options?: never }
+  | {
+      id: string;
+      label: string;
+      kind?: never;
+      options: { value: number; label: string }[];
+    };
+
+/** What an admin can record where the layer is wrong. */
+export interface CatalogCorrections {
+  /** true: the correction names some of years.available. false: the layer's one year. */
+  yearly: boolean;
+  actions: CatalogCorrectionAction[];
+  values?: CatalogCorrectionValue[];
 }
 
 export interface Catalog {
