@@ -2,6 +2,10 @@
 import { computed, reactive, ref, useId, watch } from 'vue';
 import type { Polygon } from 'geojson';
 import EditDialog from '@/components/EditDialog.vue';
+import {
+  SegmentedControl,
+  SegmentedControlItem,
+} from '@/components/ui/segmented-control';
 import type { CatalogCorrectionAction } from '@/catalog/types';
 import {
   ACTION_LABELS,
@@ -15,7 +19,7 @@ import {
 } from '@/corrections/form';
 import { submitCorrection } from '@/corrections/api';
 
-/** The form for one drawn correction: layer, action, values, years, and a note. */
+/** The form for one drawn correction: layer, action, values, years, and a reason. */
 const props = defineProps<{
   /** The drawn polygon. */
   polygon: Polygon | null;
@@ -101,16 +105,26 @@ watch(toYear, to => {
   if (fromYear.value > to) fromYear.value = to;
 });
 
+/** The years in the range that are on, as the year chips show them. */
+const keptYears = computed(() => years.value.map(String));
+
 /**
- * Check or uncheck one year in the range.
- * @param year - The year.
- * @param checked - Whether it is kept.
+ * Turn year chips on or off.
+ * @param kept - The years whose chips are on.
  */
-function setYear(year: number, checked: boolean) {
-  const next = new Set(unchecked.value);
-  if (checked) next.delete(year);
-  else next.add(year);
-  unchecked.value = next;
+function setKeptYears(kept: unknown) {
+  const on = new Set(Array.isArray(kept) ? kept.map(Number) : []);
+  unchecked.value = new Set(shownYears.value.filter(year => !on.has(year)));
+}
+
+/**
+ * Choose an action. Pressing the chosen one again keeps it.
+ * @param next - The action pressed.
+ */
+function setAction(next: unknown) {
+  if (typeof next === 'string' && next) {
+    action.value = next as CatalogCorrectionAction;
+  }
 }
 
 /**
@@ -151,8 +165,9 @@ async function save() {
   <EditDialog
     v-model:open="open"
     title="Flag a correction"
-    description="Choose the layer that is wrong inside the polygon, what should be there instead, and the years."
+    description="Choose the layer that is wrong inside the polygon, what should be there instead, the years, and why."
     submit-label="Save"
+    fixed-height
     :submit-disabled="!complete"
     :busy="busy"
     :error="error"
@@ -173,22 +188,32 @@ async function save() {
       </select>
     </label>
 
-    <template v-if="block">
-      <fieldset class="correction-field">
-        <legend class="correction-label">Action</legend>
-        <div class="correction-choices">
-          <label
+    <p v-if="!block" class="correction-help">
+      Choose the layer that is wrong inside the area you drew.
+    </p>
+
+    <template v-else>
+      <div class="correction-field">
+        <span :id="`${uid}-action`" class="correction-label">Action</span>
+        <SegmentedControl
+          :model-value="action"
+          type="single"
+          variant="outline"
+          size="sm"
+          :aria-labelledby="`${uid}-action`"
+          @update:model-value="setAction"
+        >
+          <SegmentedControlItem
             v-for="item in block.actions"
             :key="item"
-            class="correction-choice"
+            :value="item"
           >
-            <input v-model="action" type="radio" name="action" :value="item" />
             {{ ACTION_LABELS[item] }}
-          </label>
-        </div>
-      </fieldset>
+          </SegmentedControlItem>
+        </SegmentedControl>
+      </div>
 
-      <template v-if="asksValues">
+      <div v-if="asksValues" class="correction-values">
         <label
           v-for="field in block.values"
           :key="field.id"
@@ -207,6 +232,7 @@ async function save() {
             min="0"
             max="100"
             step="1"
+            placeholder="0–100"
             :value="inputs[field.id] ?? ''"
             @input="
               inputs[field.id] = toNumber(
@@ -236,13 +262,13 @@ async function save() {
             </option>
           </select>
         </label>
-      </template>
+      </div>
 
-      <fieldset class="correction-field">
-        <legend class="correction-label">Years</legend>
+      <div class="correction-field">
+        <span class="correction-label">Years</span>
         <div class="correction-range">
           <label class="correction-range-end" :for="`${uid}-from`">
-            <span class="correction-label">From</span>
+            <span class="correction-sublabel">From</span>
             <select
               :id="`${uid}-from`"
               v-model.number="fromYear"
@@ -255,7 +281,7 @@ async function save() {
             </select>
           </label>
           <label class="correction-range-end" :for="`${uid}-to`">
-            <span class="correction-label">To</span>
+            <span class="correction-sublabel">To</span>
             <select
               :id="`${uid}-to`"
               v-model.number="toYear"
@@ -269,35 +295,40 @@ async function save() {
           </label>
         </div>
         <div v-if="shownYears.length > 1" class="correction-years">
-          <label
-            v-for="year in shownYears"
-            :key="year"
-            class="correction-choice"
+          <SegmentedControl
+            :model-value="keptYears"
+            type="multiple"
+            variant="outline"
+            size="sm"
+            class="nw:flex-wrap"
+            :spacing="1.5"
+            aria-label="Years in the range"
+            @update:model-value="setKeptYears"
           >
-            <input
-              type="checkbox"
-              :name="`year-${year}`"
-              :checked="!unchecked.has(year)"
-              @change="
-                setYear(year, ($event.target as HTMLInputElement).checked)
-              "
-            />
-            {{ year }}
-          </label>
+            <SegmentedControlItem
+              v-for="year in shownYears"
+              :key="year"
+              :value="String(year)"
+              :data-year="year"
+            >
+              {{ year }}
+            </SegmentedControlItem>
+          </SegmentedControl>
         </div>
-        <p v-if="years.length === 0" class="correction-help">
+        <p v-if="years.length === 0" class="correction-help" role="alert">
           Keep at least one year.
         </p>
-      </fieldset>
+      </div>
 
       <label class="correction-field" :for="`${uid}-note`">
-        <span class="correction-label">Note (optional)</span>
+        <span class="correction-label">Reason</span>
         <textarea
           :id="`${uid}-note`"
           v-model="note"
           class="correction-input correction-note"
           name="note"
-          rows="2"
+          rows="3"
+          placeholder="What is there instead, and how you know"
           :maxlength="CORRECTION_NOTE_MAX"
         />
       </label>
@@ -309,17 +340,20 @@ async function save() {
 .correction-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  border: 0;
+  gap: 8px;
   min-width: 0;
 }
 
-.correction-label,
+.correction-label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--foreground);
+}
+
+.correction-sublabel,
 .correction-help {
   margin: 0;
-  padding: 0;
   font-size: 12px;
   line-height: 1.4;
   color: var(--muted-foreground);
@@ -327,8 +361,8 @@ async function save() {
 
 .correction-input {
   width: 100%;
-  min-height: 36px;
-  padding: 4px 10px;
+  min-height: 38px;
+  padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--background);
@@ -338,7 +372,7 @@ async function save() {
 }
 
 .correction-note {
-  padding: 8px 10px;
+  padding: 10px 12px;
   resize: vertical;
 }
 
@@ -347,35 +381,27 @@ async function save() {
   outline-offset: 2px;
 }
 
-.correction-choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-}
-
-.correction-choice {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
+.correction-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
 }
 
 .correction-range {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
 
 .correction-range-end {
   display: flex;
-  flex: 1;
   flex-direction: column;
   gap: 4px;
 }
 
 .correction-years {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: 4px 8px;
-  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 </style>

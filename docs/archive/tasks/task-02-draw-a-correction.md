@@ -28,6 +28,7 @@ From the code on 26 November 2026:
 - **Years are a range with checkboxes.** From and To set the range, with every year inside it checked. Unchecking a year drops it, for example a fire in 2019 and 2021 but not 2020. Both start at the year the layer shows for the timeline year, or its latest.
 - **The action labels** are "Remove here" (`remove`), "Add here" (`add`), and "Change kind" (`reclassify`).
 - **Messages sit above the Measure panel**, in a small panel of their own, so a message never widens the panel. Found in the browser check, where a wider panel covered the timeline. On a narrow screen in Edit mode, the heading sits above the five buttons, so it is not pushed off the edge.
+- **The form's look**, from the user on the local server: the dialog keeps one height (640 px, or the screen less 32 px) and its body scrolls, through `fixedHeight` on `EditDialog`. Action is a segmented control, as in the Photos window. The years in the range are toggle chips in a bordered box. The note field is labelled "Reason", with no "(optional)".
 - **The polygon is not measured.** A correction polygon gets no area label, and it is deleted from the draw tool when the form saves or closes.
 
 ## Do this
@@ -45,7 +46,7 @@ From the code on 26 November 2026:
    - **Action:** radio buttons for the layer's actions, labelled as decided above.
    - **Values** (for `add` and `reclassify`): a share as a percent from 0 to 100, stored from 0 to 1. Options as a select.
    - **Years:** From and To selects over `yearRange`, starting at `defaultYear`. Below them is a checkbox for each year in the range, all checked. At least one year must stay checked.
-   - **Note:** optional, at most 1,000 characters.
+   - **Reason:** at most 1,000 characters, and not required.
    - Save is off until the form is complete. A database error shows in the dialog.
    - When it saves, the dialog closes and the Measure panel reads "Correction saved for review" for a few seconds.
 4. **`MeasureComponent.vue`:**

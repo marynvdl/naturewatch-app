@@ -74,16 +74,22 @@ async function choose(name: string, value: string | number) {
 
 /**
  * Choose an action by its label.
- * @param label - The radio's label.
+ * @param label - The action's button text.
  */
 async function act(label: string) {
-  const radio = body()
-    .findAll('label')
-    .find(item => item.text() === label)!
-    .get('input');
-  await radio.setValue(true);
+  const item = body()
+    .findAll('button')
+    .find(button => button.text() === label)!;
+  await item.trigger('click');
   await flushPromises();
 }
+
+/** The action buttons' text. */
+const actionLabels = () =>
+  body()
+    .findAll('button')
+    .map(button => button.text())
+    .filter(text => /here|kind/.test(text));
 
 describe('CorrectionForm', () => {
   beforeEach(() => {
@@ -100,13 +106,13 @@ describe('CorrectionForm', () => {
     expect(
       (body().get('select[name="layer"]').element as HTMLSelectElement).value
     ).toBe('cropland');
-    const labels = body()
-      .findAll('.correction-choice')
-      .map(item => item.text());
+    const labels = actionLabels();
     expect(labels).toContain('Remove here');
     expect(labels).toContain('Add here');
     expect(labels).not.toContain('Change kind');
     expect(body().find('input[name="value-share"]').exists()).toBe(false);
+    await act('Add here');
+    expect(body().find('input[name="value-share"]').exists()).toBe(true);
     await act('Add here');
     expect(body().find('input[name="value-share"]').exists()).toBe(true);
     expect(save().attributes('disabled')).toBeDefined();
@@ -117,7 +123,7 @@ describe('CorrectionForm', () => {
     expect(
       (body().get('select[name="layer"]').element as HTMLSelectElement).value
     ).toBe('');
-    expect(body().find('fieldset').exists()).toBe(false);
+    expect(actionLabels()).toEqual([]);
     await choose('layer', 'roads');
     await act('Change kind');
     expect(body().find('select[name="value-level"]').exists()).toBe(true);
@@ -139,8 +145,12 @@ describe('CorrectionForm', () => {
     expect(years.at(-1)).toBe('2025');
     await act('Remove here');
     await choose('from-year', 2019);
-    expect(body().findAll('.correction-years input')).toHaveLength(3);
-    await body().get('input[name="year-2020"]').setValue(false);
+    expect(body().findAll('[data-year]')).toHaveLength(3);
+    await body().get('[data-year="2020"]').trigger('click');
+    await flushPromises();
+    expect(body().get('[data-year="2020"]').attributes('data-state')).toBe(
+      'off'
+    );
     await body()
       .get('textarea[name="note"]')
       .setValue('  Burnt scar is a dam  ');
