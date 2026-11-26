@@ -30,6 +30,10 @@ The scope comes from the user's notes for Molding Places, 13 November 2026.
 - A change to publication or to a boundary reaches the map only after a PMTiles rebuild in naturewatch-analysis. Each such task needs a rebuild step and its cost.
 - A replacement boundary is uploaded as GeoJSON through `submit_boundary`, and becomes current through `approve_boundary`. Drawing a boundary in the browser is a separate, larger choice.
 
+## Order, agreed 26 November 2026
+
+The eligibility part comes first: `boundary_checks`, QC, `stats_eligibility`, `stats_eligible_boundaries`, and the `place_overlaps()` fix. [Stats Ledger](stats-ledger.md) waits for it. The review queues follow.
+
 ## Open questions
 
 - Which queue comes first?
