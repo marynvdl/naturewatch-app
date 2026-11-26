@@ -6,6 +6,7 @@ import {
   ref,
   computed,
   watch,
+  type Ref,
 } from 'vue';
 import * as mapboxgl from 'mapbox-gl';
 import BasemapButtonComponent from '@/components/BasemapButtonComponent.vue';
@@ -33,6 +34,7 @@ import {
 import { rasterSourceSpec } from '@/catalog/rasterSource';
 import usePlacesStore from '@/store/PlacesStore';
 import { usePlaceBoundaries } from '@/places/usePlaceBoundaries';
+import { useCorrectionOutlines } from '@/corrections/outlines';
 import { togglesWithLabels } from '@/components/mapLabels';
 import useDrawerStore from '@/store/DrawerStore';
 import SideButtonsComponent from '@/components/SideButtonsComponent.vue';
@@ -96,9 +98,10 @@ defineProps<{
 const currentBasemap = computed(() => basemapStore.currentBasemap);
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
-const { zoomToSelectedPlace, followPanels } = usePlaceBoundaries(
+const { zoomToSelectedPlace, followPanels, flyToBox } = usePlaceBoundaries(
   () => map.value
 );
+useCorrectionOutlines(map as Ref<mapboxgl.Map | null>, flyToBox);
 
 /** Rendered profile width. The closed Places circle parks beside it. */
 const profileWidth = ref(0);

@@ -302,12 +302,13 @@ interface PlaceMap {
  * Draw the conservation-area boundaries, highlight a selection, and frame it.
  * A boundary click does not open the places list.
  * @param getMap - The Mapbox map, once MapComponent has created it.
- * @returns A control that fits the map to the selected place, and one that
- *   sets the map's padding to the open panels.
+ * @returns A control that fits the map to the selected place, one that
+ *   sets the map's padding to the open panels, and one that flies to a box.
  */
 export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   zoomToSelectedPlace: () => void;
   followPanels: () => Promise<void>;
+  flyToBox: (bounds: LngLatBounds, maxZoom?: number) => void;
 } {
   const placesStore = usePlacesStore();
   const basemapStore = useBasemapStore();
@@ -798,11 +799,13 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * the map again when it lands.
    * @param mapInstance - The map.
    * @param bounds - West, south, east, north.
+   * @param maxZoom - Fly no closer than this.
    * @returns Whether the map flew.
    */
   function flyToBounds(
     mapInstance: mapboxgl.Map,
-    bounds: LngLatBounds
+    bounds: LngLatBounds,
+    maxZoom = 10
   ): boolean {
     const south = Math.max(bounds[1], -85);
     const north = Math.min(bounds[3], 85);
@@ -811,7 +814,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         [bounds[0], south],
         [bounds[2], north],
       ],
-      { padding: panelPadding(mapInstance), maxZoom: 10 }
+      { padding: panelPadding(mapInstance), maxZoom }
     );
     if (camera?.zoom === undefined) return false;
     mapInstance.flyTo({
@@ -1332,5 +1335,15 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     }
   );
 
-  return { zoomToSelectedPlace, followPanels };
+  /**
+   * Fly to a box, with room for the open panels.
+   * @param bounds - West, south, east, north.
+   * @param maxZoom - Fly no closer than this.
+   */
+  function flyToBox(bounds: LngLatBounds, maxZoom?: number) {
+    const mapInstance = readMap();
+    if (mapInstance) flyToBounds(mapInstance, bounds, maxZoom);
+  }
+
+  return { zoomToSelectedPlace, followPanels, flyToBox };
 }

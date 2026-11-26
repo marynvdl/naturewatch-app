@@ -381,9 +381,10 @@ const usePlacesStore = defineStore('places', () => {
 
   /**
    * The admin list the Places panel shows in place of a place type: the
-   * places that need attention, or the withdrawn places. Admins only.
+   * places that need attention, the withdrawn places, or the corrections.
+   * Admins only.
    */
-  const adminList = ref<'attention' | 'withdrawn' | null>(null);
+  const adminList = ref<'attention' | 'withdrawn' | 'corrections' | null>(null);
   /** Goes up after a place is withdrawn, restored, flagged, or cleared, so the lists read again. */
   const adminListVersion = ref(0);
   /** The places list's cards while the photo filter is on, in order. */

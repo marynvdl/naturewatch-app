@@ -18,6 +18,7 @@ import { useMeasureStore } from '@/store/MeasureStore';
 import useAuthStore from '@/store/AuthStore';
 import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
+import useCorrectionsStore from '@/store/CorrectionsStore';
 
 /** Using stores */
 const basemapStore = useBasemapStore();
@@ -25,6 +26,7 @@ const measureStore = useMeasureStore();
 const auth = useAuthStore();
 const mapLayerStore = useMapLayerStore();
 const timelineStore = useTimelineStore();
+const corrections = useCorrectionsStore();
 
 // Get current basemap from store
 const currentBasemap = computed(() => basemapStore.currentBasemap);
@@ -151,9 +153,18 @@ watch(
   }
 );
 
-/** The form saved a correction. */
-function onCorrectionSaved() {
-  showNotice('Correction saved for review', 4000);
+/**
+ * The form saved a correction.
+ * @param _id - The new correction.
+ * @param missed - Photos that could not be added.
+ */
+function onCorrectionSaved(_id: string, missed: number) {
+  corrections.changed();
+  const text =
+    missed === 0
+      ? 'Correction saved for review'
+      : `Correction saved for review. ${missed} ${missed === 1 ? 'photo was' : 'photos were'} not added.`;
+  showNotice(text, missed === 0 ? 4000 : 8000);
 }
 
 /** Start a length or area measurement, or stop it if that tool is already on. */

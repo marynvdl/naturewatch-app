@@ -9,9 +9,21 @@ import type { Polygon } from 'geojson';
 import CorrectionForm from '@/components/CorrectionForm.vue';
 import { catalog } from '@/catalog';
 import { correctableLayers, type CorrectableLayer } from '@/corrections/form';
-import { submitCorrection } from '@/corrections/api';
+import {
+  setCorrectionPhotos,
+  submitCorrection,
+  uploadCorrectionPhoto,
+} from '@/corrections/api';
 
-vi.mock('@/corrections/api', () => ({ submitCorrection: vi.fn() }));
+vi.mock('@/corrections/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/corrections/api')>();
+  return {
+    ...actual,
+    submitCorrection: vi.fn(),
+    setCorrectionPhotos: vi.fn(),
+    uploadCorrectionPhoto: vi.fn(),
+  };
+});
 
 const polygon: Polygon = {
   type: 'Polygon',
@@ -94,6 +106,10 @@ const actionLabels = () =>
 describe('CorrectionForm', () => {
   beforeEach(() => {
     vi.mocked(submitCorrection).mockReset();
+    vi.mocked(setCorrectionPhotos).mockReset().mockResolvedValue(null);
+    vi.mocked(uploadCorrectionPhoto).mockReset();
+    URL.createObjectURL = vi.fn(() => 'blob:photo');
+    URL.revokeObjectURL = vi.fn();
   });
 
   afterEach(() => {
@@ -165,7 +181,8 @@ describe('CorrectionForm', () => {
       value: null,
       note: 'Burnt scar is a dam',
     });
-    expect(form.emitted('saved')).toEqual([['new-id']]);
+    expect(form.emitted('saved')).toEqual([['new-id', 0]]);
+    expect(uploadCorrectionPhoto).not.toHaveBeenCalled();
     expect(form.emitted('update:open')).toEqual([[false]]);
   });
 
@@ -183,6 +200,36 @@ describe('CorrectionForm', () => {
     expect(sent.years).toHaveLength(22);
     expect(sent.years[0]).toBe(2003);
     expect(sent.note).toBeNull();
+  });
+
+  it('uploads photos after saving, and counts the ones not added', async () => {
+    vi.mocked(submitCorrection).mockResolvedValue({ id: 'new-id' });
+    vi.mocked(uploadCorrectionPhoto)
+      .mockResolvedValueOnce({ path: 'new-id/one.jpg' })
+      .mockResolvedValueOnce({ error: 'Network error' });
+    const form = await mountForm(on('dams'));
+    await act('Add here');
+    const input = body().get('input[type="file"]');
+    const files = [
+      new File(['1'], 'one.jpg', { type: 'image/jpeg' }),
+      new File(['2'], 'two.jpg', { type: 'image/jpeg' }),
+      new File(['3'], 'three.gif', { type: 'image/gif' }),
+    ];
+    Object.defineProperty(input.element, 'files', { value: files });
+    await input.trigger('change');
+    await flushPromises();
+    expect(body().findAll('img')).toHaveLength(2);
+    expect(body().get('[role="alert"]').text()).toContain(
+      'JPEG, PNG, and WebP'
+    );
+    await save().trigger('click');
+    await flushPromises();
+    expect(uploadCorrectionPhoto).toHaveBeenCalledTimes(2);
+    expect(uploadCorrectionPhoto).toHaveBeenCalledWith('new-id', files[0]);
+    expect(setCorrectionPhotos).toHaveBeenCalledWith('new-id', [
+      'new-id/one.jpg',
+    ]);
+    expect(form.emitted('saved')).toEqual([['new-id', 1]]);
   });
 
   it('keeps the dialog open and shows the database error', async () => {

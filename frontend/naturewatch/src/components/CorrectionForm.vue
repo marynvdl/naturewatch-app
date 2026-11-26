@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive, ref, useId, watch } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref, useId, watch } from 'vue';
 import type { Polygon } from 'geojson';
 import EditDialog from '@/components/EditDialog.vue';
+import CorrectionPhotosField from '@/components/CorrectionPhotosField.vue';
 import {
   SegmentedControl,
   SegmentedControlItem,
@@ -17,7 +18,12 @@ import {
   type CorrectableLayer,
   type ValueInputs,
 } from '@/corrections/form';
-import { submitCorrection } from '@/corrections/api';
+import {
+  setCorrectionPhotos,
+  submitCorrection,
+  uploadCorrectionPhoto,
+} from '@/corrections/api';
+import { uploadProblem } from '@/places/images';
 
 /** The form for one drawn correction: layer, action, values, years, and a reason. */
 const props = defineProps<{
@@ -31,7 +37,8 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { required: true });
 
-const emit = defineEmits<{ saved: [id: string] }>();
+/** `missed` is how many photos could not be added. The correction is saved either way. */
+const emit = defineEmits<{ saved: [id: string, missed: number] }>();
 
 const uid = useId();
 const layerId = ref<string>('');
@@ -43,6 +50,9 @@ const unchecked = ref<Set<number>>(new Set());
 const note = ref('');
 const busy = ref(false);
 const error = ref('');
+/** Photos waiting to upload when the correction saves. */
+const files = ref<{ key: string; file: File; src: string }[]>([]);
+let fileKey = 0;
 
 const layer = computed(
   () => props.layers.find(item => item.id === layerId.value) ?? null
@@ -90,6 +100,7 @@ watch(
     if (!isOpen) return;
     error.value = '';
     note.value = '';
+    clearFiles();
     const only = props.layers.length === 1 ? props.layers[0].id : '';
     if (layerId.value === only) resetForLayer();
     else layerId.value = only;
@@ -128,6 +139,67 @@ function setAction(next: unknown) {
 }
 
 /**
+ * Keep chosen photos to upload on Save. A file of the wrong type or size is
+ * refused with a message.
+ * @param chosen - The chosen files.
+ */
+function addFiles(chosen: File[]) {
+  error.value = '';
+  for (const file of chosen) {
+    const problem = uploadProblem(file);
+    if (problem) {
+      error.value = problem;
+      continue;
+    }
+    fileKey += 1;
+    files.value.push({
+      key: `file-${fileKey}`,
+      file,
+      src: URL.createObjectURL(file),
+    });
+  }
+}
+
+/**
+ * Drop a waiting photo.
+ * @param key - Its key.
+ */
+function removeFile(key: string) {
+  const item = files.value.find(entry => entry.key === key);
+  if (item) URL.revokeObjectURL(item.src);
+  files.value = files.value.filter(entry => entry.key !== key);
+}
+
+/** Drop every waiting photo. */
+function clearFiles() {
+  files.value.forEach(entry => URL.revokeObjectURL(entry.src));
+  files.value = [];
+}
+
+onBeforeUnmount(clearFiles);
+
+/**
+ * Upload the waiting photos and store their paths on the correction.
+ * @param id - The saved correction.
+ * @returns How many photos could not be added.
+ */
+async function addPhotos(id: string): Promise<number> {
+  if (files.value.length === 0) return 0;
+  const results = await Promise.all(
+    files.value.map(entry => uploadCorrectionPhoto(id, entry.file))
+  );
+  const paths = [
+    ...new Set(
+      results.flatMap(result => ('path' in result ? [result.path] : []))
+    ),
+  ];
+  const missed = results.filter(result => 'error' in result).length;
+  if (paths.length === 0) return missed;
+  const failed = await setCorrectionPhotos(id, paths);
+  return failed ? files.value.length : missed;
+}
+
+/**
  * Read a number from a field, or null when it is empty.
  * @param raw - The field's value.
  */
@@ -151,12 +223,15 @@ async function save() {
     value: value.value ?? null,
     note: note.value.trim() || null,
   });
-  busy.value = false;
   if ('error' in result) {
+    busy.value = false;
     error.value = result.error;
     return;
   }
-  emit('saved', result.id);
+  const missed = await addPhotos(result.id);
+  busy.value = false;
+  clearFiles();
+  emit('saved', result.id, missed);
   open.value = false;
 }
 </script>
@@ -332,6 +407,16 @@ async function save() {
           :maxlength="CORRECTION_NOTE_MAX"
         />
       </label>
+
+      <div class="correction-field">
+        <span class="correction-label">Photos</span>
+        <CorrectionPhotosField
+          :photos="files"
+          :busy="busy"
+          @add="addFiles"
+          @remove="removeFile"
+        />
+      </div>
     </template>
   </EditDialog>
 </template>
