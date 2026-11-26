@@ -88,7 +88,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* Keep the tab between places, add back and the breadcrumb, keep the Related set while opening its places, add temporary and pinned chips, name a place when the pointer rests on it, and let the citation scroll with the content. Update `docs/user/using-the-map.md`. Run the tests and a browser check, and have the user evaluate the local app.
 - [x] [Task 02 — Edit mode on view mode](../archive/tasks/task-02-edit-mode-on-view-mode.md) — naturewatch-app
   - *Goal:* Edit mode shows the view tabs plus Photos and Status. Related keeps its cards, map drawing, and hover, with the link editor on top.
-- [ ] [Task 03 — Places bar and globe](../tasks/task-03-places-bar-and-globe.md) — naturewatch-app
+- [x] [Task 03 — Places bar and globe](../archive/tasks/task-03-places-bar-and-globe.md) — naturewatch-app
   - *Goal:* Ecoregions combine with other types, the list defaults to In view, Filter is always shown, and the map's padding follows the open panels so the globe is centred.
 - [ ] [Task 04 — Ecoregion lines](../tasks/task-04-ecoregion-lines.md) — naturewatch-app, and naturewatch-analysis only if the tiles need a rebuild
   - *Goal:* Give ecoregions a thinner, lighter outline when zoomed out, picked by the user on the dev server. Find out why Aldabra and Amsterdam–Saint Paul are misplaced, and fix it in the recipe or record it. A tile rebuild is costed and approved first.

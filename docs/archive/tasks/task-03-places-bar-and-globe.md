@@ -1,6 +1,6 @@
 # Task 03 — Places bar and globe
 
-Parcel: [Wayfinding](../parcels/wayfinding.md).
+Parcel: [Wayfinding](../../parcels/wayfinding.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 02 merged in #459.
 
