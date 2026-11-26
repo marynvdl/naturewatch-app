@@ -1184,12 +1184,12 @@ describe('Place profile', () => {
       expect(labels).not.toContain('Photos');
     });
 
-    it('groups photographs by status with the actions each one offers', async () => {
+    it('groups photographs by status with the actions each one offers, and shows no rejected one', async () => {
       const wrapper = await openPhotos();
       const groups = wrapper
         .findAll('.photos-group')
         .map(group => group.attributes('data-status'));
-      expect(groups).toEqual(['approved', 'suggested', 'rejected']);
+      expect(groups).toEqual(['approved', 'suggested']);
       const approved = wrapper
         .findAll('[data-status="approved"] [data-image]')
         .map(item => item.attributes('data-image'));
@@ -1205,7 +1205,7 @@ describe('Place profile', () => {
         'Reject',
       ]);
       expect(actions(wrapper, 's')).toEqual(['Approve', 'Reject']);
-      expect(actions(wrapper, 'r')).toEqual(['Approve']);
+      expect(wrapper.find('[data-image="r"]').exists()).toBe(false);
       const first = wrapper.get('[data-image="a"] [aria-label="Move up"]');
       expect(first.attributes('disabled')).toBeDefined();
       const last = wrapper.get('[data-image="c"] [aria-label="Move down"]');

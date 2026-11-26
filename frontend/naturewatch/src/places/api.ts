@@ -125,6 +125,8 @@ export interface PlaceWindowQuery {
    * ecoregions (`places.id`). Every place when left out or empty.
    */
   ecoregionIds?: string[];
+  /** Keep only places with suggested photographs. Admins only. */
+  photoSuggestions?: boolean;
 }
 
 /** Result of loading the capped list. */
@@ -224,6 +226,7 @@ function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
     p_east: query.extent?.[2] ?? null,
     p_north: query.extent?.[3] ?? null,
     ...ecoregionArgs(query.ecoregionIds),
+    ...photoArgs(query.photoSuggestions),
   };
 }
 
@@ -234,6 +237,15 @@ function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
  */
 function ecoregionArgs(ids: string[] | undefined) {
   return ids?.length ? { p_ecoregion_ids: ids } : {};
+}
+
+/**
+ * The photo filter argument, only when it is on.
+ * @param on - Whether only places with suggested photographs are kept.
+ * @returns `p_photo_suggestions`, or nothing.
+ */
+function photoArgs(on: boolean | undefined) {
+  return on ? { p_photo_suggestions: true } : {};
 }
 
 /**
@@ -436,17 +448,20 @@ export type KeptIdsResult =
 
 /** Place types and filters for the ids the map keeps. */
 export interface KeptIdsQuery {
+  /** Stored place types. Conservation areas when empty. */
   placeTypes: string[];
   sizeMin: number | null;
   sizeMax: number | null;
   cropMin: number;
   cropMax: number;
   ecoregionIds: string[];
+  /** Keep only places with suggested photographs. Admins only. */
+  photoSuggestions?: boolean;
 }
 
 /**
- * Ids of the places of the given types that the size, cropland, and ecoregion
- * filter keeps. Search and the map view do not apply.
+ * Ids of the places of the given types that the size, cropland, ecoregion,
+ * and photo filter keeps. Search and the map view do not apply.
  * @param query - Place types and filters.
  * @returns The ids, or why they could not be read.
  */
@@ -456,12 +471,13 @@ export async function loadKeptPlaceIds(
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
   const { data, error } = await supabase.rpc('place_kept_ids', {
-    p_place_types: query.placeTypes,
+    p_place_types: query.placeTypes.length ? query.placeTypes : [PLACE_TYPE],
     p_size_min: query.sizeMin,
     p_size_max: query.sizeMax,
     p_crop_min: query.cropMin,
     p_crop_max: query.cropMax,
     ...ecoregionArgs(query.ecoregionIds),
+    ...photoArgs(query.photoSuggestions),
   });
   if (error || !Array.isArray(data)) return { status: 'error' };
   return { status: 'ok', ids: data.map(String) };
@@ -1112,6 +1128,7 @@ export async function loadPlaceBounds(id: string): Promise<PlaceBoundsResult> {
  * @param query.sizeMin - Smallest kept size, in km², or null.
  * @param query.sizeMax - Largest kept size, in km², or null.
  * @param query.ecoregionIds - Chosen ecoregions, when any apply.
+ * @param query.photoSuggestions - Keep only places with suggested photographs.
  * @returns The extent, `missing` when no place is kept, or why it could not be read.
  */
 export async function loadPlaceExtent(query: {
@@ -1119,6 +1136,7 @@ export async function loadPlaceExtent(query: {
   sizeMin: number | null;
   sizeMax: number | null;
   ecoregionIds: string[];
+  photoSuggestions?: boolean;
 }): Promise<PlaceBoundsResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
@@ -1127,6 +1145,7 @@ export async function loadPlaceExtent(query: {
     p_size_min: query.sizeMin,
     p_size_max: query.sizeMax,
     ...ecoregionArgs(query.ecoregionIds),
+    ...photoArgs(query.photoSuggestions),
   });
   if (error || !data) return { status: 'error' };
   const row = (

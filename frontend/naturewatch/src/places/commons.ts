@@ -11,19 +11,28 @@ export const COMMONS_THUMB_WIDTH = 330;
 /** Longest caption the database stores. */
 export const CAPTION_MAX = 300;
 
-/** Licences a photograph can be stored under, as in the `licences` table. */
+/**
+ * The generic licences a photograph can be stored under, as in the `licences`
+ * table, which the upload list offers. The table also holds every ported CC
+ * version, such as `cc-by-sa-3.0-de`, which a Commons file can carry.
+ */
 export const IMAGE_LICENCES = [
   'cc0-1.0',
   'public-domain',
+  'cc-by-1.0',
   'cc-by-2.0',
   'cc-by-2.5',
   'cc-by-3.0',
   'cc-by-4.0',
+  'cc-by-sa-1.0',
   'cc-by-sa-2.0',
   'cc-by-sa-2.5',
   'cc-by-sa-3.0',
   'cc-by-sa-4.0',
 ] as const;
+
+/** A CC BY or BY-SA version, with the jurisdiction of a port, such as `cc-by-sa-3.0-de`. */
+const CC_LICENCE = /^cc-(by(?:-sa)?)-(\d\.\d)(?:-([a-z]+))?$/;
 
 /** File types a browser shows and the bucket accepts. */
 export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -52,13 +61,15 @@ export type CommonsFileResult =
 /**
  * A short licence label for a credit line.
  * @param id - A licence id, such as `cc-by-sa-4.0`.
- * @returns For example `CC BY-SA 4.0`, `CC0`, or `Public domain`.
+ * @returns For example `CC BY-SA 4.0`, `CC BY-SA 3.0 DE`, `CC0`, or `Public domain`.
  */
 export function licenceShortName(id: string): string {
   if (id === 'public-domain') return 'Public domain';
   if (id === 'cc0-1.0') return 'CC0';
-  const match = /^cc-(by(?:-sa)?)-(\d\.\d)$/.exec(id);
-  return match ? `CC ${match[1].toUpperCase()} ${match[2]}` : id;
+  const match = CC_LICENCE.exec(id);
+  if (!match) return id;
+  const port = match[3] ? ` ${match[3].toUpperCase()}` : '';
+  return `CC ${match[1].toUpperCase()} ${match[2]}${port}`;
 }
 
 /**
@@ -108,14 +119,19 @@ export function commonsFileUrl(title: string, width: number): string {
 
 /**
  * The licence id for a Commons `License` code.
- * @param code - For example `cc-by-sa-4.0`, `cc0`, or `pd`.
- * @returns An id from `IMAGE_LICENCES`, or null when it is not accepted.
+ * @param code - For example `cc-by-sa-4.0`, `cc-by-sa-3.0-de`, `cc0`, or `pd`.
+ * @returns An id from `IMAGE_LICENCES`, any CC BY or BY-SA version with its
+ *   port, or null when it is not accepted. The database checks that a port's
+ *   row exists.
  */
 export function commonsLicenceId(code: string | undefined): string | null {
   const value = (code ?? '').trim().toLowerCase();
   const id =
     value === 'pd' ? 'public-domain' : value === 'cc0' ? 'cc0-1.0' : value;
-  return (IMAGE_LICENCES as readonly string[]).includes(id) ? id : null;
+  return (IMAGE_LICENCES as readonly string[]).includes(id) ||
+    CC_LICENCE.test(id)
+    ? id
+    : null;
 }
 
 /**

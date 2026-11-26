@@ -17,14 +17,17 @@ task 05) and ecoregions (Ecoregions task 06).
           suggest_photos.tsv to the work directory. API responses are cached
           there, so a second start reads no page twice.
   counts  Read-only. How many rows of the file load would add, and how many it
-          would skip because the place already has a link to that file.
-  load    Write the file in one transaction: reuse the images row of a Commons
-          file already stored or insert one, and link it to the place as
-          suggested, with the pipeline name and the score. A place that already
-          has a link to the image, in any status, is skipped, so a rerun adds
-          nothing and a rejected photograph stays rejected. An ecoregion's row
-          is found by its ECO_ID, so a file fetched from one database loads into
-          another.
+          would skip because the place already has a link to that file or
+          refused it (photo_refusals).
+  load    Write the file in one transaction. First purge_rejected_photos()
+          deletes the links rejected more than 30 days ago and keeps a
+          photo_refusals row for each file. Then reuse the images row of a
+          Commons file already stored or insert one, and link it to the place
+          as suggested, with the pipeline name and the score. A place that
+          already has a link to the image, in any status, or a refusal of it,
+          is skipped, so a rerun adds nothing and a rejected photograph stays
+          rejected. An ecoregion's row is found by its ECO_ID, so a file
+          fetched from one database loads into another.
 
 Pipelines only suggest. An admin approves (decisions.md record 23).
 
@@ -545,6 +548,13 @@ select exists (
 ) as linked
 """
 
+REFUSED = """
+select exists (
+  select 1 from public.photo_refusals
+  where place_id = %s::uuid and commons_title = %s
+) as refused
+"""
+
 ECOREGION_PLACE = """
 select place_id::text from public.place_source_ids
 where source_id = 'resolve-ecoregions' and id_kind = 'eco_id'
@@ -564,7 +574,8 @@ def place_of(conn, row: dict) -> str | None:
 
 
 def counts(conn, work: Path) -> dict:
-    result = {"rows": 0, "would_add": 0, "already_linked": 0, "missing_place": 0}
+    result = {"rows": 0, "would_add": 0, "already_linked": 0, "refused": 0,
+              "missing_place": 0}
     for row in read_output(work):
         result["rows"] += 1
         place_id = place_of(conn, row)
@@ -572,6 +583,8 @@ def counts(conn, work: Path) -> dict:
             result["missing_place"] += 1
         elif conn.execute(LINKED, (place_id, SOURCE_ID, row["title"])).fetchone()["linked"]:
             result["already_linked"] += 1
+        elif conn.execute(REFUSED, (place_id, row["title"])).fetchone()["refused"]:
+            result["refused"] += 1
         else:
             result["would_add"] += 1
     conn.rollback()
@@ -581,12 +594,17 @@ def counts(conn, work: Path) -> dict:
 def load(conn, work: Path) -> dict:
     rows = read_output(work)
     result = {"rows": len(rows), "images_added": 0, "links_added": 0,
-              "already_linked": 0, "missing_place": 0}
+              "already_linked": 0, "refused": 0, "missing_place": 0}
     with conn.transaction():
+        purged = conn.execute("select * from public.purge_rejected_photos()").fetchone()
+        result["purged"] = {key: int(value) for key, value in purged.items()}
         for row in rows:
             place_id = place_of(conn, row)
             if place_id is None:
                 result["missing_place"] += 1
+                continue
+            if conn.execute(REFUSED, (place_id, row["title"])).fetchone()["refused"]:
+                result["refused"] += 1
                 continue
             image = conn.execute(
                 "select id from public.images where source_id = %s and source_record_id = %s",

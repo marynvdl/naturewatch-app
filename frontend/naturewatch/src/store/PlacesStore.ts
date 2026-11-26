@@ -190,18 +190,25 @@ const usePlacesStore = defineStore('places', () => {
       : []
   );
   /**
-   * Places of the listed types linked to a chosen ecoregion, which the map
-   * keeps. Null while no ecoregion applies.
+   * Applied photo filter: only places with suggested photographs. Admins in
+   * Edit mode only.
    */
-  const ecoregionPlaceIds = ref<string[] | null>(null);
+  const photoSuggestions = ref(false);
+  /**
+   * Places of the listed types linked to a chosen ecoregion, or with suggested
+   * photographs while the photo filter is on, which the map keeps. Null while
+   * neither applies.
+   */
+  const keptPlaceIds = ref<string[] | null>(null);
   let keptRequest = 0;
 
   watch(
-    () => `${listTypes.value.join(',')}|${ecoregionIds.value.join(',')}`,
+    () =>
+      `${listTypes.value.join(',')}|${ecoregionIds.value.join(',')}|${photoSuggestions.value}`,
     async () => {
       const request = ++keptRequest;
-      if (!ecoregionIds.value.length) {
-        ecoregionPlaceIds.value = null;
+      if (!ecoregionIds.value.length && !photoSuggestions.value) {
+        keptPlaceIds.value = null;
         return;
       }
       const result = await loadKeptPlaceIds({
@@ -211,9 +218,10 @@ const usePlacesStore = defineStore('places', () => {
         cropMin: CROPLAND_FULL[0],
         cropMax: CROPLAND_FULL[1],
         ecoregionIds: [...ecoregionIds.value],
+        photoSuggestions: photoSuggestions.value,
       });
       if (request !== keptRequest || result.status !== 'ok') return;
-      ecoregionPlaceIds.value = result.ids;
+      keptPlaceIds.value = result.ids;
     }
   );
   /** Current map view, west, south, east, north. */
@@ -222,7 +230,8 @@ const usePlacesStore = defineStore('places', () => {
     () =>
       sizeKept.value[0] !== null ||
       sizeKept.value[1] !== null ||
-      ecoregionIds.value.length > 0
+      ecoregionIds.value.length > 0 ||
+      photoSuggestions.value
   );
   /** Tile filter for the applied size range. */
   const tileFilter = computed(() => placeTileFilter(sizeKept.value));
@@ -231,18 +240,22 @@ const usePlacesStore = defineStore('places', () => {
    * Apply a filter to the list and the map.
    * @param size - Square kilometres.
    * @param ecoregions - Chosen ecoregions. Unchanged when left out.
+   * @param photos - Whether only places with suggested photographs are kept.
+   *   Unchanged when left out.
    */
   function applyFilter(
     size: SizeBounds,
-    ecoregions: EcoregionName[] = ecoregionsKept.value
+    ecoregions: EcoregionName[] = ecoregionsKept.value,
+    photos: boolean = photoSuggestions.value
   ) {
     sizeKept.value = [...size];
     ecoregionsKept.value = [...ecoregions];
+    photoSuggestions.value = photos;
   }
 
   /** Keep every place again. */
   function clearFilter() {
-    applyFilter([null, null], []);
+    applyFilter([null, null], [], false);
   }
 
   /** Whether the list is limited to the current map view. On at the start. */
@@ -367,42 +380,34 @@ const usePlacesStore = defineStore('places', () => {
   }
 
   /**
-   * The admin list the Places panel shows in place of a place type: the photo
-   * queue, the places that need attention, or the withdrawn places. Admins only.
+   * The admin list the Places panel shows in place of a place type: the
+   * places that need attention, or the withdrawn places. Admins only.
    */
-  const adminList = ref<'photos' | 'attention' | 'withdrawn' | null>(null);
-  /** Whether the Places panel lists the photo queue. */
-  const photoQueueOpen = computed({
-    get: () => adminList.value === 'photos',
-    set: (open: boolean) => {
-      if (open) adminList.value = 'photos';
-      else if (adminList.value === 'photos') adminList.value = null;
-    },
-  });
+  const adminList = ref<'attention' | 'withdrawn' | null>(null);
   /** Goes up after a place is withdrawn, restored, flagged, or cleared, so the lists read again. */
   const adminListVersion = ref(0);
-  /** The queue's places as listed, in order. */
-  const photoQueueIds = ref<string[]>([]);
-  /** Where the place opened from the queue was listed, so Next place still works once it leaves. */
-  const photoQueueIndex = ref(0);
-  /** Goes up after a photograph is reviewed, so the queue reads its counts again. */
-  const photoQueueVersion = ref(0);
+  /** The places list's cards while the photo filter is on, in order. */
+  const photoListIds = ref<string[]>([]);
+  /** Where the place opened from that list was, so Next place still works once it leaves. */
+  const photoListIndex = ref(0);
+  /** Goes up after a photograph is reviewed, so the list reads its counts again. */
+  const photoCountsVersion = ref(0);
 
-  /** The place after the open one in the queue, or null at its end. */
-  const nextInPhotoQueue = computed<string | null>(() => {
-    if (!photoQueueOpen.value) return null;
-    const ids = photoQueueIds.value;
+  /** The card after the open place while the photo filter is on, or null at the end. */
+  const nextPhotoPlace = computed<string | null>(() => {
+    if (!photoSuggestions.value) return null;
+    const ids = photoListIds.value;
     const at = selectedId.value ? ids.indexOf(selectedId.value) : -1;
-    return ids[at >= 0 ? at + 1 : photoQueueIndex.value] ?? null;
+    return ids[at >= 0 ? at + 1 : photoListIndex.value] ?? null;
   });
 
   /**
-   * Open a place from the photo queue on its Photos tab.
+   * Open a place on its Photos tab, from the list while the photo filter is on.
    * @param id - The place id.
    */
-  function openFromPhotoQueue(id: string) {
-    const index = photoQueueIds.value.indexOf(id);
-    if (index >= 0) photoQueueIndex.value = index;
+  function openWithPhotos(id: string) {
+    const index = photoListIds.value.indexOf(id);
+    if (index >= 0) photoListIndex.value = index;
     if (selectedId.value === id) return;
     open(id, 'list', 'photos');
   }
@@ -445,7 +450,8 @@ const usePlacesStore = defineStore('places', () => {
     sizeKept,
     ecoregionsKept,
     ecoregionIds,
-    ecoregionPlaceIds,
+    keptPlaceIds,
+    photoSuggestions,
     viewBounds,
     filtering,
     tileFilter,
@@ -466,11 +472,10 @@ const usePlacesStore = defineStore('places', () => {
     adminList,
     adminListVersion,
     openFromAdminList,
-    photoQueueOpen,
-    photoQueueIds,
-    photoQueueVersion,
-    nextInPhotoQueue,
-    openFromPhotoQueue,
+    photoListIds,
+    photoCountsVersion,
+    nextPhotoPlace,
+    openWithPhotos,
   };
 });
 

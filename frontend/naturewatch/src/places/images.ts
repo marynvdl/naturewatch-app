@@ -263,7 +263,9 @@ async function readLinks(
         .from('place_images')
         .select(LINK_COLUMNS)
         .in('place_id', chunk);
-      if (approvedOnly) call = call.eq('status', 'approved');
+      call = approvedOnly
+        ? call.eq('status', 'approved')
+        : call.in('status', ['approved', 'suggested']);
       return call.order('created_at');
     })
   );
@@ -276,8 +278,9 @@ async function readLinks(
 }
 
 /**
- * Every photograph linked to a place that the reader can see. A visitor sees
- * the approved ones, and an admin sees all.
+ * The photographs linked to a place that the reader can see. A visitor sees
+ * the approved ones, and an admin the suggested ones too. Rejected and
+ * withdrawn links are not read.
  * @param id - The place id.
  * @returns The photographs, main first, then in gallery order.
  */
@@ -575,62 +578,37 @@ export function orderPlaceImages(placeId: string, imageIds: string[]) {
   });
 }
 
-/** Places per page of the photo queue. */
-export const PHOTO_QUEUE_PAGE = 20;
+/** Places whose suggested photographs one request counts. */
+const COUNT_CHUNK = 50;
 
-/** A place with suggested photographs, in the photo queue. */
-export interface QueuedPlace {
-  placeId: string;
-  name: string;
-  placeType: string;
-  iso3: string | null;
-  areaKm2: number | null;
-  suggested: number;
-}
-
-export type PhotoQueueResult =
-  | { status: 'ok'; places: QueuedPlace[]; total: number }
+export type SuggestedCountsResult =
+  | { status: 'ok'; counts: Record<string, number> }
   | { status: 'unconfigured' }
   | { status: 'error' };
 
-interface QueueRow {
-  place_id: string;
-  name: string;
-  place_type_id: string;
-  iso3: string | null;
-  area_km2: number | null;
-  suggested_count: number;
-  total_count: number;
-}
-
 /**
- * The published places with suggested photographs, by name. Admin only.
- * @param limit - Places to return.
- * @param offset - Places to skip.
- * @returns The places, and how many there are in all.
+ * How many photographs are suggested for each place. Admins only: row
+ * security shows suggested links to no one else.
+ * @param placeIds - The listed places.
+ * @returns Counts by place id. A place with none is left out.
  */
-export async function loadPhotoQueue(
-  limit: number,
-  offset: number
-): Promise<PhotoQueueResult> {
+export async function loadSuggestedCounts(
+  placeIds: string[]
+): Promise<SuggestedCountsResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
-  const { data, error } = await supabase.rpc('photo_queue', {
-    p_limit: limit,
-    p_offset: offset,
-  });
-  if (error) return { status: 'error' };
-  const rows = (data as QueueRow[] | null) ?? [];
-  return {
-    status: 'ok',
-    places: rows.map(row => ({
-      placeId: row.place_id,
-      name: row.name,
-      placeType: row.place_type_id,
-      iso3: row.iso3,
-      areaKm2: row.area_km2,
-      suggested: Number(row.suggested_count),
-    })),
-    total: rows.length ? Number(rows[0].total_count) : offset,
-  };
+  const counts: Record<string, number> = {};
+  const ids = [...new Set(placeIds)];
+  for (let at = 0; at < ids.length; at += COUNT_CHUNK) {
+    const { data, error } = await supabase
+      .from('place_images')
+      .select('place_id')
+      .eq('status', 'suggested')
+      .in('place_id', ids.slice(at, at + COUNT_CHUNK));
+    if (error || !data) return { status: 'error' };
+    (data as { place_id: string }[]).forEach(row => {
+      counts[row.place_id] = (counts[row.place_id] ?? 0) + 1;
+    });
+  }
+  return { status: 'ok', counts };
 }

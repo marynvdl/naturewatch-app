@@ -36,7 +36,7 @@ On 12 November 2026 `derive` inserted 1,162 hosted links for 875 recognitions be
 
 ## Photo suggestions
 
-`suggest_photos.py` suggests Wikimedia Commons photographs for the published World Heritage Sites (Molding Places task 05) and ecoregions (Ecoregions task 06). It never approves one. An admin reviews them from the Photo queue in the account panel.
+`suggest_photos.py` suggests Wikimedia Commons photographs for the published World Heritage Sites (Molding Places task 05) and ecoregions (Ecoregions task 06). It never approves one. An admin reviews them in Edit mode, with the places list's **Has photo suggestions** filter.
 
 ```bash
 WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_photos.py fetch [world_heritage_site | ecoregion]
@@ -48,7 +48,7 @@ WDPA_WORK_DIR=/tmp/wdpa-work DATABASE_URL=... .venv/bin/python supabase/suggest_
 
 `fetch` reads both place types, or only the one given. An ecoregion's item is its confirmed `wikidata_item` source id (below), and its P18 and P373 are read by item id, 150 items a query, as a longer query address is refused. An ecoregion with no item gets the Commons search only. For an ecoregion, a title with the word ecoregion or a WWF code such as `PA1219` is refused too, as those files are range maps. An ecoregion's row carries its ECO_ID, and `counts` and `load` find the place by it, so a file fetched from one database loads into another.
 
-`counts` reports how many rows of the file `load` would add. `load` writes them in one transaction: a Commons file already in `images` is reused, otherwise it is inserted with `uploaded_by` null, and the place gets a `suggested` link with `suggested_by_pipeline` `suggest_photos/1`, the score, the alt text, and the caption. A place that already has a link to the file, in any status, is skipped, so a rerun adds nothing and a rejected photograph stays rejected.
+`counts` reports how many rows of the file `load` would add, and how many it would skip as already linked or refused. `load` writes them in one transaction. It first runs `purge_rejected_photos()`, which deletes the links rejected more than 30 days ago and keeps a `photo_refusals` row for each file (docs/database/design.md), and reports what it purged. Then a Commons file already in `images` is reused, otherwise it is inserted with `uploaded_by` null, and the place gets a `suggested` link with `suggested_by_pipeline` `suggest_photos/1`, the score, the alt text, and the caption. A place that already has a link to the file, in any status, or a refusal of it, is skipped, so a rerun adds nothing and a rejected photograph is not suggested again.
 
 The hosted migration ran on 16 November 2026. The one approved link from task 04 was already main, so nothing else changed. The same day `fetch` found suggestions for 195 of the 207 World Heritage Sites: 3 for 186 sites, 1 or 2 for 9, and none for 12. Of the 572 rows, 37 are Wikidata images, 56 category files, and 479 search results, over 570 distinct files. `load` added 570 `images` rows, all Commons links with `uploaded_by` null, and 572 `suggested` links, in one transaction. As `anon`, no suggested link is readable, `images` still shows only the one approved photograph, and `photo_queue` cannot be called.
 

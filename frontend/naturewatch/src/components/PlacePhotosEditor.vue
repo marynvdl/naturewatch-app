@@ -53,7 +53,6 @@ const ALT_MAX = 300;
 const GROUPS: { status: PlaceImageStatus; label: string }[] = [
   { status: 'approved', label: 'Approved' },
   { status: 'suggested', label: 'Suggested' },
-  { status: 'rejected', label: 'Rejected' },
 ];
 
 const images = ref<PlaceImage[]>([]);
@@ -710,7 +709,6 @@ onBeforeUnmount(() => {
                     Approve
                   </Button>
                   <Button
-                    v-if="image.status === 'suggested'"
                     type="button"
                     size="sm"
                     variant="outline"

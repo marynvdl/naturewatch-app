@@ -44,11 +44,11 @@ From the code and the hosted database on 26 November 2026:
    - **The queue.** Drop `photo_queue`.
    - **`photo_refusals`.** `place_id` uuid → `places` `on delete cascade`, `commons_title` text, `refused_at` timestamptz, with PK `(place_id, commons_title)`. Admins read it. Only the purge and `service_role` write it.
    - **The purge.** `purge_rejected_photos()` is admin or `service_role` only. It finds `rejected` links with `reviewed_at` more than 30 days ago and writes a `photo_refusals` row for each Commons file. It then deletes the links, and deletes each `images` row that no link uses any more. It returns the number of links and images it deleted.
-   - **Licences.** Add rows for every CC BY and BY-SA version from 1.0 to 4.0 that is missing: 1.0, 2.1, and every jurisdiction port CC published. Use ids such as `cc-by-sa-3.0-de`, titles such as "Creative Commons Attribution-ShareAlike 3.0 Germany", and the URLs on creativecommons.org.
+   - **Licences.** Add rows for every CC BY and BY-SA version from 1.0 to 4.0 that is missing: 1.0, and every jurisdiction port CC published. 2.1 was only published as ports. Use ids such as `cc-by-sa-3.0-de`, titles such as "Creative Commons Attribution-ShareAlike 3.0 Germany", and the URLs on creativecommons.org.
    - Add a local test beside `test_place_images_local.py` for the filter, the purge (links, refusals, shared images kept), and the licence rows.
 2. **Script, `supabase/suggest_photos.py`.** `load` calls `purge_rejected_photos()` first, and skips files in `photo_refusals` for that place. `counts` reports the refusals it would skip. Update `test_suggest_photos.py`.
 3. **Licences, `src/places/commons.ts`.**
-   - `IMAGE_LICENCES` lists every generic version: CC0, public domain, and BY and BY-SA 1.0, 2.0, 2.1, 2.5, 3.0, and 4.0.
+   - `IMAGE_LICENCES` lists every generic version: CC0, public domain, and BY and BY-SA 1.0, 2.0, 2.5, 3.0, and 4.0.
    - `commonsLicenceId` also accepts a port that matches `cc-by(-sa)?-N.N-xx`, and the database still checks that the row exists.
    - `licenceShortName` gives `CC BY-SA 3.0 DE` for a port.
    - The upload picker keeps reading only `IMAGE_LICENCES`.

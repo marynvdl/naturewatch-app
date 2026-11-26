@@ -39,8 +39,9 @@ describe('Places store, Ecoregion filter', () => {
       cropMin: CROPLAND_FULL[0],
       cropMax: CROPLAND_FULL[1],
       ecoregionIds: ['e1', 'e2'],
+      photoSuggestions: false,
     });
-    expect(store.ecoregionPlaceIds).toEqual(['park-in-e1', 'park-in-e2']);
+    expect(store.keptPlaceIds).toEqual(['park-in-e1', 'park-in-e2']);
 
     // A size alone keeps the chosen ecoregions
     store.applyFilter([null, null]);
@@ -54,12 +55,12 @@ describe('Places store, Ecoregion filter', () => {
     store.listTypes = ['conservation_area'];
     store.applyFilter([null, null], [savanna]);
     await flushPromises();
-    expect(store.ecoregionPlaceIds).toEqual(['park-in-e1']);
+    expect(store.keptPlaceIds).toEqual(['park-in-e1']);
 
     store.listTypes = ['ecoregion'];
     await flushPromises();
     expect(store.ecoregionIds).toEqual([]);
-    expect(store.ecoregionPlaceIds).toBeNull();
+    expect(store.keptPlaceIds).toBeNull();
     expect(store.filtering).toBe(false);
 
     store.listTypes = [];
@@ -69,7 +70,39 @@ describe('Places store, Ecoregion filter', () => {
     store.listTypes = ['world_heritage_site'];
     await flushPromises();
     expect(store.ecoregionIds).toEqual(['e1']);
-    expect(store.ecoregionPlaceIds).toEqual(['park-in-e1']);
+    expect(store.keptPlaceIds).toEqual(['park-in-e1']);
+  });
+
+  it('keeps the places with photo suggestions on the map, with or without a type', async () => {
+    const store = usePlacesStore();
+    vi.mocked(loadKeptPlaceIds).mockResolvedValue({
+      status: 'ok',
+      ids: ['park-with-photos'],
+    });
+    store.applyFilter([null, null], [], true);
+    await flushPromises();
+    expect(store.filtering).toBe(true);
+    expect(loadKeptPlaceIds).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        placeTypes: [],
+        photoSuggestions: true,
+      })
+    );
+    expect(store.keptPlaceIds).toEqual(['park-with-photos']);
+
+    store.listTypes = ['ecoregion'];
+    await flushPromises();
+    expect(loadKeptPlaceIds).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        placeTypes: ['ecoregion'],
+        photoSuggestions: true,
+      })
+    );
+
+    store.clearFilter();
+    await flushPromises();
+    expect(store.photoSuggestions).toBe(false);
+    expect(store.keptPlaceIds).toBeNull();
   });
 
   it('clears the ecoregions with the rest of the filter', async () => {
@@ -80,7 +113,7 @@ describe('Places store, Ecoregion filter', () => {
     store.clearFilter();
     await flushPromises();
     expect(store.ecoregionsKept).toEqual([]);
-    expect(store.ecoregionPlaceIds).toBeNull();
+    expect(store.keptPlaceIds).toBeNull();
     expect(store.filtering).toBe(false);
   });
 });
@@ -183,9 +216,9 @@ describe('Places store, navigation', () => {
     expect(store.mapSets).toHaveLength(1);
   });
 
-  it('opens the queue and admin lists on their tab', () => {
+  it('opens the photo-filtered list and admin lists on their tab', () => {
     const store = usePlacesStore();
-    store.openFromPhotoQueue('p1');
+    store.openWithPhotos('p1');
     expect(store.profileTab).toBe('photos');
     store.openFromAdminList('p2');
     expect(store.profileTab).toBe('status');

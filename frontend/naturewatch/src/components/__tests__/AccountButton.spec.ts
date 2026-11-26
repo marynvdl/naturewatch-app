@@ -34,31 +34,35 @@ describe('Account button', () => {
     wrapper.unmount();
   });
 
-  it('turns Edit mode on and off, with the photo queue only in Edit mode', async () => {
+  it('turns Edit mode on and off, with the admin lists only in Edit mode', async () => {
     const auth = useAuthStore();
     const places = usePlacesStore();
     const { wrapper, body } = await openPanel(true);
-    const queueButton = () =>
-      body.findAll('button').find(button => button.text() === 'Photo queue');
+    const listButton = () =>
+      body
+        .findAll('button')
+        .find(button => button.text() === 'Needs attention');
     const edit = body.get('button[aria-label="Edit mode"]');
     expect(edit.attributes('aria-pressed')).toBe('false');
-    expect(queueButton()).toBeUndefined();
+    expect(listButton()).toBeUndefined();
 
     await edit.trigger('click');
     expect(auth.editMode).toBe(true);
     expect(edit.classes()).toContain('is-on');
-    await queueButton()!.trigger('click');
+    // The photo queue is a filter on the places list now.
+    expect(body.text()).not.toContain('Photo queue');
+    await listButton()!.trigger('click');
     await flushPromises();
-    expect(places.photoQueueOpen).toBe(true);
+    expect(places.adminList).toBe('attention');
 
-    // Turning Edit mode off closes the queue.
+    // Turning Edit mode off closes the list.
     await wrapper.get('button[aria-label="Account"]').trigger('click');
     await flushPromises();
     await body.get('button[aria-label="Edit mode"]').trigger('click');
     await flushPromises();
     expect(auth.editMode).toBe(false);
-    expect(places.photoQueueOpen).toBe(false);
-    expect(queueButton()).toBeUndefined();
+    expect(places.adminList).toBeNull();
+    expect(listButton()).toBeUndefined();
     wrapper.unmount();
   });
 });

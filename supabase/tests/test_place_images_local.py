@@ -343,69 +343,6 @@ class PlaceImagesLocalTest(unittest.TestCase):
             (place, image_id),
         )
 
-    def queue(self, user_id: str | None = "admin") -> list[dict]:
-        # Page through the whole queue: the local database can hold many suggestions.
-        rows: list[dict] = []
-        while True:
-            page = self.call(
-                "select place_id::text as place_id, name, place_type_id, suggested_count, "
-                "total_count from public.photo_queue(200, %s)",
-                (len(rows),),
-                user_id,
-            )
-            rows += page
-            if len(page) < 200:
-                break
-        return [r for r in rows if r["place_id"] in (self.park, self.other)]
-
-    def test_photo_queue_lists_places_with_suggestions(self):
-        first = self.add(self.other, commons())["image_id"]
-        second = self.add(self.other, commons("Zqx dusk.jpg"))["image_id"]
-        self.suggest(self.park, first)
-        self.suggest(self.park, second)
-        # The queue lists published places with a current boundary, as place_summaries does.
-        self.conn.execute(
-            """
-            insert into public.place_boundaries (
-              place_id, version_number, geom, source_id, source_release_id,
-              review_status, is_current
-            )
-            select %s, 1,
-              extensions.ST_GeomFromText(
-                'MULTIPOLYGON(((30 -20, 30.2 -20, 30.2 -19.8, 30 -19.8, 30 -20)))', 4326
-              )::extensions.geometry(MultiPolygon, 4326),
-              'wdpca', id, 'approved', true
-            from public.source_releases where source_id = 'wdpca' limit 1
-            """,
-            (self.park,),
-        )
-        self.conn.execute(
-            "insert into public.place_curations (place_id, display_name) values (%s, 'Zqx Curated')",
-            (self.park,),
-        )
-        rows = self.queue()
-        self.assertEqual(
-            [(r["name"], r["place_type_id"], r["suggested_count"]) for r in rows],
-            [("Zqx Curated", "conservation_area", 2)],
-        )
-        self.assertGreaterEqual(rows[0]["total_count"], 1)
-
-        self.set(self.park, first, {"status": "approved"})
-        self.assertEqual(self.queue()[0]["suggested_count"], 1)
-        self.set(self.park, second, {"status": "rejected"})
-        self.assertEqual(self.queue(), [])
-
-    def test_only_an_admin_reads_the_photo_queue(self):
-        stranger = self.user()
-        for who in (None, stranger):
-            self.raises(self.errors.InsufficientPrivilege, self.queue, who)
-        self.raises(
-            self.errors.InvalidParameterValue,
-            self.call,
-            "select * from public.photo_queue(0, 0)",
-            (),
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

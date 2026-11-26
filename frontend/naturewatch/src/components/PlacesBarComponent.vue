@@ -8,7 +8,6 @@ import {
   SlidersHorizontal,
 } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
-import PhotoQueueList from '@/components/PhotoQueueList.vue';
 import AdminPlaceList from '@/components/AdminPlaceList.vue';
 import PlacesFilterDialog from '@/components/PlacesFilterDialog.vue';
 import PlaceTypeButtons from '@/components/PlaceTypeButtons.vue';
@@ -36,6 +35,7 @@ import {
   type FigureRange,
   type PlaceSort,
 } from '@/places/display';
+import { loadSuggestedCounts } from '@/places/images';
 import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 import usePlacesStore from '@/store/PlacesStore';
 import useAuthStore from '@/store/AuthStore';
@@ -73,6 +73,11 @@ const ALONE: PlaceTypeId[] = ['country'];
 const placeTypes = ref<PlaceTypeId[]>([]);
 /** Whether any type button is on. */
 const anyType = computed(() => placeTypes.value.length > 0);
+/**
+ * Whether the photo filter is on. With no type on, the list then holds every
+ * type with a button.
+ */
+const photoMode = computed(() => placesStore.photoSuggestions);
 /** The stored place types listed and drawn, in button order. Empty when none is. */
 const listedTypes = computed<string[]>(() =>
   placeTypeButtons.value
@@ -137,7 +142,9 @@ const WINDOW_AHEAD = PLACE_LIST_LIMIT / 2;
 const listWaitMs = import.meta.env.MODE === 'test' ? 0 : 200;
 
 const needle = computed(() => query.value.trim());
-const searchingAll = computed(() => !anyType.value && needle.value.length > 0);
+const searchingAll = computed(
+  () => !anyType.value && !photoMode.value && needle.value.length > 0
+);
 const allSortOptions: { id: PlaceSort; label: string }[] = [
   { id: 'name', label: 'Name' },
   { id: 'size-desc', label: 'Size, largest first' },
@@ -193,8 +200,10 @@ const emptyMessage = computed(() =>
     ? nothingStored
     : 'No places match.'
 );
-/** Whether a place type with stored places is listed. */
-const showList = computed(() => listedTypes.value.length > 0);
+/** Whether a place type with stored places is listed, or the photo filter lists every type. */
+const showList = computed(
+  () => listedTypes.value.length > 0 || (photoMode.value && !anyType.value)
+);
 /** Whether a loaded list has a count to show beside the tools. */
 const showCount = computed(() => showList.value && listStatus.value === 'ok');
 const countText = computed(() => {
@@ -224,8 +233,9 @@ function listQuery(offset = 0): PlaceWindowQuery {
     cropMax: CROPLAND_FULL[1],
     extent: listExtent.value,
     offset,
-    placeTypes: listedTypes.value.length ? listedTypes.value : [PLACE_TYPE],
+    placeTypes: queryTypes.value,
     ecoregionIds: placesStore.ecoregionIds,
+    photoSuggestions: photoMode.value,
   };
 }
 
@@ -255,6 +265,12 @@ function showBoundaries() {
  */
 function chooseResult(place: PlaceSummary) {
   const id = place.id;
+  // With the photo filter on, a card opens the place on its Photos tab.
+  if (photoMode.value && placesStore.selectedId !== id) {
+    showBoundaries();
+    placesStore.openWithPhotos(id);
+    return;
+  }
   if (placesStore.selectedId !== id) {
     // A search across every type turns on the chosen place's type, when it has a button
     if (!anyType.value) {
@@ -299,6 +315,14 @@ const BUTTON_TYPES = [
 const statsTypes = computed(() =>
   listedTypes.value.length ? listedTypes.value : BUTTON_TYPES
 );
+/**
+ * The types the list reads: the listed ones, every button's while the photo
+ * filter lists every type, or else conservation areas.
+ */
+const queryTypes = computed(() => {
+  if (listedTypes.value.length) return listedTypes.value;
+  return photoMode.value ? BUTTON_TYPES : [PLACE_TYPE];
+});
 /** The stats types and the chosen ecoregions, which the filter charts follow. */
 const statsFor = computed(
   () => `${statsTypes.value.join(',')}|${placesStore.ecoregionIds.join(',')}`
@@ -471,6 +495,7 @@ watch(
       placesStore.listInView,
       listExtent.value,
       placesStore.ecoregionIds.join(','),
+      photoMode.value,
     ] as const,
   (next, previous) => {
     if (!showList.value && !searchingAll.value) return;
@@ -547,6 +572,79 @@ watch(
   }
 );
 
+/** Leaving Edit mode, or the admin role, turns the photo filter off. */
+watch(
+  () => auth.isAdmin && auth.editMode,
+  editing => {
+    if (!editing && placesStore.photoSuggestions)
+      placesStore.applyFilter(placesStore.sizeKept, undefined, false);
+  }
+);
+
+/** Suggested photographs per listed place, while the photo filter is on. */
+const suggestedCounts = ref<Record<string, number>>({});
+let countsRequest = 0;
+
+/**
+ * Read how many photographs are suggested for the listed places.
+ * @param ids - The places to read.
+ * @returns The counts, or null when they could not be read or a newer read started.
+ */
+async function readCounts(ids: string[]) {
+  const request = ++countsRequest;
+  const result = await loadSuggestedCounts(ids);
+  if (request !== countsRequest || result.status !== 'ok') return null;
+  return result.counts;
+}
+
+/** The cards in order, for Next place, and the counts of new cards. */
+watch(
+  () => (photoMode.value ? shown.value.map(place => place.id) : null),
+  async ids => {
+    placesStore.photoListIds = ids ?? [];
+    if (!ids) {
+      suggestedCounts.value = {};
+      return;
+    }
+    const missing = ids.filter(id => !(id in suggestedCounts.value));
+    if (!missing.length) return;
+    const counts = await readCounts(missing);
+    if (!counts) return;
+    const read = Object.fromEntries(missing.map(id => [id, counts[id] ?? 0]));
+    suggestedCounts.value = { ...suggestedCounts.value, ...read };
+  }
+);
+
+/**
+ * After a photograph is reviewed, read the counts again. A place with none
+ * left leaves the list. An open place stays open.
+ */
+watch(
+  () => placesStore.photoCountsVersion,
+  async () => {
+    if (!photoMode.value || !places.value.length) return;
+    const ids = places.value.map(place => place.id);
+    const counts = await readCounts(ids);
+    if (!counts) return;
+    suggestedCounts.value = Object.fromEntries(
+      ids.map(id => [id, counts[id] ?? 0])
+    );
+    const kept = places.value.filter(place => counts[place.id]);
+    matchTotal.value -= places.value.length - kept.length;
+    places.value = kept;
+  }
+);
+
+/**
+ * A card's tag with how many photographs are suggested, while the photo filter is on.
+ * @param id - The place.
+ * @returns For example `3 suggested`, or null.
+ */
+function photoNote(id: string): string | null {
+  const count = photoMode.value ? suggestedCounts.value[id] : undefined;
+  return count ? `${count} suggested` : null;
+}
+
 /** Show or hide the recognition buttons. Less clears a selected one. */
 function toggleMore() {
   showMore.value = !showMore.value;
@@ -612,7 +710,7 @@ watch(
   <div class="places-frame" :class="{ 'has-detail': placesStore.selectedId }">
     <div
       class="places-bar places-results map-panel nw"
-      :class="{ 'has-results': anyType }"
+      :class="{ 'has-results': anyType || photoMode }"
     >
       <h2 class="places-title panel-heading">Places</h2>
       <div class="places-search">
@@ -715,14 +813,11 @@ watch(
           </template>
         </PlacesFilterDialog>
       </div>
-      <PhotoQueueList
-        v-if="auth.isAdmin && placesStore.adminList === 'photos'"
-      />
       <AdminPlaceList
-        v-else-if="auth.isAdmin && placeListKind"
+        v-if="auth.isAdmin && placeListKind"
         :kind="placeListKind"
       />
-      <template v-if="anyType || searchingAll">
+      <template v-if="anyType || searchingAll || photoMode">
         <p v-if="showNames && listStatus === 'loading'" class="places-status">
           Loading places.
         </p>
@@ -780,6 +875,7 @@ watch(
                 "
                 :current="placesStore.selectedId === place.id"
                 :photo="mainPhotoOf(place.id)"
+                :note="photoNote(place.id)"
                 :number="windowStart + index + 1"
                 @click="chooseResult(place)"
                 @highlight="on => placesStore.hoverPlace(place.id, on)"

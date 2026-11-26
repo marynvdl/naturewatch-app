@@ -357,11 +357,12 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
 
   /**
    * Filter that keeps the places the size and cropland filter keeps, and,
-   * while ecoregions are chosen, only the places linked to one of them. The
-   * tiles do not hold the links, so those places are kept by id.
+   * while ecoregions are chosen or the photo filter is on, only the places it
+   * keeps. The tiles hold neither the links nor the photographs, so those
+   * places are kept by id.
    */
   function keptFilter(): mapboxgl.FilterSpecification | null {
-    const linked = placesStore.ecoregionPlaceIds;
+    const linked = placesStore.keptPlaceIds;
     return allOf(
       placesStore.tileFilter as mapboxgl.FilterSpecification | null,
       linked ? ['in', ['get', 'id'], ['literal', linked]] : null
@@ -426,12 +427,13 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     const inSets: mapboxgl.FilterSpecification | null = areas
       ? ['in', ['get', 'id'], ['literal', areas]]
       : null;
-    const queueOnly = placesStore.adminList !== null && !placesStore.visible;
-    const recognitions = listedRecognitions().length > 0 && !queueOnly;
+    const adminListOnly =
+      placesStore.adminList !== null && !placesStore.visible;
+    const recognitions = listedRecognitions().length > 0 && !adminListOnly;
     const ecoregions =
-      placesStore.listTypes.includes(ECOREGION_TYPE) && !queueOnly;
+      placesStore.listTypes.includes(ECOREGION_TYPE) && !adminListOnly;
     const conservationAreas =
-      !queueOnly &&
+      !adminListOnly &&
       (placesStore.listTypes.includes(PLACE_TYPE) || !placesStore.sizeOnly);
     // The list's places and the sets' places draw together. With Places
     // closed, only the sets draw.
@@ -834,6 +836,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       sizeMin: placesStore.sizeKept[0],
       sizeMax: placesStore.sizeKept[1],
       ecoregionIds: [...placesStore.ecoregionIds],
+      photoSuggestions: placesStore.photoSuggestions,
     });
     if (run !== fitRun || result.status !== 'ok') return;
     await withFlight(mapInstance, async () => {
@@ -1292,7 +1295,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         placesStore.tileFilter,
         placesStore.listTypes,
         placesStore.withdrawnIds,
-        placesStore.ecoregionPlaceIds,
+        placesStore.keptPlaceIds,
       ] as const,
     () => {
       const mapInstance = readMap();
