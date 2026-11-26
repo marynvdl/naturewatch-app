@@ -1,6 +1,6 @@
 # Task 05a — Photo queue and licences
 
-Parcel: [Wayfinding](../parcels/wayfinding.md).
+Parcel: [Wayfinding](../../parcels/wayfinding.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 04 merged in #461.
 
@@ -13,6 +13,8 @@ Decided 26 November 2026 by the user:
 - **The filter is in the Filter window**, as a switch named "Has photo suggestions". It shows for admins in Edit mode only. With no place type on, it lists places of every type, as the queue does today.
 - **The purge runs before each load.** `purge_rejected_photos()` runs at the start of `suggest_photos.py load`, in the same transaction, and can also be run by hand. There is no pg_cron.
 - **Every CC port gets a row.** The upload licence picker lists only the generic versions.
+
+Applied to the hosted database on 26 November 2026, after the user approved it. It added 194 licence rows (202 CC BY and BY-SA rows in all) and dropped `photo_queue`. The first `purge_rejected_photos()` deleted nothing, as no rejected link was 30 days old. `place_kept_ids` with the photo filter keeps 743 World Heritage Sites and ecoregions. The checked switch is charcoal, as the `--on` colour read as off on the white Filter window.
 
 ## Facts already stored
 

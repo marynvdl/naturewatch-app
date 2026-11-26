@@ -92,7 +92,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* Ecoregions combine with other types, the list defaults to In view, Filter is always shown, and the map's padding follows the open panels so the globe is centred.
 - [x] [Task 04 — Ecoregion lines](../archive/tasks/task-04-ecoregion-lines.md) — naturewatch-app, and naturewatch-analysis only if the tiles need a rebuild
   - *Goal:* Draw ecoregions as fills in RESOLVE's colours with no outline, read through `ecoregion_colours()`, in the paint the user picked on the dev server. Keep the Labels toggle off the place outlines. Record why Aldabra and Amsterdam–Saint Paul are misplaced.
-- [ ] [Task 05a — Photo queue and licences](../tasks/task-05a-photo-queue-and-licences.md) — naturewatch-app
+- [x] [Task 05a — Photo queue and licences](../archive/tasks/task-05a-photo-queue-and-licences.md) — naturewatch-app
   - *Goal:* Make the queue a filter on the places list, hide rejected photos, purge old rejected links into `photo_refusals`, and accept every CC BY and CC BY-SA version.
 - [ ] [Task 05b — Better photo suggestions](../tasks/task-05b-better-photo-suggestions.md) — naturewatch-app
   - *Goal:* Add the Wikipedia lead image and photos from conservation areas inside an ecoregion. Refuse maps and signboards, and withdraw the existing ones after the user sees the counts. Rerun on the hosted database after approval.
