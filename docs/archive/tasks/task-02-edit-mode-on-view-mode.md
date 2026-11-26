@@ -1,6 +1,6 @@
 # Task 02 — Edit mode on view mode
 
-Parcel: [Wayfinding](../parcels/wayfinding.md).
+Parcel: [Wayfinding](../../parcels/wayfinding.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 01 merged in #457.
 
