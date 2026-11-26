@@ -789,6 +789,48 @@ export function linkLabel(typeId: string, outward: boolean): string {
   return choice?.label ?? typeId;
 }
 
+/** Related tab groups, read from this place's side, in this order. */
+export const RELATED_ORDER = [
+  'Recognised by',
+  'Recognises',
+  'Located in',
+  'Contains',
+  'Part of',
+  'Has part',
+  'Overlaps',
+];
+
+/**
+ * Group links by their label from this place's side, in `RELATED_ORDER`, each
+ * group largest place first.
+ * @param links - Links of one place.
+ * @returns The groups, each with its label and links.
+ */
+export function groupByRelationship(
+  links: PlaceLink[]
+): { label: string; links: PlaceLink[] }[] {
+  const groups = new Map<string, PlaceLink[]>();
+  for (const link of links) {
+    const label = linkLabel(link.typeId, link.outward);
+    groups.set(label, [...(groups.get(label) ?? []), link]);
+  }
+  const rank = (label: string) => {
+    const index = RELATED_ORDER.indexOf(label);
+    return index === -1 ? RELATED_ORDER.length : index;
+  };
+  return [...groups.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([label, items]) => ({ label, links: [...items].sort(largestFirst) }));
+}
+
+/** Sort links by the other place's area, largest first, then by name. */
+export function largestFirst(a: PlaceLink, b: PlaceLink): number {
+  return (
+    (b.otherAreaKm2 ?? -1) - (a.otherAreaKm2 ?? -1) ||
+    (a.otherName ?? '').localeCompare(b.otherName ?? '')
+  );
+}
+
 /** A link between this place and another, from this place's side. */
 export interface PlaceLink {
   id: string;
@@ -942,11 +984,7 @@ export async function loadRelatedPlaces(id: string): Promise<PlaceLinksResult> {
     status: 'ok',
     links: read.links
       .filter(link => link.otherName !== null)
-      .sort(
-        (a, b) =>
-          (b.otherAreaKm2 ?? -1) - (a.otherAreaKm2 ?? -1) ||
-          (a.otherName ?? '').localeCompare(b.otherName ?? '')
-      ),
+      .sort(largestFirst),
   };
 }
 

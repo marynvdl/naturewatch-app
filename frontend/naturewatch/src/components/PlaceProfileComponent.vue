@@ -21,7 +21,7 @@ import {
   PLACE_TYPE,
   applyCuration,
   curatePlace,
-  linkLabel,
+  groupByRelationship,
   loadDesignations,
   loadPilotPlace,
   loadPlaceCuration,
@@ -92,7 +92,6 @@ type TabId =
   | 'related'
   | 'landscape'
   | 'species'
-  | 'links'
   | 'photos'
   | 'status';
 
@@ -112,16 +111,6 @@ const relatedStatus = ref<'loading' | 'ok' | 'error'>('loading');
 const RELATED_STEP = 20;
 /** Cards shown in each group, by its label. */
 const relatedShown = ref<Record<string, number>>({});
-/** Related tab groups, read from this place's side. */
-const RELATED_ORDER = [
-  'Recognised by',
-  'Recognises',
-  'Located in',
-  'Contains',
-  'Part of',
-  'Has part',
-  'Overlaps',
-];
 /**
  * The open tab, kept in the store so it stays when another place opens. A tab
  * this place does not have shows Overview.
@@ -155,53 +144,24 @@ const tabButtons = ref<HTMLButtonElement[]>([]);
 
 const title = computed(() => place.value?.name ?? props.name ?? '');
 const countries = computed(() => countryNames(place.value?.iso3 ?? null));
-/** Every place type has the same tabs. Admins in edit mode also get Links and Photos. */
 /**
- * View mode has Overview, Related, Landscape, and Species. Edit mode has only
- * what an admin edits: Overview, Related (every link, to review), Photos, and
- * Status.
+ * Every place type has the same tabs. Edit mode swaps Landscape and Species,
+ * which have nothing to edit, for Photos and Status. A tab the other mode
+ * lacks shows Overview, and comes back when the mode is switched back.
  */
-const tabs = computed<{ id: TabId; label: string }[]>(() =>
-  editing.value
+const tabs = computed<{ id: TabId; label: string }[]>(() => [
+  { id: 'overview', label: 'Overview' },
+  { id: 'related', label: 'Related' },
+  ...(editing.value
     ? [
-        { id: 'overview', label: 'Overview' },
-        { id: 'links', label: 'Related' },
-        { id: 'photos', label: 'Photos' },
-        { id: 'status', label: 'Status' },
+        { id: 'photos' as const, label: 'Photos' },
+        { id: 'status' as const, label: 'Status' },
       ]
     : [
-        { id: 'overview', label: 'Overview' },
-        { id: 'related', label: 'Related' },
-        { id: 'landscape', label: 'Landscape' },
-        { id: 'species', label: 'Species' },
-      ]
-);
-
-/** The tab each tab becomes when Edit mode is turned on. */
-const EDIT_TAB: Partial<Record<TabId, TabId>> = {
-  related: 'links',
-  landscape: 'overview',
-  species: 'overview',
-};
-/** The tab each tab becomes when Edit mode is turned off. */
-const VIEW_TAB: Partial<Record<TabId, TabId>> = {
-  links: 'related',
-  photos: 'overview',
-  status: 'overview',
-};
-
-/**
- * Turning Edit mode on or off keeps the open tab where it has a counterpart:
- * Related in view mode is Related in edit mode. This follows the toggle, not
- * `editing`, which is briefly false while the next place's values load.
- */
-watch(
-  () => auth.isAdmin && auth.editMode,
-  on => {
-    const next = (on ? EDIT_TAB : VIEW_TAB)[placesStore.profileTab as TabId];
-    if (next) placesStore.profileTab = next;
-  }
-);
+        { id: 'landscape' as const, label: 'Landscape' },
+        { id: 'species' as const, label: 'Species' },
+      ]),
+]);
 /**
  * The ecoregions the place lies in, shown as tags in Overview, largest share
  * of the place first.
@@ -227,24 +187,23 @@ const ecoregions = computed(() =>
  * tags in Overview, are left out.
  */
 const relatedGroups = computed(() => {
-  const groups = new Map<string, PlaceLink[]>();
   const badged = new Set([
     ...recognitions.value.map(item => item.id),
     ...ecoregions.value.map(link => link.otherId),
   ]);
-  for (const link of related.value) {
-    if (badged.has(link.otherId)) continue;
-    const label = linkLabel(link.typeId, link.outward);
-    groups.set(label, [...(groups.get(label) ?? []), link]);
-  }
-  const rank = (label: string) => {
-    const index = RELATED_ORDER.indexOf(label);
-    return index === -1 ? RELATED_ORDER.length : index;
-  };
-  return [...groups.entries()]
-    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
-    .map(([label, links]) => ({ label, links }));
+  return groupByRelationship(
+    related.value.filter(link => !badged.has(link.otherId))
+  );
 });
+
+/**
+ * Whether the Related tab shows a list that scrolls on its own: the cards, or
+ * in edit mode every link.
+ */
+const relatedList = computed(
+  () =>
+    activeTab.value === 'related' && (editing.value || related.value.length > 0)
+);
 
 /**
  * Cards shown in one Related group.
@@ -372,10 +331,10 @@ function onPhotosChanged() {
   emit('photosChanged');
 }
 
-/** Read the main photographs of the Related cards shown. */
+/** Read the main photographs of the Related cards shown. Edit mode reads its own. */
 watch(
   () =>
-    activeTab.value === 'related'
+    activeTab.value === 'related' && !editing.value
       ? relatedGroups.value.flatMap(group =>
           group.links.slice(0, shownIn(group.label)).map(link => link.otherId)
         )
@@ -402,7 +361,7 @@ async function loadLinked(id: string, placeTypeId: string) {
   await Promise.all(reads);
 }
 
-/** A link changed on the Links tab. Read what view mode shows again. */
+/** A link changed in edit mode. Read the confirmed links again. */
 function onLinksChanged() {
   if (place.value) void loadLinked(place.value.id, place.value.placeTypeId);
 }
@@ -445,9 +404,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
   <section
     class="place-profile"
     :class="{
-      'is-list-tab':
-        (activeTab === 'related' && related.length > 0) ||
-        activeTab === 'photos',
+      'is-list-tab': relatedList || activeTab === 'photos',
     }"
     aria-label="Place"
   >
@@ -700,13 +657,6 @@ function onTabKey(event: KeyboardEvent, index: number) {
             </dl>
           </template>
 
-          <PlaceLinksEditor
-            v-else-if="activeTab === 'links'"
-            :place-id="place.id"
-            @changed="onLinksChanged"
-            @open="id => $emit('open', id)"
-          />
-
           <template v-else-if="activeTab === 'photos'">
             <button
               v-if="hasNext"
@@ -733,6 +683,19 @@ function onTabKey(event: KeyboardEvent, index: number) {
           <p v-else-if="activeTab === 'status'" class="place-note">
             Loading the status.
           </p>
+
+          <div
+            v-else-if="activeTab === 'related' && editing"
+            class="place-related"
+          >
+            <PlaceLinksEditor
+              :place-id="place.id"
+              @changed="onLinksChanged"
+              @open="id => $emit('open', id)"
+              @highlight="(id, on) => $emit('highlight', id, on)"
+            />
+            <p class="place-source">{{ source }}</p>
+          </div>
 
           <template v-else-if="activeTab === 'related'">
             <p v-if="relatedStatus === 'loading'" class="place-note">
@@ -814,10 +777,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
 
           <p v-else class="place-note">{{ SPECIES_NOTHING_YET }}</p>
         </div>
-        <p
-          v-if="!(activeTab === 'related' && related.length > 0)"
-          class="place-source"
-        >
+        <p v-if="!relatedList" class="place-source">
           {{ source }}
         </p>
       </template>
@@ -872,6 +832,15 @@ function onTabKey(event: KeyboardEvent, index: number) {
   align-items: stretch;
   gap: 16px;
   padding: var(--map-panel-padding);
+}
+
+/*
+ * Only the list on Related and Photos takes the room left. The header, the
+ * tabs, and anything above the list keep their height on every tab.
+ */
+.place-body > :not(.place-panel),
+.place-panel > :not(.place-related, .photos) {
+  flex: none;
 }
 
 .place-tagline {
@@ -1089,7 +1058,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
 .place-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 24px;
+  gap: 12px 20px;
   border-bottom: 1px solid var(--border);
 }
 

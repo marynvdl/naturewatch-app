@@ -38,6 +38,8 @@ vi.mock('@/places/api', async importOriginal => {
     PLACE_TYPE: 'conservation_area',
     LINK_CHOICES: actual.LINK_CHOICES,
     linkLabel: actual.linkLabel,
+    groupByRelationship: actual.groupByRelationship,
+    largestFirst: actual.largestFirst,
     applyCuration: actual.applyCuration,
     curatePlace: vi.fn(),
     loadDesignations: vi
@@ -649,7 +651,7 @@ describe('Place profile', () => {
       expect(loadPlaceLinks).not.toHaveBeenCalled();
     });
 
-    it('has only the tabs an admin edits in edit mode, and keeps Related open across the switch', async () => {
+    it('swaps Landscape and Species for Photos and Status in edit mode, and keeps the open tab', async () => {
       vi.mocked(loadPlaceLinks).mockResolvedValue({ status: 'ok', links: [] });
       const auth = useAuthStore();
       auth.isAdmin = true;
@@ -658,18 +660,95 @@ describe('Place profile', () => {
       auth.editMode = true;
       await flushPromises();
       const tabs = () => wrapper.findAll('[role="tab"]').map(tab => tab.text());
+      const open = () => wrapper.get('[aria-selected="true"]').text();
       expect(tabs()).toEqual(['Overview', 'Related', 'Photos', 'Status']);
+      expect(open()).toBe('Related');
       expect(wrapper.find('.links').exists()).toBe(true);
       auth.editMode = false;
       await flushPromises();
       expect(tabs()).toEqual(['Overview', 'Related', 'Landscape', 'Species']);
-      expect(wrapper.find('.place-related, .place-note').exists()).toBe(true);
+      expect(open()).toBe('Related');
       expect(wrapper.find('.links').exists()).toBe(false);
 
       await openTab(wrapper, 'Landscape');
       auth.editMode = true;
       await flushPromises();
-      expect(wrapper.get('[aria-selected="true"]').text()).toBe('Overview');
+      expect(open()).toBe('Overview');
+      auth.editMode = false;
+      await flushPromises();
+      expect(open()).toBe('Landscape');
+      auth.editMode = true;
+      await flushPromises();
+
+      await openTab(wrapper, 'Photos');
+      auth.editMode = false;
+      await flushPromises();
+      expect(open()).toBe('Overview');
+    });
+
+    it('draws the confirmed conservation areas and passes on card hover in edit mode', async () => {
+      const park = link({
+        id: 'c',
+        typeId: 'located_in',
+        outward: false,
+        otherId: parkId,
+        otherName: 'Makuleke Contract Park',
+        otherTypeId: 'conservation_area',
+        status: 'confirmed',
+      });
+      vi.mocked(loadRelatedPlaces).mockResolvedValue({
+        status: 'ok',
+        links: [park],
+      });
+      vi.mocked(loadPlaceLinks).mockResolvedValue({
+        status: 'ok',
+        links: [
+          park,
+          link({
+            id: 'p',
+            otherId: '66666666-6666-6666-6666-666666666666',
+            otherTypeId: 'conservation_area',
+            status: 'proposed',
+          }),
+        ],
+      });
+      const wrapper = await openLinks();
+      expect(wrapper.emitted('areas')?.at(-1)).toEqual([
+        placeId,
+        kruger.name,
+        [parkId],
+      ]);
+      await wrapper.get('[data-link="c"] .place-result').trigger('mouseenter');
+      expect(wrapper.emitted('highlight')?.at(-1)).toEqual([parkId, true]);
+      await wrapper.get('[data-link="c"] .place-result').trigger('click');
+      expect(wrapper.emitted('open')?.at(-1)).toEqual([parkId]);
+    });
+
+    it('lists the links shown as badges and tags in edit mode', async () => {
+      const recognition = link({ id: 'b', status: 'confirmed' });
+      vi.mocked(loadPlaceRecognitions).mockResolvedValue({
+        status: 'ok',
+        recognitions: [
+          {
+            id: siteId,
+            name: 'Kruger to Canyons',
+            placeTypeId: 'biosphere_reserve',
+          },
+        ],
+      });
+      vi.mocked(loadRelatedPlaces).mockResolvedValue({
+        status: 'ok',
+        links: [recognition],
+      });
+      vi.mocked(loadPlaceLinks).mockResolvedValue({
+        status: 'ok',
+        links: [recognition],
+      });
+      const wrapper = await openLinks();
+      expect(wrapper.find('.place-recognition').exists()).toBe(true);
+      expect(wrapper.get('[data-link="b"]').text()).toContain(
+        'Kruger to Canyons'
+      );
     });
 
     it('groups links by status with the actions each one offers', async () => {
@@ -677,6 +756,12 @@ describe('Place profile', () => {
         status: 'ok',
         links: [
           link({ id: 'p', status: 'proposed' }),
+          link({
+            id: 'o',
+            typeId: 'overlaps',
+            outward: true,
+            status: 'confirmed',
+          }),
           link({
             id: 'c',
             status: 'confirmed',
@@ -690,8 +775,16 @@ describe('Place profile', () => {
       const wrapper = await openLinks();
       expect(loadPlaceLinks).toHaveBeenCalledWith(placeId);
       const groups = wrapper.findAll('.links-group');
+      expect(groups.map(group => group.attributes('aria-label'))).toEqual([
+        'Proposed',
+        'Recognised by',
+        'Overlaps',
+        'Rejected',
+        'Retired',
+      ]);
       expect(groups.map(group => group.attributes('data-status'))).toEqual([
         'proposed',
+        'confirmed',
         'confirmed',
         'rejected',
         'retired',
@@ -709,9 +802,39 @@ describe('Place profile', () => {
       const proposed = wrapper.get('[data-link="p"]').text();
       expect(proposed).toContain('Recognised by');
       expect(proposed).toContain('62.0% of this place inside');
-      expect(wrapper.get('[data-link="c"]').text()).toContain(
-        'Added by an admin'
+      const confirmed = wrapper.get('[data-link="c"] .links-note').text();
+      expect(confirmed).toBe('Added by an admin');
+      expect(wrapper.get('[data-link="p"] .links-note').text()).toBe(
+        'Recognised by · Derived from the boundaries · 62.0% of this place inside'
       );
+      expect(wrapper.get('[data-link="c"] .place-result').text()).toContain(
+        'Kruger to Canyons'
+      );
+    });
+
+    it('shows 20 links of a group at a time, largest first', async () => {
+      vi.mocked(loadPlaceLinks).mockResolvedValue({
+        status: 'ok',
+        links: Array.from({ length: 23 }, (_, index) =>
+          link({
+            id: `o${index}`,
+            typeId: 'overlaps',
+            outward: true,
+            otherName: `Park ${index + 1}`,
+            otherAreaKm2: index,
+            status: 'confirmed',
+          })
+        ),
+      });
+      const wrapper = await openLinks();
+      const cards = () => wrapper.findAll('.links-item');
+      expect(cards()).toHaveLength(20);
+      expect(cards()[0].text()).toContain('Park 23');
+      const more = wrapper.get('.links-more');
+      expect(more.text()).toBe('Show 3 more');
+      await more.trigger('click');
+      expect(cards()).toHaveLength(23);
+      expect(wrapper.find('.links-more').exists()).toBe(false);
     });
 
     it('confirms, rejects, and retires with the stored subject and object', async () => {
