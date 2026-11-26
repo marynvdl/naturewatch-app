@@ -74,10 +74,15 @@ const stats: Record<string, { stat_id: string; value: number }[]> = {
 const statFilters: [string, unknown][] = [];
 const mergedInto: Record<string, string | null> = { [mergedId]: keptId };
 
-const rpc = vi.fn(async (name: string, args: { p_id: string }) => {
-  if (name !== 'place_merged_into') throw new Error(name);
-  return { data: mergedInto[args.p_id] ?? null, error: null };
-});
+const rpc = vi.fn(
+  async (
+    name: string,
+    args?: { p_id: string }
+  ): Promise<{ data: unknown; error: unknown }> => {
+    if (name !== 'place_merged_into' || !args) throw new Error(name);
+    return { data: mergedInto[args.p_id] ?? null, error: null };
+  }
+);
 
 /**
  * A query builder that answers `.eq('id', value).maybeSingle()` from `rows`,
@@ -283,5 +288,38 @@ describe('loadRelatedPlaces', () => {
     );
     expect(result.links.every(link => !link.outward)).toBe(true);
     expect(result.links[0].coverage).toBe(0.8);
+  });
+});
+
+describe('loadEcoregionColours', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'http://localhost');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test');
+    rpc.mockClear();
+  });
+
+  it('reads the colours by ecoregion id', async () => {
+    rpc.mockImplementationOnce(async () => ({
+      data: [
+        { id: 'eco-a', colour: '#A87001' },
+        { id: 'eco-b', colour: '#63CFAB' },
+      ],
+      error: null,
+    }));
+    const { loadEcoregionColours } = await import('@/places/api');
+    expect(await loadEcoregionColours()).toEqual({
+      status: 'ok',
+      colours: { 'eco-a': '#A87001', 'eco-b': '#63CFAB' },
+    });
+    expect(rpc).toHaveBeenCalledWith('ecoregion_colours');
+  });
+
+  it('reports an error when the read fails', async () => {
+    rpc.mockImplementationOnce(async () => ({
+      data: null,
+      error: { message: 'boom' },
+    }));
+    const { loadEcoregionColours } = await import('@/places/api');
+    expect(await loadEcoregionColours()).toEqual({ status: 'error' });
   });
 });

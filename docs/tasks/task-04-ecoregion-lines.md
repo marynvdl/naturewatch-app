@@ -16,6 +16,13 @@ Decided 26 November 2026 by the user, after seeing the thinner outline (candidat
 - **No tile rebuild.** Colours come from the database through a new read-only function. Generalised tiles, which would drop small parts and holes when zoomed out, go to the parcel's Deferred section.
 - **The Labels fix is part of this task.**
 
+Changed 26 November 2026 by the user, after evaluating the local app:
+
+- **Fill only, at every zoom, with no outline.** The crossfade went first. The `ecoregions-line` layer is removed.
+- **Softer colours on the monochrome basemap.** Each RESOLVE colour is mixed halfway towards paper (`#f3eee2`). On satellite the mix read as a haze, so there RESOLVE's own colours are used. The opacity is 0.35 on both.
+- **No seams.** `fill-antialias` is off. It drew a 1 px edge in the fill colour, which showed as a faint outline where two ecoregions meet.
+- **Selection.** The selected outline is 1.5 px, a light charcoal `#6b6a65` on the monochrome basemap, and light grey `#e4e4e2` on satellite. The hover outline matches, at 1.25 px.
+
 ## Facts already stored
 
 From the code, naturewatch-analysis, and the hosted database on 26 November 2026:
@@ -54,7 +61,7 @@ From the code, naturewatch-analysis, and the hosted database on 26 November 2026
 7. **User evaluation.** Start the dev server on `http://localhost:5173` and give the URL to the user. The user judges the paint before the pull request is opened.
 8. **Docs.**
    - `docs/blueprint.md`: the app reads `ecoregion_colours()` and paints the ecoregion fill from it.
-   - `docs/user/using-the-map.md`: ecoregions are fills in RESOLVE's colours when zoomed out, and fade into the olive outline closer in. Labels no longer affects the outlines.
+   - `docs/user/using-the-map.md`: ecoregions are fills in RESOLVE's colours, with a thin outline only when selected or hovered. Labels no longer affects the outlines.
    - `docs/user/data.md`: the colours are RESOLVE's, and the island sentence from the facts above.
    - The parcel:
      - Remove the Aldabra and Amsterdam–Saint Paul open question, and give its answer in this task's archived file.
@@ -74,7 +81,7 @@ From the code, naturewatch-analysis, and the hosted database on 26 November 2026
 
 ## Done when
 
-- Zoomed out, ecoregions are fills in their RESOLVE colours. Closer in, they fade into outlines, in the paint the user approved, on both basemaps.
+- Ecoregions are fills in their RESOLVE colours with no outline, in the paint the user approved, on both basemaps.
 - Labels off and on leaves every place, recognition, and ecoregion layer as it was.
 - The browser check shows no console errors.
 - The island offset is recorded in `data.md`.

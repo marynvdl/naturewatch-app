@@ -11,6 +11,7 @@ import {
   RECOGNITION_TILE_LAYER,
   ECOREGION_TILES_URL,
   ECOREGION_TILE_LAYER,
+  loadEcoregionColours,
   loadPlaceBounds,
   loadPlaceExtent,
   loadPlaceName,
@@ -21,6 +22,7 @@ import {
   RECOGNITION_COLOUR,
   boundsInsideFrame,
   isRecognitionButtonType,
+  softenColour,
   CONSERVATION_AREA_COLOUR,
   type LngLatBounds,
 } from './display';
@@ -45,7 +47,6 @@ const RECOGNITION_SELECT_LINE = 'recognitions-select-line';
 const RECOGNITION_HOVER_LINE = 'recognitions-hover-line';
 const ECOREGION_SOURCE = 'ecoregions-tiles';
 const ECOREGION_FILL = 'ecoregions-fill';
-const ECOREGION_LINE = 'ecoregions-line';
 const ECOREGION_SELECT_LINE = 'ecoregions-select-line';
 const ECOREGION_HOVER_LINE = 'ecoregions-hover-line';
 
@@ -108,6 +109,15 @@ const OUTLINE_WIDTH = [
   12,
   2.6,
 ] as mapboxgl.ExpressionSpecification;
+
+/** Ecoregion fill opacity, on both basemaps and at every zoom. */
+const ECOREGION_FILL_OPACITY = 0.35;
+
+/**
+ * Outline of a selected or hovered ecoregion: a lighter charcoal on the
+ * monochrome basemap, light grey on satellite imagery.
+ */
+const ECOREGION_MARK_COLOUR = { monochrome: '#6b6a65', satellite: '#e4e4e2' };
 
 const PLACE_FILL_OPACITY = [
   'interpolate',
@@ -219,23 +229,62 @@ function recognitionPaint(satellite: boolean) {
 }
 
 /**
- * Ecoregions are outlines only, in one colour, like recognitions. The fill is
- * transparent and only catches clicks.
+ * Fill colour of the ecoregions: RESOLVE's colour of each, by `id`, or the
+ * outline colour until the colours are read or when one has none.
+ * @param colours - RESOLVE colours by `places.id`, or null before they are read.
+ * @param fallback - Colour for an ecoregion without one.
+ * @param soften - Whether to mix each colour towards paper, as on the
+ *   monochrome basemap. Over imagery the mix reads as a haze.
+ * @returns A colour or a `match` expression.
+ */
+function ecoregionFillColour(
+  colours: Record<string, string> | null,
+  fallback: string,
+  soften: boolean
+): mapboxgl.ExpressionSpecification | string {
+  const pairs = Object.entries(colours ?? {}).flatMap(([id, hex]) => [
+    id,
+    soften ? softenColour(hex) : hex,
+  ]);
+  if (!pairs.length) return fallback;
+  return [
+    'match',
+    ['get', 'id'],
+    ...pairs,
+    fallback,
+  ] as mapboxgl.ExpressionSpecification;
+}
+
+/**
+ * Ecoregions are fills in RESOLVE's colours at every zoom, with no outline, so
+ * a patchy, squiggly ecoregion does not read as a solid shape. Neighbours are
+ * told apart by colour. A selected or hovered ecoregion gets a thin outline.
  * @param satellite - Whether the satellite basemap is shown.
+ * @param colours - RESOLVE colours by `places.id`, or null before they are read.
  * @returns Paint for each ecoregion layer.
  */
-function ecoregionPaint(satellite: boolean) {
+function ecoregionPaint(
+  satellite: boolean,
+  colours: Record<string, string> | null = null
+) {
   const colour = satellite
     ? ECOREGION_COLOUR.satellite
     : ECOREGION_COLOUR.monochrome;
+  const marked = satellite
+    ? ECOREGION_MARK_COLOUR.satellite
+    : ECOREGION_MARK_COLOUR.monochrome;
   return {
-    fill: { 'fill-color': '#000000', 'fill-opacity': 0 },
-    line: { 'line-color': colour, 'line-width': OUTLINE_WIDTH },
-    selectedLine: { 'line-color': colour, 'line-width': 2.5 },
-    hoverLine: { 'line-color': colour, 'line-width': 2 },
+    fill: {
+      'fill-color': ecoregionFillColour(colours, colour, !satellite),
+      'fill-opacity': ECOREGION_FILL_OPACITY,
+      // Antialiasing draws a 1 px edge in the fill colour, which shows as a
+      // seam where two translucent ecoregions meet.
+      'fill-antialias': false,
+    },
+    selectedLine: { 'line-color': marked, 'line-width': 1.5 },
+    hoverLine: { 'line-color': marked, 'line-width': 1.25 },
   } satisfies {
     fill: mapboxgl.FillLayer['paint'];
-    line: mapboxgl.LineLayer['paint'];
     selectedLine: mapboxgl.LineLayer['paint'];
     hoverLine: mapboxgl.LineLayer['paint'];
   };
@@ -265,6 +314,9 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   const measureStore = useMeasureStore();
   let listening = false;
   let boundsListening = false;
+  /** RESOLVE colours by `places.id`, read once, the first time ecoregions draw. */
+  let ecoregionColours: Record<string, string> | null = null;
+  let ecoregionColoursRead: Promise<void> | null = null;
   const knownBounds = new Map<string, LngLatBounds | null>();
 
   /** Read the map as the Mapbox instance this overlay draws on. */
@@ -411,15 +463,14 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       );
     });
     const ecoregionFilter = allOf(keptFilter(), withdrawnFilter());
-    [ECOREGION_FILL, ECOREGION_LINE].forEach(layer => {
-      if (!mapInstance.getLayer(layer)) return;
-      mapInstance.setFilter(layer, ecoregionFilter);
+    if (mapInstance.getLayer(ECOREGION_FILL)) {
+      mapInstance.setFilter(ECOREGION_FILL, ecoregionFilter);
       mapInstance.setLayoutProperty(
-        layer,
+        ECOREGION_FILL,
         'visibility',
         ecoregions ? 'visible' : 'none'
       );
-    });
+    }
     [RECOGNITION_FILL, RECOGNITION_LINE].forEach(layer => {
       if (!mapInstance.getLayer(layer)) return;
       mapInstance.setFilter(layer, recognitionFilter());
@@ -579,15 +630,30 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   }
 
   /**
+   * Read the ecoregion colours once per page load, then repaint the fill.
+   * Until they arrive, or if the read fails, the fill uses the outline colour.
+   */
+  function readEcoregionColours() {
+    if (ecoregionColoursRead) return;
+    ecoregionColoursRead = loadEcoregionColours().then(result => {
+      if (result.status !== 'ok') return;
+      ecoregionColours = result.colours;
+      const mapInstance = readMap();
+      if (mapInstance)
+        whenStyleReady(mapInstance, () => applyBasemapPaint(mapInstance));
+    });
+  }
+
+  /**
    * Colour the drawn places for the current basemap.
    * @param mapInstance - The map.
    */
   function applyBasemapPaint(mapInstance: mapboxgl.Map) {
     const paint = placePaint(onSatellite());
     const recognition = recognitionPaint(onSatellite());
-    const ecoregion = ecoregionPaint(onSatellite());
+    const ecoregion = ecoregionPaint(onSatellite(), ecoregionColours);
     const layers: [string, Record<string, unknown>][] = [
-      [ECOREGION_LINE, ecoregion.line],
+      [ECOREGION_FILL, ecoregion.fill],
       [ECOREGION_SELECT_LINE, ecoregion.selectedLine],
       [ECOREGION_HOVER_LINE, ecoregion.hoverLine],
       [PLACE_FILL, paint.fill],
@@ -788,7 +854,6 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     [
       ECOREGION_HOVER_LINE,
       ECOREGION_SELECT_LINE,
-      ECOREGION_LINE,
       ECOREGION_FILL,
       RECOGNITION_HOVER_LINE,
       PLACE_HOVER_LINE,
@@ -994,7 +1059,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         type: 'vector',
         url: ECOREGION_TILES_URL,
       });
-      const paint = ecoregionPaint(onSatellite());
+      const paint = ecoregionPaint(onSatellite(), ecoregionColours);
       const layers: (mapboxgl.FillLayer | mapboxgl.LineLayer)[] = [
         {
           id: ECOREGION_FILL,
@@ -1002,14 +1067,6 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
           source: ECOREGION_SOURCE,
           'source-layer': ECOREGION_TILE_LAYER,
           paint: paint.fill,
-        },
-        {
-          id: ECOREGION_LINE,
-          type: 'line',
-          source: ECOREGION_SOURCE,
-          'source-layer': ECOREGION_TILE_LAYER,
-          layout: { 'line-join': 'round' },
-          paint: paint.line,
         },
         {
           id: ECOREGION_SELECT_LINE,
@@ -1034,6 +1091,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
         if (onStandard) layer.slot = 'top';
         mapInstance.addLayer(layer, onStandard ? undefined : before);
       });
+      readEcoregionColours();
     }
     if (!mapInstance.getSource(PLACE_SOURCE)) {
       mapInstance.addSource(PLACE_SOURCE, {

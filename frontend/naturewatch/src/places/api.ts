@@ -405,6 +405,29 @@ export async function loadWithdrawnPlaceIds(): Promise<WithdrawnIdsResult> {
   return { status: 'ok', ids: data.map(String) };
 }
 
+/** Result of reading the ecoregion colours. */
+export type EcoregionColoursResult =
+  | { status: 'ok'; colours: Record<string, string> }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
+
+/**
+ * RESOLVE's colour of each published ecoregion, which the map fills it with
+ * when zoomed out.
+ * @returns Colours by `places.id`, or why they could not be read.
+ */
+export async function loadEcoregionColours(): Promise<EcoregionColoursResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('ecoregion_colours');
+  if (error || !Array.isArray(data)) return { status: 'error' };
+  const colours: Record<string, string> = {};
+  data.forEach((row: { id: string; colour: string }) => {
+    colours[String(row.id)] = row.colour;
+  });
+  return { status: 'ok', colours };
+}
+
 /** Result of reading the ids the filter keeps on the map. */
 export type KeptIdsResult =
   | { status: 'ok'; ids: string[] }
