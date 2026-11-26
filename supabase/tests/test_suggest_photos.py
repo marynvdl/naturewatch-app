@@ -364,6 +364,9 @@ class FetchEcoregionTest(unittest.TestCase):
         self.assertEqual({r["place_type_id"] for r in rows}, {"ecoregion"})
         self.assertEqual(stats["ecoregion"]["refused"], {"title": 1})
         self.assertEqual(stats["ecoregion"]["with_item"], 1)
+        # The article is selected, or the query service leaves it out.
+        sparql = [a["query"] for a in client.asked if "query" in a]
+        self.assertTrue(sparql and all("?article WHERE" in q for q in sparql))
         # No WDPA query: the ecoregion is read by its item id only.
         self.assertFalse(any("P809" in a.get("query", "") for a in client.asked))
 

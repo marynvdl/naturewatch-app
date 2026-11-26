@@ -577,7 +577,7 @@ def wikidata_items(client: Client, site_ids: list[str]) -> dict[str, dict]:
     for start in range(0, len(site_ids), SPARQL_BATCH):
         values = " ".join(json.dumps(i) for i in site_ids[start : start + SPARQL_BATCH])
         query = (
-            "SELECT ?item ?wdpa ?image ?category WHERE { "
+            "SELECT ?item ?wdpa ?image ?category ?article WHERE { "
             f"VALUES ?wdpa {{ {values} }} ?item wdt:P809 ?wdpa . "
             "OPTIONAL { ?item wdt:P18 ?image } OPTIONAL { ?item wdt:P373 ?category } "
             f"{ARTICLE} }}"
@@ -592,7 +592,7 @@ def items_by_id(client: Client, qids: list[str]) -> dict[str, dict]:
     for start in range(0, len(qids), ITEM_BATCH):
         values = " ".join(f"wd:{q}" for q in qids[start : start + ITEM_BATCH])
         query = (
-            "SELECT ?item ?image ?category WHERE { "
+            "SELECT ?item ?image ?category ?article WHERE { "
             f"VALUES ?item {{ {values} }} "
             "OPTIONAL { ?item wdt:P18 ?image } OPTIONAL { ?item wdt:P373 ?category } "
             f"{ARTICLE} }}"
@@ -690,8 +690,13 @@ def fetch(conn, work: Path, client: Client | None = None,
         for origin, _ in candidates:
             type_stats["found"][origin] = type_stats["found"].get(origin, 0) + 1
 
-        titles = list(dict.fromkeys(t for _, t in candidates))
-        chosen, refused = choose(site, candidates, file_infos(client, titles, licences))
+        # Lead images are read on their own, so the other batches match earlier runs' cache.
+        titles = list(dict.fromkeys(t for o, t in candidates if o != "lead"))
+        files = file_infos(client, titles, licences)
+        leads_left = list(dict.fromkeys(t for o, t in candidates if o == "lead" and t not in files))
+        if leads_left:
+            files.update(file_infos(client, leads_left, licences))
+        chosen, refused = choose(site, candidates, files)
         for reason, count in refused.items():
             type_stats["refused"][reason] = type_stats["refused"].get(reason, 0) + count
         if site["place_type_id"] == "ecoregion":
