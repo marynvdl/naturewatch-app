@@ -44,8 +44,13 @@ const props = withDefaults(
     matchedTotal: number;
     /** Stored place types the list shows. */
     placeTypes?: string[];
+    /**
+     * Stored place types the count covers: the listed ones, or every type
+     * with a button while none is on.
+     */
+    countTypes?: string[];
   }>(),
-  { placeTypes: undefined }
+  { placeTypes: undefined, countTypes: undefined }
 );
 
 const open = defineModel<boolean>('open', { required: true });
@@ -174,6 +179,7 @@ watch(
       props.searchPrefix,
       props.extent,
       draftEcoregionIds.value.join(','),
+      (props.countTypes ?? props.placeTypes ?? []).join(','),
     ] as const,
   async ([isOpen]) => {
     if (!isOpen) return;
@@ -186,7 +192,7 @@ watch(
       cropMin: 0,
       cropMax: 100,
       extent: props.extent,
-      placeTypes: props.placeTypes,
+      placeTypes: props.countTypes ?? props.placeTypes,
       ecoregionIds: draftEcoregionIds.value,
     });
     if (request !== countRequest) return;
@@ -200,12 +206,16 @@ function clearAll() {
   ecoregionsKept.value = [];
 }
 
-/** Apply the draft to the list and the map, and close. */
+/**
+ * Apply the draft to the list and the map, and close. With a type on, the map
+ * then flies to the places the filter keeps.
+ */
 function apply() {
   placesStore.applyFilter(
     sizeBounds.value,
     showEcoregions.value ? ecoregionsKept.value : placesStore.ecoregionsKept
   );
+  placesStore.fitToKept();
   open.value = false;
 }
 </script>
@@ -228,6 +238,12 @@ function apply() {
           {{ description }}
         </DialogDescription>
         <div class="filter-body">
+          <section class="filter-section" aria-labelledby="filter-types-title">
+            <h3 id="filter-types-title" class="filter-name filter-name-spaced">
+              Place types
+            </h3>
+            <slot name="types" />
+          </section>
           <section class="filter-section" aria-labelledby="filter-size-title">
             <h3 id="filter-size-title" class="filter-name">Size</h3>
             <p class="filter-hint">Area of the place, in km².</p>
@@ -409,6 +425,10 @@ function apply() {
   margin: 4px 0 16px;
   font-size: 13px;
   color: var(--muted-foreground);
+}
+
+.filter-name-spaced {
+  margin-bottom: 16px;
 }
 
 .filter-name-row {

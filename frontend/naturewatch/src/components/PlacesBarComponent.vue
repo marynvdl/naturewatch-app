@@ -11,6 +11,7 @@ import PlaceCard from '@/components/PlaceCard.vue';
 import PhotoQueueList from '@/components/PhotoQueueList.vue';
 import AdminPlaceList from '@/components/AdminPlaceList.vue';
 import PlacesFilterDialog from '@/components/PlacesFilterDialog.vue';
+import PlaceTypeButtons from '@/components/PlaceTypeButtons.vue';
 import {
   Popover,
   PopoverContent,
@@ -65,8 +66,8 @@ const placeListKind = computed(() =>
     ? placesStore.adminList
     : null
 );
-/** Ecoregions and Countries are chosen on their own. Countries lists nothing yet. */
-const ALONE: PlaceTypeId[] = ['ecoregion', 'country'];
+/** Countries is chosen on its own. It lists nothing yet. */
+const ALONE: PlaceTypeId[] = ['country'];
 
 /** The type buttons that are on, in the order they were chosen. */
 const placeTypes = ref<PlaceTypeId[]>([]);
@@ -111,7 +112,6 @@ const statsKey = ref<string | null>(null);
 const sizeFull = ref<FigureRange>([1, 1]);
 const sizeBins = ref<number[]>([]);
 const query = ref('');
-const listInView = ref(false);
 const resultsList = ref<HTMLElement | null>(null);
 const moreSentinel = ref<HTMLElement | null>(null);
 const earlierSentinel = ref<HTMLElement | null>(null);
@@ -157,7 +157,13 @@ const filterOpen = ref(false);
 const filterButton = ref<HTMLButtonElement | null>(null);
 
 watch(filterOpen, async open => {
-  if (open) return;
+  if (open) {
+    // The filter counts every place, not only those in view.
+    placesStore.listInView = false;
+    // With no type on, the size range is read when Filter opens.
+    if (!showList.value) void ensureStats();
+    return;
+  }
   await nextTick();
   filterButton.value?.focus();
 });
@@ -172,11 +178,6 @@ const sortLabel = computed(
 function chooseSort(id: PlaceSort) {
   sort.value = id;
   sortOpen.value = false;
-}
-
-/** Limit the list to the current map view, or show the worldwide window. */
-function toggleListInView() {
-  listInView.value = !listInView.value;
 }
 
 const shown = computed(() => places.value);
@@ -194,12 +195,8 @@ const emptyMessage = computed(() =>
 );
 /** Whether a place type with stored places is listed. */
 const showList = computed(() => listedTypes.value.length > 0);
-const showTools = computed(
-  () =>
-    showList.value &&
-    listStatus.value === 'ok' &&
-    (storedCount.value > 0 || matchTotal.value > 0 || placesStore.filtering)
-);
+/** Whether a loaded list has a count to show beside the tools. */
+const showCount = computed(() => showList.value && listStatus.value === 'ok');
 const countText = computed(() => {
   const total = matchTotal.value;
   const count = shown.value.length;
@@ -208,7 +205,7 @@ const countText = computed(() => {
 });
 const showNames = computed(() => showList.value || searchingAll.value);
 const listExtent = computed(() =>
-  listInView.value ? placesStore.viewBounds : null
+  placesStore.listInView ? placesStore.viewBounds : null
 );
 
 /**
@@ -292,19 +289,32 @@ function hideBoundaries() {
   if (placesStore.visible) placesStore.toggle();
 }
 
-/** The listed types and the chosen ecoregions, which the filter charts follow. */
-const statsFor = computed(() =>
-  listedKey.value
-    ? `${listedKey.value}|${placesStore.ecoregionIds.join(',')}`
-    : ''
+/** Every stored type with a button, whose size range Filter uses with no type on. */
+const BUTTON_TYPES = [
+  PLACE_TYPE,
+  ECOREGION_TYPE,
+  ...RECOGNITION_BUTTONS.map(button => button.id),
+];
+/** The types the filter's size range is read for: the listed ones, or every button's. */
+const statsTypes = computed(() =>
+  listedTypes.value.length ? listedTypes.value : BUTTON_TYPES
 );
+/** The stats types and the chosen ecoregions, which the filter charts follow. */
+const statsFor = computed(
+  () => `${statsTypes.value.join(',')}|${placesStore.ecoregionIds.join(',')}`
+);
+
+/** A type turned on or off in the open Filter window updates its chart. */
+watch(statsFor, () => {
+  if (filterOpen.value) void ensureStats();
+});
 
 /** Load the stored size range and chart counts once per listed type and ecoregions. */
 async function ensureStats() {
   const key = statsFor.value;
-  if (!key || statsKey.value === key) return;
+  if (statsKey.value === key) return;
   const result = await loadPilotPlaceFilterStats(
-    [...listedTypes.value],
+    [...statsTypes.value],
     [...placesStore.ecoregionIds]
   );
   if (result.status !== 'ok' || statsFor.value !== key) return;
@@ -458,7 +468,7 @@ watch(
       sort.value,
       placesStore.sizeKept[0],
       placesStore.sizeKept[1],
-      listInView.value,
+      placesStore.listInView,
       listExtent.value,
       placesStore.ecoregionIds.join(','),
     ] as const,
@@ -480,16 +490,16 @@ watch(
 /** Return to the panel with no list and no drawn boundaries. */
 function clearPlaces() {
   placeTypes.value = [];
-  listInView.value = false;
+  placesStore.listInView = true;
   placesStore.clearSelection();
   hideBoundaries();
 }
 
 /**
- * Turn a place type on, or off when it is on. Conservation areas and the
- * recognition types can be on together: the list holds them all, and the map
- * draws them all. Ecoregions and Countries are on alone. Countries has no
- * stored places. Turning a type off closes the open place.
+ * Turn a place type on, or off when it is on. Conservation areas, Ecoregions,
+ * and the recognition types can be on together: the list holds them all, and
+ * the map draws them all, ecoregions below the rest. Countries is on alone and
+ * has no stored places. Turning a type off closes the open place.
  */
 function selectPlaceType(type: PlaceTypeId) {
   placesStore.adminList = null;
@@ -615,26 +625,95 @@ watch(
         />
         <kbd class="places-kbd" aria-hidden="true">/</kbd>
       </div>
-      <div class="places-types" role="group" aria-label="Place types">
-        <button
-          v-for="type in placeTypeButtons"
-          :key="type.id"
-          type="button"
-          class="place-type map-control"
-          :class="{ 'is-on': placeTypes.includes(type.id) }"
-          :aria-pressed="placeTypes.includes(type.id)"
-          @click="selectPlaceType(type.id)"
+      <PlaceTypeButtons
+        :buttons="placeTypeButtons"
+        :selected="placeTypes"
+        :show-more="showMore"
+        @select="id => selectPlaceType(id as PlaceTypeId)"
+        @more="toggleMore"
+      />
+      <div class="places-tools">
+        <div class="places-tool-buttons">
+          <Popover v-model:open="sortOpen">
+            <PopoverTrigger as-child>
+              <button
+                type="button"
+                class="places-tool map-control"
+                :aria-label="`Sort places, ${sortLabel}`"
+              >
+                <ArrowDownUp :size="16" aria-hidden="true" />
+                Sort
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              class="places-sort-menu nw:z-[1200] nw:w-60 nw:gap-0 nw:p-1 nw:shadow-none"
+            >
+              <div role="radiogroup" aria-label="Sort places">
+                <button
+                  v-for="option in sortOptions"
+                  :key="option.id"
+                  type="button"
+                  role="radio"
+                  class="places-sort-option"
+                  :aria-checked="sort === option.id"
+                  @click="chooseSort(option.id)"
+                >
+                  {{ option.label }}
+                  <Check
+                    v-if="sort === option.id"
+                    :size="16"
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <button
+            ref="filterButton"
+            type="button"
+            class="places-tool places-filter-toggle map-control"
+            :class="{ 'is-on': placesStore.filtering }"
+            aria-haspopup="dialog"
+            @click="filterOpen = true"
+          >
+            <SlidersHorizontal :size="16" aria-hidden="true" />
+            Filter
+          </button>
+          <button
+            type="button"
+            class="places-tool places-extent-toggle map-control"
+            :class="{ 'is-on': placesStore.listInView }"
+            :aria-pressed="placesStore.listInView"
+            aria-label="Limit list to the map view"
+            @click="placesStore.listInView = !placesStore.listInView"
+          >
+            <Scan :size="16" aria-hidden="true" />
+            In view
+          </button>
+        </div>
+        <p v-if="showCount" class="places-count">{{ countText }}</p>
+        <PlacesFilterDialog
+          v-model:open="filterOpen"
+          :size-full="sizeFull"
+          :size-bins="sizeBins"
+          :search="needle"
+          :search-prefix="searchingAll"
+          :extent="listExtent"
+          :matched-total="matchTotal"
+          :place-types="listedTypes"
+          :count-types="statsTypes"
         >
-          {{ type.label }}
-        </button>
-        <button
-          type="button"
-          class="place-type-more"
-          :aria-expanded="showMore"
-          @click="toggleMore"
-        >
-          {{ showMore ? 'Less' : 'More…' }}
-        </button>
+          <template #types>
+            <PlaceTypeButtons
+              :buttons="placeTypeButtons"
+              :selected="placeTypes"
+              :show-more="showMore"
+              @select="id => selectPlaceType(id as PlaceTypeId)"
+              @more="toggleMore"
+            />
+          </template>
+        </PlacesFilterDialog>
       </div>
       <PhotoQueueList
         v-if="auth.isAdmin && placesStore.adminList === 'photos'"
@@ -666,78 +745,6 @@ watch(
         <p v-if="showNames && listStatus === 'error'" class="places-status">
           The places could not be loaded.
         </p>
-        <div v-if="showTools" class="places-tools">
-          <div class="places-tool-buttons">
-            <Popover v-model:open="sortOpen">
-              <PopoverTrigger as-child>
-                <button
-                  type="button"
-                  class="places-tool map-control"
-                  :aria-label="`Sort places, ${sortLabel}`"
-                >
-                  <ArrowDownUp :size="16" aria-hidden="true" />
-                  Sort
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                align="start"
-                class="places-sort-menu nw:z-[1200] nw:w-60 nw:gap-0 nw:p-1 nw:shadow-none"
-              >
-                <div role="radiogroup" aria-label="Sort places">
-                  <button
-                    v-for="option in sortOptions"
-                    :key="option.id"
-                    type="button"
-                    role="radio"
-                    class="places-sort-option"
-                    :aria-checked="sort === option.id"
-                    @click="chooseSort(option.id)"
-                  >
-                    {{ option.label }}
-                    <Check
-                      v-if="sort === option.id"
-                      :size="16"
-                      aria-hidden="true"
-                    />
-                  </button>
-                </div>
-              </PopoverContent>
-            </Popover>
-            <button
-              ref="filterButton"
-              type="button"
-              class="places-tool places-filter-toggle map-control"
-              :class="{ 'is-on': placesStore.filtering }"
-              aria-haspopup="dialog"
-              @click="filterOpen = true"
-            >
-              <SlidersHorizontal :size="16" aria-hidden="true" />
-              Filter
-            </button>
-            <button
-              type="button"
-              class="places-tool places-extent-toggle map-control"
-              :class="{ 'is-on': listInView }"
-              :aria-pressed="listInView"
-              aria-label="Limit list to the map view"
-              @click="toggleListInView"
-            >
-              <Scan :size="16" aria-hidden="true" />
-              In view
-            </button>
-          </div>
-          <p class="places-count">{{ countText }}</p>
-          <PlacesFilterDialog
-            v-model:open="filterOpen"
-            :size-full="sizeFull"
-            :size-bins="sizeBins"
-            :search="needle"
-            :search-prefix="searchingAll"
-            :extent="listExtent"
-            :matched-total="matchTotal"
-            :place-types="listedTypes"
-          />
-        </div>
         <div v-if="anyType && !showList" class="places-list">
           <p class="places-status">{{ nothingStored }}</p>
         </div>
@@ -824,7 +831,6 @@ watch(
 
 .places-title,
 .places-search,
-.places-types,
 .places-status {
   flex: none;
 }
@@ -881,43 +887,6 @@ watch(
   font-family: inherit;
   font-size: 14px;
   color: #8a9690;
-}
-
-.places-types {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.place-type {
-  white-space: nowrap;
-}
-
-/* A text link, so it does not read as another place type. */
-.place-type-more {
-  height: 32px;
-  margin: 0;
-  padding: 0 4px;
-  border: 0;
-  background: transparent;
-  color: var(--muted-foreground);
-  font: inherit;
-  font-size: 13px;
-  text-decoration: underline;
-  text-decoration-color: var(--border);
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-
-.place-type-more:hover {
-  color: var(--foreground);
-  text-decoration-color: currentColor;
-}
-
-.place-type-more:focus-visible {
-  outline: 2px solid var(--foreground);
-  outline-offset: 2px;
-  border-radius: 4px;
 }
 
 .places-status {

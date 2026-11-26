@@ -12,6 +12,7 @@ import {
   ECOREGION_TILES_URL,
   ECOREGION_TILE_LAYER,
   loadPlaceBounds,
+  loadPlaceExtent,
   loadPlaceName,
 } from './api';
 import {
@@ -47,6 +48,51 @@ const ECOREGION_FILL = 'ecoregions-fill';
 const ECOREGION_LINE = 'ecoregions-line';
 const ECOREGION_SELECT_LINE = 'ecoregions-select-line';
 const ECOREGION_HOVER_LINE = 'ecoregions-hover-line';
+
+/** Below this width the Places columns stack over the map, which then has no padding. */
+const NARROW = '(max-width: 720px)';
+/** The least free map, in pixels, that the padding centres the map in. */
+const MIN_FREE = 80;
+/** How long the map slides to new padding, in ms. */
+const PADDING_EASE_MS = 900;
+
+/**
+ * How the map flies to a place: one slow `flyTo` that rises into an arc and
+ * dives down to the place, as a tour would. Without `essential`, a
+ * reduced-motion setting still skips the flight.
+ */
+const FLIGHT = { speed: 0.35, curve: 1.42 } as const;
+
+/**
+ * The latitude halfway between two others on the Mercator map, so a box's
+ * centre is where it is drawn, not where its degrees average.
+ * @param south - Southern latitude, in degrees.
+ * @param north - Northern latitude, in degrees.
+ * @returns The middle latitude, in degrees.
+ */
+function mercatorMiddle(south: number, north: number): number {
+  const toY = (lat: number) =>
+    Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+  const y = (toY(south) + toY(north)) / 2;
+  return ((2 * Math.atan(Math.exp(y)) - Math.PI / 2) * 180) / Math.PI;
+}
+
+/**
+ * Slow at both ends, for a slide that starts and stops gently.
+ * @param t - Progress, 0 to 1.
+ * @returns Eased progress, 0 to 1.
+ */
+function easeInOut(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+/** Padding on every side of the map, in pixels. */
+interface Padding {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
 
 /** Outline width of recognitions and ecoregions, by zoom. */
 const OUTLINE_WIDTH = [
@@ -207,10 +253,12 @@ interface PlaceMap {
  * Draw the conservation-area boundaries, highlight a selection, and frame it.
  * A boundary click does not open the places list.
  * @param getMap - The Mapbox map, once MapComponent has created it.
- * @returns A control that fits the map to the selected place.
+ * @returns A control that fits the map to the selected place, and one that
+ *   sets the map's padding to the open panels.
  */
 export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   zoomToSelectedPlace: () => void;
+  followPanels: () => Promise<void>;
 } {
   const placesStore = usePlacesStore();
   const basemapStore = useBasemapStore();
@@ -402,22 +450,117 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   }
 
   /**
-   * Leave room for a visible places panel on the left.
+   * The map's own padding: the Places columns on the left, so the map centres
+   * in the space they leave free. Landscape is small and closes easily, so it
+   * adds none. None on a narrow screen, where the columns stack over the map.
+   * @param mapInstance - The map.
+   * @returns The padding, in pixels.
+   */
+  function panelsPadding(mapInstance: mapboxgl.Map): Padding {
+    const none: Padding = { top: 0, right: 0, bottom: 0, left: 0 };
+    if (window.matchMedia?.(NARROW).matches) return none;
+    const width = mapInstance.getCanvas().getBoundingClientRect().width;
+    const left = Math.min(panelCover(mapInstance), width);
+    if (width - left < MIN_FREE) return none;
+    return { ...none, left };
+  }
+
+  /**
+   * Leave room for the open panels, and a margin, around a fitted place.
    * @param mapInstance - The map.
    * @returns Padding for fitBounds.
    */
-  function panelPadding(mapInstance: mapboxgl.Map): {
-    top: number;
-    right: number;
-    bottom: number;
-    left: number;
-  } {
+  function panelPadding(mapInstance: mapboxgl.Map): Padding {
+    const panels = panelsPadding(mapInstance);
     return {
       top: 72,
       right: 72,
       bottom: 72,
-      left: Math.max(72, panelCover(mapInstance) + 24),
+      left: Math.max(72, panels.left + 24),
     };
+  }
+
+  /**
+   * Whether two paddings are the same to the pixel.
+   * @param a - One padding.
+   * @param b - The other.
+   * @returns True when every side matches.
+   */
+  function samePadding(
+    a: mapboxgl.PaddingOptions,
+    b: mapboxgl.PaddingOptions
+  ): boolean {
+    return (['top', 'right', 'bottom', 'left'] as const).every(
+      side => Math.abs((a[side] ?? 0) - (b[side] ?? 0)) < 1
+    );
+  }
+
+  /**
+   * Set the map's padding to the open panels. Eased, the map slides so its
+   * centre stays in the middle of the free space. Held, the view stays where it
+   * is, for after a fit that already placed it. Waits while the map moves: the
+   * end of the move sets it.
+   * @param mapInstance - The map.
+   * @param ease - Slide the map to the new padding.
+   */
+  function applyPanelsPadding(mapInstance: mapboxgl.Map, ease: boolean) {
+    if (mapInstance.isMoving()) return;
+    const next = panelsPadding(mapInstance);
+    if (samePadding(mapInstance.getPadding(), next)) return;
+    if (ease) {
+      mapInstance.easeTo({
+        padding: next,
+        duration: PADDING_EASE_MS,
+        easing: easeInOut,
+      });
+      return;
+    }
+    const canvas = mapInstance.getCanvas().getBoundingClientRect();
+    const x = next.left + (canvas.width - next.left - next.right) / 2;
+    const y = canvas.height / 2;
+    mapInstance.jumpTo({
+      center: mapInstance.unproject([x, y]),
+      padding: next,
+    });
+  }
+
+  let paddingRun = 0;
+  /**
+   * Flights being prepared. A flight carries the panels' padding itself, so
+   * the padding does not slide on its own meanwhile.
+   */
+  let flightsPending = 0;
+
+  /** Follow the panels once they stop changing width. */
+  async function followPanels() {
+    const mapInstance = readMap();
+    if (!mapInstance) return;
+    const run = ++paddingRun;
+    await panelsSettled(mapInstance);
+    if (run !== paddingRun || flightsPending > 0) return;
+    applyPanelsPadding(mapInstance, true);
+  }
+
+  /**
+   * Prepare a flight: wait for the panels to settle, so it starts once, from
+   * where they end. Without a flight, the padding slides as usual.
+   * @param mapInstance - The map.
+   * @param prepare - Reads what the flight needs, then flies or not.
+   * @returns Whether the map flew.
+   */
+  async function withFlight(
+    mapInstance: mapboxgl.Map,
+    prepare: () => Promise<boolean>
+  ): Promise<boolean> {
+    flightsPending += 1;
+    let flew = false;
+    try {
+      flew = await prepare();
+    } finally {
+      flightsPending -= 1;
+    }
+    if (!flew && flightsPending === 0) applyPanelsPadding(mapInstance, true);
+    return flew;
   }
 
   /** Highlight the selected boundary, from whichever archive holds it. */
@@ -509,32 +652,48 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * @param mapInstance - The map.
    */
   async function centreCoveredPlace(mapInstance: mapboxgl.Map) {
-    const id = placesStore.selectedId;
-    const [place] = await Promise.all([
-      selectedBounds(),
-      panelsSettled(mapInstance),
-    ]);
-    if (placesStore.selectedId !== id) return;
-    if (!place) return;
+    await withFlight(mapInstance, async () => {
+      const id = placesStore.selectedId;
+      const [place] = await Promise.all([
+        selectedBounds(),
+        panelsSettled(mapInstance),
+      ]);
+      if (placesStore.selectedId !== id || !place) return false;
+      return centreIfCovered(mapInstance, place);
+    });
+  }
+
+  /**
+   * Fly a place the panels hide into the middle of the free map, keeping the
+   * zoom.
+   * @param mapInstance - The map.
+   * @param place - West, south, east, north.
+   * @returns Whether the map flew.
+   */
+  function centreIfCovered(
+    mapInstance: mapboxgl.Map,
+    place: LngLatBounds
+  ): boolean {
     const canvas = mapInstance.getCanvas().getBoundingClientRect();
-    const cover = Math.min(panelCover(mapInstance), canvas.width);
-    if (canvas.width - cover < 80) return;
+    const panels = panelsPadding(mapInstance);
+    const { left, right } = panels;
+    if (canvas.width - left - right < MIN_FREE) return false;
     const northWest = mapInstance.project([place[0], place[3]]);
     const southEast = mapInstance.project([place[2], place[1]]);
-    const shown: LngLatBounds = [cover, 0, canvas.width, canvas.height];
+    const shown: LngLatBounds = [left, 0, canvas.width - right, canvas.height];
     const drawn: LngLatBounds = [
       northWest.x,
       northWest.y,
       southEast.x,
       southEast.y,
     ];
-    if (boundsInsideFrame(shown, drawn)) return;
-    mapInstance.easeTo({
-      center: [(place[0] + place[2]) / 2, (place[1] + place[3]) / 2],
-      padding: { left: cover, top: 0, right: 0, bottom: 0 },
-      retainPadding: false,
-      duration: 800,
+    if (boundsInsideFrame(shown, drawn)) return false;
+    mapInstance.flyTo({
+      center: [(place[0] + place[2]) / 2, mercatorMiddle(place[1], place[3])],
+      padding: panels,
+      ...FLIGHT,
     });
+    return true;
   }
 
   /**
@@ -545,30 +704,76 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    */
   async function frameSelectedPlace(mapInstance: mapboxgl.Map, force = false) {
     highlightSelection(mapInstance);
-    const id = placesStore.selectedId;
-    const place = await selectedBounds();
-    if (!place || placesStore.selectedId !== id) return;
-    const view = mapInstance.getBounds();
-    if (!view) return;
-    const frame: LngLatBounds = [
-      view.getWest(),
-      view.getSouth(),
-      view.getEast(),
-      view.getNorth(),
-    ];
-    if (!force && boundsInsideFrame(frame, place)) return;
-    mapInstance.fitBounds(
+    await withFlight(mapInstance, async () => {
+      const id = placesStore.selectedId;
+      const [place] = await Promise.all([
+        selectedBounds(),
+        panelsSettled(mapInstance),
+      ]);
+      if (!place || placesStore.selectedId !== id) return false;
+      const view = mapInstance.getBounds();
+      if (!view) return false;
+      const frame: LngLatBounds = [
+        view.getWest(),
+        view.getSouth(),
+        view.getEast(),
+        view.getNorth(),
+      ];
+      if (!force && boundsInsideFrame(frame, place)) return false;
+      return flyToBounds(mapInstance, place);
+    });
+  }
+
+  /**
+   * Fly to a box in one `flyTo`, with room for the open panels and a margin.
+   * The flight takes the panels' padding as the map's own, so nothing moves
+   * the map again when it lands.
+   * @param mapInstance - The map.
+   * @param bounds - West, south, east, north.
+   * @returns Whether the map flew.
+   */
+  function flyToBounds(
+    mapInstance: mapboxgl.Map,
+    bounds: LngLatBounds
+  ): boolean {
+    const south = Math.max(bounds[1], -85);
+    const north = Math.min(bounds[3], 85);
+    const camera = mapInstance.cameraForBounds(
       [
-        [place[0], place[1]],
-        [place[2], place[3]],
+        [bounds[0], south],
+        [bounds[2], north],
       ],
-      {
-        padding: panelPadding(mapInstance),
-        retainPadding: false,
-        maxZoom: 10,
-        duration: 800,
-      }
+      { padding: panelPadding(mapInstance), maxZoom: 10 }
     );
+    if (camera?.zoom === undefined) return false;
+    mapInstance.flyTo({
+      center: [(bounds[0] + bounds[2]) / 2, mercatorMiddle(south, north)],
+      zoom: camera.zoom,
+      padding: panelsPadding(mapInstance),
+      ...FLIGHT,
+    });
+    return true;
+  }
+
+  let fitRun = 0;
+
+  /** Fly to the places the applied filter keeps, of the listed types. */
+  async function fitKeptPlaces() {
+    const mapInstance = readMap();
+    const types = [...placesStore.listTypes];
+    if (!mapInstance || !types.length) return;
+    const run = ++fitRun;
+    const result = await loadPlaceExtent({
+      placeTypes: types,
+      sizeMin: placesStore.sizeKept[0],
+      sizeMax: placesStore.sizeKept[1],
+      ecoregionIds: [...placesStore.ecoregionIds],
+    });
+    if (run !== fitRun || result.status !== 'ok') return;
+    await withFlight(mapInstance, async () => {
+      await panelsSettled(mapInstance);
+      return run === fitRun && flyToBounds(mapInstance, result.bounds);
+    });
   }
 
   /** Fit the map to the selected place, even when it is already in view. */
@@ -986,10 +1191,16 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       const instance = mapInstance as mapboxgl.Map;
       instance.on('style.load', () => syncPlaceOverlay(instance));
       if (!boundsListening) {
-        instance.on('moveend', () => publishViewBounds(instance));
+        instance.on('moveend', () => {
+          publishViewBounds(instance);
+          // A fit or a drag ended while the panels changed: take their padding
+          // now, keeping the view where the move left it.
+          requestAnimationFrame(() => applyPanelsPadding(instance, false));
+        });
         boundsListening = true;
       }
       publishViewBounds(instance);
+      void followPanels();
       drawWhenReady(instance);
     },
     { flush: 'sync' }
@@ -1033,6 +1244,11 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   );
 
   watch(
+    () => placesStore.fitRequest,
+    () => void fitKeptPlaces()
+  );
+
+  watch(
     () => placesStore.hoveredId,
     () => {
       const mapInstance = readMap();
@@ -1055,5 +1271,5 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     }
   );
 
-  return { zoomToSelectedPlace };
+  return { zoomToSelectedPlace, followPanels };
 }

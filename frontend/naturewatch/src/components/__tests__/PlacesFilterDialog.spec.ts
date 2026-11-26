@@ -60,10 +60,11 @@ let wrapper: VueWrapper | null = null;
  * Mount the dialog closed, then open it as the list does.
  * @returns The mounted dialog.
  */
-async function mountDialog(placeTypes?: string[]) {
+async function mountDialog(placeTypes?: string[], countTypes?: string[]) {
   const mounted = mount(PlacesFilterDialog, {
     props: {
       placeTypes,
+      countTypes,
       open: false,
       sizeFull,
       sizeBins: emptyBins,
@@ -286,5 +287,25 @@ describe('Places filter dialog', () => {
     );
     await button('Show 2 places').trigger('click');
     expect(store.ecoregionsKept).toEqual(chosen);
+  });
+
+  it('with no type, counts every type it is given, and Apply asks the map to fit', async () => {
+    vi.mocked(loadPilotPlaceWindowCount).mockClear();
+    await mountDialog([], ['conservation_area', 'ecoregion']);
+    const store = usePlacesStore();
+    const fits = store.fitRequest;
+
+    expect(body().find('.filter-chart').exists()).toBe(true);
+    expect(body().find('#filter-ecoregion-title').exists()).toBe(true);
+    expect(body().find('#filter-types-title').exists()).toBe(true);
+    expect(loadPilotPlaceWindowCount).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        placeTypes: ['conservation_area', 'ecoregion'],
+      })
+    );
+
+    await button('Show 2 places').trigger('click');
+    await flushPromises();
+    expect(store.fitRequest).toBe(fits + 1);
   });
 });
