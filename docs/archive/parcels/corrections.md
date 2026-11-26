@@ -4,6 +4,8 @@ An admin draws a polygon over a layer and records that the layer is wrong there,
 
 *Started 26 November 2026 from the user's brainstorm. Defined on 26 November 2026. It runs in parallel with Shaping Boundaries. The first use is flagging false cropland.*
 
+Archived 26 November 2026. Tasks 01 to 03 are merged into `develop` (#466, #467, #468), and both migrations are applied to the hosted database.
+
 ## Goal
 
 As an admin, in edit mode, I can:
@@ -27,7 +29,7 @@ As an admin, in edit mode, I can:
 
 ## Capture and apply
 
-This parcel is the capture side: drawing, the form, photos, and a review queue. The apply side rasterises the approved corrections per layer and year, marks the cells they change, and recounts the affected places. It belongs with the [Stats Ledger](stats-ledger.md), which provides the reverse index.
+This parcel is the capture side: drawing, the form, photos, and a review queue. The apply side rasterises the approved corrections per layer and year, marks the cells they change, and recounts the affected places. It belongs with the [Stats Ledger](../../parcels/stats-ledger.md), which provides the reverse index.
 
 ## Open questions
 
@@ -44,11 +46,11 @@ This parcel is the capture side: drawing, the form, photos, and a review queue. 
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app. Task files are written when a task starts.
 
-- [x] [Task 01 — Corrections schema and catalog](../archive/tasks/task-01-corrections-schema.md) — naturewatch-app
+- [x] [Task 01 — Corrections schema and catalog](../tasks/task-01-corrections-schema.md) — naturewatch-app
   - *Goal:* Add the corrections table, its submit and review RPCs with admin-only access, and a Storage bucket for photos. Add a `corrections` block to each published threat layer in `layers.json` (built, treeloss, fire, cropland, roads, dams), with its schema and catalog tests. Apply the migration to the hosted database after approval.
-- [x] [Task 02 — Draw and record a correction](../archive/tasks/task-02-draw-a-correction.md) — naturewatch-app
+- [x] [Task 02 — Draw and record a correction](../tasks/task-02-draw-a-correction.md) — naturewatch-app
   - *Goal:* In edit mode, a button in the Measure panel draws a polygon and opens a form built from the catalog, with a layer picker that lists the threat layers on the map, then saves the correction as `submitted`. Update `docs/user/using-the-map.md`. Run the tests and a browser check.
-- [x] [Task 03 — Review queue, map outlines, and photos](../archive/tasks/task-03-review-corrections.md) — naturewatch-app
+- [x] [Task 03 — Review queue, map outlines, and photos](../tasks/task-03-review-corrections.md) — naturewatch-app
   - *Goal:* An admin list of corrections to approve or reject, the approved corrections outlined on the map, and photos added to a correction. Run the tests and a browser check.
 
 ## Done when

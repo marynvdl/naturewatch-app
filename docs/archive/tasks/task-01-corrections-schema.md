@@ -1,6 +1,6 @@
 # Task 01 — Corrections schema and catalog
 
-Parcel: [Corrections](../../parcels/corrections.md).
+Parcel: [Corrections](../parcels/corrections.md).
 
 Repository: naturewatch-app. Start from `develop`. The parcel was defined in #465.
 
