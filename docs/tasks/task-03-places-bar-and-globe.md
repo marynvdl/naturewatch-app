@@ -20,7 +20,7 @@ Changed 26 November 2026 by the user, after evaluating the local app:
 - **In view stays in the tools row. Opening Filter turns it off**, so the window counts every place. The window always shows the chart and "Show N places". With no type on, both cover every type with a button. The window repeats the type buttons and More… at the top, as a **Place types** section, acting at once on the panel. (In view moved into the window first, then came back.)
 - **After Apply, the map flies to the kept places.** A new read-only function, `place_extent`, returns the box around the listed places of the types that are on that the size and ecoregion filter keeps. It is a migration, applied to the hosted database after the user approves. With no type on, Apply does not move the map.
 - **Landscape adds no padding.** Only the Places columns do.
-- **Slower, smoother moves.** Fits and pans fly (`flyTo`, speed 0.5, curve 1.6), rising and coming down on a long move. The padding slide takes 900 ms, slow at both ends. A reduced-motion setting still skips the flights.
+- **Slower, smoother moves.** Every fit and pan is one `flyTo` (speed 0.35, curve 1.42), rising into an arc and diving down to the place. It starts once the panels have settled and carries their padding, so nothing moves the map again when it lands. `cameraForBounds` gives the zoom. The padding slide takes 900 ms, slow at both ends, and waits while a flight is being prepared. A reduced-motion setting still skips the flights.
 
 ## Facts already stored
 

@@ -43,6 +43,8 @@ class FakeMap {
   layers = new Map<string, Record<string, unknown>>();
   handlers: { type: string; layer?: string; handler: Handler }[] = [];
   fitBounds = vi.fn();
+  /** The camera a fit would take: a zoom only. */
+  cameraForBounds = vi.fn(() => ({ zoom: 6 }));
   /** The map's own padding, which an ease or a jump sets. */
   padding = { top: 0, right: 0, bottom: 0, left: 0 };
   easeTo = vi.fn((options: { padding?: FakeMap['padding'] }) => {
@@ -52,7 +54,9 @@ class FakeMap {
     )
       this.padding = options.padding;
   });
-  flyTo = vi.fn();
+  flyTo = vi.fn((options: { padding?: FakeMap['padding'] }) => {
+    if (options.padding) this.padding = options.padding;
+  });
   jumpTo = vi.fn((options: { padding?: FakeMap['padding'] }) => {
     if (options.padding) this.padding = options.padding;
   });
@@ -161,6 +165,10 @@ async function drawPlaces() {
   const store = usePlacesStore();
   store.toggle();
   await flushPromises();
+  // Let the first frame check wait out the panels, as it does on the page.
+  for (let frame = 0; frame < 10; frame += 1)
+    await new Promise(resolve => requestAnimationFrame(resolve));
+  await flushPromises();
   return { map, store, followPanels };
 }
 
@@ -248,7 +256,10 @@ describe('place boundaries from tiles', () => {
     expect(store.selectedFrom).toBe('map');
     await vi.waitFor(() =>
       expect(map.flyTo).toHaveBeenCalledWith(
-        expect.objectContaining({ center: [40.5, -9.5], speed: 0.5 })
+        expect.objectContaining({
+          center: [40.5, expect.closeTo(-9.5, 2)],
+          speed: 0.35,
+        })
       )
     );
     expect(loadPlaceBounds).toHaveBeenCalledWith(outsideWindow);
@@ -299,27 +310,20 @@ describe('place boundaries from tiles', () => {
     const { map, store } = await drawPlaces();
 
     store.selectPlace(outsideWindow);
-    await flushPromises();
+    await vi.waitFor(() => expect(map.flyTo).toHaveBeenCalled());
 
-    expect(map.fitBounds).toHaveBeenCalledWith(
+    expect(map.cameraForBounds).toHaveBeenCalledWith(
       [
         [40, -10],
         [41, -9],
       ],
       expect.objectContaining({ maxZoom: 10 })
     );
-  });
-
-  it('does not keep the panel padding after framing a place', async () => {
-    const { map, store } = await drawPlaces();
-
-    store.selectPlace(outsideWindow);
-    await flushPromises();
-
-    expect(map.fitBounds).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ retainPadding: false })
+    expect(map.flyTo).toHaveBeenCalledWith(
+      expect.objectContaining({ zoom: 6, speed: 0.35, curve: 1.42 })
     );
+    // One flight: the padding does not slide on its own as well
+    expect(map.easeTo).not.toHaveBeenCalled();
   });
 
   it('still draws boundaries when the place store is not configured', async () => {
@@ -332,7 +336,7 @@ describe('place boundaries from tiles', () => {
 
     store.selectPlace(outsideWindow);
     await flushPromises();
-    expect(map.fitBounds).not.toHaveBeenCalled();
+    expect(map.flyTo).not.toHaveBeenCalled();
   });
 
   it('marks a selection with a thicker outline and no extra fill', async () => {
@@ -736,7 +740,7 @@ describe('place boundaries from tiles', () => {
       filter
     );
     // Hovering does not move the map
-    expect(map.fitBounds).not.toHaveBeenCalled();
+    expect(map.flyTo).not.toHaveBeenCalled();
     expect(map.easeTo).not.toHaveBeenCalled();
 
     store.hoverPlace(outsideWindow, false);
@@ -859,23 +863,32 @@ describe('map padding from the open panels', () => {
     );
   });
 
-  it('flies to a place with the panels and a margin, without keeping that padding', async () => {
+  it('flies to a place in the free map, taking the panels as its padding', async () => {
     const { map, store } = await drawPlaces();
     addPanel({ className: 'places-frame' }, { left: 0, right: 360 });
     addPanel({ id: 'layers-panel' }, { left: 960, right: 1200 });
 
     store.selectPlace(outsideWindow);
-    await flushPromises();
+    await vi.waitFor(() => expect(map.flyTo).toHaveBeenCalled());
 
-    expect(map.fitBounds).toHaveBeenCalledWith(
+    // The zoom leaves a margin beside the panels; Landscape takes no room
+    expect(map.cameraForBounds).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         padding: { top: 72, right: 72, bottom: 72, left: 384 },
-        retainPadding: false,
-        speed: 0.5,
-        curve: 1.6,
       })
     );
+    const flight = map.flyTo.mock.calls[0][0] as {
+      center: [number, number];
+      retainPadding?: boolean;
+    };
+    expect(flight).toMatchObject({
+      padding: { top: 0, right: 0, bottom: 0, left: 360 },
+      speed: 0.35,
+      curve: 1.42,
+    });
+    expect(flight.retainPadding).toBeUndefined();
+    expect(flight.center[0]).toBe(40.5);
   });
 
   it('flies to the places the filter keeps once it is applied', async () => {
@@ -893,19 +906,22 @@ describe('map padding from the open panels', () => {
     store.listTypes = ['conservation_area'];
     store.applyFilter([2000, null]);
     store.fitToKept();
-    await flushPromises();
+    await vi.waitFor(() => expect(map.flyTo).toHaveBeenCalled());
     expect(loadPlaceExtent).toHaveBeenCalledWith({
       placeTypes: ['conservation_area'],
       sizeMin: 2000,
       sizeMax: null,
       ecoregionIds: [],
     });
-    expect(map.fitBounds).toHaveBeenLastCalledWith(
+    expect(map.cameraForBounds).toHaveBeenLastCalledWith(
       [
         [10, -85],
         [50, 20],
       ],
-      expect.objectContaining({ retainPadding: false, speed: 0.5 })
+      expect.anything()
+    );
+    expect(map.flyTo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ zoom: 6, speed: 0.35 })
     );
   });
 });
