@@ -48,6 +48,21 @@ const ECOREGION_LINE = 'ecoregions-line';
 const ECOREGION_SELECT_LINE = 'ecoregions-select-line';
 const ECOREGION_HOVER_LINE = 'ecoregions-hover-line';
 
+/** Below this width the Places columns stack over the map, which then has no padding. */
+const NARROW = '(max-width: 720px)';
+/** The least free map, in pixels, that the padding centres the map in. */
+const MIN_FREE = 80;
+/** How long the map slides to new padding, in ms. */
+const PADDING_EASE_MS = 300;
+
+/** Padding on every side of the map, in pixels. */
+interface Padding {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 /** Outline width of recognitions and ecoregions, by zoom. */
 const OUTLINE_WIDTH = [
   'interpolate',
@@ -207,10 +222,12 @@ interface PlaceMap {
  * Draw the conservation-area boundaries, highlight a selection, and frame it.
  * A boundary click does not open the places list.
  * @param getMap - The Mapbox map, once MapComponent has created it.
- * @returns A control that fits the map to the selected place.
+ * @returns A control that fits the map to the selected place, and one that
+ *   sets the map's padding to the open panels.
  */
 export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   zoomToSelectedPlace: () => void;
+  followPanels: () => Promise<void>;
 } {
   const placesStore = usePlacesStore();
   const basemapStore = useBasemapStore();
@@ -402,22 +419,105 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   }
 
   /**
-   * Leave room for a visible places panel on the left.
+   * How far the open Landscape panel reaches over the map from its right edge.
+   * @param mapInstance - The map.
+   * @returns Pixels from the right of the map canvas.
+   */
+  function landscapeCover(mapInstance: mapboxgl.Map): number {
+    // The panel keeps its box while closed. Its content is hidden then.
+    const panel = document.querySelector('#layers-panel .layer-panel');
+    if (!(panel instanceof HTMLElement)) return 0;
+    if (getComputedStyle(panel).visibility === 'hidden') return 0;
+    const box = panel.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0) return 0;
+    const canvasRight = mapInstance.getCanvas().getBoundingClientRect().right;
+    return Math.max(0, Math.round(canvasRight - box.left));
+  }
+
+  /**
+   * The map's own padding: the Places columns on the left and the open
+   * Landscape panel on the right, so the map centres in the space they leave
+   * free. None on a narrow screen, where the columns stack over the map.
+   * @param mapInstance - The map.
+   * @returns The padding, in pixels.
+   */
+  function panelsPadding(mapInstance: mapboxgl.Map): Padding {
+    const none: Padding = { top: 0, right: 0, bottom: 0, left: 0 };
+    if (window.matchMedia?.(NARROW).matches) return none;
+    const width = mapInstance.getCanvas().getBoundingClientRect().width;
+    const left = Math.min(panelCover(mapInstance), width);
+    let right = Math.min(landscapeCover(mapInstance), width - left);
+    // Too little map between the panels: centre beside the Places columns only.
+    if (width - left - right < MIN_FREE) right = 0;
+    if (width - left < MIN_FREE) return none;
+    return { ...none, left, right };
+  }
+
+  /**
+   * Leave room for the open panels, and a margin, around a fitted place.
    * @param mapInstance - The map.
    * @returns Padding for fitBounds.
    */
-  function panelPadding(mapInstance: mapboxgl.Map): {
-    top: number;
-    right: number;
-    bottom: number;
-    left: number;
-  } {
+  function panelPadding(mapInstance: mapboxgl.Map): Padding {
+    const panels = panelsPadding(mapInstance);
     return {
       top: 72,
-      right: 72,
+      right: panels.right + 72,
       bottom: 72,
-      left: Math.max(72, panelCover(mapInstance) + 24),
+      left: Math.max(72, panels.left + 24),
     };
+  }
+
+  /**
+   * Whether two paddings are the same to the pixel.
+   * @param a - One padding.
+   * @param b - The other.
+   * @returns True when every side matches.
+   */
+  function samePadding(
+    a: mapboxgl.PaddingOptions,
+    b: mapboxgl.PaddingOptions
+  ): boolean {
+    return (['top', 'right', 'bottom', 'left'] as const).every(
+      side => Math.abs((a[side] ?? 0) - (b[side] ?? 0)) < 1
+    );
+  }
+
+  /**
+   * Set the map's padding to the open panels. Eased, the map slides so its
+   * centre stays in the middle of the free space. Held, the view stays where it
+   * is, for after a fit that already placed it. Waits while the map moves: the
+   * end of the move sets it.
+   * @param mapInstance - The map.
+   * @param ease - Slide the map to the new padding.
+   */
+  function applyPanelsPadding(mapInstance: mapboxgl.Map, ease: boolean) {
+    if (mapInstance.isMoving()) return;
+    const next = panelsPadding(mapInstance);
+    if (samePadding(mapInstance.getPadding(), next)) return;
+    if (ease) {
+      mapInstance.easeTo({ padding: next, duration: PADDING_EASE_MS });
+      return;
+    }
+    const canvas = mapInstance.getCanvas().getBoundingClientRect();
+    const x = next.left + (canvas.width - next.left - next.right) / 2;
+    const y = canvas.height / 2;
+    mapInstance.jumpTo({
+      center: mapInstance.unproject([x, y]),
+      padding: next,
+    });
+  }
+
+  let paddingRun = 0;
+
+  /** Follow the panels once they stop changing width. */
+  async function followPanels() {
+    const mapInstance = readMap();
+    if (!mapInstance) return;
+    const run = ++paddingRun;
+    await panelsSettled(mapInstance);
+    if (run !== paddingRun) return;
+    applyPanelsPadding(mapInstance, true);
   }
 
   /** Highlight the selected boundary, from whichever archive holds it. */
@@ -489,15 +589,16 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
   }
 
   /**
-   * Wait until the place columns stop changing width, for at most a second.
+   * Wait until the place columns and the Landscape panel stop changing width,
+   * for at most a second.
    * @param mapInstance - The map.
    */
   async function panelsSettled(mapInstance: mapboxgl.Map) {
-    let last = -1;
+    let last = '';
     let steady = 0;
     for (let frame = 0; frame < 60 && steady < 3; frame += 1) {
       await new Promise(resolve => requestAnimationFrame(resolve));
-      const cover = panelCover(mapInstance);
+      const cover = `${panelCover(mapInstance)},${landscapeCover(mapInstance)}`;
       steady = cover === last ? steady + 1 : 0;
       last = cover;
     }
@@ -517,11 +618,12 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     if (placesStore.selectedId !== id) return;
     if (!place) return;
     const canvas = mapInstance.getCanvas().getBoundingClientRect();
-    const cover = Math.min(panelCover(mapInstance), canvas.width);
-    if (canvas.width - cover < 80) return;
+    const panels = panelsPadding(mapInstance);
+    const { left, right } = panels;
+    if (canvas.width - left - right < MIN_FREE) return;
     const northWest = mapInstance.project([place[0], place[3]]);
     const southEast = mapInstance.project([place[2], place[1]]);
-    const shown: LngLatBounds = [cover, 0, canvas.width, canvas.height];
+    const shown: LngLatBounds = [left, 0, canvas.width - right, canvas.height];
     const drawn: LngLatBounds = [
       northWest.x,
       northWest.y,
@@ -531,7 +633,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     if (boundsInsideFrame(shown, drawn)) return;
     mapInstance.easeTo({
       center: [(place[0] + place[2]) / 2, (place[1] + place[3]) / 2],
-      padding: { left: cover, top: 0, right: 0, bottom: 0 },
+      padding: panels,
       retainPadding: false,
       duration: 800,
     });
@@ -986,10 +1088,16 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       const instance = mapInstance as mapboxgl.Map;
       instance.on('style.load', () => syncPlaceOverlay(instance));
       if (!boundsListening) {
-        instance.on('moveend', () => publishViewBounds(instance));
+        instance.on('moveend', () => {
+          publishViewBounds(instance);
+          // A fit or a drag ended while the panels changed: take their padding
+          // now, keeping the view where the move left it.
+          requestAnimationFrame(() => applyPanelsPadding(instance, false));
+        });
         boundsListening = true;
       }
       publishViewBounds(instance);
+      void followPanels();
       drawWhenReady(instance);
     },
     { flush: 'sync' }
@@ -1055,5 +1163,5 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     }
   );
 
-  return { zoomToSelectedPlace };
+  return { zoomToSelectedPlace, followPanels };
 }

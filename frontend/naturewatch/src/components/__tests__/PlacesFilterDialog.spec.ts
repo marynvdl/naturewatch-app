@@ -60,10 +60,11 @@ let wrapper: VueWrapper | null = null;
  * Mount the dialog closed, then open it as the list does.
  * @returns The mounted dialog.
  */
-async function mountDialog(placeTypes?: string[]) {
+async function mountDialog(placeTypes?: string[], noType = false) {
   const mounted = mount(PlacesFilterDialog, {
     props: {
       placeTypes,
+      noType,
       open: false,
       sizeFull,
       sizeBins: emptyBins,
@@ -286,5 +287,23 @@ describe('Places filter dialog', () => {
     );
     await button('Show 2 places').trigger('click');
     expect(store.ecoregionsKept).toEqual(chosen);
+  });
+
+  it('with no type, keeps the filter for later without a count or a chart', async () => {
+    vi.mocked(loadPilotPlaceWindowCount).mockClear();
+    await mountDialog([], true);
+    const store = usePlacesStore();
+
+    expect(body().find('.filter-chart').exists()).toBe(false);
+    expect(body().find('#filter-ecoregion-title').exists()).toBe(true);
+    const minimum = body().get('#filter-size-0');
+    await minimum.setValue('5000');
+    await minimum.trigger('change');
+    await flushPromises();
+    expect(loadPilotPlaceWindowCount).not.toHaveBeenCalled();
+
+    await button('Apply').trigger('click');
+    await flushPromises();
+    expect(store.sizeKept).toEqual([5000, null]);
   });
 });

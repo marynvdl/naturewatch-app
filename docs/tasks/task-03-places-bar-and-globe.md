@@ -44,7 +44,7 @@ From the code on 26 November 2026:
 5. **Map padding.**
    - The map's padding is the Places cover on the left (as `panelCover` measures it) and, while Landscape is open on a screen wider than 720 px, the Landscape panel's width on the right. It is 0 on the right otherwise, and 0 on the left at 720 px and below.
    - It follows the panels as they open, close, and resize. When it changes, the map eases for about 300 ms to the new padding, keeping the zoom.
-   - `fitBounds` and `centreCoveredPlace` keep the map's padding, adding only the 72 px margin to it, and no longer pass `retainPadding: false`. A place fitted or clicked lands in the middle of the free space, as today.
+   - `fitBounds` and `centreCoveredPlace` pass the panels' padding, with the 72 px margin for a fit, and keep `retainPadding: false`, because Mapbox otherwise keeps a fit's padding, margin included, as the map's own. A move under way when the panels change takes the new padding when it ends, keeping the view where it is. A place fitted or clicked lands in the middle of the free space, as today.
 6. **Docs.** In `docs/user/using-the-map.md`, rewrite the sentences on Ecoregions being on alone, conservation areas not drawn while it is on, In view being off at the start, and when the tools show. Add one sentence that the map centres in the space the open panels leave free.
 7. **Tests.**
    - Places bar: Ecoregions together with Conservation areas and a recognition type, Countries alone, the tools row with no type, Filter's Apply with no type, and In view on at the start and after clearing.

@@ -57,9 +57,9 @@ const usePlacesStore = defineStore('places', () => {
   const selectedId = ref<string | null>(null);
   const selectedFrom = ref<'list' | 'map' | null>(null);
   /**
-   * Stored place types the list shows and the map draws: `conservation_area`
-   * and the recognition button types chosen, or `ecoregion` alone. Empty when
-   * none is.
+   * Stored place types the list shows and the map draws: any of
+   * `conservation_area`, `ecoregion`, and the recognition button types.
+   * Empty when none is.
    */
   const listTypes = ref<string[]>([]);
   /** Withdrawn places, which the map hides until the tiles are rebuilt. */

@@ -44,8 +44,13 @@ const props = withDefaults(
     matchedTotal: number;
     /** Stored place types the list shows. */
     placeTypes?: string[];
+    /**
+     * No place type is on. The panel then keeps the size range and the
+     * ecoregions for when one is, with no count and no chart.
+     */
+    noType?: boolean;
   }>(),
-  { placeTypes: undefined }
+  { placeTypes: undefined, noType: false }
 );
 
 const open = defineModel<boolean>('open', { required: true });
@@ -134,8 +139,10 @@ async function typeSize(end: 0 | 1, event: Event) {
   input.value = formatSizeInput(sizeKept.value[end]);
 }
 
-const showText = computed(
-  () => `Show ${keptCount.value} ${keptCount.value === 1 ? 'place' : 'places'}`
+const showText = computed(() =>
+  props.noType
+    ? 'Apply'
+    : `Show ${keptCount.value} ${keptCount.value === 1 ? 'place' : 'places'}`
 );
 
 /**
@@ -176,7 +183,7 @@ watch(
       draftEcoregionIds.value.join(','),
     ] as const,
   async ([isOpen]) => {
-    if (!isOpen) return;
+    if (!isOpen || props.noType) return;
     const request = ++countRequest;
     const result = await loadPilotPlaceWindowCount({
       search: props.search,
@@ -231,7 +238,7 @@ function apply() {
           <section class="filter-section" aria-labelledby="filter-size-title">
             <h3 id="filter-size-title" class="filter-name">Size</h3>
             <p class="filter-hint">Area of the place, in km².</p>
-            <div class="filter-chart" aria-hidden="true">
+            <div v-if="!noType" class="filter-chart" aria-hidden="true">
               <span
                 v-for="(bar, index) in sizeBars"
                 :key="index"

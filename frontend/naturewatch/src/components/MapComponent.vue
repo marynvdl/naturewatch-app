@@ -95,7 +95,9 @@ defineProps<{
 const currentBasemap = computed(() => basemapStore.currentBasemap);
 const visibleMapLayers = computed(() => mapLayerStore.getVisibleLayers());
 const map = ref<mapboxgl.Map | null>(null);
-const { zoomToSelectedPlace } = usePlaceBoundaries(() => map.value);
+const { zoomToSelectedPlace, followPanels } = usePlaceBoundaries(
+  () => map.value
+);
 
 /** Rendered profile width. The closed Places circle parks beside it. */
 const profileWidth = ref(0);
@@ -156,6 +158,7 @@ function observeProfile() {
   profileObserver = new ResizeObserver(() => {
     measureProfile();
     measureTimelineRoom();
+    void followPanels();
   });
   const watched = document.querySelectorAll(
     '.map-frame, .map-place, .places-bar, .timeline'
@@ -166,6 +169,12 @@ function observeProfile() {
 watch(
   () => [placesStore.selectedId, placesOpen.value, timelineStore.visible],
   observeProfile,
+  { flush: 'post' }
+);
+/** Centre the map in the space the Places columns and Landscape leave free. */
+watch(
+  () => [!!placesStore.selectedId, placesOpen.value, drawerVisible.value],
+  () => void followPanels(),
   { flush: 'post' }
 );
 onMounted(observeProfile);

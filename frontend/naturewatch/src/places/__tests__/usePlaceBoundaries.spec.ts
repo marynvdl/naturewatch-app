@@ -41,7 +41,29 @@ class FakeMap {
   layers = new Map<string, Record<string, unknown>>();
   handlers: { type: string; layer?: string; handler: Handler }[] = [];
   fitBounds = vi.fn();
-  easeTo = vi.fn();
+  /** The map's own padding, which an ease or a jump sets. */
+  padding = { top: 0, right: 0, bottom: 0, left: 0 };
+  easeTo = vi.fn((options: { padding?: FakeMap['padding'] }) => {
+    if (
+      options.padding &&
+      (options as { retainPadding?: boolean }).retainPadding !== false
+    )
+      this.padding = options.padding;
+  });
+  jumpTo = vi.fn((options: { padding?: FakeMap['padding'] }) => {
+    if (options.padding) this.padding = options.padding;
+  });
+  /** Whether a camera move is under way. */
+  moving = false;
+  isMoving() {
+    return this.moving;
+  }
+  getPadding() {
+    return this.padding;
+  }
+  unproject([x, y]: [number, number]) {
+    return { lng: x, lat: y };
+  }
   setFilter = vi.fn();
   setPaintProperty = vi.fn();
   setLayoutProperty = vi.fn();
@@ -79,7 +101,12 @@ class FakeMap {
   getCanvas() {
     return {
       style: {} as Record<string, string>,
-      getBoundingClientRect: () => ({ left: 0, width: 1200, height: 800 }),
+      getBoundingClientRect: () => ({
+        left: 0,
+        right: 1200,
+        width: 1200,
+        height: 800,
+      }),
     };
   }
   project([lng, lat]: [number, number]) {
@@ -126,12 +153,58 @@ const parkId = '11111111-1111-1111-1111-111111111111';
 async function drawPlaces() {
   const map = new FakeMap();
   const ref = shallowRef<FakeMap | null>(null);
-  usePlaceBoundaries(() => ref.value);
+  const { followPanels } = usePlaceBoundaries(() => ref.value);
   ref.value = map;
   const store = usePlacesStore();
   store.toggle();
   await flushPromises();
-  return { map, store };
+  return { map, store, followPanels };
+}
+
+/**
+ * A panel's box, the full height of the map.
+ * @param box - Its left and right edges.
+ * @param box.left - Left edge, in pixels.
+ * @param box.right - Right edge, in pixels.
+ * @returns The box.
+ */
+function panelBox(box: { left: number; right: number }): DOMRect {
+  return {
+    ...box,
+    top: 0,
+    bottom: 800,
+    width: box.right - box.left,
+    height: 800,
+  } as DOMRect;
+}
+
+/**
+ * Put a panel in the page at a given box.
+ * @param attributes - Its class or id.
+ * @param attributes.className - Its class.
+ * @param attributes.id - Its id.
+ * @param box - Where it sits, in pixels.
+ * @param box.left - Left edge, in pixels.
+ * @param box.right - Right edge, in pixels.
+ * @returns The panel.
+ */
+function addPanel(
+  attributes: { className?: string; id?: string },
+  box: { left: number; right: number }
+): HTMLElement {
+  const panel = document.createElement('div');
+  if (attributes.className) panel.className = attributes.className;
+  if (attributes.id) panel.id = attributes.id;
+  if (attributes.id === 'layers-panel') {
+    // The Landscape panel is measured by its content.
+    const content = document.createElement('div');
+    content.className = 'layer-panel';
+    content.getBoundingClientRect = () => panelBox(box);
+    panel.append(content);
+  }
+  panel.getBoundingClientRect = () => panelBox(box);
+  document.body.append(panel);
+  return panel;
 }
 
 describe('place boundaries from tiles', () => {
@@ -433,6 +506,20 @@ describe('place boundaries from tiles', () => {
     ]);
   });
 
+  it('draws conservation areas and recognitions together with ecoregions', async () => {
+    const { map, store } = await drawPlaces();
+    store.listTypes = ['conservation_area', 'ecoregion', 'ramsar_site'];
+    await flushPromises();
+
+    expect(map.getLayoutProperty('ecoregions-line', 'visibility')).toBe(
+      'visible'
+    );
+    expect(map.getLayoutProperty('places-fill', 'visibility')).toBe('visible');
+    expect(map.getLayoutProperty('recognitions-line', 'visibility')).toBe(
+      'visible'
+    );
+  });
+
   it('opens a clicked ecoregion, unless a drawn park is under the click', async () => {
     const { map, store } = await drawPlaces();
     store.listTypes = ['ecoregion'];
@@ -707,5 +794,85 @@ describe('place boundaries from tiles', () => {
       error: new Error('403'),
     });
     expect(store.status).toBe('error');
+  });
+});
+
+describe('map padding from the open panels', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    document.body.innerHTML = '';
+    vi.mocked(loadPlaceRelease).mockResolvedValue({
+      status: 'ok',
+      releaseMonth: '2026-10-01',
+    });
+  });
+
+  it('eases to the Places columns on the left and Landscape on the right', async () => {
+    const { map, followPanels } = await drawPlaces();
+    addPanel({ className: 'places-frame' }, { left: 0, right: 360 });
+    addPanel({ id: 'layers-panel' }, { left: 960, right: 1200 });
+
+    await followPanels();
+
+    expect(map.easeTo).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        padding: { top: 0, right: 240, bottom: 0, left: 360 },
+      })
+    );
+  });
+
+  it('leaves out a hidden panel, and returns to no padding when they close', async () => {
+    const { map, followPanels } = await drawPlaces();
+    const list = addPanel(
+      { className: 'places-frame' },
+      { left: 0, right: 360 }
+    );
+    const layers = addPanel({ id: 'layers-panel' }, { left: 960, right: 1200 });
+    layers.style.visibility = 'hidden';
+
+    await followPanels();
+    expect(map.padding).toEqual({ top: 0, right: 0, bottom: 0, left: 360 });
+
+    list.remove();
+    await followPanels();
+    expect(map.padding).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+  });
+
+  it('takes the padding after a move ends, keeping the view where it is', async () => {
+    const { map, followPanels } = await drawPlaces();
+    addPanel({ className: 'places-frame' }, { left: 0, right: 400 });
+    map.moving = true;
+
+    await followPanels();
+    expect(map.easeTo).not.toHaveBeenCalledWith(
+      expect.objectContaining({ padding: expect.anything() })
+    );
+
+    map.moving = false;
+    map.fire('moveend', undefined, {});
+    await vi.waitFor(() =>
+      expect(map.jumpTo).toHaveBeenCalledWith({
+        center: { lng: 800, lat: 400 },
+        padding: { top: 0, right: 0, bottom: 0, left: 400 },
+      })
+    );
+  });
+
+  it('fits a place with the panels and a margin, without keeping that padding', async () => {
+    const { map, store } = await drawPlaces();
+    addPanel({ className: 'places-frame' }, { left: 0, right: 360 });
+    addPanel({ id: 'layers-panel' }, { left: 960, right: 1200 });
+
+    store.selectPlace(outsideWindow);
+    await flushPromises();
+
+    expect(map.fitBounds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        padding: { top: 72, right: 312, bottom: 72, left: 384 },
+        retainPadding: false,
+      })
+    );
   });
 });
