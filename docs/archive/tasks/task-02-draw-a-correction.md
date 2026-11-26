@@ -1,6 +1,6 @@
 # Task 02 — Draw and record a correction
 
-Parcel: [Corrections](../parcels/corrections.md).
+Parcel: [Corrections](../../parcels/corrections.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 01 merged in #466.
 
