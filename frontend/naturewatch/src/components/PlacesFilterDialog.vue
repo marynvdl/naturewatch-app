@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { Info, Scan, X } from '@lucide/vue';
+import { Info, X } from '@lucide/vue';
 import {
   DialogClose,
   DialogContent,
@@ -45,12 +45,12 @@ const props = withDefaults(
     /** Stored place types the list shows. */
     placeTypes?: string[];
     /**
-     * No place type is on. The panel then keeps the size range and the
-     * ecoregions for when one is, with no count and no chart.
+     * Stored place types the count covers: the listed ones, or every type
+     * with a button while none is on.
      */
-    noType?: boolean;
+    countTypes?: string[];
   }>(),
-  { placeTypes: undefined, noType: false }
+  { placeTypes: undefined, countTypes: undefined }
 );
 
 const open = defineModel<boolean>('open', { required: true });
@@ -139,10 +139,8 @@ async function typeSize(end: 0 | 1, event: Event) {
   input.value = formatSizeInput(sizeKept.value[end]);
 }
 
-const showText = computed(() =>
-  props.noType
-    ? 'Apply'
-    : `Show ${keptCount.value} ${keptCount.value === 1 ? 'place' : 'places'}`
+const showText = computed(
+  () => `Show ${keptCount.value} ${keptCount.value === 1 ? 'place' : 'places'}`
 );
 
 /**
@@ -181,9 +179,10 @@ watch(
       props.searchPrefix,
       props.extent,
       draftEcoregionIds.value.join(','),
+      (props.countTypes ?? props.placeTypes ?? []).join(','),
     ] as const,
   async ([isOpen]) => {
-    if (!isOpen || props.noType) return;
+    if (!isOpen) return;
     const request = ++countRequest;
     const result = await loadPilotPlaceWindowCount({
       search: props.search,
@@ -193,7 +192,7 @@ watch(
       cropMin: 0,
       cropMax: 100,
       extent: props.extent,
-      placeTypes: props.placeTypes,
+      placeTypes: props.countTypes ?? props.placeTypes,
       ecoregionIds: draftEcoregionIds.value,
     });
     if (request !== countRequest) return;
@@ -216,13 +215,8 @@ function apply() {
     sizeBounds.value,
     showEcoregions.value ? ecoregionsKept.value : placesStore.ecoregionsKept
   );
-  if (!props.noType) placesStore.fitToKept();
+  placesStore.fitToKept();
   open.value = false;
-}
-
-/** Limit the list to the map view, or not. It applies at once, not on Apply. */
-function toggleInView() {
-  placesStore.listInView = !placesStore.listInView;
 }
 </script>
 
@@ -244,28 +238,17 @@ function toggleInView() {
           {{ description }}
         </DialogDescription>
         <div class="filter-body">
-          <section class="filter-section" aria-labelledby="filter-view-title">
-            <h3 id="filter-view-title" class="filter-name">Map view</h3>
+          <section class="filter-section" aria-labelledby="filter-types-title">
+            <h3 id="filter-types-title" class="filter-name">Place types</h3>
             <p class="filter-hint">
-              List only the places in the current map view. The map still draws
-              every place the filter keeps.
+              The same buttons as the Places panel. They apply at once.
             </p>
-            <button
-              type="button"
-              class="filter-view-toggle map-control"
-              :class="{ 'is-on': placesStore.listInView }"
-              :aria-pressed="placesStore.listInView"
-              aria-label="Limit list to the map view"
-              @click="toggleInView"
-            >
-              <Scan :size="16" aria-hidden="true" />
-              In view
-            </button>
+            <slot name="types" />
           </section>
           <section class="filter-section" aria-labelledby="filter-size-title">
             <h3 id="filter-size-title" class="filter-name">Size</h3>
             <p class="filter-hint">Area of the place, in km².</p>
-            <div v-if="!noType" class="filter-chart" aria-hidden="true">
+            <div class="filter-chart" aria-hidden="true">
               <span
                 v-for="(bar, index) in sizeBars"
                 :key="index"
@@ -443,10 +426,6 @@ function toggleInView() {
   margin: 4px 0 16px;
   font-size: 13px;
   color: var(--muted-foreground);
-}
-
-.filter-view-toggle {
-  gap: 6px;
 }
 
 .filter-name-row {

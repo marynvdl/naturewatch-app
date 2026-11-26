@@ -60,11 +60,11 @@ let wrapper: VueWrapper | null = null;
  * Mount the dialog closed, then open it as the list does.
  * @returns The mounted dialog.
  */
-async function mountDialog(placeTypes?: string[], noType = false) {
+async function mountDialog(placeTypes?: string[], countTypes?: string[]) {
   const mounted = mount(PlacesFilterDialog, {
     props: {
       placeTypes,
-      noType,
+      countTypes,
       open: false,
       sizeFull,
       sizeBins: emptyBins,
@@ -289,38 +289,20 @@ describe('Places filter dialog', () => {
     expect(store.ecoregionsKept).toEqual(chosen);
   });
 
-  it('with no type, keeps the filter for later without a count or a chart', async () => {
+  it('with no type, counts every type it is given, and Apply asks the map to fit', async () => {
     vi.mocked(loadPilotPlaceWindowCount).mockClear();
-    await mountDialog([], true);
-    const store = usePlacesStore();
-
-    expect(body().find('.filter-chart').exists()).toBe(false);
-    expect(body().find('#filter-ecoregion-title').exists()).toBe(true);
-    const minimum = body().get('#filter-size-0');
-    await minimum.setValue('5000');
-    await minimum.trigger('change');
-    await flushPromises();
-    expect(loadPilotPlaceWindowCount).not.toHaveBeenCalled();
-
-    await button('Apply').trigger('click');
-    await flushPromises();
-    expect(store.sizeKept).toEqual([5000, null]);
-    expect(store.fitRequest).toBe(0);
-  });
-
-  it('turns In view on and off at once, and flies to the kept places on Apply', async () => {
-    await mountDialog(['conservation_area']);
+    await mountDialog([], ['conservation_area', 'ecoregion']);
     const store = usePlacesStore();
     const fits = store.fitRequest;
-    const inView = body().get(
-      'button[aria-label="Limit list to the map view"]'
-    );
-    expect(inView.attributes('aria-pressed')).toBe('true');
 
-    await inView.trigger('click');
-    expect(store.listInView).toBe(false);
-    expect(inView.attributes('aria-pressed')).toBe('false');
-    expect(store.fitRequest).toBe(fits);
+    expect(body().find('.filter-chart').exists()).toBe(true);
+    expect(body().find('#filter-ecoregion-title').exists()).toBe(true);
+    expect(body().find('#filter-types-title').exists()).toBe(true);
+    expect(loadPilotPlaceWindowCount).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        placeTypes: ['conservation_area', 'ecoregion'],
+      })
+    );
 
     await button('Show 2 places').trigger('click');
     await flushPromises();

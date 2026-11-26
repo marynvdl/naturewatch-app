@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { ArrowDownUp, Check, Search, SlidersHorizontal } from '@lucide/vue';
+import {
+  ArrowDownUp,
+  Check,
+  Scan,
+  Search,
+  SlidersHorizontal,
+} from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
 import PhotoQueueList from '@/components/PhotoQueueList.vue';
 import AdminPlaceList from '@/components/AdminPlaceList.vue';
 import PlacesFilterDialog from '@/components/PlacesFilterDialog.vue';
+import PlaceTypeButtons from '@/components/PlaceTypeButtons.vue';
 import {
   Popover,
   PopoverContent,
@@ -151,6 +158,8 @@ const filterButton = ref<HTMLButtonElement | null>(null);
 
 watch(filterOpen, async open => {
   if (open) {
+    // The filter counts every place, not only those in view.
+    placesStore.listInView = false;
     // With no type on, the size range is read when Filter opens.
     if (!showList.value) void ensureStats();
     return;
@@ -294,6 +303,11 @@ const statsTypes = computed(() =>
 const statsFor = computed(
   () => `${statsTypes.value.join(',')}|${placesStore.ecoregionIds.join(',')}`
 );
+
+/** A type turned on or off in the open Filter window updates its chart. */
+watch(statsFor, () => {
+  if (filterOpen.value) void ensureStats();
+});
 
 /** Load the stored size range and chart counts once per listed type and ecoregions. */
 async function ensureStats() {
@@ -611,27 +625,13 @@ watch(
         />
         <kbd class="places-kbd" aria-hidden="true">/</kbd>
       </div>
-      <div class="places-types" role="group" aria-label="Place types">
-        <button
-          v-for="type in placeTypeButtons"
-          :key="type.id"
-          type="button"
-          class="place-type map-control"
-          :class="{ 'is-on': placeTypes.includes(type.id) }"
-          :aria-pressed="placeTypes.includes(type.id)"
-          @click="selectPlaceType(type.id)"
-        >
-          {{ type.label }}
-        </button>
-        <button
-          type="button"
-          class="place-type-more"
-          :aria-expanded="showMore"
-          @click="toggleMore"
-        >
-          {{ showMore ? 'Less' : 'More…' }}
-        </button>
-      </div>
+      <PlaceTypeButtons
+        :buttons="placeTypeButtons"
+        :selected="placeTypes"
+        :show-more="showMore"
+        @select="id => selectPlaceType(id as PlaceTypeId)"
+        @more="toggleMore"
+      />
       <div class="places-tools">
         <div class="places-tool-buttons">
           <Popover v-model:open="sortOpen">
@@ -680,6 +680,17 @@ watch(
             <SlidersHorizontal :size="16" aria-hidden="true" />
             Filter
           </button>
+          <button
+            type="button"
+            class="places-tool places-extent-toggle map-control"
+            :class="{ 'is-on': placesStore.listInView }"
+            :aria-pressed="placesStore.listInView"
+            aria-label="Limit list to the map view"
+            @click="placesStore.listInView = !placesStore.listInView"
+          >
+            <Scan :size="16" aria-hidden="true" />
+            In view
+          </button>
         </div>
         <p v-if="showCount" class="places-count">{{ countText }}</p>
         <PlacesFilterDialog
@@ -691,8 +702,18 @@ watch(
           :extent="listExtent"
           :matched-total="matchTotal"
           :place-types="listedTypes"
-          :no-type="!showList"
-        />
+          :count-types="statsTypes"
+        >
+          <template #types>
+            <PlaceTypeButtons
+              :buttons="placeTypeButtons"
+              :selected="placeTypes"
+              :show-more="showMore"
+              @select="id => selectPlaceType(id as PlaceTypeId)"
+              @more="toggleMore"
+            />
+          </template>
+        </PlacesFilterDialog>
       </div>
       <PhotoQueueList
         v-if="auth.isAdmin && placesStore.adminList === 'photos'"
@@ -810,7 +831,6 @@ watch(
 
 .places-title,
 .places-search,
-.places-types,
 .places-status {
   flex: none;
 }
@@ -867,43 +887,6 @@ watch(
   font-family: inherit;
   font-size: 14px;
   color: #8a9690;
-}
-
-.places-types {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.place-type {
-  white-space: nowrap;
-}
-
-/* A text link, so it does not read as another place type. */
-.place-type-more {
-  height: 32px;
-  margin: 0;
-  padding: 0 4px;
-  border: 0;
-  background: transparent;
-  color: var(--muted-foreground);
-  font: inherit;
-  font-size: 13px;
-  text-decoration: underline;
-  text-decoration-color: var(--border);
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-
-.place-type-more:hover {
-  color: var(--foreground);
-  text-decoration-color: currentColor;
-}
-
-.place-type-more:focus-visible {
-  outline: 2px solid var(--foreground);
-  outline-offset: 2px;
-  border-radius: 4px;
 }
 
 .places-status {

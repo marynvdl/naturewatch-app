@@ -10,14 +10,14 @@ Ecoregions combine with the other place types and draw below them. The list star
 
 Decided 26 November 2026 by the user:
 
-- **Tools before a type.** The whole tools row, Sort, Filter, and In view, always shows under the type buttons. The count shows only once a list loads. With no type on, Filter edits the kept size range and ecoregions, and its button reads **Apply** instead of a count.
+- **Tools before a type.** The whole tools row, Sort, Filter, and In view, always shows under the type buttons. The count shows only once a list loads. With no type on, Filter edits the kept size range and ecoregions for when a type is chosen. (Its button first read **Apply** with no count or chart; see below.)
 - **Panels.** The padding leaves room for the Places columns on the left (list and profile). Measure, and the stacked column on a narrow screen, add no padding. (Landscape was included at first; see below.)
 - **Camera.** When a panel opens or closes, the map eases to the new padding, so its centre stays in the middle of the free space. The zoom stays.
 - **Ecoregion filter.** While Ecoregions is on, with or without other types, the Ecoregion field is hidden and the chosen ecoregions do not apply. That is today's rule.
 
 Changed 26 November 2026 by the user, after evaluating the local app:
 
-- **In view moves into the Filter window**, as a **Map view** section at the top. The tools row is Sort and Filter. In view acts at once, not on Apply, and does not make the Filter button charcoal.
+- **In view stays in the tools row. Opening Filter turns it off**, so the window counts every place. The window always shows the chart and "Show N places". With no type on, both cover every type with a button. The window repeats the type buttons and More… at the top, as a **Place types** section, acting at once on the panel. (In view moved into the window first, then came back.)
 - **After Apply, the map flies to the kept places.** A new read-only function, `place_extent`, returns the box around the listed places of the types that are on that the size and ecoregion filter keeps. It is a migration, applied to the hosted database after the user approves. With no type on, Apply does not move the map.
 - **Landscape adds no padding.** Only the Places columns do.
 - **Slower, smoother moves.** Fits and pans fly (`flyTo`, speed 0.5, curve 1.6), rising and coming down on a long move. The padding slide takes 900 ms, slow at both ends. A reduced-motion setting still skips the flights.
@@ -80,7 +80,7 @@ From the code on 26 November 2026:
 ## Done when
 
 - Ecoregions combine with the other types and draw below them, and a park inside an ecoregion opens the park.
-- The list starts with In view on, in the Filter window, and Sort and Filter show before a type is chosen. After Apply the map flies to the kept places.
+- The list starts with In view on, Sort, Filter, and In view show before a type is chosen, and opening Filter turns In view off and counts every place. After Apply the map flies to the kept places.
 - The globe is centred in the free space beside the Places columns, and fits land there, with no console errors in the browser check.
 - The tests, type check, and lint pass.
 - The user has evaluated the local app and approved it.

@@ -6,6 +6,7 @@ import {
   loadPilotPlaceFilterStats,
   loadPilotPlaceRank,
   loadPilotPlaceWindow,
+  loadPilotPlaceWindowCount,
   loadPlaceRelease,
   loadPlaceSearchWindow,
 } from '@/places/api';
@@ -715,40 +716,52 @@ describe('Places panel', () => {
     expect(store.listInView).toBe(true);
   });
 
-  it('shows Sort and Filter before a type, and Filter applies for later', async () => {
-    const wrapper = mountPlaces();
+  it('shows the tools before a type, and Filter counts every place with the type buttons', async () => {
+    vi.mocked(loadPilotPlaceWindowCount).mockResolvedValue({
+      status: 'ok',
+      total: 2,
+    });
+    const wrapper = mountPlaces(true);
     const store = usePlacesStore();
     await flushPromises();
 
     const tools = wrapper.findAll('.places-tool').map(tool => tool.text());
-    expect(tools).toEqual(['Sort', 'Filter']);
+    expect(tools).toEqual(['Sort', 'Filter', 'In view']);
     expect(wrapper.find('.places-count').exists()).toBe(false);
+    expect(store.listInView).toBe(true);
 
+    // Opening Filter turns In view off, so it counts every place
     await wrapper.get('button.places-filter-toggle').trigger('click');
     await flushPromises();
-    // The size range is read over every type with a button
+    expect(store.listInView).toBe(false);
+    const dialog = wrapper.findComponent({ name: 'PlacesFilterDialog' });
+    const everyType = [
+      'conservation_area',
+      'ecoregion',
+      'world_heritage_site',
+      'ramsar_site',
+      'biosphere_reserve',
+    ];
+    expect(dialog.props('countTypes')).toEqual(everyType);
+    expect(loadPilotPlaceFilterStats).toHaveBeenLastCalledWith(everyType, []);
+
+    // The window repeats the type buttons, and they act on the panel
+    const inWindow = new DOMWrapper(document.body)
+      .findAll('.filter-dialog .place-type')
+      .find(button => button.text() === 'Conservation areas');
+    expect(inWindow).toBeDefined();
+    await inWindow!.trigger('click');
+    await flushPromises();
+    expect(store.listTypes).toEqual(['conservation_area']);
+    expect(typeButton(wrapper, 'Conservation areas').classes()).toContain(
+      'is-on'
+    );
+    expect(dialog.props('countTypes')).toEqual(['conservation_area']);
     expect(loadPilotPlaceFilterStats).toHaveBeenLastCalledWith(
-      [
-        'conservation_area',
-        'ecoregion',
-        'world_heritage_site',
-        'ramsar_site',
-        'biosphere_reserve',
-      ],
+      ['conservation_area'],
       []
     );
-    const dialog = wrapper.findComponent({ name: 'PlacesFilterDialog' });
-    expect(dialog.props('noType')).toBe(true);
-
-    store.applyFilter([2000, null]);
-    await typeButton(wrapper, 'Conservation areas').trigger('click');
-    await flushPromises();
-    expect(dialog.props('noType')).toBe(false);
-    expect(wrapper.find('.places-count').exists()).toBe(true);
-    expect(loadPilotPlaceWindow).toHaveBeenLastCalledWith(
-      expect.objectContaining({ sizeMin: 2000 }),
-      expect.any(AbortSignal)
-    );
+    wrapper.unmount();
   });
 
   it('lists places that start with the search when no type is selected', async () => {
