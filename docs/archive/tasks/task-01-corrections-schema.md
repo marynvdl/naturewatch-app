@@ -1,12 +1,14 @@
 # Task 01 — Corrections schema and catalog
 
-Parcel: [Corrections](../parcels/corrections.md).
+Parcel: [Corrections](../../parcels/corrections.md).
 
 Repository: naturewatch-app. Start from `develop`. The parcel was defined in #465.
 
 ## Goal
 
 The database stores a correction to a layer: its polygon, years, action, value, note, photos, submitter, and review. An admin submits one and an admin reviews it, through RPCs only. Photos have a private Storage bucket. Each published threat layer in `layers.json` says which corrections it accepts, and the catalog tests check it. Nothing on the map changes yet. Drawing and the form are task 02.
+
+Applied to the hosted database on 26 November 2026, after the user approved it: `layer_corrections` is there with row security on and no rows, with both RPCs and the private `correction-photos` bucket. Task 05b's migration file was brought onto the branch unchanged, so `db push` applied only this one.
 
 ## Facts already stored
 

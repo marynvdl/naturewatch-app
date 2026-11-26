@@ -43,7 +43,7 @@ This parcel is the capture side: drawing, the form, photos, and a review queue. 
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app. Task files are written when a task starts.
 
-- [ ] [Task 01 — Corrections schema and catalog](../tasks/task-01-corrections-schema.md) — naturewatch-app
+- [x] [Task 01 — Corrections schema and catalog](../archive/tasks/task-01-corrections-schema.md) — naturewatch-app
   - *Goal:* Add the corrections table, its submit and review RPCs with admin-only access, and a Storage bucket for photos. Add a `corrections` block to each published threat layer in `layers.json` (built, treeloss, fire, cropland, roads, dams), with its schema and catalog tests. Apply the migration to the hosted database after approval.
 - [ ] Task 02 — Draw and record a correction — naturewatch-app
   - *Goal:* In edit mode, a button in the Measure panel draws a polygon and opens a form built from the catalog, with a layer picker that lists the threat layers on the map, then saves the correction as `submitted`. Update `docs/user/using-the-map.md`. Run the tests and a browser check.
