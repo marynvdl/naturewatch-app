@@ -36,7 +36,7 @@ From the code and the hosted database on 26 November 2026:
 3. **Refuse maps and signs.**
    - `file_infos` also reads the `Categories` extmetadata.
    - A file is refused, as `title` or `category`, when its title or one of its categories names a map, information board, sign, signboard, plan, diagram, or panel. Words are matched whole, so "Panelas" or "Signal Hill" are kept. The words are one list in the script.
-4. **Fewer search results.** A place that already has 2 files from P18, the lead image, or its category takes at most 1 search result.
+4. **Fewer search results.** A place takes at most 1 search result. The rule first written, at most 1 once a place has 2 better files, changed nothing under the cap of 3, so the user chose this one on 26 November 2026. On the hosted suggestions it withdraws 407 of the 806 search links.
 5. **Photos from places inside.**
    - For each ecoregion, `fetch` reads the approved links of the published World Heritage Sites and conservation areas with a confirmed, current `located_in` link to it. Each place's main photograph comes first, then the rest, with places ordered by `subject_coverage`, largest first.
    - It keeps up to 3, on top of the 3 Commons files, with origin `child`, score 0.8, and the place's id and name. The image and its alt text and caption are reused.
@@ -65,7 +65,7 @@ From the code and the hosted database on 26 November 2026:
 
 ## Done when
 
-- `fetch` suggests the Wikipedia lead image, refuses maps, boards, and signs by title or category, takes at most 1 search result after 2 better files, and suggests ecoregions up to 3 photographs from places inside.
+- `fetch` suggests the Wikipedia lead image, refuses maps, boards, and signs by title or category, takes at most 1 search result per place, and suggests ecoregions up to 3 photographs from places inside.
 - Those photographs read "From <place>" on the Photos tab.
 - The existing suggestions the new rules refuse are withdrawn on the hosted database, after the user saw the counts.
 - The rerun is loaded on the hosted database after approval, and its counts are recorded here.

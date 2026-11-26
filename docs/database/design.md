@@ -472,6 +472,7 @@ Supabase Auth does all sign-in. There are no password, session, or identity tabl
 | `suggested_by_user` | uuid FK → `profiles`, null | |
 | `suggested_by_pipeline` | text, null | Pipeline name and version |
 | `suggestion_score` | double precision, null | |
+| `suggested_from_place_id` | uuid FK → `places`, null | `on delete set null`. A suggestion borrowed from a place inside this one. Since Wayfinding task 05b (`20261203100000_photo_suggested_from.sql`). |
 | `reviewed_by`, `reviewed_at`, `review_note` | | |
 | `caption`, `alt_text` | text | |
 | `is_primary` | boolean | Unique per place where true. CHECK: only when `approved`. |
