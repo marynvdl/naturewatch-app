@@ -2,64 +2,85 @@
 
 Parcel: [Wayfinding](../parcels/wayfinding.md).
 
-Repository: naturewatch-app. The work moves to naturewatch-analysis only if the tiles need a rebuild. Start from `develop`. Task 03 merged in #460.
+Repository: naturewatch-app. Start from `develop`. Task 03 merged in #460.
 
 ## Goal
 
-Ecoregion outlines get thinner and lighter when zoomed out, so a world or continent view is not covered in olive lines. The user picks the paint on the dev server. Find out why the Aldabra and Amsterdam–Saint Paul ecoregions do not line up with the basemap. Then fix it in the recipe, or record it in `docs/user/data.md`.
+Zoomed out, ecoregions show as fills in RESOLVE's colours, with no outline. Zoomed in, they show as outlines only. In between, one fades into the other, so a squiggly, patchy ecoregion such as Zambezian Baikiaea woodlands no longer looks like a solid shape. The user judges the paint on the dev server. The Labels toggle stops hiding the ecoregion and recognition outlines. Find out why the Aldabra and Amsterdam–Saint Paul ecoregions do not line up with the basemap, and record the cause.
+
+Decided 26 November 2026 by the user, after seeing the thinner outline (candidate A):
+
+- **Thinner lines alone do not help.** Zambezian Baikiaea woodlands has 470 parts, 387 of them under 10 km², with 131,645 points and 53 holes. Zoomed out it still reads as a solid shape.
+- **Crossfade from fill to outline.** This replaces candidates B and C. It reverses the decision of 22 November (Ecoregions task 04) to draw outlines only and leave RESOLVE's colours unread.
+- **One colour per ecoregion**, RESOLVE's `COLOR`, not the biome colour `COLOR_BIO`.
+- **No tile rebuild.** Colours come from the database through a new read-only function. Generalised tiles, which would drop small parts and holes when zoomed out, go to the parcel's Deferred section.
+- **The Labels fix is part of this task.**
 
 ## Facts already stored
 
 From the code, naturewatch-analysis, and the hosted database on 26 November 2026:
 
-- `usePlaceBoundaries.ts`: `ecoregionPaint(satellite)` gives `ecoregions-line` the colour `ECOREGION_COLOUR` (`display.ts`: monochrome `#5b6b2f`, satellite `#e3e8a0`) and the width `OUTLINE_WIDTH`: 0.8 px at zoom 3, 1.4 at 6, 2 at 9, and 2.6 at 12. The line has full opacity at every zoom. Recognitions share `OUTLINE_WIDTH`. The selected line is 2.5 px and the hover line 2 px. `setBasemapPaint` reapplies the paint when the basemap changes.
-- The archive `gs://nature-watch-tiles/places/ecoregions/v1/ecoregions.pmtiles`, layer `ecoregions`, zooms 0–12, was built on 21 November 2026 from `cookbook/recipes/places-ecoregions.yaml`. The recipe sets `simplification: 1`, `simplification_max_zoom: 0`, and `detect_shared_borders: true`. Ecoregions under 30 km² start at zoom 1.
-- Hosted `place_boundaries`, current boundary, read only:
-  - Aldabra Island xeric scrub: 159.1 km², 5 parts, 167 points, box 46.20–46.52° E, 9.47–9.34° S.
-  - Amsterdam-Saint Paul Islands temperate grasslands: 69.2 km², 2 parts, 48 points, box 77.48–77.59° E, 38.74–37.82° S.
-  - Both boxes sit on the real islands. The polygons are coarse, so the likely cause is RESOLVE's own shapes, not a shifted tile. This step checks that.
-- `docs/user/data.md` says the ecoregions come from RESOLVE Ecoregions 2017. `docs/user/using-the-map.md` says the outlines are olive, and pale yellow on satellite.
+- `usePlaceBoundaries.ts`:
+  - `ecoregionPaint(satellite)` gives `ecoregions-fill` a transparent fill that only catches clicks.
+  - It gives `ecoregions-line` the colour `ECOREGION_COLOUR` (`display.ts`: monochrome `#5b6b2f`, satellite `#e3e8a0`) at full opacity. Candidate A's widths are on this branch, uncommitted: 0.3 px at zoom 1, 0.5 at 4, 1 at 7, 1.6 at 10, and 2.2 at 12.
+  - Recognitions keep `OUTLINE_WIDTH`. The selected line is 2.5 px and the hover line 2 px.
+  - `applyBasemapPaint` reapplies the paint when the basemap changes. The ecoregion layers sit below the conservation-area and recognition layers, whose fill is a solid green patch when zoomed out (`PLACE_FILL_OPACITY`, 0.6 at zoom 4).
+- `ecoregion_details.source_attributes` holds RESOLVE's attributes. All 846 published ecoregions have a valid `COLOR` (`#RRGGBB`), 537 distinct colours. `anon` has no grant on `ecoregion_details`. The tiles carry only `id` and `area_km2`.
+- `withdrawn_place_ids()` (`20261126100000_place_cleanup.sql`) is the pattern for a small read the map makes once per page load: `language sql`, `stable`, `security definer`, `set search_path = ''`. Its local test is `supabase/tests/test_place_cleanup_local.py`.
+- **Labels.** `setLabels` in `MapComponent.vue` hides every `symbol` and `line` layer except `measure-label`, `gl-draw`, and `places-` layers. The `ecoregions-` and `recognitions-` lines are hidden too. Turning Labels back on makes them visible even while their type is off.
+- **Aldabra and Amsterdam–Saint Paul.** Checked on 26 November 2026:
+  - The importer only repairs invalid shapes and does not simplify. The stored boundaries are RESOLVE's polygons: Aldabra has 5 parts and 167 points, Amsterdam–Saint Paul 2 parts and 48 points.
+  - The archive's features match them at zooms 1 to 12.
+  - In the browser, the Aldabra outline sits about 1–2 km north of the basemap atoll, and the Amsterdam outline about 2 km south-west of the island.
+  - So the offset is RESOLVE's own coarse island shapes. One sentence in `docs/user/data.md` records it, uncommitted on this branch.
 
 ## Do this
 
-1. **Paint, `usePlaceBoundaries.ts`.** Give ecoregions their own line width and opacity by zoom. Recognitions keep `OUTLINE_WIDTH`. The selected and hover lines stay as they are. Start from these candidates. Show them to the user one at a time on the dev server, and change them as the user asks:
-   - **A, thinner:** 0.3 px at zoom 1, 0.5 at 4, 1 at 7, 1.6 at 10, 2.2 at 12. Full opacity.
-   - **B, thinner and faded:** A's widths, with opacity 0.4 up to zoom 3, rising to 0.9 at zoom 7.
-   - **C, thinner and paler:** A's widths, with the colour going from a paler olive at zoom 3 to `#5b6b2f` at zoom 7. On satellite, from a fainter yellow to `#e3e8a0`.
-
-   Both basemaps follow the same rule. The candidates are not committed side by side, and no switcher is added.
-2. **Misplaced ecoregions.** For Aldabra and Amsterdam–Saint Paul, compare:
-   - the RESOLVE 2017 polygon, from the source file if it is on the laptop, otherwise its stored copy;
-   - the stored current boundary;
-   - the archive's features at zoom 12, read with a range request from the public bucket;
-   - the basemap coastline in the browser.
-
-   Report which step the mismatch starts at, with a screenshot of each place.
-   - **RESOLVE's shape is the cause:** add one sentence to the ecoregions part of `docs/user/data.md`. It says RESOLVE draws small islands coarsely, so an outline can miss the coastline, and names these two as examples.
-   - **The tiles are the cause:** propose the recipe change in naturewatch-analysis, with a cost estimate for the rebuild, and wait for approval. Rebuilding goes through that repo's task skill, with its own branch and a pull request into `main`, linked from this one.
-3. **Tests.** In `usePlaceBoundaries.spec.ts`, check the ecoregion line paint on both basemaps, and that recognitions keep their widths. Run the catalog suite, the places tests, `npm run type-check`, and `npm run lint`.
-4. **Browser check.** Run the `browser-check` skill on `/`, wide and narrow, with Ecoregions on. Use a world view and a zoom 8 view, on the monochrome and satellite basemaps, with Conservation areas on too in one shot.
-5. **User evaluation.** Start the dev server on `http://localhost:5173` and give the URL to the user. The user picks the paint before the pull request is opened.
-6. **Docs.**
-   - `docs/user/using-the-map.md`: one sentence that ecoregion outlines are thinner and lighter when zoomed out.
-   - `docs/user/data.md`: only if step 2 records the cause there.
-   - The parcel: remove the Aldabra and Amsterdam–Saint Paul open question, and give its answer in this task's archived file.
+1. **Read, a migration.** Add `ecoregion_colours()`, which returns `(id uuid, colour text)` for each published ecoregion from `source_attributes->>'COLOR'`. It follows the `withdrawn_place_ids()` pattern, and `anon` and `authenticated` may execute it. Add a local test beside `test_place_cleanup_local.py`. Apply the migration to the hosted database only after the user approves.
+2. **Client read, `src/places/api.ts`.** Read `ecoregion_colours()` once per page load, the first time ecoregions draw. Until it answers, or if it fails, the fill uses `ECOREGION_COLOUR`.
+3. **Paint, `usePlaceBoundaries.ts`.**
+   - `ecoregions-fill` takes each ecoregion's colour through a `match` on `id`. Its opacity fades by zoom.
+   - `ecoregions-line` keeps its single colour, and its opacity rises as the fill fades.
+   - Starting point, both basemaps: fill opacity 0.35 up to zoom 4, falling to 0 at zoom 7. Line opacity 0 up to zoom 4, rising to 1 at zoom 7. Candidate A's widths stay.
+   - The fill keeps catching clicks at every zoom, at opacity 0.
+   - The selected and hover lines stay as they are, at full opacity at every zoom.
+   - Change the numbers as the user asks.
+4. **Labels, `MapComponent.vue`.** `setLabels` leaves the `ecoregions-` and `recognitions-` layers alone, as it does the `places-` layers.
+5. **Tests.**
+   - `usePlaceBoundaries.spec.ts`: the fill's colour match and both opacity ramps on both basemaps, the fallback colour, and that recognitions keep their widths.
+   - A test that turning Labels off and on leaves the place, recognition, and ecoregion layers as they were.
+   - Run the catalog suite, the places and component tests, the new local pytest, `npm run type-check`, and `npm run lint`.
+6. **Browser check.** Run the `browser-check` skill on `/`, wide and narrow, with Ecoregions on. Use a world view, southern Africa at zoom 4 and 6, and zoom 8, on the monochrome and satellite basemaps. Take one shot with Conservation areas on too, and one with Labels off.
+7. **User evaluation.** Start the dev server on `http://localhost:5173` and give the URL to the user. The user judges the paint before the pull request is opened.
+8. **Docs.**
+   - `docs/blueprint.md`: the app reads `ecoregion_colours()` and paints the ecoregion fill from it.
+   - `docs/user/using-the-map.md`: ecoregions are fills in RESOLVE's colours when zoomed out, and fade into the olive outline closer in. Labels no longer affects the outlines.
+   - `docs/user/data.md`: the colours are RESOLVE's, and the island sentence from the facts above.
+   - The parcel:
+     - Remove the Aldabra and Amsterdam–Saint Paul open question, and give its answer in this task's archived file.
+     - Add the generalised tiles to Deferred.
+     - Make task 04's goal and the Done when line match the crossfade.
 
 ## Do not
 
+- Do not rebuild or replace a tile archive.
 - Do not change the conservation-area, recognition, selected, or hover paint.
-- Do not change the database.
-- Do not rebuild or replace a tile archive without a costed, approved proposal.
+- Do not apply the migration to the hosted database before the user approves.
+- Do not change the card dot colour or `ECOREGION_COLOUR`.
+- Do not paint by biome.
 - Do not edit the RESOLVE polygons by hand.
-- Do not open the pull request before the user has picked the paint.
+- Do not open the pull request before the user has judged the paint.
 - Do not start task 05a.
 
 ## Done when
 
-- Ecoregion outlines are thinner and lighter when zoomed out, in the paint the user picked, on both basemaps, with no console errors in the browser check.
-- The cause of the two misplaced ecoregions is found. It is either recorded in `data.md`, or fixed by an approved rebuild whose pull request in naturewatch-analysis has merged.
+- Zoomed out, ecoregions are fills in their RESOLVE colours. Closer in, they fade into outlines, in the paint the user approved, on both basemaps.
+- Labels off and on leaves every place, recognition, and ecoregion layer as it was.
+- The browser check shows no console errors.
+- The island offset is recorded in `data.md`.
+- `ecoregion_colours()` is applied to the hosted database, after approval, and the map reads it.
 - The tests, type check, and lint pass.
-- `using-the-map.md`, `data.md` where needed, and the parcel match the result.
+- `blueprint.md`, `using-the-map.md`, `data.md`, and the parcel match the result.
 - One pull request into `develop`, merged after its checks pass and the user approves.
 
 ## How to work
