@@ -38,7 +38,7 @@ The rules, encodings, and sample figures are in the two recipes and `energy/READ
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. Task files are written when a task starts.
 
-- [ ] [Task 01 — Energy: recipes and sample](../tasks/task-01-energy-recipes-and-sample.md) — naturewatch-analysis
+- [x] [Task 01 — Energy: recipes and sample](../archive/tasks/task-01-energy-recipes-and-sample.md) — naturewatch-analysis
   - *Goal:* Add the `power-lines` and `power-sites` recipes: release, classes kept, sprout bands, tile encodings, and the attributes kept. On the laptop, build a sample for windows such as the Karoo and one European region. Check them against imagery, compare solar and wind farms with Global Renewables Watch, and choose the top zooms. Write the expected global cost and stop for approval.
 - [ ] Task 02 — Energy: global seed and sprouts — naturewatch-analysis
   - *Goal:* After approval, write the global seed and both sprouts with their VRT and STAC files. Check the sample windows against task 01. Record the run cost.

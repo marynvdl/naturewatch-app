@@ -1,6 +1,6 @@
 # Task 01 — Energy recipes and sample
 
-Parcel: [Energy](../parcels/energy.md). Shared design: [Threat Layers](../parcels/threat-layers.md#shared-design).
+Parcel: [Energy](../../parcels/energy.md). Shared design: [Threat Layers](../../parcels/threat-layers.md#shared-design).
 
 Repository: naturewatch-analysis. Start from `main`. This is the first task in the parcel.
 
