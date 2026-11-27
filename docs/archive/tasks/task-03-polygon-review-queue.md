@@ -1,12 +1,14 @@
 # Task 03 — Polygon review queue
 
-Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 02 merged in #473.
 
 ## Goal
 
 An admin in edit mode opens a Boundaries list from the Account menu. It lists the current boundaries that are still `pending` or were `excluded`, with their findings. Choosing one opens the place on its Status tab. A Boundary section there shows the findings. The admin can accept the warnings, which sets `qc_status` to `accepted`, and can set the boundary to `eligible`, `excluded`, or back to `pending`, with a reason. Every change is audited. Nothing on the map changes.
+
+Done on 27 November 2026. The migration was applied to the local database with psql, because the local history lacks the corrections migration's row, and to hosted after the user approved it. The browser check ran against the local stack and restored the rows it changed. No boundary on hosted was reviewed.
 
 ## Facts already stored
 
