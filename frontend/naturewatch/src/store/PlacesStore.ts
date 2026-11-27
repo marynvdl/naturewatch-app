@@ -384,7 +384,9 @@ const usePlacesStore = defineStore('places', () => {
    * places that need attention, the withdrawn places, or the corrections.
    * Admins only.
    */
-  const adminList = ref<'attention' | 'withdrawn' | 'corrections' | null>(null);
+  const adminList = ref<
+    'attention' | 'withdrawn' | 'corrections' | 'boundaries' | null
+  >(null);
   /** Goes up after a place is withdrawn, restored, flagged, or cleared, so the lists read again. */
   const adminListVersion = ref(0);
   /** The places list's cards while the photo filter is on, in order. */

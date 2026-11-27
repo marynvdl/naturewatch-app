@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, useId, watch } from 'vue';
+import PlaceBoundaryReview from '@/components/PlaceBoundaryReview.vue';
 import PlaceSuggestInput from '@/components/PlaceSuggestInput.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,9 +17,9 @@ import {
 import usePlacesStore from '@/store/PlacesStore';
 
 /**
- * The Status tab, in Edit mode: withdraw a place from the map or restore it,
- * and flag it as needing attention or clear the flag. Each takes a reason and
- * an optional note.
+ * The Status tab, in Edit mode: review the current boundary for Stats,
+ * withdraw a place from the map or restore it, and flag it as needing
+ * attention or clear the flag. Each takes a reason and an optional note.
  */
 const props = defineProps<{
   placeId: string;
@@ -155,6 +156,8 @@ function clearFlag() {
 
 <template>
   <div class="status">
+    <PlaceBoundaryReview :place-id="placeId" />
+
     <section class="status-form" aria-labelledby="status-withdrawal">
       <p id="status-withdrawal" class="map-section status-heading">
         Withdraw from the map
