@@ -31,6 +31,24 @@ From the code and the hosted database on 27 November 2026:
   - No pieces table is stored, and the database does not grow.
 - **Tested locally, then with one hosted call** (the user).
 
+## Result of the local heavy test
+
+The test ran on 27 November 2026 on the local stack. It used the three heaviest hosted boundaries and the 278 neighbours whose boxes meet theirs, 257 MB in all. The copied rows were removed afterwards.
+
+- **The first version had no index.** It joined the pieces in two CTEs. It took 584 s on `7963122c`, which cut into 21,197 pieces against 131,027 neighbour pieces, about 2.8 billion box tests. The neighbours' pieces now go into a temporary table with a GiST index, so the function is `plpgsql` and volatile.
+
+| Subject | Neighbours | Old: time, peak memory | New: time, peak memory |
+| --- | --- | --- | --- |
+| `7963122c` (Natura 2000) | 108 | 99.6 s, 1,890 MB | 53.3 s, 592 MB |
+| `f22094e2` (Natura 2000) | 108 | 97.5 s, 1,884 MB | 53.4 s, 602 MB |
+| `16b1d97b` (conservation area) | 6 | 21.4 s, 885 MB | 9.5 s, 293 MB |
+
+- **The same places came back.**
+  - For overlaps of 0.1 km² or more, the areas agree within 0.007%.
+  - For overlaps of 0.01 km² or more, they agree within 0.14%.
+  - The coverages differ by at most 0.00002.
+- **Three slivers below 0.005 km² differ more.** Along a shared border, the old function gave about 0.00001 km² and the new one about 0.0013 km². Shapely, on the whole shapes, gives 0.0022 and 0.0041 km². No method agrees on such slivers. They are far below the 1% share the derive scripts use.
+
 ## Do this
 
 1. **Migration `20261207100000_overlaps_on_pieces.sql`.**
@@ -68,7 +86,7 @@ From the code and the hosted database on 27 November 2026:
 ## Done when
 
 - The migration is applied to the local and hosted databases.
-- The local heavy test shows the same overlaps as before, within 0.1%, at a much lower peak memory, and the numbers are recorded in this file.
+- The local heavy test shows the same overlaps as before, within 0.1% for overlaps of 0.1 km² or more, at a much lower peak memory, and the numbers are recorded in this file.
 - The one hosted call finished within the timeout.
 - The fixture and supabase tests pass.
 - design.md is updated.

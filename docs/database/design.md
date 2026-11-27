@@ -427,7 +427,7 @@ Examples:
 
 **No relationship means stats can be added up.** Places in the same country can overlap or leave gaps. A total across places is its own calculation on a spatial union, or a stat of the parent's own boundary.
 
-Spatial overlap is found on demand by an admin-only function, `place_overlaps(place_id)`, using the GiST index. It returns each overlapping published place with the shared area and both coverages. It is not stored. A reviewer's decision is stored: `confirmed` keeps the link, `rejected` stops it being suggested again.
+Spatial overlap is found on demand by an admin-only function, `place_overlaps(place_id)`, using the GiST index. Since Shaping Boundaries task 02 (`20261207100000_overlaps_on_pieces.sql`) it cuts both shapes into pieces of at most 256 vertices and sums the areas of the pieces that meet, through a GiST index on a temporary table, so its memory stays bounded on any boundary. It returns each overlapping published place with the shared area and both coverages. It is not stored. A reviewer's decision is stored: `confirmed` keeps the link, `rejected` stops it being suggested again.
 
 ### 4.6 People, images, audit
 
