@@ -663,8 +663,11 @@ onBeforeUnmount(() => {
               <p v-if="image.isPrimary" class="photos-main">Main photograph</p>
               <p class="photos-caption">{{ image.caption ?? image.altText }}</p>
               <p class="photos-note">{{ credit(image) }}</p>
+              <p v-if="image.suggestedFrom" class="photos-note">
+                From {{ image.suggestedFrom }}
+              </p>
               <p
-                v-if="image.suggestedByPipeline"
+                v-else-if="image.suggestedByPipeline"
                 class="photos-note"
                 :title="image.suggestedByPipeline"
               >

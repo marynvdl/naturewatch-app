@@ -32,6 +32,7 @@ export const EXTENSIONS: Record<string, string> = {
 };
 const LINK_COLUMNS =
   'place_id, image_id, status, is_primary, gallery_position, caption, alt_text, suggested_by_pipeline, suggestion_score, created_at, ' +
+  'from_place:places!suggested_from_place_id(name, curation:place_curations(display_name)), ' +
   'image:images(storage_path, external_url, source_id, source_record_id, source_url, creator_name, width, height, image_status, ' +
   'licence:licences(id, title, url), source:sources(title))';
 
@@ -51,6 +52,8 @@ export interface PlaceImage {
   caption: string | null;
   altText: string;
   suggestedByPipeline: string | null;
+  /** The place inside this one whose photograph was suggested, by name. */
+  suggestedFrom: string | null;
   createdAt: string;
   src: string;
   thumbnail: string;
@@ -147,6 +150,10 @@ interface LinkRow {
   caption: string | null;
   alt_text: string;
   suggested_by_pipeline: string | null;
+  from_place: {
+    name: string;
+    curation: { display_name: string | null } | null;
+  } | null;
   created_at: string;
   image: {
     storage_path: string | null;
@@ -234,6 +241,9 @@ function fromRow(row: LinkRow): PlaceImage | null {
     caption: row.caption,
     altText: row.alt_text,
     suggestedByPipeline: row.suggested_by_pipeline,
+    suggestedFrom: row.from_place
+      ? (row.from_place.curation?.display_name ?? row.from_place.name)
+      : null,
     createdAt: row.created_at,
     src,
     thumbnail,

@@ -972,6 +972,7 @@ describe('Place profile', () => {
         caption: null,
         altText: 'Grassland at dusk',
         suggestedByPipeline: null,
+        suggestedFrom: null,
         createdAt: '2026-11-14T09:00:00Z',
         src: 'https://example.test/a.jpg',
         thumbnail: 'https://example.test/a-small.jpg',
@@ -1089,6 +1090,25 @@ describe('Place profile', () => {
     it('opens on Overview without a start tab, with no Next place', async () => {
       const wrapper = await openPhotos();
       expect(wrapper.text()).not.toContain('Next place');
+    });
+
+    it('names the place a borrowed suggestion came from', async () => {
+      vi.mocked(loadPlaceImages).mockResolvedValue({
+        status: 'ok',
+        images: [
+          photo({
+            imageId: 'k1',
+            status: 'suggested',
+            position: null,
+            suggestedByPipeline: 'suggest_photos/2',
+            suggestedFrom: 'Gobabeb',
+          }),
+        ],
+      });
+      const wrapper = await openPhotos(true);
+      const card = wrapper.get('[data-image="k1"]').text();
+      expect(card).toContain('From Gobabeb');
+      expect(card).not.toContain('Suggested by Sooty');
     });
 
     it('reviews suggestions in the photo viewer, one after another', async () => {
