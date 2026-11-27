@@ -1,6 +1,6 @@
 # Task 05b — Better photo suggestions
 
-Parcel: [Wayfinding](../../parcels/wayfinding.md).
+Parcel: [Wayfinding](../parcels/wayfinding.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 05a merged in #463.
 

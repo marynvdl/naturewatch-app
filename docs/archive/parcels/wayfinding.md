@@ -63,7 +63,7 @@ As an admin, I can:
 
 ## Deferred
 
-- A higher Built floor through a tile rebuild, or Google's 0.2 presence cutoff. Task 06 records the false positives instead. The cleaned sprout is task 1 of [Stats Ledger](stats-ledger.md).
+- A higher Built floor through a tile rebuild, or Google's 0.2 presence cutoff. Task 06 records the false positives instead. The cleaned sprout is task 1 of [Stats Ledger](../../parcels/stats-ledger.md).
 - A button for photo suggestions.
 - Chip icons per place type, such as one for ecoregions and one for conservation areas, as a visual system for the sets on the map.
 - The Attention and Withdrawn admin lists as filters on the places list, like the photo queue.
@@ -75,19 +75,19 @@ As an admin, I can:
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request into `develop` in naturewatch-app, or into `main` in naturewatch-analysis. Task files are written when a task starts.
 
-- [x] [Task 01 — Profile navigation](../archive/tasks/task-01-profile-navigation.md) — naturewatch-app
+- [x] [Task 01 — Profile navigation](../tasks/task-01-profile-navigation.md) — naturewatch-app
   - *Goal:* Keep the tab between places, add back and the breadcrumb, keep the Related set while opening its places, add temporary and pinned chips, name a place when the pointer rests on it, and let the citation scroll with the content. Update `docs/user/using-the-map.md`. Run the tests and a browser check, and have the user evaluate the local app.
-- [x] [Task 02 — Edit mode on view mode](../archive/tasks/task-02-edit-mode-on-view-mode.md) — naturewatch-app
+- [x] [Task 02 — Edit mode on view mode](../tasks/task-02-edit-mode-on-view-mode.md) — naturewatch-app
   - *Goal:* Edit mode shows the view tabs plus Photos and Status. Related keeps its cards, map drawing, and hover, with the link editor on top.
-- [x] [Task 03 — Places bar and globe](../archive/tasks/task-03-places-bar-and-globe.md) — naturewatch-app
+- [x] [Task 03 — Places bar and globe](../tasks/task-03-places-bar-and-globe.md) — naturewatch-app
   - *Goal:* Ecoregions combine with other types, the list defaults to In view, Filter is always shown, and the map's padding follows the open panels so the globe is centred.
-- [x] [Task 04 — Ecoregion lines](../archive/tasks/task-04-ecoregion-lines.md) — naturewatch-app, and naturewatch-analysis only if the tiles need a rebuild
+- [x] [Task 04 — Ecoregion lines](../tasks/task-04-ecoregion-lines.md) — naturewatch-app, and naturewatch-analysis only if the tiles need a rebuild
   - *Goal:* Draw ecoregions as fills in RESOLVE's colours with no outline, read through `ecoregion_colours()`, in the paint the user picked on the dev server. Keep the Labels toggle off the place outlines. Record why Aldabra and Amsterdam–Saint Paul are misplaced.
-- [x] [Task 05a — Photo queue and licences](../archive/tasks/task-05a-photo-queue-and-licences.md) — naturewatch-app
+- [x] [Task 05a — Photo queue and licences](../tasks/task-05a-photo-queue-and-licences.md) — naturewatch-app
   - *Goal:* Make the queue a filter on the places list, hide rejected photos, purge old rejected links into `photo_refusals`, and accept every CC BY and CC BY-SA version.
-- [x] [Task 05b — Better photo suggestions](../archive/tasks/task-05b-better-photo-suggestions.md) — naturewatch-app
+- [x] [Task 05b — Better photo suggestions](../tasks/task-05b-better-photo-suggestions.md) — naturewatch-app
   - *Goal:* Add the Wikipedia lead image and photos from conservation areas inside an ecoregion. Refuse maps and signboards, and withdraw the existing ones after the user sees the counts. Rerun on the hosted database after approval.
-- [ ] [Task 06 — Built false positives](../tasks/task-06-built-false-positives.md) — naturewatch-app
+- [x] [Task 06 — Built false positives](../tasks/task-06-built-false-positives.md) — naturewatch-app
   - *Goal:* Record in `docs/user/data.md` that Built has no presence cutoff on Google cells, so bare rock can show as built, for example in southern Kruger.
 
 ## Done when
