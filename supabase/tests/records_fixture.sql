@@ -1518,6 +1518,46 @@ begin
     raise exception 'place_overlaps returned a place that does not overlap';
   end if;
 
+  -- A subject of 800 vertices is cut into several pieces. The summed area of the
+  -- pieces equals the whole-shape intersection with a square over a quarter of it.
+  declare
+    round_place uuid;
+    square_place uuid;
+    round_geom extensions.geometry := extensions.st_multi(extensions.st_buffer(
+      extensions.st_setsrid(extensions.st_makepoint(40, 10), 4326), 0.5, 'quad_segs=200'));
+    square_geom extensions.geometry := extensions.st_multi(
+      extensions.st_makeenvelope(40, 10, 41, 11, 4326));
+    expected double precision;
+  begin
+    if (select count(*) from extensions.st_subdivide(round_geom, 256)) < 2 then
+      raise exception 'the round fixture is not cut into pieces';
+    end if;
+    insert into public.places (name, place_type_id, publication_status)
+    values ('Fixture Round', 'conservation_area', 'published') returning id into round_place;
+    insert into public.places (name, place_type_id, publication_status)
+    values ('Fixture Square', 'ramsar_site', 'published') returning id into square_place;
+    insert into public.place_boundaries (
+      place_id, version_number, geom, source_id, source_release_id, review_status, is_current
+    )
+    select p.id, 1, p.geom, 'wdpca', release.id, 'approved', true
+    from (values (round_place, round_geom), (square_place, square_geom)) as p (id, geom)
+    cross join (select id from public.source_releases where source_id = 'wdpca' limit 1) as release;
+
+    expected := extensions.st_area(
+      extensions.st_intersection(round_geom, square_geom)::extensions.geography, true) / 1e6;
+    select * into overlap from public.place_overlaps(round_place) where place_id = square_place;
+    if overlap is null or abs(overlap.intersection_km2 - expected) > expected * 1e-6
+      or abs(overlap.subject_coverage - 0.25) > 0.01 then
+      raise exception 'place_overlaps on pieces returned %, expected % km2', overlap, expected;
+    end if;
+    select * into overlap from public.place_overlaps(square_place) where place_id = round_place;
+    if overlap is null or abs(overlap.intersection_km2 - expected) > expected * 1e-6 then
+      raise exception 'place_overlaps from the square returned %, expected % km2', overlap, expected;
+    end if;
+    delete from public.place_boundaries where place_id in (round_place, square_place);
+    delete from public.places where id in (round_place, square_place);
+  end;
+
   select id into whs_boundary from public.place_boundaries where place_id = whs and is_current;
   select id into park_boundary from public.place_boundaries where place_id = park and is_current;
   select id into ramsar_boundary from public.place_boundaries where place_id = ramsar and is_current;
