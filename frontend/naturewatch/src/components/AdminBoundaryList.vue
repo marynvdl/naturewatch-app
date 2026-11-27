@@ -118,6 +118,9 @@ watch(
   <div class="queue">
     <SegmentedControl
       :model-value="view"
+      type="single"
+      variant="outline"
+      size="sm"
       aria-label="Stats eligibility"
       @update:model-value="setView"
     >
