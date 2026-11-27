@@ -1,6 +1,6 @@
 # Task 05b — Better photo suggestions
 
-Parcel: [Wayfinding](../parcels/wayfinding.md).
+Parcel: [Wayfinding](../../parcels/wayfinding.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 05a merged in #463.
 
@@ -12,6 +12,12 @@ Decided 26 November 2026 by the user:
 
 - **Photos from places inside are suggested links.** `suggest_photos.py` writes them as `suggested`, with a new column `place_images.suggested_from_place_id`. The Photos tab shows "From <place>" on them instead of "Suggested by Sooty". The photo filter counts them like any suggestion.
 - **Up to 3 extra.** An ecoregion gets at most 3 photographs from places inside, on top of its 3 Commons suggestions.
+
+On the hosted database, after the user approved each step:
+
+- **26 November 2026.** The migration was applied. `withdraw --write` withdrew 438 of the 2,015 `suggest_photos/1` suggestions, all on ecoregions: 378 extra search results, 58 by Commons category (mostly maps, such as "Biogeographical maps of Europe" and "IBRA maps", and one sign), and 2 by title (signs). 1,577 suggestions were left.
+- **26–27 November 2026.** `fetch` sent about 3,100 requests. Commons asked for a wait of about 40 seconds on most of them under `maxlag`, so the first run took over 5 hours. That run found no lead image, because the Wikidata queries did not select `?article`. The fix reran from the cache with 106 new requests. The file has 2,591 rows. World Heritage Sites have 266 rows on 195 of 207 sites: 170 from search, 40 from a category, 38 from P18, and 18 lead images. Ecoregions have 2,325 rows on 829 of 846: 679 from a category, 507 from P18, 481 from places inside, 424 from search, and 234 lead images. European Atlantic mixed forests now gets its lead photograph first.
+- **27 November 2026.** `load` added 695 `suggested` links and 211 `images` rows. It skipped 1,896 rows as already linked, and the purge deleted nothing. Waiting for review: 1,577 from `suggest_photos/1`, and from `suggest_photos/2` 478 photographs from places inside on 225 ecoregions, 189 other ecoregion files on 182, and 28 on 25 World Heritage Sites.
 
 ## Facts already stored
 

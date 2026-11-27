@@ -94,7 +94,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* Draw ecoregions as fills in RESOLVE's colours with no outline, read through `ecoregion_colours()`, in the paint the user picked on the dev server. Keep the Labels toggle off the place outlines. Record why Aldabra and Amsterdam–Saint Paul are misplaced.
 - [x] [Task 05a — Photo queue and licences](../archive/tasks/task-05a-photo-queue-and-licences.md) — naturewatch-app
   - *Goal:* Make the queue a filter on the places list, hide rejected photos, purge old rejected links into `photo_refusals`, and accept every CC BY and CC BY-SA version.
-- [ ] [Task 05b — Better photo suggestions](../tasks/task-05b-better-photo-suggestions.md) — naturewatch-app
+- [x] [Task 05b — Better photo suggestions](../archive/tasks/task-05b-better-photo-suggestions.md) — naturewatch-app
   - *Goal:* Add the Wikipedia lead image and photos from conservation areas inside an ecoregion. Refuse maps and signboards, and withdraw the existing ones after the user sees the counts. Rerun on the hosted database after approval.
 - [ ] [Task 06 — Built false positives](../tasks/task-06-built-false-positives.md) — naturewatch-app
   - *Goal:* Record in `docs/user/data.md` that Built has no presence cutoff on Google cells, so bare rock can show as built, for example in southern Kruger.
