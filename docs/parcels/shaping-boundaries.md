@@ -41,7 +41,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* `place_overlaps()` cuts shapes with `ST_Subdivide`, and it is tested on the heaviest boundaries without running out of memory.
 - [x] [Task 03 — Polygon review queue](../archive/tasks/task-03-polygon-review-queue.md) — naturewatch-app
   - *Goal:* An admin list of flagged and `pending` boundaries with their findings. An admin accepts a warning (`qc_status` `accepted`) and sets the boundary to `eligible` or `excluded`, with a reason. Run the tests and a browser check.
-- [ ] [Task 03b — Plain boundary review](../tasks/task-03b-plain-boundary-review.md) — naturewatch-app
+- [x] [Task 03b — Plain boundary review](../archive/tasks/task-03b-plain-boundary-review.md) — naturewatch-app
   - *Goal:* Plain words for the review: one verdict per boundary, Hide from map and Flag for follow-up for the place, a Stats line, and the review list as a filter on the places list. Run the tests and a browser check.
 - [ ] Task 04 — Overlap review queue — naturewatch-app
   - *Goal:* An admin list of overlapping pairs and of the `recognises` links left `proposed`. For each pair, the admin decides the relationship, publication, and Stats eligibility through `review_overlap`. Run the tests and a browser check.

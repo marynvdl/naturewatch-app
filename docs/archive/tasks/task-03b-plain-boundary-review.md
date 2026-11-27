@@ -1,6 +1,6 @@
 # Task 03b — Plain boundary review
 
-Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 03 merged in #477.
 
@@ -8,12 +8,14 @@ Repository: naturewatch-app. Start from `develop`. Task 03 merged in #477.
 
 The Status tab and the review list use plain words for the decisions an admin makes. A boundary gets one verdict in one click: **Shape is right, count it**, **Needs fixing**, or **Leave out of Stats**. The place's own controls become **Hide from map** and **Flag for follow-up**. One line says whether the place is counted in Stats, and why. The review list becomes a filter on the places list, so Sort, In view, the place types, and Filter apply to it. The database keeps its names. Only the screen changes, plus the one value and the one RPC that the verdicts need.
 
+Done on 27 November 2026. The migration was applied to the local database with psql and to hosted after the user approved it. On hosted, the task 03 functions are gone, and the 2 accepted boundaries are unchanged. The browser check ran against the local stack and restored every row it changed. In it, a long card note overflowed its tag on a narrow screen, so `PlaceCard` now keeps a note to one line with an ellipsis.
+
 ## Facts already stored
 
 From the code and the hosted database on 27 November 2026:
 
 - **Task 03** (`20261208100000_boundary_review.sql`) added `accept_boundary_qc`, `admin_boundary_list`, and the audit trigger on `place_boundaries` without `geom`. `AdminBoundaryList.vue` is a fourth admin list. `PlaceBoundaryReview.vue` is the Boundary section of the Status tab, with Accept warnings, Eligible, Excluded, and Back to pending.
-- **Values.** `qc_status` is `unchecked`, `passed`, `flagged`, or `accepted`. `stats_eligibility` is `pending`, `eligible`, or `excluded`. A CHECK allows `eligible` only when QC is `passed` or `accepted`. `set_stats_eligibility` asks for a reason for `excluded`, and for `eligible` when QC is not `passed` ([record 8](../database/decisions.md#8-stats-eligibility-is-stored-and-changed-only-on-purpose)).
+- **Values.** `qc_status` is `unchecked`, `passed`, `flagged`, or `accepted`. `stats_eligibility` is `pending`, `eligible`, or `excluded`. A CHECK allows `eligible` only when QC is `passed` or `accepted`. `set_stats_eligibility` asks for a reason for `excluded`, and for `eligible` when QC is not `passed` ([record 8](../../database/decisions.md#8-stats-eligibility-is-stored-and-changed-only-on-purpose)).
 - **What Stats reads.** `stats_eligible_boundaries` keeps current, eligible boundaries of published places. So a withdrawn place is never counted, and a flag (`place_attention`) does not affect Stats.
 - **Hosted counts.** 51,000 boundaries are eligible, all of them under 100,000 vertices. 783 were left pending: 650 flagged and 133 heavy. 2 were accepted in the app after task 03.
 - **`check_boundaries.py load`** keeps an `accepted` status on a rerun, and sets a flagged boundary that was eligible back to pending.
@@ -124,8 +126,8 @@ With the user, 27 November 2026:
      - §4.2: `rejected`, `review_boundary`, the helper, and the notes RPC, with the task 03 functions marked as dropped;
      - §4.6: the renamed lists, as labels only;
      - §6: the RPC list.
-   - [Record 8](../database/decisions.md#8-stats-eligibility-is-stored-and-changed-only-on-purpose): one line saying `review_boundary` changes eligibility on purpose too, and that eligibility no longer implies being under the vertex cap.
-   - The [Stats Ledger](../parcels/stats-ledger.md) parcel, Design: the run applies the vertex cap from the `vertex_count` finding and records it in its `selection`.
+   - [Record 8](../../database/decisions.md#8-stats-eligibility-is-stored-and-changed-only-on-purpose): one line saying `review_boundary` changes eligibility on purpose too, and that eligibility no longer implies being under the vertex cap.
+   - The [Stats Ledger](../../parcels/stats-ledger.md) parcel, Design: the run applies the vertex cap from the `vertex_count` finding and records it in its `selection`.
    - This parcel: add this task before task 04.
 
 ## Do not
