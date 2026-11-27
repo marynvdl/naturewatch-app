@@ -242,6 +242,136 @@ class BoundaryQcLocalTest(unittest.TestCase):
         for b in (pending, excluded, draft, old):
             self.assertNotIn(b, ids)
 
+    # --- accept_boundary_qc ---
+
+    def accept(self, user_id="admin", boundary: str | None = None) -> dict:
+        return self.call(
+            "select boundary_id::text as id, qc_status from public.accept_boundary_qc(%s)",
+            (boundary or self.boundary,), user_id,
+        )[0]
+
+    def test_admin_accepts_a_flagged_boundary(self):
+        self.set_qc("flagged")
+        self.assertEqual(self.accept(), {"id": self.boundary, "qc_status": "accepted"})
+        self.assertEqual(self.set_eligibility("eligible", "Real islands")["stats_eligibility"], "eligible")
+
+    def test_accept_refuses_other_statuses_and_old_boundaries(self):
+        for status in ("passed", "accepted", "unchecked"):
+            self.set_qc(status)
+            self.raises(self.errors.InvalidParameterValue, self.accept)
+        _, old = self.place("Zqx QC Old", current=False)
+        self.set_qc("flagged", old)
+        self.raises(self.errors.InvalidParameterValue, self.accept, boundary=old)
+        self.raises(self.errors.NoDataFound, self.accept, boundary=str(uuid.uuid4()))
+
+    def test_non_admin_cannot_accept(self):
+        self.set_qc("flagged")
+        self.raises(self.errors.InsufficientPrivilege, self.accept, self.other)
+        self.raises(self.errors.InsufficientPrivilege, self.accept, None)
+
+    # --- admin_boundary_list ---
+
+    def finding(self, boundary: str, check_id: str, outcome: str, value: float | None = None,
+                at: str = "2026-11-27 10:00"):
+        self.conn.execute(
+            "insert into public.boundary_checks (boundary_id, check_id, check_category, outcome, "
+            "measured_value, checker_version, checked_at) values (%s, %s, %s, %s, %s, 'test', %s)",
+            (boundary, check_id, "processing_cost" if check_id == "vertex_count" else "modelling",
+             outcome, value, at),
+        )
+
+    def boundary_list(self, eligibility: str, user_id="admin", limit=200, offset=0) -> list[dict]:
+        return self.call(
+            "select place_id::text as place_id, name, boundary_id::text as boundary_id, qc_status, "
+            "stats_eligibility_reason as reason, warnings, vertex_count, total_count "
+            "from public.admin_boundary_list(%s, %s, %s)",
+            (eligibility, limit, offset), user_id,
+        )
+
+    def ours(self, rows: list[dict]) -> list[dict]:
+        return [r for r in rows if r["name"].startswith("Zqx QC")]
+
+    def test_list_filters_and_shows_findings(self):
+        self.set_qc("flagged")
+        self.finding(self.boundary, "small_components", "warn", 0.8)
+        self.finding(self.boundary, "holes", "warn", 0.9, at="2026-11-26 10:00")
+        self.finding(self.boundary, "holes", "pass", 0.1)
+        self.finding(self.boundary, "vertex_count", "warn", 150000)
+        _, excluded = self.place("Zqx QC Excluded")
+        self.set_qc("passed", excluded)
+        self.set_eligibility("excluded", "Duplicate of a park", boundary=excluded)
+        _, eligible = self.place("Zqx QC Eligible")
+        self.set_qc("passed", eligible)
+        self.set_eligibility("eligible", boundary=eligible)
+        _, draft = self.place("Zqx QC Draft", publication="draft")
+        _, old = self.place("Zqx QC Old", current=False)
+
+        pending = self.ours(self.boundary_list("pending"))
+        self.assertEqual([r["boundary_id"] for r in pending], [self.boundary])
+        row = pending[0]
+        self.assertEqual(row["warnings"], ["small_components", "vertex_count"])
+        self.assertEqual(row["vertex_count"], 150000)
+        self.assertEqual(row["qc_status"], "flagged")
+        self.assertNotIn(draft, [r["boundary_id"] for r in pending])
+        self.assertNotIn(old, [r["boundary_id"] for r in pending])
+
+        out = self.ours(self.boundary_list("excluded"))
+        self.assertEqual([(r["boundary_id"], r["reason"], r["warnings"]) for r in out],
+                         [(excluded, "Duplicate of a park", [])])
+
+    def test_list_total_and_pages(self):
+        self.place("Zqx QC Second")
+        rows = self.boundary_list("pending", limit=1)
+        self.assertEqual(len(rows), 1)
+        self.assertGreaterEqual(rows[0]["total_count"], 2)
+
+    def test_list_refusals(self):
+        self.raises(self.errors.InsufficientPrivilege, self.boundary_list, "pending", self.other)
+        self.raises(self.errors.InsufficientPrivilege, self.boundary_list, "pending", None)
+        self.raises(self.errors.InvalidParameterValue, self.boundary_list, "eligible")
+        self.raises(self.errors.InvalidParameterValue, self.boundary_list, "pending", "admin", 0)
+
+    # --- audit ---
+
+    def audit_rows(self) -> list[dict]:
+        return self.conn.execute(
+            "select action, actor::text as actor, old_values, new_values from public.audit_log "
+            "where table_name = 'place_boundaries' and row_id = %s order by id",
+            (self.boundary,),
+        ).fetchall()
+
+    def test_review_changes_are_audited_without_geom(self):
+        self.set_qc("flagged")
+        self.accept()
+        self.set_eligibility("excluded", "Not a park")
+        rows = self.audit_rows()
+        self.assertEqual(len(rows), 3)
+        accepted = rows[1]
+        self.assertEqual(accepted["actor"], self.admin)
+        self.assertEqual((accepted["old_values"]["qc_status"], accepted["new_values"]["qc_status"]),
+                         ("flagged", "accepted"))
+        for row in rows:
+            self.assertNotIn("geom", row["old_values"])
+            self.assertNotIn("geom", row["new_values"])
+            self.assertIn("area_km2", row["new_values"])
+
+    def test_other_updates_are_not_audited(self):
+        self.conn.execute(
+            "update public.place_boundaries set source_url = 'https://example.test' where id = %s",
+            (self.boundary,),
+        )
+        self.conn.execute(
+            "update public.place_boundaries set qc_status = qc_status where id = %s", (self.boundary,),
+        )
+        self.assertEqual(self.audit_rows(), [])
+
+    def test_other_audit_triggers_keep_their_keys(self):
+        self.conn.execute("delete from public.user_roles where user_id = %s", (self.admin,))
+        row = self.conn.execute(
+            "select row_id from public.audit_log where table_name = 'user_roles' order by id desc limit 1"
+        ).fetchone()
+        self.assertEqual(row["row_id"], f"{self.admin}/admin")
+
     # --- load ---
 
     def load(self, rows: list[dict]):

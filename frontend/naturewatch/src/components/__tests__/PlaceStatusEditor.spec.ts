@@ -28,6 +28,15 @@ vi.mock('@/places/api', async importOriginal => {
   return { ...actual, loadWithdrawnPlaceIds: vi.fn() };
 });
 
+vi.mock('@/places/boundaryReview', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/places/boundaryReview')>();
+  return {
+    ...actual,
+    loadBoundaryReview: vi.fn(async () => ({ status: 'ok', review: null })),
+  };
+});
+
 const placeId = '33333333-3333-3333-3333-333333333333';
 
 const PUBLISHED: PlaceStatus = {

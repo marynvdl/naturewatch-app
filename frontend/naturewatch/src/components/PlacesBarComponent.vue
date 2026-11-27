@@ -9,6 +9,7 @@ import {
 } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
 import AdminPlaceList from '@/components/AdminPlaceList.vue';
+import AdminBoundaryList from '@/components/AdminBoundaryList.vue';
 import AdminCorrectionList from '@/components/AdminCorrectionList.vue';
 import PlacesFilterDialog from '@/components/PlacesFilterDialog.vue';
 import PlaceTypeButtons from '@/components/PlaceTypeButtons.vue';
@@ -820,6 +821,9 @@ watch(
       />
       <AdminCorrectionList
         v-else-if="auth.isAdmin && placesStore.adminList === 'corrections'"
+      />
+      <AdminBoundaryList
+        v-else-if="auth.isAdmin && placesStore.adminList === 'boundaries'"
       />
       <template v-if="anyType || searchingAll || photoMode">
         <p v-if="showNames && listStatus === 'loading'" class="places-status">

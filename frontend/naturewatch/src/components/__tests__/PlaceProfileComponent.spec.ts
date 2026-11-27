@@ -71,6 +71,15 @@ vi.mock('@/places/images', async importOriginal => {
   };
 });
 
+vi.mock('@/places/boundaryReview', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/places/boundaryReview')>();
+  return {
+    ...actual,
+    loadBoundaryReview: vi.fn(async () => ({ status: 'ok', review: null })),
+  };
+});
+
 vi.mock('@/places/status', async importOriginal => {
   const actual = await importOriginal<typeof import('@/places/status')>();
   return {

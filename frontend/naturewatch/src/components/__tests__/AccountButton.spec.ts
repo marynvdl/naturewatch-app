@@ -62,6 +62,14 @@ describe('Account button', () => {
       .trigger('click');
     await flushPromises();
     expect(places.adminList).toBe('corrections');
+    await wrapper.get('button[aria-label="Account"]').trigger('click');
+    await flushPromises();
+    await body
+      .findAll('button')
+      .find(button => button.text() === 'Boundaries')!
+      .trigger('click');
+    await flushPromises();
+    expect(places.adminList).toBe('boundaries');
 
     // Turning Edit mode off closes the list.
     await wrapper.get('button[aria-label="Account"]').trigger('click');
