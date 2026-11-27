@@ -6,28 +6,33 @@ The first [Threat Layers](threat-layers.md) parcel. One Energy layer in the Pres
 
 ## Goal
 
-A person can turn on Energy and see power lines as a share zoomed out and by voltage class zoomed in, and power plants and solar and wind farms as features. Clicking a plant or farm shows its name, operator, source, and capacity where the data records them. The layer names its sources, release, and attribution.
+A person can turn on Energy and see power lines as a share zoomed out and by voltage class zoomed in. Power plants, solar and wind farms, and substations show as a heatmap zoomed out and as shapes zoomed in. Clicking a site shows its name, operator, source, and output where the data records them. The layer names its sources, release, and attribution.
 
 Each kind has a sprout, so the ledger and the pressure sandbox read power lines and generation footprints separately.
 
 ## Sources
 
-- **Overture `base/infrastructure`** (OpenStreetMap), release `2026-10-21.0`: power lines, minor lines, plants, and generators, with their `name`, `operator`, source, and output tags.
-- **Global Renewables Watch** (solar and wind installations detected from imagery), compared with OpenStreetMap in task 01. It is used only if it adds farms that OpenStreetMap misses and its licence fits.
+- **Overture `base/infrastructure`** (OpenStreetMap), release `2026-10-21.0`: power lines, plants, generators, and substations, with their `name`, `operator`, source, and output tags. The seed keeps every infrastructure subtype, so Water can reuse the read.
+
+Task 01 compared Global Renewables Watch with OpenStreetMap and left it out: it missed real solar plants and turbines in both windows, and its data has no licence of its own.
 
 ## Design
 
 The shared design is in [Threat Layers](threat-layers.md#shared-design). For Energy:
 
-- **Sprouts.** `power-lines`, with the cells a line touches and its voltage class, and `power-sites`, with the cells inside a plant or farm and its source (solar, wind, fossil, hydro, nuclear, other). A plant mapped only as a point marks its own cell.
-- **Tiles.** Power lines raster, like Roads. Plants and farms vector, with the attributes kept for the feature card.
-- **Map.** One Energy toggle that draws both archives.
+- **Sprouts.** `power-lines`, with the cells a line touches and its voltage class, and `power-sites`, with the cells inside a site and its source group. The group of a site with several sources is the dirtiest, so the sandbox can weight cleaner and dirtier power apart.
+- **Tiles.** Power lines raster, like Roads. Power sites vector: a point per site to zoom 9 for a heatmap, then the shape with the feature card. Crowded points merge but keep their summed area and count, in total and per group.
+- **Map.** One Energy toggle that draws both archives. The heatmap's colours and weights are set in the client.
+
+The rules, encodings, and sample figures are in the two recipes and `energy/README.md` in naturewatch-analysis.
 
 ## Open questions
 
-- The classes kept: cables, substations, towers, and single generators such as rooftop solar. To settle in task 01.
-- Whether the seed keeps every `base/infrastructure` subtype, so Water and Mines reuse one read. To settle in task 01, by its cost.
-- How one catalog entry draws a raster and a vector archive together. To settle in task 04.
+- How one catalog entry draws a raster and a vector archive together, and the heatmap's palette and weight. To settle in task 04.
+
+## Deferred
+
+- **Global Renewables Watch** as a gap-fill for solar and wind where OpenStreetMap is thin, once its data licence is stated and it is checked in such a region.
 
 ## Tasks
 

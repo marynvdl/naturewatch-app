@@ -15,6 +15,7 @@ A [Threat Layers](threat-layers.md) parcel. One Water layer in the Pressures gro
 
 - Whether reservoirs are drawn, or only the dam point.
 - How complete OpenStreetMap water features are outside Europe and North America.
+- Where water and sewage treatment plants and pumping stations come from. Energy task 01 found none in Overture `base/infrastructure` in its two windows, which hold dams, weirs, pipelines, covered reservoirs, and water towers. They may be in Overture's land use or buildings.
 - Whether the Rivers placeholder (fragmentation, flow) belongs in this parcel.
 
 ## Tasks
