@@ -1,6 +1,6 @@
 # Task 02 — Overlaps on pieces
 
-Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 01 merged in #471.
 
@@ -48,6 +48,15 @@ The test ran on 27 November 2026 on the local stack. It used the three heaviest 
   - For overlaps of 0.01 km² or more, they agree within 0.14%.
   - The coverages differ by at most 0.00002.
 - **Three slivers below 0.005 km² differ more.** Along a shared border, the old function gave about 0.00001 km² and the new one about 0.0013 km². Shapely, on the whole shapes, gives 0.0022 and 0.0041 km². No method agrees on such slivers. They are far below the 1% share the derive scripts use.
+
+## Hosted
+
+The migration was applied on 27 November 2026, after the user approved it. Two calls were then made as the owner with `statement_timeout = '5min'`, the lighter one first. Neither restarted the database.
+
+- `16b1d97b`: 4 overlaps, 22,124 km², in 19.7 s.
+- `7963122c`: 106 overlaps, 3,534 km², in 133 s.
+
+Locally these gave 6 and 108 overlaps. The local copy held each ecoregion twice: the local one and the one copied from hosted.
 
 ## Do this
 
