@@ -1,6 +1,6 @@
 # Task 01 — Boundary QC and Stats eligibility
 
-Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
 
 Repository: naturewatch-app. Start from `develop`. The parcel was defined in #470.
 
@@ -8,11 +8,13 @@ Repository: naturewatch-app. Start from `develop`. The parcel was defined in #47
 
 Every current boundary has QC findings in `boundary_checks`, a `qc_status`, and a `stats_eligibility`. The Stats Ledger reads `stats_eligible_boundaries`. An admin can change eligibility through `set_stats_eligibility`, but no screen calls it yet. That is task 03. Nothing on the map changes.
 
+Applied to the hosted database on 26 and 27 November 2026, after the user approved each step. `measure` read all 51,783 current boundaries; none was invalid. The user chose one setting for every place type (`DEFAULT_THRESHOLDS` in the script) and the 100,000-vertex cap. `load` wrote 207,132 findings in 13 minutes, in batches of 500, because each update re-runs the boundary's validity CHECK and area. 650 boundaries are flagged, 51,000 are eligible, and 783 stay `pending`: the flagged ones and 133 that passed but are over the cap.
+
 ## Facts already stored
 
 From the code and the hosted database on 26 November 2026:
 
-- **The design is written.** [design.md §4.2](../database/design.md#42-boundaries-and-quality) has the columns, the constraints, `boundary_checks`, the four starting checks, and the view. [Record 7](../database/decisions.md#7-boundary-quality-as-findings-with-thresholds-in-code) covers the thresholds in code, and [record 8](../database/decisions.md#8-stats-eligibility-is-stored-and-changed-only-on-purpose) covers eligibility.
+- **The design is written.** [design.md §4.2](../../database/design.md#42-boundaries-and-quality) has the columns, the constraints, `boundary_checks`, the four starting checks, and the view. [Record 7](../../database/decisions.md#7-boundary-quality-as-findings-with-thresholds-in-code) covers the thresholds in code, and [record 8](../../database/decisions.md#8-stats-eligibility-is-stored-and-changed-only-on-purpose) covers eligibility.
 - **Hosted size.** There are 51,783 current boundaries, all of them published. Their geometry is about 3.5 GB. About 230 have over 100,000 vertices, and the largest has about 1.9 million.
   - By type: 39,457 conservation areas, 8,770 Natura 2000 sites, 1,087 Ramsar sites, 1,029 Emerald sites, 846 ecoregions, 220 biosphere reserves, 207 World Heritage Sites, and 167 other recognitions.
   - Current boundaries are approved, so a constraint already makes them valid and not empty.
