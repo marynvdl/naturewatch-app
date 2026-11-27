@@ -6,7 +6,7 @@ A combined human-pressure layer built from the threat layers, and from it the la
 
 ## Order
 
-1. **More threat layers.** Railways and power lines (Overture, the same release and GeoParquet as roads), dams (GOODD or GRanD), mines (Maus et al. 2022, Tang & Werner 2023), and oil and gas pipelines (Global Energy Monitor). Each one becomes a seed, then a sprout on the 0.00025° grid, then a ledger column. That gives per-place stats and a pressure input in one go.
+1. **More threat layers.** Railways, power lines, mines, dams, and pipelines, as seeds, sprouts, tiles, and map layers, in the [Threat Layers](threat-layers.md) parcel. Each sprout then becomes a ledger column, which gives per-place stats and a pressure input in one go.
 2. **A weight sandbox on the laptop.** Windows such as the Karoo with Karoo National Park, Kruger, Congo, Borneo, the Cerrado, rural France, and the Sahel, with one band per layer and pressure recomputed in the browser as the weights change. It can start on built, crops, and roads before step 1 ends.
 3. **The pressure sprout**, at about 300 m to 1 km, built from the tally COGs, then its tiles.
 4. **Delineation**, then the `old_growth` places and a stats sweep over them.
