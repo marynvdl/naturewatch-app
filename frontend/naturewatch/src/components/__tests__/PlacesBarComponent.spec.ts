@@ -18,6 +18,7 @@ import {
 } from '@/places/display';
 import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 import { loadSuggestedCounts } from '@/places/images';
+import { loadBoundaryNotes, type BoundaryNote } from '@/places/boundaryReview';
 import usePlacesStore from '@/store/PlacesStore';
 import useAuthStore from '@/store/AuthStore';
 
@@ -51,6 +52,12 @@ vi.mock('@/places/mainPhotos', () => ({
 vi.mock('@/components/AdminPlaceList.vue', () => ({
   default: { name: 'AdminPlaceList', template: '<div class="queue-stub" />' },
 }));
+
+vi.mock('@/places/boundaryReview', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/places/boundaryReview')>();
+  return { ...actual, loadBoundaryNotes: vi.fn() };
+});
 
 vi.mock('@/places/images', () => ({
   loadSuggestedCounts: vi.fn(),
@@ -312,6 +319,85 @@ describe('Places panel', () => {
     await flushPromises();
     expect(store.photoSuggestions).toBe(false);
     expect(wrapper.find('.place-card-note').exists()).toBe(false);
+  });
+
+  it('lists the places in a boundary review view, with their notes, for an admin in Edit mode', async () => {
+    const pinia = createPinia();
+    const auth = useAuthStore(pinia);
+    const store = usePlacesStore(pinia);
+    auth.isAdmin = true;
+    auth.editMode = true;
+    let notes: Record<string, BoundaryNote> = {
+      [places[0].id]: {
+        qcStatus: 'flagged',
+        eligibility: 'pending',
+        note: null,
+        warnings: ['small_components', 'vertex_count'],
+        vertexCount: 412000,
+        vertexCap: 100000,
+      },
+      [places[1].id]: {
+        qcStatus: 'passed',
+        eligibility: 'pending',
+        note: null,
+        warnings: [],
+        vertexCount: 7239,
+        vertexCap: 100000,
+      },
+    };
+    vi.mocked(loadBoundaryNotes).mockImplementation(async () => ({
+      status: 'ok',
+      notes: { ...notes },
+    }));
+    vi.mocked(loadPilotPlaceWindow).mockImplementation(async query => {
+      const list = query.boundaryReview
+        ? places.map(place => ({
+            ...place,
+            place_type_id: 'conservation_area',
+          }))
+        : [];
+      return { status: 'ok', places: list, total: list.length };
+    });
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    await flushPromises();
+
+    store.applyFilter([null, null], [], false, 'to_review');
+    await flushPromises();
+    const query = vi.mocked(loadPilotPlaceWindow).mock.calls.at(-1)![0];
+    expect(query.boundaryReview).toBe('to_review');
+    expect(query.placeTypes).toEqual(
+      expect.arrayContaining(['conservation_area', 'ecoregion'])
+    );
+    const cards = wrapper.findAll('.place-result');
+    expect(cards.map(card => card.find('.place-card-note').text())).toEqual([
+      'Many tiny pieces · 412,000 points',
+      '7,239 points',
+    ]);
+
+    await cards[0].trigger('click');
+    await flushPromises();
+    expect(store.selectedId).toBe(places[0].id);
+    expect(store.profileTab).toBe('status');
+
+    // The open place gets a verdict: it leaves the list and stays open.
+    notes = {
+      ...notes,
+      [places[0].id]: {
+        ...notes[places[0].id],
+        qcStatus: 'accepted',
+        eligibility: 'eligible',
+      },
+    };
+    store.adminListVersion += 1;
+    await flushPromises();
+    expect(wrapper.findAll('.place-result')).toHaveLength(1);
+    expect(store.selectedId).toBe(places[0].id);
+
+    auth.editMode = false;
+    await flushPromises();
+    expect(store.boundaryReview).toBeNull();
   });
 
   it('shows the main photograph on a card that has one', async () => {

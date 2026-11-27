@@ -1,5 +1,6 @@
 """Boundary QC columns, boundary_checks, stats_eligible_boundaries, set_stats_eligibility,
-and check_boundaries.py load, against the local database.
+review_boundary, the boundary review filter and notes, and check_boundaries.py load,
+against the local database.
 
 Each test runs in one transaction that is rolled back. Skipped when the local
 database is not running.
@@ -79,6 +80,12 @@ class BoundaryQcLocalTest(unittest.TestCase):
             """,
             (place_id, PARK, self.release, current),
         ).fetchone()["id"]
+        # Details make a published place listed, for the list reads.
+        self.conn.execute(
+            "insert into public.conservation_area_details (place_id, designation, iso3, realm, "
+            "source_id, source_release_id) values (%s, 'Zqx', array['ZWE'], 'Terrestrial', 'wdpca', %s)",
+            (place_id, self.release),
+        )
         return place_id, boundary
 
     def act_as(self, user_id: str | None):
@@ -242,94 +249,139 @@ class BoundaryQcLocalTest(unittest.TestCase):
         for b in (pending, excluded, draft, old):
             self.assertNotIn(b, ids)
 
-    # --- accept_boundary_qc ---
+    # --- review_boundary ---
 
-    def accept(self, user_id="admin", boundary: str | None = None) -> dict:
+    def review(self, verdict: str, note: str | None = None, user_id="admin",
+               boundary: str | None = None) -> dict:
         return self.call(
-            "select boundary_id::text as id, qc_status from public.accept_boundary_qc(%s)",
-            (boundary or self.boundary,), user_id,
+            "select qc_status, stats_eligibility, stats_eligibility_reason as reason "
+            "from public.review_boundary(%s, %s, %s)",
+            (boundary or self.boundary, verdict, note), user_id,
         )[0]
 
-    def test_admin_accepts_a_flagged_boundary(self):
-        self.set_qc("flagged")
-        self.assertEqual(self.accept(), {"id": self.boundary, "qc_status": "accepted"})
-        self.assertEqual(self.set_eligibility("eligible", "Real islands")["stats_eligibility"], "eligible")
-
-    def test_accept_refuses_other_statuses_and_old_boundaries(self):
-        for status in ("passed", "accepted", "unchecked"):
-            self.set_qc(status)
-            self.raises(self.errors.InvalidParameterValue, self.accept)
-        _, old = self.place("Zqx QC Old", current=False)
-        self.set_qc("flagged", old)
-        self.raises(self.errors.InvalidParameterValue, self.accept, boundary=old)
-        self.raises(self.errors.NoDataFound, self.accept, boundary=str(uuid.uuid4()))
-
-    def test_non_admin_cannot_accept(self):
-        self.set_qc("flagged")
-        self.raises(self.errors.InsufficientPrivilege, self.accept, self.other)
-        self.raises(self.errors.InsufficientPrivilege, self.accept, None)
-
-    # --- admin_boundary_list ---
-
     def finding(self, boundary: str, check_id: str, outcome: str, value: float | None = None,
-                at: str = "2026-11-27 10:00"):
+                at: str = "2026-11-27 10:00", threshold: float | None = None):
         self.conn.execute(
             "insert into public.boundary_checks (boundary_id, check_id, check_category, outcome, "
-            "measured_value, checker_version, checked_at) values (%s, %s, %s, %s, %s, 'test', %s)",
+            "measured_value, threshold_used, checker_version, checked_at) "
+            "values (%s, %s, %s, %s, %s, %s, 'test', %s)",
             (boundary, check_id, "processing_cost" if check_id == "vertex_count" else "modelling",
-             outcome, value, at),
+             outcome, value, threshold, at),
         )
 
-    def boundary_list(self, eligibility: str, user_id="admin", limit=200, offset=0) -> list[dict]:
-        return self.call(
-            "select place_id::text as place_id, name, boundary_id::text as boundary_id, qc_status, "
-            "stats_eligibility_reason as reason, warnings, vertex_count, total_count "
-            "from public.admin_boundary_list(%s, %s, %s)",
-            (eligibility, limit, offset), user_id,
-        )
+    def flag(self, boundary: str | None = None):
+        b = boundary or self.boundary
+        self.finding(b, "small_components", "warn", 0.8)
+        self.finding(b, "vertex_count", "warn", 150000, threshold=100000)
+        self.set_qc("flagged", b)
 
-    def ours(self, rows: list[dict]) -> list[dict]:
-        return [r for r in rows if r["name"].startswith("Zqx QC")]
+    def test_count_accepts_a_flagged_boundary_with_a_note(self):
+        self.flag()
+        self.raises(self.errors.InvalidParameterValue, self.review, "count")
+        row = self.review("count", "  Real islands ")
+        self.assertEqual(row, {"qc_status": "accepted", "stats_eligibility": "eligible",
+                               "reason": "Real islands"})
+        self.assertEqual(self.boundary_row()["stats_eligibility_set_at"] is not None, True)
 
-    def test_list_filters_and_shows_findings(self):
-        self.set_qc("flagged")
-        self.finding(self.boundary, "small_components", "warn", 0.8)
-        self.finding(self.boundary, "holes", "warn", 0.9, at="2026-11-26 10:00")
-        self.finding(self.boundary, "holes", "pass", 0.1)
-        self.finding(self.boundary, "vertex_count", "warn", 150000)
-        _, excluded = self.place("Zqx QC Excluded")
-        self.set_qc("passed", excluded)
-        self.set_eligibility("excluded", "Duplicate of a park", boundary=excluded)
-        _, eligible = self.place("Zqx QC Eligible")
-        self.set_qc("passed", eligible)
-        self.set_eligibility("eligible", boundary=eligible)
-        _, draft = self.place("Zqx QC Draft", publication="draft")
+    def test_count_a_passed_boundary_needs_no_note(self):
+        self.set_qc("passed")
+        self.assertEqual(self.review("count")["stats_eligibility"], "eligible")
+
+    def test_count_refuses_unchecked_and_rejected(self):
+        self.raises(self.errors.InvalidParameterValue, self.review, "count", "x")
+        self.set_qc("rejected")
+        self.raises(self.errors.InvalidParameterValue, self.review, "count", "x")
+
+    def test_fix_and_leave_out(self):
+        self.set_qc("passed")
+        self.review("count")
+        row = self.review("fix")
+        self.assertEqual(row, {"qc_status": "rejected", "stats_eligibility": "pending", "reason": None})
+        self.raises(self.errors.InvalidParameterValue, self.review, "leave_out")
+        row = self.review("leave_out", "Duplicate of a park")
+        self.assertEqual((row["qc_status"], row["stats_eligibility"]), ("rejected", "excluded"))
+
+    def test_undo_goes_back_to_what_the_checks_say(self):
+        self.flag()
+        self.review("count", "Real islands")
+        self.assertEqual(self.review("undo"),
+                         {"qc_status": "flagged", "stats_eligibility": "pending", "reason": None})
+        self.review("fix")
+        self.assertEqual(self.review("undo")["qc_status"], "flagged")
+        # Only the heavy check warns: the shape passed.
+        _, heavy = self.place("Zqx QC Heavy")
+        self.finding(heavy, "small_components", "pass", 0.1)
+        self.finding(heavy, "vertex_count", "warn", 150000, threshold=100000)
+        self.set_qc("passed", heavy)
+        self.review("fix", boundary=heavy)
+        self.assertEqual(self.review("undo", boundary=heavy)["qc_status"], "passed")
+        # No findings at all: unchecked.
+        _, bare = self.place("Zqx QC Bare")
+        self.set_qc("rejected", bare)
+        self.assertEqual(self.review("undo", boundary=bare)["qc_status"], "unchecked")
+
+    def test_review_refusals(self):
+        self.set_qc("passed")
+        self.raises(self.errors.InsufficientPrivilege, self.review, "count", None, self.other)
+        self.raises(self.errors.InsufficientPrivilege, self.review, "count", None, None)
+        self.raises(self.errors.InvalidParameterValue, self.review, "maybe")
+        self.raises(self.errors.InvalidParameterValue, self.review, "leave_out", "x" * 1001)
+        self.raises(self.errors.NoDataFound, self.review, "count", None, "admin", str(uuid.uuid4()))
         _, old = self.place("Zqx QC Old", current=False)
+        self.raises(self.errors.InvalidParameterValue, self.review, "fix", None, "admin", old)
 
-        pending = self.ours(self.boundary_list("pending"))
-        self.assertEqual([r["boundary_id"] for r in pending], [self.boundary])
-        row = pending[0]
-        self.assertEqual(row["warnings"], ["small_components", "vertex_count"])
-        self.assertEqual(row["vertex_count"], 150000)
-        self.assertEqual(row["qc_status"], "flagged")
-        self.assertNotIn(draft, [r["boundary_id"] for r in pending])
-        self.assertNotIn(old, [r["boundary_id"] for r in pending])
+    # --- the list filter and the notes ---
 
-        out = self.ours(self.boundary_list("excluded"))
-        self.assertEqual([(r["boundary_id"], r["reason"], r["warnings"]) for r in out],
-                         [(excluded, "Duplicate of a park", [])])
+    def window_ids(self, view: str | None, user_id="admin") -> set[str]:
+        rows = self.call(
+            "select id::text as id from public.place_window(array['conservation_area'], "
+            "p_search => 'Zqx QC', p_limit => 50, p_boundary_review => %s)",
+            (view,), user_id,
+        )
+        return {r["id"] for r in rows}
 
-    def test_list_total_and_pages(self):
-        self.place("Zqx QC Second")
-        rows = self.boundary_list("pending", limit=1)
-        self.assertEqual(len(rows), 1)
-        self.assertGreaterEqual(rows[0]["total_count"], 2)
+    def test_filter_views(self):
+        self.flag()
+        fix_place, fix = self.place("Zqx QC Fix")
+        self.set_qc("passed", fix)
+        self.review("fix", boundary=fix)
+        out_place, out = self.place("Zqx QC Out")
+        self.set_qc("passed", out)
+        self.review("leave_out", "Too small", boundary=out)
+        ok_place, ok = self.place("Zqx QC Ok")
+        self.set_qc("passed", ok)
+        self.review("count", boundary=ok)
 
-    def test_list_refusals(self):
-        self.raises(self.errors.InsufficientPrivilege, self.boundary_list, "pending", self.other)
-        self.raises(self.errors.InsufficientPrivilege, self.boundary_list, "pending", None)
-        self.raises(self.errors.InvalidParameterValue, self.boundary_list, "eligible")
-        self.raises(self.errors.InvalidParameterValue, self.boundary_list, "pending", "admin", 0)
+        self.assertEqual(self.window_ids("to_review"), {self.place_id})
+        self.assertEqual(self.window_ids("needs_fixing"), {fix_place})
+        self.assertEqual(self.window_ids("left_out"), {out_place})
+        self.assertEqual(self.window_ids(None), {self.place_id, fix_place, out_place, ok_place})
+        count = self.call(
+            "select public.place_window_count(array['conservation_area'], p_search => 'Zqx QC', "
+            "p_boundary_review => 'needs_fixing') as n"
+        )[0]["n"]
+        self.assertEqual(count, 1)
+        self.raises(self.errors.InvalidParameterValue, self.window_ids, "eligible")
+
+    def test_filter_keeps_nothing_for_others_and_visitors_still_list(self):
+        self.flag()
+        self.assertEqual(self.window_ids("to_review", self.other), set())
+        self.assertEqual(self.window_ids("to_review", None), set())
+        self.assertIn(self.place_id, self.window_ids(None, None))
+
+    def test_notes(self):
+        self.flag()
+        rows = self.call(
+            "select place_id::text as place_id, qc_status, warnings, vertex_count, vertex_cap "
+            "from public.boundary_review_notes(%s::uuid[])",
+            ([self.place_id],),
+        )
+        self.assertEqual(rows, [{"place_id": self.place_id, "qc_status": "flagged",
+                                 "warnings": ["small_components", "vertex_count"],
+                                 "vertex_count": 150000, "vertex_cap": 100000}])
+        self.raises(self.errors.InsufficientPrivilege, self.call,
+                    "select * from public.boundary_review_notes(%s::uuid[])", ([self.place_id],),
+                    self.other)
 
     # --- audit ---
 
@@ -341,9 +393,9 @@ class BoundaryQcLocalTest(unittest.TestCase):
         ).fetchall()
 
     def test_review_changes_are_audited_without_geom(self):
-        self.set_qc("flagged")
-        self.accept()
-        self.set_eligibility("excluded", "Not a park")
+        self.flag()
+        self.review("count", "Real islands")
+        self.review("leave_out", "Not a park")
         rows = self.audit_rows()
         self.assertEqual(len(rows), 3)
         accepted = rows[1]
@@ -446,6 +498,15 @@ class BoundaryQcLocalTest(unittest.TestCase):
         self.assertEqual((row["qc_status"], row["stats_eligibility"]), ("flagged", "pending"))
         self.assertIn("back to pending", row["stats_eligibility_reason"])
         self.assertEqual(self.boundary_row(accepted)["qc_status"], "accepted")
+
+    def test_load_keeps_rejected_and_never_makes_it_eligible(self):
+        n = len(check_boundaries.SIZE_EDGES_KM2)
+        self.set_qc("rejected")
+        good = {"place_type_id": "conservation_area", "valid": True, "valid_reason": "",
+                "vertices": 5, "parts": 1, "holes": 0, "parts_lt": [0] * n, "holes_lt": [0] * n}
+        self.load([{**good, "boundary_id": self.boundary}])
+        row = self.boundary_row()
+        self.assertEqual((row["qc_status"], row["stats_eligibility"]), ("rejected", "pending"))
 
 
 if __name__ == "__main__":

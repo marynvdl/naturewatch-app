@@ -1552,8 +1552,8 @@ describe('Place profile', () => {
     const tabs = wrapper.findAll('[role="tab"]').map(tab => tab.text());
     expect(tabs.at(-1)).toBe('Status');
     expect(wrapper.findAll('.place-flag').map(tag => tag.text())).toEqual([
-      'Withdrawn: Already captured by other places',
-      'Needs attention: Possible duplicate',
+      'Hidden: Already captured by other places',
+      'Follow-up: Possible duplicate',
     ]);
     await openTab(wrapper, 'Status');
     expect(wrapper.find('.status').exists()).toBe(true);

@@ -19,6 +19,7 @@ Resumes the Stats Pipeline. Each raster is tallied once onto coarse cells, and e
 - **Hansen tree loss.** It is on the same 0.00025° grid. Read it from the publisher's tiles and keep a column per loss year, with the `treecover2000` threshold in the method summary. To check: read and egress terms into `europe-west1`, or copy it as a seed once.
 - **Earth Engine** only as a seed source for data that lives only there, exported onto the grid. It is not the counting engine.
 - Carried over from Wayfinding: cut boundaries into 1° pieces first; size the job from the 941-place run (872 s on Batch); treat the 198 boundaries with over 100,000 vertices on their own.
+- **The run applies the vertex cap.** Since Shaping Boundaries task 03b, eligible does not mean under the cap. A run selects by the latest `vertex_count` finding and records the cap in its `selection`. The heavy boundaries get a later run of their own, priced and approved first.
 
 ## Open questions
 

@@ -840,6 +840,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       sizeMax: placesStore.sizeKept[1],
       ecoregionIds: [...placesStore.ecoregionIds],
       photoSuggestions: placesStore.photoSuggestions,
+      boundaryReview: placesStore.boundaryReview,
     });
     if (run !== fitRun || result.status !== 'ok') return;
     await withFlight(mapInstance, async () => {

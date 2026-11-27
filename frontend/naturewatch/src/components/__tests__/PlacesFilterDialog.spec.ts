@@ -157,6 +157,36 @@ describe('Places filter dialog', () => {
     expect(store.photoSuggestions).toBe(false);
   });
 
+  it('offers the boundary review filter to admins in Edit mode, and applies it', async () => {
+    const store = usePlacesStore();
+    const auth = useAuthStore();
+    await mountDialog();
+    expect(body().text()).not.toContain('Boundary review');
+    wrapper?.unmount();
+
+    auth.isAdmin = true;
+    auth.editMode = true;
+    await mountDialog();
+    expect(body().text()).toContain('Boundary review');
+    await button('Needs fixing').trigger('click');
+    await flushPromises();
+    expect(loadPilotPlaceWindowCount).toHaveBeenLastCalledWith(
+      expect.objectContaining({ boundaryReview: 'needs_fixing' })
+    );
+    expect(store.boundaryReview).toBeNull();
+    await button('Show 2 places').trigger('click');
+    await flushPromises();
+    expect(store.boundaryReview).toBe('needs_fixing');
+    expect(store.filtering).toBe(true);
+    wrapper?.unmount();
+
+    await mountDialog();
+    await button('All').trigger('click');
+    await button('Show 2 places').trigger('click');
+    await flushPromises();
+    expect(store.boundaryReview).toBeNull();
+  });
+
   it('counts the draft, and applies it only from the show button', async () => {
     const store = usePlacesStore();
     const dialog = await mountDialog();

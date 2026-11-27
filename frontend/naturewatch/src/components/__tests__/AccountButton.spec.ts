@@ -39,9 +39,7 @@ describe('Account button', () => {
     const places = usePlacesStore();
     const { wrapper, body } = await openPanel(true);
     const listButton = () =>
-      body
-        .findAll('button')
-        .find(button => button.text() === 'Needs attention');
+      body.findAll('button').find(button => button.text() === 'Follow-up');
     const edit = body.get('button[aria-label="Edit mode"]');
     expect(edit.attributes('aria-pressed')).toBe('false');
     expect(listButton()).toBeUndefined();
@@ -62,14 +60,7 @@ describe('Account button', () => {
       .trigger('click');
     await flushPromises();
     expect(places.adminList).toBe('corrections');
-    await wrapper.get('button[aria-label="Account"]').trigger('click');
-    await flushPromises();
-    await body
-      .findAll('button')
-      .find(button => button.text() === 'Boundaries')!
-      .trigger('click');
-    await flushPromises();
-    expect(places.adminList).toBe('boundaries');
+    expect(body.text()).not.toContain('Boundaries');
 
     // Turning Edit mode off closes the list.
     await wrapper.get('button[aria-label="Account"]').trigger('click');

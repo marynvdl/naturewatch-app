@@ -107,7 +107,7 @@ describe('Place status editor', () => {
     });
     const store = usePlacesStore();
     const wrapper = mountEditor();
-    const withdraw = button(wrapper, 0, 'Withdraw');
+    const withdraw = button(wrapper, 0, 'Hide from map');
     expect(withdraw.attributes('disabled')).toBeDefined();
 
     await wrapper
@@ -116,7 +116,7 @@ describe('Place status editor', () => {
     await wrapper
       .get('textarea[name="withdrawal-note"]')
       .setValue('  Inside Kruger. ');
-    await button(wrapper, 0, 'Withdraw').trigger('click');
+    await button(wrapper, 0, 'Hide from map').trigger('click');
     await flushPromises();
 
     expect(setPlaceWithdrawn).toHaveBeenCalledWith(
@@ -139,14 +139,14 @@ describe('Place status editor', () => {
       withdrawn: true,
       withdrawalReason: 'Not a place',
     });
-    expect(wrapper.text()).toContain('Withdrawn. Visitors do not see');
+    expect(wrapper.text()).toContain('Hidden. Visitors do not see');
     expect(
       (
         wrapper.get('input[name="withdrawal-reason"]')
           .element as HTMLSelectElement
       ).value
     ).toBe('Not a place');
-    await button(wrapper, 0, 'Restore').trigger('click');
+    await button(wrapper, 0, 'Show on map').trigger('click');
     await flushPromises();
     expect(setPlaceWithdrawn).toHaveBeenCalledWith(placeId, null);
     expect(wrapper.emitted('changed')).toEqual([[PUBLISHED]]);
@@ -209,7 +209,7 @@ describe('Place status editor', () => {
     });
     vi.mocked(loadStatusReasons).mockClear();
     await input.setValue('  Merged into its neighbour ');
-    await button(wrapper, 0, 'Withdraw').trigger('click');
+    await button(wrapper, 0, 'Hide from map').trigger('click');
     await flushPromises();
     expect(setPlaceWithdrawn).toHaveBeenCalledWith(
       placeId,
@@ -252,7 +252,7 @@ describe('Place status editor', () => {
       'Inside a bigger park'
     );
     expect(
-      button(wrapper, 0, 'Withdraw').attributes('disabled')
+      button(wrapper, 0, 'Hide from map').attributes('disabled')
     ).toBeUndefined();
     vi.useRealTimers();
     wrapper.unmount();

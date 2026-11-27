@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import {
+  SegmentedControl,
+  SegmentedControlItem,
+} from '@/components/ui/segmented-control';
+import { REVIEW_VIEWS, type BoundaryReviewView } from '@/places/boundaryReview';
 import { computed, nextTick, ref, watch } from 'vue';
 import { Info, X } from '@lucide/vue';
 import {
@@ -65,10 +70,26 @@ const sizeBounds = ref<SizeBounds>([null, null]);
 const ecoregionsKept = ref<EcoregionName[]>([]);
 /** The draft photo filter. */
 const photosKept = ref(false);
-/** The photo filter, for admins in Edit mode. */
+/** The draft boundary review view, or `all` for none. */
+const reviewKept = ref<BoundaryReviewView | 'all'>('all');
+/** The photo and boundary review filters, for admins in Edit mode. */
 const showPhotos = computed(() => auth.isAdmin && auth.editMode);
 const keptCount = ref(props.matchedTotal);
 let countRequest = 0;
+
+/** The draft review view for the list reads, or null. Admins in Edit mode only. */
+const draftReview = computed<BoundaryReviewView | null>(() =>
+  showPhotos.value && reviewKept.value !== 'all' ? reviewKept.value : null
+);
+
+/**
+ * Choose a review view. Choosing the chosen one again keeps it.
+ * @param next - The view, or `all`.
+ */
+function setReview(next: unknown) {
+  if (next === 'all' || REVIEW_VIEWS.some(view => view.id === next))
+    reviewKept.value = next as BoundaryReviewView | 'all';
+}
 
 /** The Ecoregion field, for every listed type but Ecoregions. */
 const showEcoregions = computed(
@@ -80,6 +101,7 @@ watch(open, isOpen => {
   sizeBounds.value = [...placesStore.sizeKept];
   ecoregionsKept.value = [...placesStore.ecoregionsKept];
   photosKept.value = placesStore.photoSuggestions;
+  reviewKept.value = placesStore.boundaryReview ?? 'all';
   keptCount.value = props.matchedTotal;
 });
 
@@ -189,6 +211,7 @@ watch(
       draftEcoregionIds.value.join(','),
       (props.countTypes ?? props.placeTypes ?? []).join(','),
       photosKept.value,
+      reviewKept.value,
     ] as const,
   async ([isOpen]) => {
     if (!isOpen) return;
@@ -204,6 +227,7 @@ watch(
       placeTypes: props.countTypes ?? props.placeTypes,
       ecoregionIds: draftEcoregionIds.value,
       photoSuggestions: showPhotos.value && photosKept.value,
+      boundaryReview: draftReview.value,
     });
     if (request !== countRequest) return;
     if (result.status === 'ok') keptCount.value = result.total;
@@ -215,6 +239,7 @@ function clearAll() {
   sizeBounds.value = [null, null];
   ecoregionsKept.value = [];
   photosKept.value = false;
+  reviewKept.value = 'all';
 }
 
 /**
@@ -225,7 +250,8 @@ function apply() {
   placesStore.applyFilter(
     sizeBounds.value,
     showEcoregions.value ? ecoregionsKept.value : placesStore.ecoregionsKept,
-    showPhotos.value && photosKept.value
+    showPhotos.value && photosKept.value,
+    draftReview.value
   );
   placesStore.fitToKept();
   open.value = false;
@@ -349,6 +375,32 @@ function apply() {
                 class="nw:data-[state=checked]:bg-foreground"
               />
             </div>
+          </section>
+          <section
+            v-if="showPhotos"
+            class="filter-section"
+            aria-labelledby="filter-review-title"
+          >
+            <h3 id="filter-review-title" class="filter-name filter-name-spaced">
+              Boundary review
+            </h3>
+            <SegmentedControl
+              :model-value="reviewKept"
+              type="single"
+              variant="outline"
+              size="sm"
+              aria-labelledby="filter-review-title"
+              @update:model-value="setReview"
+            >
+              <SegmentedControlItem value="all">All</SegmentedControlItem>
+              <SegmentedControlItem
+                v-for="view in REVIEW_VIEWS"
+                :key="view.id"
+                :value="view.id"
+              >
+                {{ view.label }}
+              </SegmentedControlItem>
+            </SegmentedControl>
           </section>
         </div>
         <footer class="filter-foot">

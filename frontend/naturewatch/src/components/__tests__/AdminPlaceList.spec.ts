@@ -61,7 +61,7 @@ describe('Admin place list', () => {
     expect(cards[0].text()).toContain('Alpha Reserve');
     expect(cards[0].text()).toContain('Boundary looks wrong');
     expect(cards[1].text()).toContain('Possible duplicate');
-    expect(wrapper.text()).toContain('2 places need attention');
+    expect(wrapper.text()).toContain('2 places flagged for follow-up');
   });
 
   it('opens a place in Edit mode on its Status tab', async () => {
@@ -79,7 +79,7 @@ describe('Admin place list', () => {
     const places = usePlacesStore();
     const wrapper = mount(AdminPlaceList, { props: { kind: 'withdrawn' } });
     await flushPromises();
-    expect(wrapper.text()).toContain('2 places withdrawn');
+    expect(wrapper.text()).toContain('2 places hidden');
     vi.mocked(loadAdminPlaceList).mockResolvedValue({
       status: 'ok',
       places: [],
@@ -88,6 +88,6 @@ describe('Admin place list', () => {
     places.adminListVersion += 1;
     await flushPromises();
     expect(loadAdminPlaceList).toHaveBeenCalledTimes(2);
-    expect(wrapper.text()).toContain('No place is withdrawn.');
+    expect(wrapper.text()).toContain('No place is hidden.');
   });
 });

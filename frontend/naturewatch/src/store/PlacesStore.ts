@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import type { BoundaryReviewView } from '@/places/boundaryReview';
 import { computed, ref, watch } from 'vue';
 import {
   loadKeptPlaceIds,
@@ -195,6 +196,11 @@ const usePlacesStore = defineStore('places', () => {
    */
   const photoSuggestions = ref(false);
   /**
+   * Applied boundary review filter: only places whose boundary is in this
+   * review view. Admins in Edit mode only. Null while off.
+   */
+  const boundaryReview = ref<BoundaryReviewView | null>(null);
+  /**
    * Places of the listed types linked to a chosen ecoregion, or with suggested
    * photographs while the photo filter is on, which the map keeps. Null while
    * neither applies.
@@ -204,10 +210,14 @@ const usePlacesStore = defineStore('places', () => {
 
   watch(
     () =>
-      `${listTypes.value.join(',')}|${ecoregionIds.value.join(',')}|${photoSuggestions.value}`,
+      `${listTypes.value.join(',')}|${ecoregionIds.value.join(',')}|${photoSuggestions.value}|${boundaryReview.value}`,
     async () => {
       const request = ++keptRequest;
-      if (!ecoregionIds.value.length && !photoSuggestions.value) {
+      if (
+        !ecoregionIds.value.length &&
+        !photoSuggestions.value &&
+        !boundaryReview.value
+      ) {
         keptPlaceIds.value = null;
         return;
       }
@@ -219,6 +229,7 @@ const usePlacesStore = defineStore('places', () => {
         cropMax: CROPLAND_FULL[1],
         ecoregionIds: [...ecoregionIds.value],
         photoSuggestions: photoSuggestions.value,
+        boundaryReview: boundaryReview.value,
       });
       if (request !== keptRequest || result.status !== 'ok') return;
       keptPlaceIds.value = result.ids;
@@ -231,7 +242,8 @@ const usePlacesStore = defineStore('places', () => {
       sizeKept.value[0] !== null ||
       sizeKept.value[1] !== null ||
       ecoregionIds.value.length > 0 ||
-      photoSuggestions.value
+      photoSuggestions.value ||
+      boundaryReview.value !== null
   );
   /** Tile filter for the applied size range. */
   const tileFilter = computed(() => placeTileFilter(sizeKept.value));
@@ -242,20 +254,24 @@ const usePlacesStore = defineStore('places', () => {
    * @param ecoregions - Chosen ecoregions. Unchanged when left out.
    * @param photos - Whether only places with suggested photographs are kept.
    *   Unchanged when left out.
+   * @param review - The boundary review view to keep, or null. Unchanged when
+   *   left out.
    */
   function applyFilter(
     size: SizeBounds,
     ecoregions: EcoregionName[] = ecoregionsKept.value,
-    photos: boolean = photoSuggestions.value
+    photos: boolean = photoSuggestions.value,
+    review: BoundaryReviewView | null = boundaryReview.value
   ) {
     sizeKept.value = [...size];
     ecoregionsKept.value = [...ecoregions];
     photoSuggestions.value = photos;
+    boundaryReview.value = review;
   }
 
   /** Keep every place again. */
   function clearFilter() {
-    applyFilter([null, null], [], false);
+    applyFilter([null, null], [], false, null);
   }
 
   /** Whether the list is limited to the current map view. On at the start. */
@@ -384,10 +400,11 @@ const usePlacesStore = defineStore('places', () => {
    * places that need attention, the withdrawn places, or the corrections.
    * Admins only.
    */
-  const adminList = ref<
-    'attention' | 'withdrawn' | 'corrections' | 'boundaries' | null
-  >(null);
-  /** Goes up after a place is withdrawn, restored, flagged, or cleared, so the lists read again. */
+  const adminList = ref<'attention' | 'withdrawn' | 'corrections' | null>(null);
+  /**
+   * Goes up after a place is hidden, shown, flagged, or cleared, or a boundary
+   * is reviewed, so the lists read again.
+   */
   const adminListVersion = ref(0);
   /** The places list's cards while the photo filter is on, in order. */
   const photoListIds = ref<string[]>([]);
@@ -416,7 +433,8 @@ const usePlacesStore = defineStore('places', () => {
   }
 
   /**
-   * Open a place from the attention or withdrawn list on its Status tab.
+   * Open a place on its Status tab: from the follow-up or hidden list, or from
+   * the places list while the boundary review filter is on.
    * @param id - The place id.
    */
   function openFromAdminList(id: string) {
@@ -455,6 +473,7 @@ const usePlacesStore = defineStore('places', () => {
     ecoregionIds,
     keptPlaceIds,
     photoSuggestions,
+    boundaryReview,
     viewBounds,
     filtering,
     tileFilter,
