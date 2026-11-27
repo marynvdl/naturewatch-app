@@ -35,7 +35,7 @@ The admin work on boundaries. It follows [Molding Places](../archive/parcels/mol
 
 Do one task at a time, in this order. Start a task only after the one above it has merged. Each task is one branch and one pull request in each repo it names. Task files are written when a task starts.
 
-- [ ] Task 01 — Boundary QC and Stats eligibility — naturewatch-app
+- [x] [Task 01 — Boundary QC and Stats eligibility](../archive/tasks/task-01-boundary-qc.md) — naturewatch-app
   - *Goal:* Add `qc_status`, the `stats_eligibility` columns, `boundary_checks`, `stats_eligible_boundaries`, and `set_stats_eligibility`. Write `supabase/check_boundaries.py` with the four starting checks, and set the first eligibility with a vertex cap. Run it on the hosted database after approval.
 - [ ] Task 02 — Overlaps on pieces — naturewatch-app
   - *Goal:* `place_overlaps()` cuts shapes with `ST_Subdivide`, and it is tested on the heaviest boundaries without running out of memory.

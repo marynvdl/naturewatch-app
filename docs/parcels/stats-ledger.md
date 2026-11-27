@@ -7,7 +7,7 @@ Resumes the Stats Pipeline. Each raster is tallied once onto coarse cells, and e
 ## Order
 
 1. **Buildings sprout v2.** Apply the approved speckle rule ([buildings/README.md](https://github.com/marynvdl/naturewatch-analysis/blob/main/buildings/README.md), "Google speckle, resumed": floor 0.012 and seed 0.15 within 2 km, Google cells only) to sprout v1 on Batch. Stats, Tiles and Pressure then read one cleaned layer. Expected about $1–3, priced from a pilot first.
-2. **The ledger.** It waits for the eligibility part of [Shaping Boundaries](shaping-boundaries.md).
+2. **The ledger.** It reads `stats_eligible_boundaries`, filled by [Shaping Boundaries](shaping-boundaries.md) task 01.
 
 ## Design so far
 
