@@ -1,6 +1,6 @@
 # Task 05a — Photo queue and licences
 
-Parcel: [Wayfinding](../../parcels/wayfinding.md).
+Parcel: [Wayfinding](../parcels/wayfinding.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 04 merged in #461.
 
