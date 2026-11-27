@@ -217,6 +217,13 @@ class CorrectionsLocalTest(unittest.TestCase):
         first = self.submit()
         second = self.submit()
         third = self.submit()
+        # One transaction gives all three the same created_at, so set them apart.
+        for seconds, correction in ((3, first), (2, second), (1, third)):
+            self.conn.execute(
+                "update public.layer_corrections set created_at = now() - make_interval(secs => %s) "
+                "where id = %s",
+                (seconds, correction),
+            )
         self.review(third, "approved")
         submitted = [row for row in self.listed(["submitted"], 1000) if row["id"] not in before]
         self.assertEqual([row["id"] for row in submitted], [second, first])
