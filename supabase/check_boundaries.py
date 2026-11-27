@@ -72,7 +72,8 @@ class Thresholds:
     tiny_share: float
 
 
-# Approved after measure on the hosted database. See the task file.
+# Approved on 27 November 2026 after measure on the hosted database: one setting for
+# every place type, which flagged 0-2% of each type.
 DEFAULT_THRESHOLDS = Thresholds(
     part_km2=0.01, min_parts=50, small_share=0.5, hole_km2=0.001, min_holes=50, tiny_share=0.5
 )
