@@ -39,7 +39,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* Add `qc_status`, the `stats_eligibility` columns, `boundary_checks`, `stats_eligible_boundaries`, and `set_stats_eligibility`. Write `supabase/check_boundaries.py` with the four starting checks, and set the first eligibility with a vertex cap. Run it on the hosted database after approval.
 - [x] [Task 02 — Overlaps on pieces](../archive/tasks/task-02-overlaps-on-pieces.md) — naturewatch-app
   - *Goal:* `place_overlaps()` cuts shapes with `ST_Subdivide`, and it is tested on the heaviest boundaries without running out of memory.
-- [ ] Task 03 — Polygon review queue — naturewatch-app
+- [ ] [Task 03 — Polygon review queue](../tasks/task-03-polygon-review-queue.md) — naturewatch-app
   - *Goal:* An admin list of flagged and `pending` boundaries with their findings. An admin accepts a warning (`qc_status` `accepted`) and sets the boundary to `eligible` or `excluded`, with a reason. Run the tests and a browser check.
 - [ ] Task 04 — Overlap review queue — naturewatch-app
   - *Goal:* An admin list of overlapping pairs and of the `recognises` links left `proposed`. For each pair, the admin decides the relationship, publication, and Stats eligibility through `review_overlap`. Run the tests and a browser check.
