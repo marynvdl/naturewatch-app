@@ -10,6 +10,8 @@ The Status tab and the review list use plain words for the decisions an admin ma
 
 Done on 27 November 2026. The migration was applied to the local database with psql and to hosted after the user approved it. On hosted, the task 03 functions are gone, and the 2 accepted boundaries are unchanged. The browser check ran against the local stack and restored every row it changed. In it, a long card note overflowed its tag on a narrow screen, so `PlaceCard` now keeps a note to one line with an ellipsis.
 
+Afterwards, at the user's request, the 43 ecoregions under To review were counted at once on hosted, as owner, with one note: "Shape is right: all ecoregions in To review counted at once, at the admin's request, 27 Nov 2026." All 846 ecoregion boundaries are now counted.
+
 ## Facts already stored
 
 From the code and the hosted database on 27 November 2026:
