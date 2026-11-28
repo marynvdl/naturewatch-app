@@ -27,8 +27,16 @@ import {
 } from '@/places/api';
 import { formatPercent, placeTypeLabel } from '@/places/display';
 import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
+import { reviewOverlap, type OverlapDecision } from '@/places/overlapReview';
+import usePlacesStore from '@/store/PlacesStore';
 
-const props = defineProps<{ placeId: string }>();
+const props = defineProps<{
+  placeId: string;
+  /** This place's type. Same place needs two conservation areas. */
+  placeTypeId?: string | null;
+}>();
+
+const placesStore = usePlacesStore();
 
 const emit = defineEmits<{
   /** A link was added or its status changed. */
@@ -59,12 +67,33 @@ interface LinkGroup {
   links: PlaceLink[];
 }
 
-/** The actions each status offers, in order. */
-const ACTIONS: Record<LinkStatus, { status: LinkStatus; label: string }[]> = {
-  proposed: [
-    { status: 'confirmed', label: 'Confirm' },
-    { status: 'rejected', label: 'Reject' },
-  ],
+/** One button under a card: a status to set, or a decision on a proposed link. */
+type LinkAction =
+  | { kind: 'status'; status: LinkStatus; label: string }
+  | { kind: 'decision'; decision: OverlapDecision; label: string };
+
+/** The decisions on a proposed link, in order. */
+const PROPOSED: LinkAction[] = [
+  { kind: 'decision', decision: 'keep', label: 'Keep link' },
+  { kind: 'decision', decision: 'not_related', label: 'Not related' },
+];
+const SAME_PLACE: LinkAction = {
+  kind: 'decision',
+  decision: 'same_place',
+  label: 'Same place, hide it',
+};
+const BACK_TO_REVIEW: LinkAction = {
+  kind: 'decision',
+  decision: 'undo',
+  label: 'Back to review',
+};
+const CONSERVATION_AREA = 'conservation_area';
+
+/** The statuses a reviewed link can be set to, in order. */
+const ACTIONS: Record<
+  Exclude<LinkStatus, 'proposed'>,
+  { status: LinkStatus; label: string }[]
+> = {
   confirmed: [
     { status: 'rejected', label: 'Reject' },
     { status: 'retired', label: 'Retire' },
@@ -156,6 +185,9 @@ function noteOf(link: PlaceLink, group: LinkGroup): string {
     link.coverage != null
       ? `${formatPercent(link.coverage * 100)}% of this place inside`
       : null,
+    link.otherCoverage != null
+      ? `${formatPercent(link.otherCoverage * 100)}% of it inside this place`
+      : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -192,6 +224,59 @@ function ends(outward: boolean, otherId: string): [string, string] {
   return outward ? [props.placeId, otherId] : [otherId, props.placeId];
 }
 
+/**
+ * The buttons under a card. A proposed link gets the decisions, with Same
+ * place for an overlap between two conservation areas. A reviewed derived link
+ * can go back to review.
+ */
+function actionsOf(link: PlaceLink): LinkAction[] {
+  if (link.status === 'proposed') {
+    const same =
+      link.typeId === 'overlaps' &&
+      props.placeTypeId === CONSERVATION_AREA &&
+      link.otherTypeId === CONSERVATION_AREA;
+    return same ? [...PROPOSED, SAME_PLACE] : PROPOSED;
+  }
+  const actions: LinkAction[] = ACTIONS[link.status].map(action => ({
+    kind: 'status',
+    ...action,
+  }));
+  if (link.status !== 'retired' && link.origin === 'derived')
+    actions.push(BACK_TO_REVIEW);
+  return actions;
+}
+
+/** Whether a button is the main one: the one that keeps the link. */
+function isMain(action: LinkAction): boolean {
+  return action.kind === 'status'
+    ? action.status === 'confirmed'
+    : action.decision === 'keep';
+}
+
+/** A key for a button. */
+function keyOf(action: LinkAction): string {
+  return action.kind === 'status' ? action.status : action.decision;
+}
+
+/** Run one button, then read the links again. */
+async function act(link: PlaceLink, action: LinkAction) {
+  if (action.kind === 'status') await review(link, action.status);
+  else await decide(link, action.decision);
+}
+
+/** Show why a change failed under its link. */
+function fail(link: PlaceLink, message: string) {
+  linkError.value = { id: link.id, message };
+}
+
+/** The links changed: read them again, and tell the list and the map. */
+async function changed(hidden: boolean) {
+  await load();
+  emit('changed');
+  placesStore.adminListVersion += 1;
+  if (hidden) void placesStore.loadWithdrawn();
+}
+
 /** Confirm, reject, or retire one link, then read the links again. */
 async function review(link: PlaceLink, next: LinkStatus) {
   busyId.value = link.id;
@@ -200,17 +285,35 @@ async function review(link: PlaceLink, next: LinkStatus) {
   const result = await setPlaceRelationship(subject, link.typeId, object, next);
   busyId.value = null;
   if (result.status !== 'ok') {
-    linkError.value = {
-      id: link.id,
-      message:
-        result.status === 'error'
-          ? result.message
-          : 'The place store is not configured.',
-    };
+    fail(
+      link,
+      result.status === 'error'
+        ? result.message
+        : 'The place store is not configured.'
+    );
     return;
   }
-  await load();
-  emit('changed');
+  await changed(false);
+}
+
+/**
+ * Keep a proposed link, mark it not related, hide the place on the card as
+ * the same place, or put a reviewed link back to review.
+ */
+async function decide(link: PlaceLink, decision: OverlapDecision) {
+  busyId.value = link.id;
+  linkError.value = null;
+  const message = await reviewOverlap(
+    link.id,
+    decision,
+    decision === 'same_place' ? link.otherId : null
+  );
+  busyId.value = null;
+  if (message) {
+    fail(link, message);
+    return;
+  }
+  await changed(decision === 'same_place' || decision === 'undo');
 }
 
 /** Search for places a short while after typing stops. */
@@ -425,15 +528,15 @@ onBeforeUnmount(() => {
           >
             {{ linkError.message }}
           </p>
-          <div v-if="ACTIONS[link.status].length" class="links-actions">
+          <div v-if="actionsOf(link).length" class="links-actions">
             <Button
-              v-for="action in ACTIONS[link.status]"
-              :key="action.status"
+              v-for="action in actionsOf(link)"
+              :key="keyOf(action)"
               type="button"
               size="sm"
-              :variant="action.status === 'confirmed' ? 'default' : 'outline'"
+              :variant="isMain(action) ? 'default' : 'outline'"
               :disabled="busyId === link.id"
-              @click="review(link, action.status)"
+              @click="act(link, action)"
             >
               {{ action.label }}
             </Button>

@@ -42,6 +42,11 @@ import {
   reviewViewOf,
   type BoundaryNote,
 } from '@/places/boundaryReview';
+import {
+  loadOverlapNotes,
+  overlapCardNote,
+  type OverlapNote,
+} from '@/places/overlapReview';
 import { loadSuggestedCounts } from '@/places/images';
 import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 import usePlacesStore from '@/store/PlacesStore';
@@ -87,8 +92,12 @@ const anyType = computed(() => placeTypes.value.length > 0);
 const photoMode = computed(() => placesStore.photoSuggestions);
 /** The boundary review filter is on: cards open the Status tab. */
 const reviewMode = computed(() => placesStore.boundaryReview !== null);
+/** The link review filter is on: cards open the Related tab. */
+const linkMode = computed(() => placesStore.overlapReview !== null);
 /** An admin filter is on, which lists every type when none is chosen. */
-const adminFilterMode = computed(() => photoMode.value || reviewMode.value);
+const adminFilterMode = computed(
+  () => photoMode.value || reviewMode.value || linkMode.value
+);
 /** The stored place types listed and drawn, in button order. Empty when none is. */
 const listedTypes = computed<string[]>(() =>
   placeTypeButtons.value
@@ -249,6 +258,7 @@ function listQuery(offset = 0): PlaceWindowQuery {
     ecoregionIds: placesStore.ecoregionIds,
     photoSuggestions: photoMode.value,
     boundaryReview: placesStore.boundaryReview,
+    overlapReview: placesStore.overlapReview,
   };
 }
 
@@ -282,6 +292,12 @@ function chooseResult(place: PlaceSummary) {
   if (photoMode.value && placesStore.selectedId !== id) {
     showBoundaries();
     placesStore.openWithPhotos(id);
+    return;
+  }
+  // With the link review filter on, a card opens its Related tab.
+  if (linkMode.value && placesStore.selectedId !== id) {
+    showBoundaries();
+    placesStore.openForLinkReview(id);
     return;
   }
   // With the boundary review filter on, a card opens its Status tab.
@@ -516,6 +532,7 @@ watch(
       placesStore.ecoregionIds.join(','),
       photoMode.value,
       placesStore.boundaryReview,
+      placesStore.overlapReview,
     ] as const,
   (next, previous) => {
     if (!showList.value && !searchingAll.value) return;
@@ -598,9 +615,17 @@ watch(
   editing => {
     if (
       !editing &&
-      (placesStore.photoSuggestions || placesStore.boundaryReview)
+      (placesStore.photoSuggestions ||
+        placesStore.boundaryReview ||
+        placesStore.overlapReview)
     )
-      placesStore.applyFilter(placesStore.sizeKept, undefined, false, null);
+      placesStore.applyFilter(
+        placesStore.sizeKept,
+        undefined,
+        false,
+        null,
+        null
+      );
   }
 );
 
@@ -652,6 +677,74 @@ watch(
       const note = notes[place.id];
       return note && reviewViewOf(note.qcStatus, note.eligibility) === view;
     });
+    matchTotal.value -= places.value.length - kept.length;
+    places.value = kept;
+  }
+);
+
+/** Each card's proposed links, while the link review filter is on. */
+const linkNotes = ref<Record<string, OverlapNote>>({});
+let linkNotesRequest = 0;
+
+/**
+ * Read the proposed links of the listed places, of the chosen kind.
+ * @param ids - The places to read.
+ * @returns The notes, or null when they could not be read or a newer read started.
+ */
+async function readLinkNotes(ids: string[]) {
+  const request = ++linkNotesRequest;
+  const result = await loadOverlapNotes(ids, placesStore.overlapReview);
+  if (request !== linkNotesRequest || result.status !== 'ok') return null;
+  return result.notes;
+}
+
+/** The proposed links of new cards. A new kind reads them all again. */
+watch(
+  () =>
+    linkMode.value
+      ? ([
+          shown.value.map(place => place.id),
+          placesStore.overlapReview,
+        ] as const)
+      : null,
+  async (next, previous) => {
+    if (!next) {
+      linkNotes.value = {};
+      return;
+    }
+    if (previous && previous[1] !== next[1]) linkNotes.value = {};
+    const missing = next[0].filter(id => !(id in linkNotes.value));
+    if (!missing.length) return;
+    const notes = await readLinkNotes(missing);
+    if (!notes) return;
+    const read = Object.fromEntries(
+      missing.map(id => [
+        id,
+        notes[id] ?? { count: 0, otherName: null, share: null },
+      ])
+    );
+    linkNotes.value = { ...linkNotes.value, ...read };
+  }
+);
+
+/**
+ * After a link is decided, read the proposed links again. A place with none of
+ * the chosen kind left leaves the list. An open place stays open.
+ */
+watch(
+  () => placesStore.adminListVersion,
+  async () => {
+    if (!placesStore.overlapReview || !places.value.length) return;
+    const ids = places.value.map(place => place.id);
+    const notes = await readLinkNotes(ids);
+    if (!notes) return;
+    linkNotes.value = Object.fromEntries(
+      ids.map(id => [
+        id,
+        notes[id] ?? { count: 0, otherName: null, share: null },
+      ])
+    );
+    const kept = places.value.filter(place => notes[place.id]?.count);
     matchTotal.value -= places.value.length - kept.length;
     places.value = kept;
   }
@@ -730,6 +823,8 @@ function photoNote(id: string): string | null {
 function cardNoteOf(id: string): string | null {
   const photos = photoNote(id);
   if (photos) return photos;
+  const links = linkMode.value ? linkNotes.value[id] : undefined;
+  if (links?.count) return overlapCardNote(links);
   const note = reviewMode.value ? reviewNotes.value[id] : undefined;
   return note ? cardNote(note) || null : null;
 }

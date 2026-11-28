@@ -142,6 +142,7 @@ Why the database is designed as it is. The design itself is [design.md](design.m
 - `place_relationships` holds typed links (`part_of`, `located_in`, `recognises`, `overlaps`) with origin, review status, and provenance.
 - Symmetric types are stored once.
 - Spatial overlap is computed on demand by an admin function and not stored. Only a reviewer's decision is stored.
+- A candidate link may be stored as `proposed`, computed on a laptop from the boundaries, for a reviewer to decide: the `recognises` links, and since Shaping Boundaries task 04 the `overlaps` links between conservation areas. The database still does not compute all pairs.
 - Derived rows may carry `subject_coverage` and the boundary versions they were measured on.
 
 **Why.**

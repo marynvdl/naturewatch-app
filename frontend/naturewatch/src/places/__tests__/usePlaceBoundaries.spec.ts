@@ -1018,6 +1018,7 @@ describe('map padding from the open panels', () => {
       ecoregionIds: [],
       photoSuggestions: false,
       boundaryReview: null,
+      overlapReview: null,
     });
     expect(map.cameraForBounds).toHaveBeenLastCalledWith(
       [

@@ -361,9 +361,14 @@ async function loadLinked(id: string, placeTypeId: string) {
   await Promise.all(reads);
 }
 
-/** A link changed in edit mode. Read the confirmed links again. */
+/**
+ * A link changed in edit mode. Read the confirmed links again, and the status:
+ * undoing Same place shows this place on the map again.
+ */
 function onLinksChanged() {
-  if (place.value) void loadLinked(place.value.id, place.value.placeTypeId);
+  if (!place.value) return;
+  void loadLinked(place.value.id, place.value.placeTypeId);
+  void loadStatus();
 }
 
 watch(() => props.placeId, load, { immediate: true });
@@ -690,6 +695,7 @@ function onTabKey(event: KeyboardEvent, index: number) {
           >
             <PlaceLinksEditor
               :place-id="place.id"
+              :place-type-id="place.placeTypeId"
               @changed="onLinksChanged"
               @open="id => $emit('open', id)"
               @highlight="(id, on) => $emit('highlight', id, on)"

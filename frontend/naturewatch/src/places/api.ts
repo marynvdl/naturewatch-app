@@ -1,4 +1,5 @@
 import type { BoundaryReviewView } from '@/places/boundaryReview';
+import type { OverlapReviewView } from '@/places/overlapReview';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseClient } from '@/plugins/supabase';
 import {
@@ -130,6 +131,8 @@ export interface PlaceWindowQuery {
   photoSuggestions?: boolean;
   /** Keep only places whose boundary is in this review view. Admins only. */
   boundaryReview?: BoundaryReviewView | null;
+  /** Keep only places with a proposed link of this kind. Admins only. */
+  overlapReview?: OverlapReviewView | null;
 }
 
 /** Result of loading the capped list. */
@@ -231,6 +234,7 @@ function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
     ...ecoregionArgs(query.ecoregionIds),
     ...photoArgs(query.photoSuggestions),
     ...reviewArgs(query.boundaryReview),
+    ...overlapArgs(query.overlapReview),
   };
 }
 
@@ -250,6 +254,15 @@ function ecoregionArgs(ids: string[] | undefined) {
  */
 function reviewArgs(view: BoundaryReviewView | null | undefined) {
   return view ? { p_boundary_review: view } : {};
+}
+
+/**
+ * The link review filter argument, only when a view is chosen.
+ * @param view - The kind of proposed link, or null.
+ * @returns `p_overlap_review`, or nothing.
+ */
+function overlapArgs(view: OverlapReviewView | null | undefined) {
+  return view ? { p_overlap_review: view } : {};
 }
 
 /**
@@ -472,6 +485,8 @@ export interface KeptIdsQuery {
   photoSuggestions?: boolean;
   /** Keep only places whose boundary is in this review view. Admins only. */
   boundaryReview?: BoundaryReviewView | null;
+  /** Keep only places with a proposed link of this kind. Admins only. */
+  overlapReview?: OverlapReviewView | null;
 }
 
 /**
@@ -494,6 +509,7 @@ export async function loadKeptPlaceIds(
     ...ecoregionArgs(query.ecoregionIds),
     ...photoArgs(query.photoSuggestions),
     ...reviewArgs(query.boundaryReview),
+    ...overlapArgs(query.overlapReview),
   });
   if (error || !Array.isArray(data)) return { status: 'error' };
   return { status: 'ok', ids: data.map(String) };
@@ -904,6 +920,8 @@ export interface PlaceLink {
   status: LinkStatus;
   /** Derived links: the share of this place inside the other. */
   coverage: number | null;
+  /** Derived links: the share of the other place inside this one. */
+  otherCoverage: number | null;
 }
 
 /** Result of reading a place's links. */
@@ -984,6 +1002,7 @@ export async function loadPlaceLinks(
       origin: row.origin,
       status: (row.retired_at ? 'retired' : row.status) as LinkStatus,
       coverage: outward ? row.subject_coverage : row.object_coverage,
+      otherCoverage: outward ? row.object_coverage : row.subject_coverage,
     };
   });
   const ids = [...new Set(links.map(link => link.otherId))];
@@ -1146,6 +1165,7 @@ export async function loadPlaceBounds(id: string): Promise<PlaceBoundsResult> {
  * @param query.ecoregionIds - Chosen ecoregions, when any apply.
  * @param query.photoSuggestions - Keep only places with suggested photographs.
  * @param query.boundaryReview - Keep only places whose boundary is in this review view.
+ * @param query.overlapReview - Keep only places with a proposed link of this kind.
  * @returns The extent, `missing` when no place is kept, or why it could not be read.
  */
 export async function loadPlaceExtent(query: {
@@ -1155,6 +1175,7 @@ export async function loadPlaceExtent(query: {
   ecoregionIds: string[];
   photoSuggestions?: boolean;
   boundaryReview?: BoundaryReviewView | null;
+  overlapReview?: OverlapReviewView | null;
 }): Promise<PlaceBoundsResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
@@ -1165,6 +1186,7 @@ export async function loadPlaceExtent(query: {
     ...ecoregionArgs(query.ecoregionIds),
     ...photoArgs(query.photoSuggestions),
     ...reviewArgs(query.boundaryReview),
+    ...overlapArgs(query.overlapReview),
   });
   if (error || !data) return { status: 'error' };
   const row = (

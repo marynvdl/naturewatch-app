@@ -4,6 +4,7 @@ import {
   SegmentedControlItem,
 } from '@/components/ui/segmented-control';
 import { REVIEW_VIEWS, type BoundaryReviewView } from '@/places/boundaryReview';
+import { OVERLAP_VIEWS, type OverlapReviewView } from '@/places/overlapReview';
 import { computed, nextTick, ref, watch } from 'vue';
 import { Info, X } from '@lucide/vue';
 import {
@@ -72,6 +73,8 @@ const ecoregionsKept = ref<EcoregionName[]>([]);
 const photosKept = ref(false);
 /** The draft boundary review view, or `all` for none. */
 const reviewKept = ref<BoundaryReviewView | 'all'>('all');
+/** The draft link review view, or `all` for none. */
+const linksKept = ref<OverlapReviewView | 'all'>('all');
 /** The photo and boundary review filters, for admins in Edit mode. */
 const showPhotos = computed(() => auth.isAdmin && auth.editMode);
 const keptCount = ref(props.matchedTotal);
@@ -82,13 +85,33 @@ const draftReview = computed<BoundaryReviewView | null>(() =>
   showPhotos.value && reviewKept.value !== 'all' ? reviewKept.value : null
 );
 
+/** The draft link review view for the list reads, or null. Admins in Edit mode only. */
+const draftLinks = computed<OverlapReviewView | null>(() =>
+  showPhotos.value && linksKept.value !== 'all' ? linksKept.value : null
+);
+
 /**
- * Choose a review view. Choosing the chosen one again keeps it.
+ * Choose a review view. Choosing the chosen one again keeps it. A view turns
+ * the link review off, so one review filter is on at a time.
  * @param next - The view, or `all`.
  */
 function setReview(next: unknown) {
-  if (next === 'all' || REVIEW_VIEWS.some(view => view.id === next))
+  if (next === 'all' || REVIEW_VIEWS.some(view => view.id === next)) {
     reviewKept.value = next as BoundaryReviewView | 'all';
+    if (next !== 'all') linksKept.value = 'all';
+  }
+}
+
+/**
+ * Choose a link review view. Choosing the chosen one again keeps it. A view
+ * turns the boundary review off.
+ * @param next - The view, or `all`.
+ */
+function setLinks(next: unknown) {
+  if (next === 'all' || OVERLAP_VIEWS.some(view => view.id === next)) {
+    linksKept.value = next as OverlapReviewView | 'all';
+    if (next !== 'all') reviewKept.value = 'all';
+  }
 }
 
 /** The Ecoregion field, for every listed type but Ecoregions. */
@@ -102,6 +125,7 @@ watch(open, isOpen => {
   ecoregionsKept.value = [...placesStore.ecoregionsKept];
   photosKept.value = placesStore.photoSuggestions;
   reviewKept.value = placesStore.boundaryReview ?? 'all';
+  linksKept.value = placesStore.overlapReview ?? 'all';
   keptCount.value = props.matchedTotal;
 });
 
@@ -212,6 +236,7 @@ watch(
       (props.countTypes ?? props.placeTypes ?? []).join(','),
       photosKept.value,
       reviewKept.value,
+      linksKept.value,
     ] as const,
   async ([isOpen]) => {
     if (!isOpen) return;
@@ -228,6 +253,7 @@ watch(
       ecoregionIds: draftEcoregionIds.value,
       photoSuggestions: showPhotos.value && photosKept.value,
       boundaryReview: draftReview.value,
+      overlapReview: draftLinks.value,
     });
     if (request !== countRequest) return;
     if (result.status === 'ok') keptCount.value = result.total;
@@ -240,6 +266,7 @@ function clearAll() {
   ecoregionsKept.value = [];
   photosKept.value = false;
   reviewKept.value = 'all';
+  linksKept.value = 'all';
 }
 
 /**
@@ -251,7 +278,8 @@ function apply() {
     sizeBounds.value,
     showEcoregions.value ? ecoregionsKept.value : placesStore.ecoregionsKept,
     showPhotos.value && photosKept.value,
-    draftReview.value
+    draftReview.value,
+    draftLinks.value
   );
   placesStore.fitToKept();
   open.value = false;
@@ -395,6 +423,32 @@ function apply() {
               <SegmentedControlItem value="all">All</SegmentedControlItem>
               <SegmentedControlItem
                 v-for="view in REVIEW_VIEWS"
+                :key="view.id"
+                :value="view.id"
+              >
+                {{ view.label }}
+              </SegmentedControlItem>
+            </SegmentedControl>
+          </section>
+          <section
+            v-if="showPhotos"
+            class="filter-section"
+            aria-labelledby="filter-links-title"
+          >
+            <h3 id="filter-links-title" class="filter-name filter-name-spaced">
+              Link review
+            </h3>
+            <SegmentedControl
+              :model-value="linksKept"
+              type="single"
+              variant="outline"
+              size="sm"
+              aria-labelledby="filter-links-title"
+              @update:model-value="setLinks"
+            >
+              <SegmentedControlItem value="all">All</SegmentedControlItem>
+              <SegmentedControlItem
+                v-for="view in OVERLAP_VIEWS"
                 :key="view.id"
                 :value="view.id"
               >
