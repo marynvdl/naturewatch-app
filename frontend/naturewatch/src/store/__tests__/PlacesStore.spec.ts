@@ -41,6 +41,7 @@ describe('Places store, Ecoregion filter', () => {
       ecoregionIds: ['e1', 'e2'],
       photoSuggestions: false,
       boundaryReview: null,
+      overlapReview: null,
     });
     expect(store.keptPlaceIds).toEqual(['park-in-e1', 'park-in-e2']);
 

@@ -19,6 +19,7 @@ import {
 import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 import { loadSuggestedCounts } from '@/places/images';
 import { loadBoundaryNotes, type BoundaryNote } from '@/places/boundaryReview';
+import { loadOverlapNotes, type OverlapNote } from '@/places/overlapReview';
 import usePlacesStore from '@/store/PlacesStore';
 import useAuthStore from '@/store/AuthStore';
 
@@ -52,6 +53,12 @@ vi.mock('@/places/mainPhotos', () => ({
 vi.mock('@/components/AdminPlaceList.vue', () => ({
   default: { name: 'AdminPlaceList', template: '<div class="queue-stub" />' },
 }));
+
+vi.mock('@/places/overlapReview', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/places/overlapReview')>();
+  return { ...actual, loadOverlapNotes: vi.fn() };
+});
 
 vi.mock('@/places/boundaryReview', async importOriginal => {
   const actual =
@@ -398,6 +405,65 @@ describe('Places panel', () => {
     auth.editMode = false;
     await flushPromises();
     expect(store.boundaryReview).toBeNull();
+  });
+
+  it('lists the places with proposed links of a kind, with their notes, for an admin in Edit mode', async () => {
+    const pinia = createPinia();
+    const auth = useAuthStore(pinia);
+    const store = usePlacesStore(pinia);
+    auth.isAdmin = true;
+    auth.editMode = true;
+    let notes: Record<string, OverlapNote> = {
+      [places[0].id]: { count: 3, otherName: 'Sabi Sand', share: 0.62 },
+      [places[1].id]: { count: 1, otherName: null, share: null },
+    };
+    vi.mocked(loadOverlapNotes).mockImplementation(async () => ({
+      status: 'ok',
+      notes: { ...notes },
+    }));
+    vi.mocked(loadPilotPlaceWindow).mockImplementation(async query => {
+      const list = query.overlapReview
+        ? places.map(place => ({
+            ...place,
+            place_type_id: 'conservation_area',
+          }))
+        : [];
+      return { status: 'ok', places: list, total: list.length };
+    });
+    const wrapper = mount(PlacesBarComponent, {
+      global: { plugins: [pinia] },
+    });
+    await flushPromises();
+
+    store.applyFilter([null, null], [], false, null, 'overlaps');
+    await flushPromises();
+    const query = vi.mocked(loadPilotPlaceWindow).mock.calls.at(-1)![0];
+    expect(query.overlapReview).toBe('overlaps');
+    expect(loadOverlapNotes).toHaveBeenCalledWith(
+      expect.arrayContaining([places[0].id]),
+      'overlaps'
+    );
+    const cards = wrapper.findAll('.place-result');
+    expect(cards.map(card => card.find('.place-card-note').text())).toEqual([
+      '3 proposed links · 62.0% inside Sabi Sand',
+      '1 proposed link',
+    ]);
+
+    await cards[0].trigger('click');
+    await flushPromises();
+    expect(store.selectedId).toBe(places[0].id);
+    expect(store.profileTab).toBe('related');
+
+    // The other place's last link is decided: it leaves the list.
+    notes = { [places[0].id]: notes[places[0].id] };
+    store.adminListVersion += 1;
+    await flushPromises();
+    expect(wrapper.findAll('.place-result')).toHaveLength(1);
+    expect(store.selectedId).toBe(places[0].id);
+
+    auth.editMode = false;
+    await flushPromises();
+    expect(store.overlapReview).toBeNull();
   });
 
   it('shows the main photograph on a card that has one', async () => {

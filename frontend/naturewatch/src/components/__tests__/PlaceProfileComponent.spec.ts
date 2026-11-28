@@ -28,6 +28,7 @@ import {
   type PlaceImage,
 } from '@/places/images';
 import { PHOTOS_NONE } from '@/places/photos';
+import { reviewOverlap } from '@/places/overlapReview';
 import { loadPlaceStatus } from '@/places/status';
 import useAuthStore from '@/store/AuthStore';
 import usePlacesStore from '@/store/PlacesStore';
@@ -52,6 +53,7 @@ vi.mock('@/places/api', async importOriginal => {
     loadRelatedPlaces: vi.fn(),
     searchPlaces: vi.fn(),
     setPlaceRelationship: vi.fn(),
+    loadWithdrawnPlaceIds: vi.fn().mockResolvedValue({ status: 'ok', ids: [] }),
   };
 });
 
@@ -78,6 +80,12 @@ vi.mock('@/places/boundaryReview', async importOriginal => {
     ...actual,
     loadBoundaryReview: vi.fn(async () => ({ status: 'ok', review: null })),
   };
+});
+
+vi.mock('@/places/overlapReview', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/places/overlapReview')>();
+  return { ...actual, reviewOverlap: vi.fn(async () => null) };
 });
 
 vi.mock('@/places/status', async importOriginal => {
@@ -430,6 +438,7 @@ describe('Place profile', () => {
         origin: 'derived',
         status: 'proposed',
         coverage: 0.62,
+        otherCoverage: null,
         ...values,
       };
     }
@@ -449,6 +458,7 @@ describe('Place profile', () => {
       // jsdom has no scrollIntoView, which the combobox calls
       Element.prototype.scrollIntoView = vi.fn();
       vi.mocked(setPlaceRelationship).mockResolvedValue({ status: 'ok' });
+      vi.mocked(reviewOverlap).mockReset().mockResolvedValue(null);
     });
 
     it('leaves the recognitions shown as badges out of the Related tab', async () => {
@@ -804,9 +814,10 @@ describe('Place profile', () => {
           .findAll('button')
           .slice(1)
           .map(button => button.text());
-      expect(actions('p')).toEqual(['Confirm', 'Reject']);
+      expect(actions('p')).toEqual(['Keep link', 'Not related']);
+      expect(actions('o')).toEqual(['Reject', 'Retire', 'Back to review']);
       expect(actions('c')).toEqual(['Reject', 'Retire']);
-      expect(actions('r')).toEqual(['Confirm', 'Retire']);
+      expect(actions('r')).toEqual(['Confirm', 'Retire', 'Back to review']);
       expect(actions('t')).toEqual([]);
       const proposed = wrapper.get('[data-link="p"]').text();
       expect(proposed).toContain('Recognised by');
@@ -846,7 +857,60 @@ describe('Place profile', () => {
       expect(wrapper.find('.links-more').exists()).toBe(false);
     });
 
-    it('confirms, rejects, and retires with the stored subject and object', async () => {
+    it('offers Same place only on an overlap between two conservation areas, with both shares', async () => {
+      vi.mocked(loadPlaceLinks).mockResolvedValue({
+        status: 'ok',
+        links: [
+          link({
+            id: 'pair',
+            typeId: 'overlaps',
+            outward: true,
+            otherId: parkId,
+            otherName: 'Sabi Sand',
+            otherTypeId: 'conservation_area',
+            coverage: 0.4,
+            otherCoverage: 0.92,
+          }),
+          link({
+            id: 'mixed',
+            typeId: 'overlaps',
+            outward: true,
+            otherTypeId: 'ramsar_site',
+          }),
+        ],
+      });
+      const wrapper = await openLinks();
+      const actions = (id: string) =>
+        wrapper
+          .get(`[data-link="${id}"]`)
+          .findAll('.links-actions button')
+          .map(button => button.text());
+      expect(actions('pair')).toEqual([
+        'Keep link',
+        'Not related',
+        'Same place, hide it',
+      ]);
+      expect(actions('mixed')).toEqual(['Keep link', 'Not related']);
+      expect(wrapper.get('[data-link="pair"] .links-note').text()).toBe(
+        'Overlaps · Derived from the boundaries · 40.0% of this place inside · 92.0% of it inside this place'
+      );
+      const places = usePlacesStore();
+      const loadWithdrawn = vi
+        .spyOn(places, 'loadWithdrawn')
+        .mockResolvedValue();
+      const version = places.adminListVersion;
+      const same = wrapper
+        .get('[data-link="pair"]')
+        .findAll('button')
+        .find(button => button.text() === 'Same place, hide it');
+      await same!.trigger('click');
+      await flushPromises();
+      expect(reviewOverlap).toHaveBeenCalledWith('pair', 'same_place', parkId);
+      expect(loadWithdrawn).toHaveBeenCalled();
+      expect(places.adminListVersion).toBe(version + 1);
+    });
+
+    it('decides proposed links, and sets reviewed ones with the stored subject and object', async () => {
       vi.mocked(loadPlaceLinks).mockResolvedValue({
         status: 'ok',
         links: [
@@ -870,17 +934,21 @@ describe('Place profile', () => {
         await button.trigger('click');
         await flushPromises();
       };
-      await press('p', 'Confirm');
-      await press('p', 'Reject');
+      await press('p', 'Keep link');
+      await press('p', 'Not related');
       await press('c', 'Retire');
+      await press('c', 'Back to review');
+      expect(vi.mocked(reviewOverlap).mock.calls).toEqual([
+        ['p', 'keep', null],
+        ['p', 'not_related', null],
+        ['c', 'undo', null],
+      ]);
       expect(vi.mocked(setPlaceRelationship).mock.calls).toEqual([
-        [siteId, 'recognises', placeId, 'confirmed'],
-        [siteId, 'recognises', placeId, 'rejected'],
         [placeId, 'located_in', parkId, 'retired'],
       ]);
       // Each change reads the links and the Related tab again
-      expect(loadPlaceLinks).toHaveBeenCalledTimes(4);
-      expect(loadRelatedPlaces).toHaveBeenCalledTimes(4);
+      expect(loadPlaceLinks).toHaveBeenCalledTimes(5);
+      expect(loadRelatedPlaces).toHaveBeenCalledTimes(5);
     });
 
     it('shows the error on the link when a change fails', async () => {
@@ -888,17 +956,16 @@ describe('Place profile', () => {
         status: 'ok',
         links: [link({ id: 'p' })],
       });
-      vi.mocked(setPlaceRelationship).mockResolvedValue({
-        status: 'error',
-        message: 'the reverse recognises link is already stored',
-      });
+      vi.mocked(reviewOverlap).mockResolvedValue(
+        'This link has been reviewed. Choose Back to review first.'
+      );
       const wrapper = await openLinks();
       await wrapper
         .get('[data-link="p"] .links-actions button')
         .trigger('click');
       await flushPromises();
       expect(wrapper.get('[data-link="p"] [role="alert"]').text()).toBe(
-        'the reverse recognises link is already stored'
+        'This link has been reviewed. Choose Back to review first.'
       );
     });
 

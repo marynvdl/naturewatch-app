@@ -218,6 +218,7 @@ const country = computed(() => countryName(props.iso3));
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  max-width: 100%;
   margin-top: auto;
 }
 

@@ -841,6 +841,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
       ecoregionIds: [...placesStore.ecoregionIds],
       photoSuggestions: placesStore.photoSuggestions,
       boundaryReview: placesStore.boundaryReview,
+      overlapReview: placesStore.overlapReview,
     });
     if (run !== fitRun || result.status !== 'ok') return;
     await withFlight(mapInstance, async () => {

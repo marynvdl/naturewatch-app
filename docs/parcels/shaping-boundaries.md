@@ -18,18 +18,19 @@ The admin work on boundaries. It follows [Molding Places](../archive/parcels/mol
 - **The first eligibility is set by the script.** A boundary that passed QC and is under a vertex cap becomes `eligible`, with the reason recorded. Flagged or heavy boundaries stay `pending` for the polygon queue. After that, eligibility changes only through `set_stats_eligibility` ([record 8](../database/decisions.md#8-stats-eligibility-is-stored-and-changed-only-on-purpose)). The cap is set in task 01. On 26 November 2026, about 230 of the 52,000 current boundaries had over 100,000 vertices.
 - **The queues are derived in views or RPCs, not stored** ([design.md §3](../database/design.md#3-status-fields)). They reuse the admin lists in the Places panel, like the Corrections list.
 - **`place_overlaps()` works on pieces.** It cuts shapes with `ST_Subdivide` before a screen calls it.
+- **The overlap queue's pairs come from a laptop script** (settled in task 04). `derive_overlaps.py` computes the overlapping conservation areas from the WDPCA file and loads the pairs above a chosen share as proposed `overlaps` links, as the `recognises` links were. No hosted query looks at all pairs.
 - **A replacement is a new version.** `submit_boundary` stores it as `proposed`, with `derived_from_boundary_id` when it is an edit. `approve_boundary` makes it current, and it starts `unchecked` and `pending`. Map editing uses the `@mapbox/mapbox-gl-draw` tool that corrections already use.
 - **The map lags the database.** A change to publication or to a boundary reaches the map only after a PMTiles rebuild in naturewatch-analysis. Each task that makes such a change says how to rebuild and what it costs.
 
 ## Open questions
 
 - How PMTiles rebuilds are started after admin changes: by hand per batch, or on a schedule. To settle in task 05.
-- Where the overlap queue gets its candidate pairs without a hosted all-pairs query. To settle in task 04.
 - How map editing handles a boundary with very many vertices. To settle in task 06.
 
 ## Deferred
 
 - `confirm_source_match`, named in the notes of 13 November 2026. No task uses it yet.
+- 950 Indian Reserve Forests share one placeholder boundary in WDPCA (594 points, 29.39 km², in Kerala), so no overlap pair was loaded for them in task 04. Mark them Needs fixing, or replace their boundaries in task 05, then run `derive_overlaps.py` for them again.
 
 ## Tasks
 
@@ -43,7 +44,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* An admin list of flagged and `pending` boundaries with their findings. An admin accepts a warning (`qc_status` `accepted`) and sets the boundary to `eligible` or `excluded`, with a reason. Run the tests and a browser check.
 - [x] [Task 03b — Plain boundary review](../archive/tasks/task-03b-plain-boundary-review.md) — naturewatch-app
   - *Goal:* Plain words for the review: one verdict per boundary, Hide from map and Flag for follow-up for the place, a Stats line, and the review list as a filter on the places list. Run the tests and a browser check.
-- [ ] Task 04 — Overlap review queue — naturewatch-app
+- [x] [Task 04 — Overlap review queue](../archive/tasks/task-04-overlap-review-queue.md) — naturewatch-app
   - *Goal:* An admin list of overlapping pairs and of the `recognises` links left `proposed`. For each pair, the admin decides the relationship, publication, and Stats eligibility through `review_overlap`. Run the tests and a browser check.
 - [ ] Task 05 — Upload a replacement boundary — naturewatch-app and naturewatch-analysis
   - *Goal:* `submit_boundary` takes a GeoJSON upload, and `approve_boundary` makes it current, with `submitted_by` and `reviewed_by`. The new boundary gets QC. Add the PMTiles rebuild step and its cost.

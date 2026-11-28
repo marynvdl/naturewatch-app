@@ -187,6 +187,42 @@ describe('Places filter dialog', () => {
     expect(store.boundaryReview).toBeNull();
   });
 
+  it('offers the link review filter to admins in Edit mode, one review filter at a time', async () => {
+    const store = usePlacesStore();
+    const auth = useAuthStore();
+    await mountDialog();
+    expect(body().text()).not.toContain('Link review');
+    wrapper?.unmount();
+
+    auth.isAdmin = true;
+    auth.editMode = true;
+    await mountDialog();
+    expect(body().text()).toContain('Link review');
+    await button('Left out').trigger('click');
+    await button('Overlaps').trigger('click');
+    await flushPromises();
+    expect(loadPilotPlaceWindowCount).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        boundaryReview: null,
+        overlapReview: 'overlaps',
+      })
+    );
+    await button('Show 2 places').trigger('click');
+    await flushPromises();
+    expect(store.overlapReview).toBe('overlaps');
+    expect(store.boundaryReview).toBeNull();
+    expect(store.filtering).toBe(true);
+    wrapper?.unmount();
+
+    // Choosing a boundary review view turns the link review off.
+    await mountDialog();
+    await button('To review').trigger('click');
+    await button('Show 2 places').trigger('click');
+    await flushPromises();
+    expect(store.boundaryReview).toBe('to_review');
+    expect(store.overlapReview).toBeNull();
+  });
+
   it('counts the draft, and applies it only from the show button', async () => {
     const store = usePlacesStore();
     const dialog = await mountDialog();
