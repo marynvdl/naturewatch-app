@@ -20,7 +20,7 @@ Task 01 compared Global Renewables Watch with OpenStreetMap and left it out: it 
 
 The shared design is in [Threat Layers](threat-layers.md#shared-design). For Energy:
 
-- **Sprouts.** `power-lines`, with the cells a line touches and its voltage class, and `power-sites`, with the cells inside a site and its source group. The group of a site with several sources is the dirtiest, so the sandbox can weight cleaner and dirtier power apart.
+- **Sprouts.** `power-lines`, with the cells a line touches and its voltage class, and `power-sites`, with the cells inside a site and its source group. The group of a site with several sources is the dirtiest, so the sandbox can weight cleaner and dirtier power apart. A wind farm marks only its turbines' cells: its outline holds the land or sea between them, and offshore outlines were nearly half the global site cells in task 02.
 - **Tiles.** Power lines raster, like Roads. Power sites vector: a point per site to zoom 9 for a heatmap, then the shape with the feature card. Crowded points merge but keep their summed area and count, in total and per group.
 - **Map.** One Energy toggle that draws both archives. The heatmap's colours and weights are set in the client.
 
@@ -28,6 +28,7 @@ The rules, encodings, and sample figures are in the two recipes and `energy/READ
 
 ## Open questions
 
+- How the heatmap weighs a wind farm, whose outline is far larger than its turbines' footprint. To settle in task 03.
 - How one catalog entry draws a raster and a vector archive together, and the heatmap's palette and weight. To settle in task 04.
 
 ## Deferred
@@ -40,7 +41,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 - [x] [Task 01 — Energy: recipes and sample](../archive/tasks/task-01-energy-recipes-and-sample.md) — naturewatch-analysis
   - *Goal:* Add the `power-lines` and `power-sites` recipes: release, classes kept, sprout bands, tile encodings, and the attributes kept. On the laptop, build a sample for windows such as the Karoo and one European region. Check them against imagery, compare solar and wind farms with Global Renewables Watch, and choose the top zooms. Write the expected global cost and stop for approval.
-- [ ] [Task 02 — Energy: global seed and sprouts](../tasks/task-02-energy-seed-and-sprouts.md) — naturewatch-analysis
+- [x] [Task 02 — Energy: global seed and sprouts](../archive/tasks/task-02-energy-seed-and-sprouts.md) — naturewatch-analysis
   - *Goal:* After approval, write the global seed and both sprouts with their VRT and STAC files. Check the sample windows against task 01. Record the run cost.
 - [ ] Task 03 — Energy: PMTiles — naturewatch-analysis
   - *Goal:* After approval, build the raster and vector archives, verify them, upload them with the immutable cache header, and record the run cost.
