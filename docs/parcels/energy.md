@@ -40,7 +40,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
 
 - [x] [Task 01 — Energy: recipes and sample](../archive/tasks/task-01-energy-recipes-and-sample.md) — naturewatch-analysis
   - *Goal:* Add the `power-lines` and `power-sites` recipes: release, classes kept, sprout bands, tile encodings, and the attributes kept. On the laptop, build a sample for windows such as the Karoo and one European region. Check them against imagery, compare solar and wind farms with Global Renewables Watch, and choose the top zooms. Write the expected global cost and stop for approval.
-- [ ] Task 02 — Energy: global seed and sprouts — naturewatch-analysis
+- [ ] [Task 02 — Energy: global seed and sprouts](../tasks/task-02-energy-seed-and-sprouts.md) — naturewatch-analysis
   - *Goal:* After approval, write the global seed and both sprouts with their VRT and STAC files. Check the sample windows against task 01. Record the run cost.
 - [ ] Task 03 — Energy: PMTiles — naturewatch-analysis
   - *Goal:* After approval, build the raster and vector archives, verify them, upload them with the immutable cache header, and record the run cost.
