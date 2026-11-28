@@ -1,12 +1,30 @@
 # Task 04 — Overlap review queue
 
-Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 03b merged in #480.
 
 ## Goal
 
 An admin, in edit mode, filters the places list to the places that have proposed links. A proposed link is a `recognises` link below the confirmation share, or a new `overlaps` link between two conservation areas. On the Related tab, each proposed link gets one decision in one click, through `review_overlap`: **Keep link**, **Not related**, or, for two conservation areas, **Same place, hide it**. The overlapping conservation-area pairs are computed on a laptop and loaded as proposed links, as the `recognises` links were. This settles the parcel's open question on where the pairs come from.
+
+Done on 28 November 2026. The migration was applied to the local database with psql and to hosted after the user approved it. The browser check ran against the local stack with five Ethiopian places copied from hosted, removed afterwards. It found that a long card note ran past the card's edge, so `PlaceCard` now limits its tags row to the card's width. It also found that undoing Same place left the profile's Hidden tag, so the profile now reads the place's status again after a link changes.
+
+## Result of the pairs
+
+`import_wdpa.py build`, then `derive_overlaps.py compute`, on this laptop on 28 November 2026: 39,457 parks in 13.8 min, at 2,012 MB peak memory, with no failures. It found 458,877 pairs at 1% or more.
+
+- **450,908 of them had both shares at 100%.** 1,201 places in 124 groups have the same boundary. One group is 950 Indian Reserve Forests with one placeholder shape of 594 points and 29.39 km², and each also meets the Western Ghats Eco-sensitive Area. The user left that group out (see the parcel's Deferred section). The other 123 groups have 2 or 3 places each and were loaded.
+- **The other 7,152 pairs**, by share of the smaller place:
+
+  | Share | Pairs | Parks |
+  | --- | --- | --- |
+  | 25% | 4,933 | 6,360 |
+  | 50% | 4,302 | 5,762 |
+  | 75% | 3,725 | 5,088 |
+  | 90% | 3,289 | 4,537 |
+
+- The user chose 50%. `load 0.5` ran on hosted after the user approved it, from a copy of the links file without the 950 places, and inserted 4,302 proposed `overlaps` links with none skipped.
 
 ## Facts already stored
 
@@ -89,7 +107,7 @@ With the user, 28 November 2026:
 7. **Docs.**
    - `docs/user/using-the-map.md`: the Link review filter, the decisions, and the shares line.
    - `docs/database/design.md` §4.5: `review_overlap`, the helper, the notes RPC, and `derive_overlaps.py` with the share chosen. §6: the RPC list.
-   - [Record 11](../database/decisions.md#11-relationships-are-semantic-spatial-overlap-is-computed-and-nothing-adds-up): a proposed candidate may be stored, computed on a laptop. The database still does not compute all pairs.
+   - [Record 11](../../database/decisions.md#11-relationships-are-semantic-spatial-overlap-is-computed-and-nothing-adds-up): a proposed candidate may be stored, computed on a laptop. The database still does not compute all pairs.
    - `docs/blueprint.md`: the Link review filter, in the sentence on the photo filter.
    - This parcel: the open question on candidate pairs is settled.
 

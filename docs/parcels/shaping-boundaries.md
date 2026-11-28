@@ -30,6 +30,7 @@ The admin work on boundaries. It follows [Molding Places](../archive/parcels/mol
 ## Deferred
 
 - `confirm_source_match`, named in the notes of 13 November 2026. No task uses it yet.
+- 950 Indian Reserve Forests share one placeholder boundary in WDPCA (594 points, 29.39 km², in Kerala), so no overlap pair was loaded for them in task 04. Mark them Needs fixing, or replace their boundaries in task 05, then run `derive_overlaps.py` for them again.
 
 ## Tasks
 
@@ -43,7 +44,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* An admin list of flagged and `pending` boundaries with their findings. An admin accepts a warning (`qc_status` `accepted`) and sets the boundary to `eligible` or `excluded`, with a reason. Run the tests and a browser check.
 - [x] [Task 03b — Plain boundary review](../archive/tasks/task-03b-plain-boundary-review.md) — naturewatch-app
   - *Goal:* Plain words for the review: one verdict per boundary, Hide from map and Flag for follow-up for the place, a Stats line, and the review list as a filter on the places list. Run the tests and a browser check.
-- [ ] [Task 04 — Overlap review queue](../tasks/task-04-overlap-review-queue.md) — naturewatch-app
+- [x] [Task 04 — Overlap review queue](../archive/tasks/task-04-overlap-review-queue.md) — naturewatch-app
   - *Goal:* An admin list of overlapping pairs and of the `recognises` links left `proposed`. For each pair, the admin decides the relationship, publication, and Stats eligibility through `review_overlap`. Run the tests and a browser check.
 - [ ] Task 05 — Upload a replacement boundary — naturewatch-app and naturewatch-analysis
   - *Goal:* `submit_boundary` takes a GeoJSON upload, and `approve_boundary` makes it current, with `submitted_by` and `reviewed_by`. The new boundary gets QC. Add the PMTiles rebuild step and its cost.
