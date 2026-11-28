@@ -1,6 +1,6 @@
 # Task 02 — Energy: global seed and sprouts
 
-Parcel: [Energy](../parcels/energy.md). Shared design: [Threat Layers](../parcels/threat-layers.md#shared-design).
+Parcel: [Energy](../../parcels/energy.md). Shared design: [Threat Layers](../../parcels/threat-layers.md#shared-design).
 
 Repository: naturewatch-analysis. Start from `main`. Task 01 is merged.
 
