@@ -2,7 +2,7 @@
 
 Notes for a family of parcels that add pressure layers in the [Roads](../archive/parcels/roads.md) pattern. Each parcel is one theme layer on the map. This page holds the design they share and their order. Their tasks are in the theme parcels.
 
-*Defined 27 November 2026 as one parcel, taken out of step 1 of [Pressure and Cores](pressure-and-cores.md). Split into theme parcels the same day, after the user looked at Open Infrastructure Map. None of this waits for the [Stats Ledger](stats-ledger.md) or [Shaping Boundaries](shaping-boundaries.md).*
+*Defined 27 November 2026 as one parcel, taken out of step 1 of [Pressure and Cores](pressure-and-cores.md). Split into theme parcels the same day, after the user looked at Open Infrastructure Map. None of this waits for the [Stats Ledger](stats-ledger.md) or [Shaping Boundaries](../archive/parcels/shaping-boundaries.md).*
 
 ## Parcels
 

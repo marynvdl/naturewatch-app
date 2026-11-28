@@ -4,9 +4,9 @@ The third places parcel. [Budding Places](budding-places.md) built public browsi
 
 *Started 13 November 2026. Defined the same day.*
 
-Archived 16 November 2026. Tasks 01 to 06 are merged into `develop` and their migrations are applied to the hosted database. Tagline suggestions, the first task 06, were put on ice and are in Deferred. Task 06 became a cleanup of places and the profile. Boundary work continues in [Shaping Boundaries](../../parcels/shaping-boundaries.md).
+Archived 16 November 2026. Tasks 01 to 06 are merged into `develop` and their migrations are applied to the hosted database. Tagline suggestions, the first task 06, were put on ice and are in Deferred. Task 06 became a cleanup of places and the profile. Boundary work continues in [Shaping Boundaries](shaping-boundaries.md).
 
-The boundary work is not in this parcel. Overlap review, boundary quality findings, replacing a boundary, and Stats eligibility are in [Shaping Boundaries](../../parcels/shaping-boundaries.md).
+The boundary work is not in this parcel. Overlap review, boundary quality findings, replacing a boundary, and Stats eligibility are in [Shaping Boundaries](shaping-boundaries.md).
 
 ## Goal
 
@@ -22,7 +22,7 @@ The user can sign in, open any place, switch to edit mode, and:
 
 Agreed with the user on 13 November 2026.
 
-- **Two parcels.** This one needs only sign-in and a few tables. The boundary work needs quality checks, a fix to `place_overlaps()`, and PMTiles rebuilds, so it is [Shaping Boundaries](../../parcels/shaping-boundaries.md).
+- **Two parcels.** This one needs only sign-in and a few tables. The boundary work needs quality checks, a fix to `place_overlaps()`, and PMTiles rebuilds, so it is [Shaping Boundaries](shaping-boundaries.md).
 - **Edit mode in the map app, plus a small `/admin` route.** Anything about one place is edited in its profile, behind an Edit/View toggle. Lists that span many places, the queues, are on `/admin`. There is no separate admin app.
 - **Only admins sign in, by email magic link** (Supabase Auth). Contributors are deferred.
 - **Curated values override the source values** ([record 22](../../database/decisions.md#22-curated-values-are-overrides-not-edits-to-source-columns)). They are stored in `place_curations`. `places.name` and the details tables are not changed.

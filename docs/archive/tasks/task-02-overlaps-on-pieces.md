@@ -1,6 +1,6 @@
 # Task 02 — Overlaps on pieces
 
-Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 01 merged in #471.
 

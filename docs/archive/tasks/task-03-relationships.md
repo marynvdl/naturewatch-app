@@ -63,7 +63,7 @@ From the code and the hosted database on 14 November 2026:
 ## Do not
 
 - Do not delete a relationship row. Retiring keeps it.
-- Do not change `place_overlaps()`, `derive_recognises.py`, or the coverage values. Overlap review and `place_overlaps()` fixes are in [Shaping Boundaries](../../parcels/shaping-boundaries.md).
+- Do not change `place_overlaps()`, `derive_recognises.py`, or the coverage values. Overlap review and `place_overlaps()` fixes are in [Shaping Boundaries](../parcels/shaping-boundaries.md).
 - Do not suggest links from `place_overlaps()` in the profile.
 - Do not add countries as places.
 - Do not rebuild the PMTiles or change the analysis repo.

@@ -1,6 +1,6 @@
 # Task 03b — Plain boundary review
 
-Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 03 merged in #477.
 

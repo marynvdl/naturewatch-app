@@ -8,6 +8,8 @@ Repository: naturewatch-app. Start from `develop`. Task 05 merged in #484, and n
 
 In edit mode, on a place's Status tab, an admin chooses **Edit on map**. The current boundary opens in mapbox-gl-draw with a handle on each point. The admin moves, adds, and removes points, then chooses **Submit**. The edited shape is stored through `submit_boundary` as a proposed version, with `derived_from_boundary_id` set to the boundary it was edited from. It is then approved or discarded as an upload is in task 05. A boundary of more than 5,000 points is not opened for editing, and the section says to use Replace boundary instead. This settles the parcel's open question on boundaries with very many points.
 
+Done on 28 November 2026. The migration was applied to the local database with psql and to hosted after the user approved it. The plan's separate draw tool failed in the browser check, because a second mapbox-gl-draw tool on the same map adds the same sources again. Measuring, corrections, and the edit share one tool (`src/places/mapDraw.ts`), and the edited boundary carries a `boundary_edit` property that measuring skips. The edit fits the map up to zoom 16, since the usual fit stops at 10. The browser check ran on Malpelo Island xeric scrub, whose original boundary was restored afterwards, and on European Atlantic mixed forests (8,254 points) for the limit. On a phone the panel covers most of the map, as it does for an upload.
+
 ## Facts already stored
 
 From the code and the hosted database on 28 November 2026:
