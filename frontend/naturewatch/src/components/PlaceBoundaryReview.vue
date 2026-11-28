@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useId, watch } from 'vue';
 import { Button } from '@/components/ui/button';
+import PlaceBoundaryUpload from '@/components/PlaceBoundaryUpload.vue';
 import {
   REVIEW_NOTE_MAX,
   findingText,
@@ -19,7 +20,8 @@ import usePlacesStore from '@/store/PlacesStore';
  * The top of the Status tab, in Edit mode: one line on whether the place is
  * counted in Stats, then the Boundary section. It lists the shape check, and
  * takes one verdict on the current boundary: Shape is right, count it; Needs
- * fixing; or Leave out of Stats. Back to review undoes a verdict.
+ * fixing; or Leave out of Stats. Back to review undoes a verdict. It ends
+ * with the upload of a replacement boundary.
  */
 const props = defineProps<{
   placeId: string;
@@ -232,6 +234,7 @@ async function give(next: BoundaryVerdict) {
           </Button>
         </div>
       </template>
+      <PlaceBoundaryUpload :place-id="placeId" @approved="load" />
     </template>
   </section>
 </template>

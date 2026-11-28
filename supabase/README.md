@@ -128,6 +128,10 @@ Database Honing task 05 copied each site's geometry from `places.geom` into `pla
 
 The hosted backfill ran on 10 November 2026, on Micro compute (1 GB of memory) with a 16 GB disk. The switch to Large did not take effect, and Micro was enough. It called `backfill_place_boundaries()` through `supabase db query --linked`, one committed batch of 500 sites per call, then ran the `verify` queries the same way. 50,889 boundaries took 15 minutes (the slowest batch 26 s), and the GiST index 41 s. The database grew from 3,541 MB to 6,989 MB, of which `place_boundaries` is 3,447 MB. For 3 sites whose two parcels share an edge, the union is larger than the sum of the parcels by 11 to 27 m², about 3 × 10⁻⁹ of the area, from the vertices the union adds where edges meet. `verify` allows 10⁻⁶. The first list reads afterwards were slow while `places` came back into the cache, and one search hit the anon time limit once.
 
+### Uploaded boundaries
+
+An admin uploads a replacement boundary on a place's Status tab (`submit_boundary`, then `approve_boundary`). It becomes current `unchecked` and `pending`. To check it, run `check_boundaries.py measure --unchecked`, then `load --unchecked`, with the same connection as the other scripts. `measure --unchecked` reads only the current boundaries still `unchecked` and writes `boundary_measures_unchecked.tsv` afresh in `BOUNDARY_QC_WORK_DIR`. The map draws the new boundary after the places archive is rebuilt (naturewatch-analysis `places/README.md`).
+
 ## Import
 
 The script needs Python with the GDAL bindings (`osgeo`), `psycopg`, `shapely`, and `pyproj`.
