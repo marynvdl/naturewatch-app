@@ -20,17 +20,16 @@ The admin work on boundaries. It follows [Molding Places](../archive/parcels/mol
 - **`place_overlaps()` works on pieces.** It cuts shapes with `ST_Subdivide` before a screen calls it.
 - **The overlap queue's pairs come from a laptop script** (settled in task 04). `derive_overlaps.py` computes the overlapping conservation areas from the WDPCA file and loads the pairs above a chosen share as proposed `overlaps` links, as the `recognises` links were. No hosted query looks at all pairs.
 - **A replacement is a new version.** `submit_boundary` stores it as `proposed`, with `derived_from_boundary_id` when it is an edit. `approve_boundary` makes it current, and it starts `unchecked` and `pending`. Map editing uses the `@mapbox/mapbox-gl-draw` tool that corrections already use.
-- **The map lags the database.** A change to publication or to a boundary reaches the map only after a PMTiles rebuild in naturewatch-analysis. Each task that makes such a change says how to rebuild and what it costs.
+- **The map lags the database.** A change to publication or to a boundary reaches the map only after a PMTiles rebuild in naturewatch-analysis. Rebuilds are started by hand, per batch of changes, after approval (settled in task 05). The step and its cost are in naturewatch-analysis `places/README.md`.
 
 ## Open questions
 
-- How PMTiles rebuilds are started after admin changes: by hand per batch, or on a schedule. To settle in task 05.
 - How map editing handles a boundary with very many vertices. To settle in task 06.
 
 ## Deferred
 
 - `confirm_source_match`, named in the notes of 13 November 2026. No task uses it yet.
-- 950 Indian Reserve Forests share one placeholder boundary in WDPCA (594 points, 29.39 km², in Kerala), so no overlap pair was loaded for them in task 04. Mark them Needs fixing, or replace their boundaries in task 05, then run `derive_overlaps.py` for them again.
+- 950 Indian Reserve Forests share one placeholder boundary in WDPCA (594 points, 29.39 km², in Kerala), so no overlap pair was loaded for them in task 04. Mark them Needs fixing, or upload their real boundaries one by one (task 05), then run `derive_overlaps.py` for them again.
 
 ## Tasks
 

@@ -17,6 +17,10 @@
             second start continues. An accepted or rejected qc_status is kept. Eligibility
             set by a person is kept.
 
+measure --unchecked and load --unchecked do the same for the current boundaries
+still unchecked, such as an approved upload, in boundary_measures_unchecked.tsv.
+measure --unchecked starts that file afresh each time.
+
 The geometry is never checked in the database: place_overlaps() ran the hosted
 Micro database out of memory on 12 November 2026. load commits in batches
 because each update re-runs the boundary's validity CHECK and area.
@@ -50,6 +54,7 @@ SIZE_EDGES_KM2 = (0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0)
 FETCH_ROWS = 50
 LOAD_BATCH = 500
 MEASURES_NAME = "boundary_measures.tsv"
+UNCHECKED_NAME = "boundary_measures_unchecked.tsv"
 FAILED_NAME = "boundary_measures_failed.json"
 NO_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -91,6 +96,7 @@ from public.place_boundaries as boundary
 join public.places on places.id = boundary.place_id
 where boundary.is_current
   and boundary.id > %(after)s::uuid
+  and (not %(unchecked)s or boundary.qc_status = 'unchecked')
 """
 BOUNDARIES = (
     "select boundary.id::text as boundary_id, places.place_type_id, "
@@ -272,8 +278,12 @@ def from_row(row: dict) -> dict:
     }
 
 
-def read_measures(work: Path) -> list[dict]:
-    path = work / MEASURES_NAME
+def measures_name(unchecked: bool) -> str:
+    return UNCHECKED_NAME if unchecked else MEASURES_NAME
+
+
+def read_measures(work: Path, unchecked: bool = False) -> list[dict]:
+    path = work / measures_name(unchecked)
     if not path.exists():
         raise SystemExit(f"no measures yet: run measure first ({path})")
     with path.open(newline="") as handle:
@@ -343,17 +353,19 @@ def eligible_reason(vertex_cap: int = VERTEX_CAP) -> str:
 # --- commands -------------------------------------------------------------------------
 
 
-def run_measure(conn, work: Path) -> dict:
+def run_measure(conn, work: Path, unchecked: bool = False) -> dict:
     started = time.monotonic()
     project = Projector()
-    path = work / MEASURES_NAME
+    path = work / measures_name(unchecked)
+    if unchecked:
+        path.unlink(missing_ok=True)
     done = []
     if path.exists():
         with path.open(newline="") as handle:
             done = [row["boundary_id"] for row in csv.DictReader(handle, delimiter="\t", quoting=csv.QUOTE_NONE)]
     after = max(done) if done else NO_ID
     with conn.cursor() as cur:
-        cur.execute(BOUNDARIES_COUNT, {"after": after})
+        cur.execute(BOUNDARIES_COUNT, {"after": after, "unchecked": unchecked})
         todo = cur.fetchone()["n"]
     print(f"boundaries to do: {todo} (already done: {len(done)})", flush=True)
 
@@ -366,7 +378,7 @@ def run_measure(conn, work: Path) -> dict:
             writer.writerow(COLUMNS)
         with conn.cursor(name="boundary_qc") as cur:
             cur.itersize = FETCH_ROWS
-            cur.execute(BOUNDARIES, {"after": after})
+            cur.execute(BOUNDARIES, {"after": after, "unchecked": unchecked})
             for row in cur:
                 count += 1
                 try:
@@ -486,17 +498,20 @@ def counts(conn) -> list[dict]:
 
 def main() -> None:
     command = sys.argv[1] if len(sys.argv) > 1 else ""
-    if command not in ("measure", "summary", "load", "counts"):
-        raise SystemExit("usage: check_boundaries.py measure | summary | load | counts")
+    options = sys.argv[2:]
+    if command not in ("measure", "summary", "load", "counts") or not set(options) <= {"--unchecked"} \
+            or (options and command not in ("measure", "load")):
+        raise SystemExit("usage: check_boundaries.py measure [--unchecked] | summary | load [--unchecked] | counts")
+    unchecked = "--unchecked" in options
     if command == "summary":
         summary(read_measures(work_dir()))
         return
     conn = import_wdpa.open_connection()
     try:
         if command == "measure":
-            run_measure(conn, work_dir())
+            run_measure(conn, work_dir(), unchecked)
         elif command == "load":
-            load(conn, read_measures(work_dir()))
+            load(conn, read_measures(work_dir(), unchecked))
             counts(conn)
         else:
             counts(conn)

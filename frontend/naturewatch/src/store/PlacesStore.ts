@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import type { BoundaryReviewView } from '@/places/boundaryReview';
 import type { OverlapReviewView } from '@/places/overlapReview';
+import type { MultiPolygon } from 'geojson';
 import { computed, ref, watch } from 'vue';
 import {
   loadKeptPlaceIds,
@@ -419,6 +420,11 @@ const usePlacesStore = defineStore('places', () => {
    * is reviewed, so the lists read again.
    */
   const adminListVersion = ref(0);
+  /**
+   * The uploaded or proposed boundary on the Status tab, which the map
+   * outlines. Null while there is none.
+   */
+  const boundaryPreview = ref<MultiPolygon | null>(null);
   /** The places list's cards while the photo filter is on, in order. */
   const photoListIds = ref<string[]>([]);
   /** Where the place opened from that list was, so Next place still works once it leaves. */
@@ -517,6 +523,7 @@ const usePlacesStore = defineStore('places', () => {
     clearSelection,
     adminList,
     adminListVersion,
+    boundaryPreview,
     openFromAdminList,
     openForLinkReview,
     photoListIds,
