@@ -78,7 +78,7 @@ const country = computed(() => countryName(props.iso3));
         <span v-if="areaKm2 != null" class="place-card-area">
           {{ formatAreaTag(areaKm2) }} km²
         </span>
-        <span v-if="note" class="place-card-area place-card-note">
+        <span v-if="note" class="place-card-area place-card-note" :title="note">
           {{ note }}
         </span>
       </span>
@@ -227,5 +227,14 @@ const country = computed(() => countryName(props.iso3));
   background: var(--on);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
+}
+
+/* A long note, such as a review note, stays on one line, cut with an ellipsis. */
+.place-card-note {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

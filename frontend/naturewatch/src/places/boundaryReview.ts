@@ -1,89 +1,62 @@
 import { placesClient } from '@/places/api';
 
 /**
- * The polygon review queue: current boundaries whose Stats eligibility is
- * pending or excluded, their QC findings, and the admin's decisions.
+ * The boundary review: a verdict on each current boundary, in plain words, and
+ * the places list's filter by review view. The database keeps its own names:
+ * `qc_status` and `stats_eligibility`.
  */
 
-/** The longest eligibility reason `set_stats_eligibility` keeps. */
-export const ELIGIBILITY_REASON_MAX = 1000;
-/** Boundaries the list loads at once. */
-export const BOUNDARY_LIST_PAGE = 20;
+/** The longest note `review_boundary` keeps. */
+export const REVIEW_NOTE_MAX = 1000;
 
-export type QcStatus = 'unchecked' | 'passed' | 'flagged' | 'accepted';
+export type QcStatus =
+  | 'unchecked'
+  | 'passed'
+  | 'flagged'
+  | 'accepted'
+  | 'rejected';
 export type StatsEligibility = 'pending' | 'eligible' | 'excluded';
-/** The two views of the list. */
-export type BoundaryListView = 'pending' | 'excluded';
+/** The places list's boundary review views. */
+export type BoundaryReviewView = 'to_review' | 'needs_fixing' | 'left_out';
+/** A verdict an admin gives a boundary. */
+export type BoundaryVerdict = 'count' | 'fix' | 'leave_out' | 'undo';
 
-/** A boundary on the review list. */
-export interface ListedBoundary {
-  placeId: string;
-  name: string;
-  placeType: string;
-  iso3: string | null;
-  areaKm2: number | null;
-  boundaryId: string;
-  qcStatus: QcStatus;
-  reason: string | null;
-  /** The checks whose latest finding is `warn` or `fail`. */
-  warnings: string[];
-  vertexCount: number | null;
-}
+/** The filter's views, in the order they show. */
+export const REVIEW_VIEWS: { id: BoundaryReviewView; label: string }[] = [
+  { id: 'to_review', label: 'To review' },
+  { id: 'needs_fixing', label: 'Needs fixing' },
+  { id: 'left_out', label: 'Left out' },
+];
 
-export type BoundaryListResult =
-  | { status: 'ok'; boundaries: ListedBoundary[]; total: number }
-  | { status: 'unconfigured' }
-  | { status: 'error' };
+/** The verdict a boundary has now, in plain words. */
+export type VerdictState = 'not_reviewed' | 'counted' | 'fix' | 'left_out';
 
 /**
- * One page of the review list, by place name. Admins only.
- * @param view - Pending or excluded boundaries.
- * @param limit - At most this many, up to 200.
- * @param offset - Skip this many.
- * @returns The page and the total, or why it could not be read.
+ * The verdict a boundary has now.
+ * @param qc - `qc_status`.
+ * @param eligibility - `stats_eligibility`.
+ * @returns The verdict.
  */
-export async function loadBoundaryList(
-  view: BoundaryListView,
-  limit: number,
-  offset: number
-): Promise<BoundaryListResult> {
-  const supabase = placesClient();
-  if (!supabase) return { status: 'unconfigured' };
-  const { data, error } = await supabase.rpc('admin_boundary_list', {
-    p_eligibility: view,
-    p_limit: limit,
-    p_offset: offset,
-  });
-  if (error || !Array.isArray(data)) return { status: 'error' };
-  const rows = data as {
-    place_id: string;
-    name: string;
-    place_type_id: string;
-    iso3: string | null;
-    area_km2: number | null;
-    boundary_id: string;
-    qc_status: QcStatus;
-    stats_eligibility_reason: string | null;
-    warnings: string[] | null;
-    vertex_count: number | null;
-    total_count: number | string;
-  }[];
-  return {
-    status: 'ok',
-    total: Number(rows[0]?.total_count ?? 0),
-    boundaries: rows.map(row => ({
-      placeId: row.place_id,
-      name: row.name,
-      placeType: row.place_type_id,
-      iso3: row.iso3,
-      areaKm2: row.area_km2,
-      boundaryId: row.boundary_id,
-      qcStatus: row.qc_status,
-      reason: row.stats_eligibility_reason,
-      warnings: row.warnings ?? [],
-      vertexCount: row.vertex_count,
-    })),
-  };
+export function verdictState(
+  qc: QcStatus,
+  eligibility: StatsEligibility
+): VerdictState {
+  if (eligibility === 'excluded') return 'left_out';
+  if (qc === 'rejected') return 'fix';
+  if (eligibility === 'eligible') return 'counted';
+  return 'not_reviewed';
+}
+
+/** Which review view a boundary is in. */
+export function reviewViewOf(
+  qc: QcStatus,
+  eligibility: StatsEligibility
+): BoundaryReviewView | null {
+  const state = verdictState(qc, eligibility);
+  if (state === 'left_out') return 'left_out';
+  if (state === 'fix') return 'needs_fixing';
+  if (state === 'not_reviewed') return 'to_review';
+  return null;
 }
 
 /** The latest finding of one check. */
@@ -101,7 +74,7 @@ export interface BoundaryReview {
   boundaryId: string;
   qcStatus: QcStatus;
   eligibility: StatsEligibility;
-  reason: string | null;
+  note: string | null;
   setBy: string | null;
   setAt: string | null;
   findings: BoundaryFinding[];
@@ -171,7 +144,7 @@ export async function loadBoundaryReview(
       boundaryId: boundary.id,
       qcStatus: boundary.qc_status,
       eligibility: boundary.stats_eligibility,
-      reason: boundary.stats_eligibility_reason,
+      note: boundary.stats_eligibility_reason,
       setBy: boundary.stats_eligibility_set_by,
       setAt: boundary.stats_eligibility_set_at,
       findings: [...latest.values()].sort(
@@ -182,96 +155,164 @@ export async function loadBoundaryReview(
 }
 
 /**
- * Accept the warnings of a flagged boundary. Admins only.
+ * Give a boundary a verdict. Admins only.
  * @param boundaryId - `place_boundaries.id`.
+ * @param verdict - Count it, needs fixing, leave out, or back to review.
+ * @param note - Why, or null.
  * @returns An error message, or null.
  */
-export async function acceptBoundaryQc(
-  boundaryId: string
+export async function reviewBoundary(
+  boundaryId: string,
+  verdict: BoundaryVerdict,
+  note: string | null
 ): Promise<string | null> {
   const supabase = placesClient();
   if (!supabase) return 'The database is not configured.';
-  const { error } = await supabase.rpc('accept_boundary_qc', {
+  const { error } = await supabase.rpc('review_boundary', {
     p_boundary_id: boundaryId,
+    p_verdict: verdict,
+    p_note: note,
   });
   return error ? error.message : null;
 }
+
+/** A card's review, while the places list is filtered by review. */
+export interface BoundaryNote {
+  qcStatus: QcStatus;
+  eligibility: StatsEligibility;
+  note: string | null;
+  warnings: string[];
+  vertexCount: number | null;
+  vertexCap: number | null;
+}
+
+export type BoundaryNotesResult =
+  | { status: 'ok'; notes: Record<string, BoundaryNote> }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
 
 /**
- * Set a boundary's Stats eligibility. Admins only.
- * @param boundaryId - `place_boundaries.id`.
- * @param eligibility - The new eligibility.
- * @param reason - Why, or null.
- * @returns An error message, or null.
+ * Read the reviews of the listed places, at most 200. Admins only.
+ * @param placeIds - `places.id` of the cards.
+ * @returns The reviews by place id, or why they could not be read.
  */
-export async function setStatsEligibility(
-  boundaryId: string,
-  eligibility: StatsEligibility,
-  reason: string | null
-): Promise<string | null> {
+export async function loadBoundaryNotes(
+  placeIds: string[]
+): Promise<BoundaryNotesResult> {
   const supabase = placesClient();
-  if (!supabase) return 'The database is not configured.';
-  const { error } = await supabase.rpc('set_stats_eligibility', {
-    p_boundary_id: boundaryId,
-    p_eligibility: eligibility,
-    p_reason: reason,
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('boundary_review_notes', {
+    p_place_ids: placeIds.slice(0, 200),
   });
-  return error ? error.message : null;
+  if (error || !Array.isArray(data)) return { status: 'error' };
+  const notes: Record<string, BoundaryNote> = {};
+  for (const row of data as {
+    place_id: string;
+    qc_status: QcStatus;
+    stats_eligibility: StatsEligibility;
+    stats_eligibility_reason: string | null;
+    warnings: string[] | null;
+    vertex_count: number | null;
+    vertex_cap: number | null;
+  }[]) {
+    notes[row.place_id] = {
+      qcStatus: row.qc_status,
+      eligibility: row.stats_eligibility,
+      note: row.stats_eligibility_reason,
+      warnings: row.warnings ?? [],
+      vertexCount: row.vertex_count,
+      vertexCap: row.vertex_cap,
+    };
+  }
+  return { status: 'ok', notes };
 }
 
-/** What each check is called. */
-export const CHECK_LABELS: Record<string, string> = {
-  geometry_valid: 'Invalid shape',
-  small_components: 'Small parts',
-  holes: 'Tiny holes',
-  vertex_count: 'Over the vertex cap',
+/** What each check that warns is called, on a card. */
+const WARNING_LABELS: Record<string, string> = {
+  geometry_valid: 'Shape not valid',
+  small_components: 'Many tiny pieces',
+  holes: 'Many tiny holes',
 };
 
 const count = (value: unknown) =>
   typeof value === 'number' ? value.toLocaleString('en-GB') : '?';
 
 /**
- * A finding as one line, such as "Small parts: 412 of 600 parts under 0.01 km²".
+ * A finding as one line, such as "Many tiny pieces: 82 of 129 under 0.01 km²".
  * @param finding - The finding.
  * @returns The text.
  */
 export function findingText(finding: BoundaryFinding): string {
   const d = finding.details;
+  const warns = finding.outcome !== 'pass';
   switch (finding.checkId) {
     case 'geometry_valid':
-      return finding.outcome === 'pass'
-        ? 'Shape: valid'
-        : `Shape: invalid${typeof d.reason === 'string' ? `, ${d.reason}` : ''}`;
+      return warns
+        ? `Shape not valid${typeof d.reason === 'string' && d.reason ? `: ${d.reason}` : ''}`
+        : 'Shape is valid';
     case 'small_components':
-      return `Small parts: ${count(d.small_parts)} of ${count(d.parts)} parts under ${d.part_km2} km²`;
+      return warns
+        ? `Many tiny pieces: ${count(d.small_parts)} of ${count(d.parts)} under ${d.part_km2} km²`
+        : `${count(d.parts)} ${d.parts === 1 ? 'piece' : 'pieces'}`;
     case 'holes':
-      return `Tiny holes: ${count(d.tiny_holes)} of ${count(d.holes)} holes under ${d.hole_km2} km²`;
+      return warns
+        ? `Many tiny holes: ${count(d.tiny_holes)} of ${count(d.holes)} under ${d.hole_km2} km²`
+        : d.holes
+          ? `${count(d.holes)} ${d.holes === 1 ? 'hole' : 'holes'}`
+          : 'No holes';
     case 'vertex_count':
-      return `Vertices: ${count(finding.measuredValue)}${
-        finding.outcome === 'pass'
-          ? ''
-          : `, over the cap of ${count(finding.thresholdUsed)}`
-      }`;
+      return `${count(finding.measuredValue)} points`;
     default:
       return `${finding.checkId}: ${finding.outcome}`;
   }
 }
 
 /**
- * A list card's note: the warnings and the vertex count, or the reason on Excluded.
- * @param boundary - The listed boundary.
- * @param view - The list's view.
+ * Whether a finding counts against the shape. The point count is about cost,
+ * not shape, so it never does.
+ * @param finding - The finding.
+ */
+export function warnsOnShape(finding: BoundaryFinding): boolean {
+  return finding.checkId !== 'vertex_count' && finding.outcome !== 'pass';
+}
+
+/**
+ * A card's note: the shape warnings and the points, or the note when left out
+ * or needing fixing.
+ * @param note - The card's review.
  * @returns The note.
  */
-export function listNote(
-  boundary: ListedBoundary,
-  view: BoundaryListView
-): string {
-  if (view === 'excluded' && boundary.reason) return boundary.reason;
-  const parts = boundary.warnings
+export function cardNote(note: BoundaryNote): string {
+  const state = verdictState(note.qcStatus, note.eligibility);
+  if ((state === 'left_out' || state === 'fix') && note.note) return note.note;
+  const parts = note.warnings
     .filter(id => id !== 'vertex_count')
-    .map(id => CHECK_LABELS[id] ?? id);
-  if (boundary.vertexCount !== null)
-    parts.push(`${count(boundary.vertexCount)} vertices`);
+    .map(id => WARNING_LABELS[id] ?? id);
+  if (note.vertexCount !== null)
+    parts.push(`${count(note.vertexCount)} points`);
   return parts.join(' · ');
+}
+
+/**
+ * One line on whether the place is counted in Stats, and why.
+ * @param hidden - Whether the place is hidden from the map.
+ * @param review - Its current boundary's review, or null when it has none.
+ * @returns The line.
+ */
+export function statsLine(
+  hidden: boolean,
+  review: BoundaryReview | null
+): string {
+  if (hidden) return 'Not counted in Stats: hidden from map.';
+  if (!review) return 'Not counted in Stats: no boundary.';
+  const state = verdictState(review.qcStatus, review.eligibility);
+  if (state === 'left_out')
+    return `Not counted in Stats: left out.${review.note ? ` ${review.note}` : ''}`;
+  if (state === 'fix') return 'Not counted in Stats: the shape needs fixing.';
+  if (state === 'not_reviewed')
+    return 'Not counted in Stats yet: not reviewed.';
+  const points = review.findings.find(f => f.checkId === 'vertex_count');
+  if (points && points.outcome !== 'pass')
+    return `Counted in Stats, in a separate run: over ${count(points.thresholdUsed)} points.`;
+  return 'Counted in Stats.';
 }

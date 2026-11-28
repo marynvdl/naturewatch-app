@@ -5,7 +5,6 @@ import {
   Flag,
   LogOut,
   Pencil,
-  Shapes,
   SquareDashed,
   UserRound,
 } from '@lucide/vue';
@@ -19,8 +18,9 @@ import usePlacesStore from '@/store/PlacesStore';
 
 /**
  * Shown only while someone is signed in. Visitors see nothing. An admin's
- * controls are here: Edit mode, and in Edit mode the Needs attention,
- * Withdrawn, Corrections, and Boundaries lists. The photo filter is in the places list's Filter window.
+ * controls are here: Edit mode, and in Edit mode the Follow-up, Hidden, and
+ * Corrections lists. The photo and boundary review filters are in the places
+ * list's Filter window.
  */
 const auth = useAuthStore();
 const placesStore = usePlacesStore();
@@ -34,10 +34,9 @@ function toggleEditMode() {
 
 /** The admin lists, in the order their buttons show. */
 const lists = [
-  { id: 'attention', label: 'Needs attention', icon: Flag },
-  { id: 'withdrawn', label: 'Withdrawn', icon: Archive },
+  { id: 'attention', label: 'Follow-up', icon: Flag },
+  { id: 'withdrawn', label: 'Hidden', icon: Archive },
   { id: 'corrections', label: 'Corrections', icon: SquareDashed },
-  { id: 'boundaries', label: 'Boundaries', icon: Shapes },
 ] as const;
 
 /**

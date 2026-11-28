@@ -40,6 +40,7 @@ describe('Places store, Ecoregion filter', () => {
       cropMax: CROPLAND_FULL[1],
       ecoregionIds: ['e1', 'e2'],
       photoSuggestions: false,
+      boundaryReview: null,
     });
     expect(store.keptPlaceIds).toEqual(['park-in-e1', 'park-in-e2']);
 
@@ -102,6 +103,26 @@ describe('Places store, Ecoregion filter', () => {
     store.clearFilter();
     await flushPromises();
     expect(store.photoSuggestions).toBe(false);
+    expect(store.keptPlaceIds).toBeNull();
+  });
+
+  it('keeps the places in a boundary review view on the map', async () => {
+    const store = usePlacesStore();
+    vi.mocked(loadKeptPlaceIds).mockResolvedValue({
+      status: 'ok',
+      ids: ['park-to-fix'],
+    });
+    store.applyFilter([null, null], [], false, 'needs_fixing');
+    await flushPromises();
+    expect(store.filtering).toBe(true);
+    expect(loadKeptPlaceIds).toHaveBeenLastCalledWith(
+      expect.objectContaining({ boundaryReview: 'needs_fixing' })
+    );
+    expect(store.keptPlaceIds).toEqual(['park-to-fix']);
+
+    store.clearFilter();
+    await flushPromises();
+    expect(store.boundaryReview).toBeNull();
     expect(store.keptPlaceIds).toBeNull();
   });
 

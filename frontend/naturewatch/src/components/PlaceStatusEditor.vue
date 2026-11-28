@@ -17,9 +17,10 @@ import {
 import usePlacesStore from '@/store/PlacesStore';
 
 /**
- * The Status tab, in Edit mode: review the current boundary for Stats,
- * withdraw a place from the map or restore it, and flag it as needing
- * attention or clear the flag. Each takes a reason and an optional note.
+ * The Status tab, in Edit mode: whether the place is counted in Stats, a
+ * verdict on its current boundary, and for the place itself, hide it from the
+ * map or show it again, and flag it for follow-up or clear the flag. Hiding
+ * and flagging take a reason and an optional note.
  */
 const props = defineProps<{
   placeId: string;
@@ -121,7 +122,7 @@ async function run(
   emit('changed', read.placeStatus);
 }
 
-/** Withdraw the place, or save a new reason or note while it is withdrawn. */
+/** Hide the place, or save a new reason or note while it is hidden. */
 function withdraw() {
   const reason = withdrawalReason.value.trim();
   if (!reason) return;
@@ -156,17 +157,16 @@ function clearFlag() {
 
 <template>
   <div class="status">
-    <PlaceBoundaryReview :place-id="placeId" />
+    <PlaceBoundaryReview :place-id="placeId" :hidden="placeStatus.withdrawn" />
 
+    <p id="status-place" class="map-section status-heading">Place</p>
     <section class="status-form" aria-labelledby="status-withdrawal">
-      <p id="status-withdrawal" class="map-section status-heading">
-        Withdraw from the map
-      </p>
+      <p id="status-withdrawal" class="status-subheading">Hide from map</p>
       <p class="status-help">
         {{
           placeStatus.withdrawn
-            ? 'Withdrawn. Visitors do not see this place, and it gets no new facts.'
-            : 'A withdrawn place leaves the map, the list, and search, and gets no new facts.'
+            ? 'Hidden. Visitors do not see this place, it gets no new facts, and Stats does not count it.'
+            : 'A hidden place leaves the map, the list, and search for everyone. It gets no new facts, and Stats does not count it.'
         }}
       </p>
       <label class="status-field" :for="`${uid}-withdrawal-reason`">
@@ -203,7 +203,7 @@ function clearFlag() {
           :disabled="!withdrawalReason.trim() || busy !== null"
           @click="withdraw"
         >
-          Withdraw
+          Hide from map
         </Button>
         <template v-else>
           <Button
@@ -223,21 +223,19 @@ function clearFlag() {
             :disabled="busy !== null"
             @click="restore"
           >
-            Restore
+            Show on map
           </Button>
         </template>
       </div>
     </section>
 
     <section class="status-form" aria-labelledby="status-attention">
-      <p id="status-attention" class="map-section status-heading">
-        Needs attention
-      </p>
+      <p id="status-attention" class="status-subheading">Flag for follow-up</p>
       <p class="status-help">
         {{
           placeStatus.attentionReason
-            ? 'Flagged. It is on the Needs attention list.'
-            : 'A flagged place is listed under Needs attention. Visitors do not see the flag.'
+            ? 'Flagged. It is on the Follow-up list.'
+            : 'A flagged place is listed under Follow-up. Visitors and Stats are not affected.'
         }}
       </p>
       <label class="status-field" :for="`${uid}-attention-reason`">
@@ -316,8 +314,20 @@ function clearFlag() {
 }
 
 .status-heading,
+.status-subheading,
 .status-help {
   margin: 0;
+}
+
+/* The Place heading sits closer to its two forms. */
+.status-heading + .status-form {
+  margin-top: -12px;
+}
+
+.status-subheading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
 }
 
 .status-help,

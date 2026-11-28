@@ -12,7 +12,7 @@ import usePlacesStore from '@/store/PlacesStore';
 import useAuthStore from '@/store/AuthStore';
 
 /**
- * The places that need attention, or the withdrawn places, for an admin in the
+ * The places flagged for follow-up, or the hidden places, for an admin in the
  * Places panel. Choosing one opens it in Edit mode on its Status tab.
  */
 const props = defineProps<{ kind: AdminPlaceListKind }>();
@@ -27,7 +27,7 @@ const loadingMore = ref(false);
 let request = 0;
 
 const label = computed(() =>
-  props.kind === 'attention' ? 'Needs attention' : 'Withdrawn places'
+  props.kind === 'attention' ? 'Follow-up' : 'Hidden places'
 );
 const hasMore = computed(() => places.value.length < total.value);
 const countText = computed(() => {
@@ -36,8 +36,8 @@ const countText = computed(() => {
     places.value.length === total.value
       ? `${total.value} ${noun}`
       : `${places.value.length} of ${total.value} ${noun}`;
-  if (props.kind === 'withdrawn') return `${count} withdrawn`;
-  return `${count} ${total.value === 1 ? 'needs' : 'need'} attention`;
+  if (props.kind === 'withdrawn') return `${count} hidden`;
+  return `${count} flagged for follow-up`;
 });
 
 watch(places, list => requestMainPhotos(list.map(place => place.placeId)));
@@ -110,8 +110,8 @@ watch(
     <p v-else-if="total === 0" class="queue-status">
       {{
         kind === 'attention'
-          ? 'No place is flagged as needing attention.'
-          : 'No place is withdrawn.'
+          ? 'No place is flagged for follow-up.'
+          : 'No place is hidden.'
       }}
     </p>
     <template v-else>

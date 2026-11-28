@@ -1,3 +1,4 @@
+import type { BoundaryReviewView } from '@/places/boundaryReview';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseClient } from '@/plugins/supabase';
 import {
@@ -127,6 +128,8 @@ export interface PlaceWindowQuery {
   ecoregionIds?: string[];
   /** Keep only places with suggested photographs. Admins only. */
   photoSuggestions?: boolean;
+  /** Keep only places whose boundary is in this review view. Admins only. */
+  boundaryReview?: BoundaryReviewView | null;
 }
 
 /** Result of loading the capped list. */
@@ -227,6 +230,7 @@ function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
     p_north: query.extent?.[3] ?? null,
     ...ecoregionArgs(query.ecoregionIds),
     ...photoArgs(query.photoSuggestions),
+    ...reviewArgs(query.boundaryReview),
   };
 }
 
@@ -237,6 +241,15 @@ function matchedArgs(query: Omit<PlaceWindowQuery, 'sort' | 'offset'>) {
  */
 function ecoregionArgs(ids: string[] | undefined) {
   return ids?.length ? { p_ecoregion_ids: ids } : {};
+}
+
+/**
+ * The boundary review filter argument, only when a view is chosen.
+ * @param view - The review view, or null.
+ * @returns `p_boundary_review`, or nothing.
+ */
+function reviewArgs(view: BoundaryReviewView | null | undefined) {
+  return view ? { p_boundary_review: view } : {};
 }
 
 /**
@@ -457,6 +470,8 @@ export interface KeptIdsQuery {
   ecoregionIds: string[];
   /** Keep only places with suggested photographs. Admins only. */
   photoSuggestions?: boolean;
+  /** Keep only places whose boundary is in this review view. Admins only. */
+  boundaryReview?: BoundaryReviewView | null;
 }
 
 /**
@@ -478,6 +493,7 @@ export async function loadKeptPlaceIds(
     p_crop_max: query.cropMax,
     ...ecoregionArgs(query.ecoregionIds),
     ...photoArgs(query.photoSuggestions),
+    ...reviewArgs(query.boundaryReview),
   });
   if (error || !Array.isArray(data)) return { status: 'error' };
   return { status: 'ok', ids: data.map(String) };
@@ -1129,6 +1145,7 @@ export async function loadPlaceBounds(id: string): Promise<PlaceBoundsResult> {
  * @param query.sizeMax - Largest kept size, in km², or null.
  * @param query.ecoregionIds - Chosen ecoregions, when any apply.
  * @param query.photoSuggestions - Keep only places with suggested photographs.
+ * @param query.boundaryReview - Keep only places whose boundary is in this review view.
  * @returns The extent, `missing` when no place is kept, or why it could not be read.
  */
 export async function loadPlaceExtent(query: {
@@ -1137,6 +1154,7 @@ export async function loadPlaceExtent(query: {
   sizeMax: number | null;
   ecoregionIds: string[];
   photoSuggestions?: boolean;
+  boundaryReview?: BoundaryReviewView | null;
 }): Promise<PlaceBoundsResult> {
   const supabase = placesClient();
   if (!supabase) return { status: 'unconfigured' };
@@ -1146,6 +1164,7 @@ export async function loadPlaceExtent(query: {
     p_size_max: query.sizeMax,
     ...ecoregionArgs(query.ecoregionIds),
     ...photoArgs(query.photoSuggestions),
+    ...reviewArgs(query.boundaryReview),
   });
   if (error || !data) return { status: 'error' };
   const row = (

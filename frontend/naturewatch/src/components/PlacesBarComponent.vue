@@ -9,7 +9,6 @@ import {
 } from '@lucide/vue';
 import PlaceCard from '@/components/PlaceCard.vue';
 import AdminPlaceList from '@/components/AdminPlaceList.vue';
-import AdminBoundaryList from '@/components/AdminBoundaryList.vue';
 import AdminCorrectionList from '@/components/AdminCorrectionList.vue';
 import PlacesFilterDialog from '@/components/PlacesFilterDialog.vue';
 import PlaceTypeButtons from '@/components/PlaceTypeButtons.vue';
@@ -37,6 +36,12 @@ import {
   type FigureRange,
   type PlaceSort,
 } from '@/places/display';
+import {
+  cardNote,
+  loadBoundaryNotes,
+  reviewViewOf,
+  type BoundaryNote,
+} from '@/places/boundaryReview';
 import { loadSuggestedCounts } from '@/places/images';
 import { mainPhotoOf, requestMainPhotos } from '@/places/mainPhotos';
 import usePlacesStore from '@/store/PlacesStore';
@@ -80,6 +85,10 @@ const anyType = computed(() => placeTypes.value.length > 0);
  * type with a button.
  */
 const photoMode = computed(() => placesStore.photoSuggestions);
+/** The boundary review filter is on: cards open the Status tab. */
+const reviewMode = computed(() => placesStore.boundaryReview !== null);
+/** An admin filter is on, which lists every type when none is chosen. */
+const adminFilterMode = computed(() => photoMode.value || reviewMode.value);
 /** The stored place types listed and drawn, in button order. Empty when none is. */
 const listedTypes = computed<string[]>(() =>
   placeTypeButtons.value
@@ -145,7 +154,7 @@ const listWaitMs = import.meta.env.MODE === 'test' ? 0 : 200;
 
 const needle = computed(() => query.value.trim());
 const searchingAll = computed(
-  () => !anyType.value && !photoMode.value && needle.value.length > 0
+  () => !anyType.value && !adminFilterMode.value && needle.value.length > 0
 );
 const allSortOptions: { id: PlaceSort; label: string }[] = [
   { id: 'name', label: 'Name' },
@@ -202,9 +211,10 @@ const emptyMessage = computed(() =>
     ? nothingStored
     : 'No places match.'
 );
-/** Whether a place type with stored places is listed, or the photo filter lists every type. */
+/** Whether a place type with stored places is listed, or an admin filter lists every type. */
 const showList = computed(
-  () => listedTypes.value.length > 0 || (photoMode.value && !anyType.value)
+  () =>
+    listedTypes.value.length > 0 || (adminFilterMode.value && !anyType.value)
 );
 /** Whether a loaded list has a count to show beside the tools. */
 const showCount = computed(() => showList.value && listStatus.value === 'ok');
@@ -238,6 +248,7 @@ function listQuery(offset = 0): PlaceWindowQuery {
     placeTypes: queryTypes.value,
     ecoregionIds: placesStore.ecoregionIds,
     photoSuggestions: photoMode.value,
+    boundaryReview: placesStore.boundaryReview,
   };
 }
 
@@ -271,6 +282,12 @@ function chooseResult(place: PlaceSummary) {
   if (photoMode.value && placesStore.selectedId !== id) {
     showBoundaries();
     placesStore.openWithPhotos(id);
+    return;
+  }
+  // With the boundary review filter on, a card opens its Status tab.
+  if (reviewMode.value && placesStore.selectedId !== id) {
+    showBoundaries();
+    placesStore.openFromAdminList(id);
     return;
   }
   if (placesStore.selectedId !== id) {
@@ -318,12 +335,12 @@ const statsTypes = computed(() =>
   listedTypes.value.length ? listedTypes.value : BUTTON_TYPES
 );
 /**
- * The types the list reads: the listed ones, every button's while the photo
+ * The types the list reads: the listed ones, every button's while an admin
  * filter lists every type, or else conservation areas.
  */
 const queryTypes = computed(() => {
   if (listedTypes.value.length) return listedTypes.value;
-  return photoMode.value ? BUTTON_TYPES : [PLACE_TYPE];
+  return adminFilterMode.value ? BUTTON_TYPES : [PLACE_TYPE];
 });
 /** The stats types and the chosen ecoregions, which the filter charts follow. */
 const statsFor = computed(
@@ -498,6 +515,7 @@ watch(
       listExtent.value,
       placesStore.ecoregionIds.join(','),
       photoMode.value,
+      placesStore.boundaryReview,
     ] as const,
   (next, previous) => {
     if (!showList.value && !searchingAll.value) return;
@@ -574,12 +592,68 @@ watch(
   }
 );
 
-/** Leaving Edit mode, or the admin role, turns the photo filter off. */
+/** Leaving Edit mode, or the admin role, turns the photo and review filters off. */
 watch(
   () => auth.isAdmin && auth.editMode,
   editing => {
-    if (!editing && placesStore.photoSuggestions)
-      placesStore.applyFilter(placesStore.sizeKept, undefined, false);
+    if (
+      !editing &&
+      (placesStore.photoSuggestions || placesStore.boundaryReview)
+    )
+      placesStore.applyFilter(placesStore.sizeKept, undefined, false, null);
+  }
+);
+
+/** Each card's boundary review, while the review filter is on. */
+const reviewNotes = ref<Record<string, BoundaryNote>>({});
+let notesRequest = 0;
+
+/**
+ * Read the boundary reviews of the listed places.
+ * @param ids - The places to read.
+ * @returns The reviews, or null when they could not be read or a newer read started.
+ */
+async function readNotes(ids: string[]) {
+  const request = ++notesRequest;
+  const result = await loadBoundaryNotes(ids);
+  if (request !== notesRequest || result.status !== 'ok') return null;
+  return result.notes;
+}
+
+/** The reviews of new cards. */
+watch(
+  () => (reviewMode.value ? shown.value.map(place => place.id) : null),
+  async ids => {
+    if (!ids) {
+      reviewNotes.value = {};
+      return;
+    }
+    const missing = ids.filter(id => !(id in reviewNotes.value));
+    if (!missing.length) return;
+    const notes = await readNotes(missing);
+    if (notes) reviewNotes.value = { ...reviewNotes.value, ...notes };
+  }
+);
+
+/**
+ * After a boundary is reviewed, read the reviews again. A place that left the
+ * chosen view leaves the list. An open place stays open.
+ */
+watch(
+  () => placesStore.adminListVersion,
+  async () => {
+    const view = placesStore.boundaryReview;
+    if (!view || !places.value.length) return;
+    const ids = places.value.map(place => place.id);
+    const notes = await readNotes(ids);
+    if (!notes) return;
+    reviewNotes.value = notes;
+    const kept = places.value.filter(place => {
+      const note = notes[place.id];
+      return note && reviewViewOf(note.qcStatus, note.eligibility) === view;
+    });
+    matchTotal.value -= places.value.length - kept.length;
+    places.value = kept;
   }
 );
 
@@ -647,6 +721,19 @@ function photoNote(id: string): string | null {
   return count ? `${count} suggested` : null;
 }
 
+/**
+ * A card's note while the review filter is on: its warnings and points, or
+ * the note on a boundary left out or needing fixing.
+ * @param id - The place.
+ * @returns The note, or null.
+ */
+function cardNoteOf(id: string): string | null {
+  const photos = photoNote(id);
+  if (photos) return photos;
+  const note = reviewMode.value ? reviewNotes.value[id] : undefined;
+  return note ? cardNote(note) || null : null;
+}
+
 /** Show or hide the recognition buttons. Less clears a selected one. */
 function toggleMore() {
   showMore.value = !showMore.value;
@@ -712,7 +799,7 @@ watch(
   <div class="places-frame" :class="{ 'has-detail': placesStore.selectedId }">
     <div
       class="places-bar places-results map-panel nw"
-      :class="{ 'has-results': anyType || photoMode }"
+      :class="{ 'has-results': anyType || adminFilterMode }"
     >
       <h2 class="places-title panel-heading">Places</h2>
       <div class="places-search">
@@ -822,10 +909,7 @@ watch(
       <AdminCorrectionList
         v-else-if="auth.isAdmin && placesStore.adminList === 'corrections'"
       />
-      <AdminBoundaryList
-        v-else-if="auth.isAdmin && placesStore.adminList === 'boundaries'"
-      />
-      <template v-if="anyType || searchingAll || photoMode">
+      <template v-if="anyType || searchingAll || adminFilterMode">
         <p v-if="showNames && listStatus === 'loading'" class="places-status">
           Loading places.
         </p>
@@ -883,7 +967,7 @@ watch(
                 "
                 :current="placesStore.selectedId === place.id"
                 :photo="mainPhotoOf(place.id)"
-                :note="photoNote(place.id)"
+                :note="cardNoteOf(place.id)"
                 :number="windowStart + index + 1"
                 @click="chooseResult(place)"
                 @highlight="on => placesStore.hoverPlace(place.id, on)"

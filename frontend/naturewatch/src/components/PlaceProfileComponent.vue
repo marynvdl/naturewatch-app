@@ -476,12 +476,12 @@ function onTabKey(event: KeyboardEvent, index: number) {
         <li v-if="placeStatus.withdrawn" class="place-flag is-withdrawn">
           {{
             placeStatus.withdrawalReason
-              ? `Withdrawn: ${placeStatus.withdrawalReason}`
-              : 'Withdrawn'
+              ? `Hidden: ${placeStatus.withdrawalReason}`
+              : 'Hidden'
           }}
         </li>
         <li v-if="placeStatus.attentionReason" class="place-flag">
-          Needs attention: {{ placeStatus.attentionReason }}
+          Follow-up: {{ placeStatus.attentionReason }}
         </li>
       </ul>
       <PlaceEditField

@@ -14,7 +14,7 @@
             boundary into boundary_checks, set qc_status, and set the first
             stats_eligibility. A boundary that is no longer current, or that
             already has findings from this CHECKER_VERSION, is skipped, so a
-            second start continues. An accepted qc_status is kept. Eligibility
+            second start continues. An accepted or rejected qc_status is kept. Eligibility
             set by a person is kept.
 
 The geometry is never checked in the database: place_overlaps() ran the hosted
@@ -142,29 +142,30 @@ select c.boundary_id, c.check_id, c.check_category, c.outcome, c.measured_value,
 from loaded_checks as c
 join loaded_status as s on s.boundary_id = c.boundary_id
 """
-# An accepted status stays. A boundary made eligible by a person stays as it is,
+# An accepted or rejected status stays: it is a person's verdict on the shape, and a
+# rejected boundary is never made eligible. A boundary made eligible by a person stays as it is,
 # unless it becomes flagged, which the eligibility CHECK refuses; then it goes
 # back to pending. Only a boundary never decided is made eligible here.
 UPDATE_STATUS = """
 update public.place_boundaries as b
-set qc_status = case when b.qc_status = 'accepted' then 'accepted' else s.qc_status end,
+set qc_status = case when b.qc_status in ('accepted', 'rejected') then b.qc_status else s.qc_status end,
   stats_eligibility = case
     when b.stats_eligibility = 'eligible' and b.qc_status <> 'accepted' and s.qc_status <> 'passed'
       then 'pending'
-    when b.stats_eligibility = 'pending' and b.stats_eligibility_set_at is null and s.eligible
+    when b.stats_eligibility = 'pending' and b.stats_eligibility_set_at is null and s.eligible and b.qc_status <> 'rejected'
       then 'eligible'
     else b.stats_eligibility
   end,
   stats_eligibility_reason = case
     when b.stats_eligibility = 'eligible' and b.qc_status <> 'accepted' and s.qc_status <> 'passed'
       then %(version)s || ': flagged, back to pending'
-    when b.stats_eligibility = 'pending' and b.stats_eligibility_set_at is null and s.eligible
+    when b.stats_eligibility = 'pending' and b.stats_eligibility_set_at is null and s.eligible and b.qc_status <> 'rejected'
       then s.reason
     else b.stats_eligibility_reason
   end,
   stats_eligibility_set_at = case
     when (b.stats_eligibility = 'eligible' and b.qc_status <> 'accepted' and s.qc_status <> 'passed')
-      or (b.stats_eligibility = 'pending' and b.stats_eligibility_set_at is null and s.eligible)
+      or (b.stats_eligibility = 'pending' and b.stats_eligibility_set_at is null and s.eligible and b.qc_status <> 'rejected')
       then now()
     else b.stats_eligibility_set_at
   end

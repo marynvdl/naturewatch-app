@@ -99,6 +99,8 @@ Why the database is designed as it is. The design itself is [design.md](design.m
 
 **Eligibility is not selection.** Eligibility says a boundary may be processed. A run's selection says which eligible boundaries that run did process. `stat_runs.selection` records the criteria. `stat_run_issues` records boundaries that failed or were skipped.
 
+**Since Shaping Boundaries task 03b**, `review_boundary` changes eligibility on purpose too, as an admin's verdict. Eligibility no longer implies being under the vertex cap: a correct heavy boundary is made eligible, and a run applies the cap from the latest `vertex_count` finding and records it in its `selection`.
+
 ## 9. One source model with explicit foreign keys
 
 **Decision.**
