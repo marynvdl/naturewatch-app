@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
-import MapboxDraw from '@mapbox/mapbox-gl-draw';
+import type MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import turfLength from '@turf/length';
 import turfArea from '@turf/area';
@@ -11,6 +11,7 @@ import turfDestination from '@turf/destination';
 import type { Polygon } from 'geojson';
 import { Eraser, Flag, Pentagon, Ruler, Trash2 } from '@lucide/vue';
 import CorrectionForm from '@/components/CorrectionForm.vue';
+import { isBoundaryEdit, mapDraw } from '@/places/mapDraw';
 import { catalog } from '@/catalog';
 import { correctableLayers, shapeProblem } from '@/corrections/form';
 import useBasemapStore from '@/store/BasemapStore';
@@ -19,6 +20,7 @@ import useAuthStore from '@/store/AuthStore';
 import useMapLayerStore from '@/store/MapLayerStore';
 import useTimelineStore from '@/store/TimelineStore';
 import useCorrectionsStore from '@/store/CorrectionsStore';
+import type * as mapboxgl from 'mapbox-gl';
 
 /** Using stores */
 const basemapStore = useBasemapStore();
@@ -200,22 +202,24 @@ const storedLabels = ref<
 >([]);
 
 onMounted(() => {
-  draw = new MapboxDraw({
-    displayControlsDefault: false,
-  });
-
-  map.value?.addControl(draw, 'bottom-right');
+  if (map.value) draw = mapDraw(map.value as mapboxgl.Map);
   map.value?.on('draw.actionable', syncMode);
   map.value?.on('draw.create', syncMode);
   map.value?.on('draw.delete', syncMode);
   map.value?.on('draw.modechange', syncMode);
+  // The boundary edit changes the mode without an event when it ends.
+  watch(() => measureStore.editingBoundary, syncMode);
 
   watch(
     () => measureStore.shouldDeleteAll,
     newValue => {
       if (newValue) {
-        // Function to delete all drawn objects
-        draw?.deleteAll();
+        // Delete every measurement, but not a boundary being edited.
+        draw?.delete(
+          (draw?.getAll().features ?? [])
+            .filter(feature => !isBoundaryEdit(feature))
+            .map(feature => String(feature.id))
+        );
 
         // Remove all measurement labels
         storedLabels.value.forEach(label => {
@@ -274,6 +278,8 @@ function formatDistance(distanceM: number): string {
 
 /** Label a finished line or polygon with its length or area. */
 function measure(event: any) {
+  // The boundary being edited shares the draw tool. It is not measured.
+  if (isBoundaryEdit(event.features[0])) return;
   if (correcting.value) {
     if (event.type === 'draw.create') startCorrection(event.features[0]);
     return;

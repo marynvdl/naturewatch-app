@@ -19,12 +19,8 @@ The admin work on boundaries. It follows [Molding Places](../archive/parcels/mol
 - **The queues are derived in views or RPCs, not stored** ([design.md §3](../database/design.md#3-status-fields)). They reuse the admin lists in the Places panel, like the Corrections list.
 - **`place_overlaps()` works on pieces.** It cuts shapes with `ST_Subdivide` before a screen calls it.
 - **The overlap queue's pairs come from a laptop script** (settled in task 04). `derive_overlaps.py` computes the overlapping conservation areas from the WDPCA file and loads the pairs above a chosen share as proposed `overlaps` links, as the `recognises` links were. No hosted query looks at all pairs.
-- **A replacement is a new version.** `submit_boundary` stores it as `proposed`, with `derived_from_boundary_id` when it is an edit. `approve_boundary` makes it current, and it starts `unchecked` and `pending`. Map editing uses the `@mapbox/mapbox-gl-draw` tool that corrections already use.
+- **A replacement is a new version.** `submit_boundary` stores it as `proposed`, with `derived_from_boundary_id` when it is an edit. `approve_boundary` makes it current, and it starts `unchecked` and `pending`. Map editing uses the `@mapbox/mapbox-gl-draw` tool that corrections already use, for a boundary of at most 5,000 points. A larger one is replaced by upload, not simplified (settled in task 06).
 - **The map lags the database.** A change to publication or to a boundary reaches the map only after a PMTiles rebuild in naturewatch-analysis. Rebuilds are started by hand, per batch of changes, after approval (settled in task 05). The step and its cost are in naturewatch-analysis `places/README.md`.
-
-## Open questions
-
-- How map editing handles a boundary with very many vertices. To settle in task 06.
 
 ## Deferred
 

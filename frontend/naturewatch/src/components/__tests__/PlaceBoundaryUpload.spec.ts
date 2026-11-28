@@ -5,6 +5,7 @@ import type { MultiPolygon } from 'geojson';
 import PlaceBoundaryUpload from '@/components/PlaceBoundaryUpload.vue';
 import {
   approveBoundary,
+  loadCurrentBoundary,
   loadProposedBoundary,
   readBoundaryFile,
   rejectBoundary,
@@ -19,6 +20,7 @@ vi.mock('@/places/replacementBoundary', async importOriginal => {
   return {
     ...actual,
     approveBoundary: vi.fn(),
+    loadCurrentBoundary: vi.fn(),
     loadProposedBoundary: vi.fn(),
     readBoundaryFile: vi.fn(),
     rejectBoundary: vi.fn(),
@@ -47,6 +49,7 @@ const PROPOSED: ProposedBoundary = {
   sourceUrl: 'https://example.test/park',
   submittedBy: 'someone',
   createdAt: '2026-11-28T10:00:00Z',
+  derivedFrom: null,
   shape: SHAPE,
 };
 
@@ -104,9 +107,9 @@ describe('PlaceBoundaryUpload', () => {
     vi.clearAllMocks();
   });
 
-  it('offers Replace boundary when nothing is proposed', async () => {
+  it('offers Replace boundary and Edit on map when nothing is proposed', async () => {
     const wrapper = await mountWith(null);
-    expect(labels(wrapper)).toEqual(['Replace boundary']);
+    expect(labels(wrapper)).toEqual(['Replace boundary', 'Edit on map']);
     expect(usePlacesStore().boundaryPreview).toBeNull();
   });
 
@@ -144,7 +147,8 @@ describe('PlaceBoundaryUpload', () => {
     expect(submitBoundary).toHaveBeenCalledWith(
       placeId,
       SHAPE,
-      'https://example.test'
+      'https://example.test',
+      null
     );
     expect(labels(wrapper)).toEqual(['Approve', 'Discard']);
   });
@@ -159,7 +163,7 @@ describe('PlaceBoundaryUpload', () => {
     const wrapper = await mountWith(null);
     await chooseFile(wrapper);
     await click(wrapper, 'Cancel');
-    expect(labels(wrapper)).toEqual(['Replace boundary']);
+    expect(labels(wrapper)).toEqual(['Replace boundary', 'Edit on map']);
     expect(usePlacesStore().boundaryPreview).toBeNull();
   });
 
@@ -173,7 +177,7 @@ describe('PlaceBoundaryUpload', () => {
     expect(wrapper.find('[role="alert"]').text()).toBe(
       'The file must hold a polygon or a multipolygon.'
     );
-    expect(labels(wrapper)).toEqual(['Replace boundary']);
+    expect(labels(wrapper)).toEqual(['Replace boundary', 'Edit on map']);
   });
 
   it('clears a refusal when a good file follows', async () => {
@@ -231,7 +235,7 @@ describe('PlaceBoundaryUpload', () => {
     await click(wrapper, 'Discard');
     expect(rejectBoundary).toHaveBeenCalledWith('b2');
     expect(wrapper.emitted('approved')).toBeUndefined();
-    expect(labels(wrapper)).toEqual(['Replace boundary']);
+    expect(labels(wrapper)).toEqual(['Replace boundary', 'Edit on map']);
   });
 
   it('shows a refusal from the database', async () => {
@@ -249,5 +253,114 @@ describe('PlaceBoundaryUpload', () => {
     const wrapper = await mountWith(PROPOSED);
     wrapper.unmount();
     expect(usePlacesStore().boundaryPreview).toBeNull();
+  });
+
+  describe('Edit on map', () => {
+    /** The edited shape, one point moved. */
+    const MOVED: MultiPolygon = {
+      type: 'MultiPolygon',
+      coordinates: [
+        [
+          [
+            [30, -20],
+            [30.2, -20],
+            [30.1, -19.9],
+            [30, -20],
+          ],
+        ],
+      ],
+    };
+
+    /**
+     * Open the edit on a boundary of at most 5,000 points.
+     * @param wrapper - The mounted upload.
+     */
+    async function openEdit(wrapper: Awaited<ReturnType<typeof mountWith>>) {
+      vi.mocked(loadCurrentBoundary).mockResolvedValue({
+        status: 'ok',
+        current: { boundaryId: 'b1', points: 4, shape: SHAPE },
+      });
+      await click(wrapper, 'Edit on map');
+      // The map's draw tool writes the shape back as it opens.
+      usePlacesStore().boundaryEdited = SHAPE;
+      await flushPromises();
+    }
+
+    it('opens the current boundary in the draw tool', async () => {
+      const wrapper = await mountWith(null);
+      await openEdit(wrapper);
+      const store = usePlacesStore();
+      expect(store.boundaryEdit).toEqual(SHAPE);
+      expect(store.boundaryPreview).toBeNull();
+      expect(wrapper.text()).toContain('Editing boundary');
+      expect(wrapper.text()).toContain('4 points.');
+      expect(labels(wrapper)).toEqual(['Delete point', 'Submit', 'Cancel']);
+      await click(wrapper, 'Delete point');
+      expect(store.boundaryEditTrash).toBe(1);
+    });
+
+    it('says to upload a boundary of more than 5,000 points', async () => {
+      vi.mocked(loadCurrentBoundary).mockResolvedValue({
+        status: 'ok',
+        current: { boundaryId: 'b1', points: 12345, shape: null },
+      });
+      const wrapper = await mountWith(null);
+      await click(wrapper, 'Edit on map');
+      expect(wrapper.text()).toContain(
+        'This boundary has 12,345 points. Edit on map takes at most 5,000. Use Replace boundary instead.'
+      );
+      expect(labels(wrapper)).toEqual(['Replace boundary', 'Edit on map']);
+      expect(usePlacesStore().boundaryEdit).toBeNull();
+    });
+
+    it('submits the edit with the boundary it came from', async () => {
+      vi.mocked(submitBoundary).mockResolvedValue(null);
+      const wrapper = await mountWith(null);
+      await openEdit(wrapper);
+      usePlacesStore().boundaryEdited = MOVED;
+      await flushPromises();
+      vi.mocked(loadProposedBoundary).mockResolvedValue({
+        status: 'ok',
+        proposed: { ...PROPOSED, derivedFrom: 'b1', submittedBy: null },
+      });
+      await click(wrapper, 'Submit');
+      expect(submitBoundary).toHaveBeenCalledWith(placeId, MOVED, null, 'b1');
+      expect(usePlacesStore().boundaryEdit).toBeNull();
+      expect(wrapper.text()).toContain('Edited 28 Nov 2026.');
+      expect(labels(wrapper)).toEqual(['Approve', 'Discard']);
+    });
+
+    it('keeps the edit open when the database refuses it', async () => {
+      vi.mocked(submitBoundary).mockResolvedValue(
+        'The shape is not valid: Self-intersection[30.1 -19.95]'
+      );
+      const wrapper = await mountWith(null);
+      await openEdit(wrapper);
+      await click(wrapper, 'Submit');
+      expect(wrapper.find('[role="alert"]').text()).toBe(
+        'The shape is not valid: Self-intersection[30.1 -19.95]'
+      );
+      expect(labels(wrapper)).toEqual(['Delete point', 'Submit', 'Cancel']);
+      expect(usePlacesStore().boundaryEdit).toEqual(SHAPE);
+    });
+
+    it('drops the edit on Cancel, on another place, and on close', async () => {
+      const wrapper = await mountWith(null);
+      await openEdit(wrapper);
+      await click(wrapper, 'Cancel');
+      expect(usePlacesStore().boundaryEdit).toBeNull();
+      expect(labels(wrapper)).toEqual(['Replace boundary', 'Edit on map']);
+
+      await openEdit(wrapper);
+      await wrapper.setProps({
+        placeId: '55555555-5555-5555-5555-555555555555',
+      });
+      await flushPromises();
+      expect(usePlacesStore().boundaryEdit).toBeNull();
+
+      await openEdit(wrapper);
+      wrapper.unmount();
+      expect(usePlacesStore().boundaryEdit).toBeNull();
+    });
   });
 });
