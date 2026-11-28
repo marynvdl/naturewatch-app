@@ -362,7 +362,7 @@ On 12 November 2026 that was 11,480 of 50,937 published places: 207, 1,087, 220,
 
 **Alternatives.**
 - Rebuilding the PMTiles after each withdrawal. Correct without a client filter, but slow and billable for each change.
-- A separate "calculate facts" switch per place. Stats eligibility per boundary is planned in [Shaping Boundaries](../parcels/shaping-boundaries.md) instead.
+- A separate "calculate facts" switch per place. Stats eligibility per boundary is planned in [Shaping Boundaries](../archive/parcels/shaping-boundaries.md) instead.
 - A fixed list of reasons, enforced by a CHECK. Consistent, but every new reason would need a migration. Agreed first, then changed by the user on 16 November 2026 during evaluation.
 - Deriving "needs attention" only from checks, as design.md §3 first said. That still comes, beside the manual flag.
 

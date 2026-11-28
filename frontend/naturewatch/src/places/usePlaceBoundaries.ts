@@ -886,8 +886,8 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
    * @param event - The click or the end of the tap.
    */
   function choosePlace(event: mapboxgl.MapMouseEvent | mapboxgl.MapTouchEvent) {
-    // A click while measuring places a point. It does not choose a place.
-    if (measureStore.drawing) return;
+    // A click while measuring or editing places a point. It does not choose a place.
+    if (measureStore.busy) return;
     // An ecoregion lies under the parks drawn inside it. A click on a park opens the park.
     if (event.features?.[0]?.layer?.id === ECOREGION_FILL && drawnAbove(event))
       return;
@@ -973,7 +973,7 @@ export function usePlaceBoundaries(getMap: () => PlaceMap | null): {
     )
       return;
     hideTip();
-    if (measureStore.drawing) return;
+    if (measureStore.busy) return;
     tipPoint = point;
     tipTimer = setTimeout(async () => {
       tipTimer = null;

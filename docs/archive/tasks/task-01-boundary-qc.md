@@ -1,6 +1,6 @@
 # Task 01 — Boundary QC and Stats eligibility
 
-Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
 
 Repository: naturewatch-app. Start from `develop`. The parcel was defined in #470.
 

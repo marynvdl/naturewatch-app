@@ -1,6 +1,6 @@
 # Task 03 — Polygon review queue
 
-Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 02 merged in #473.
 

@@ -36,6 +36,7 @@ import usePlacesStore from '@/store/PlacesStore';
 import { usePlaceBoundaries } from '@/places/usePlaceBoundaries';
 import { useCorrectionOutlines } from '@/corrections/outlines';
 import { useBoundaryPreview } from '@/places/boundaryPreview';
+import { useBoundaryEdit } from '@/places/boundaryEdit';
 import { togglesWithLabels } from '@/components/mapLabels';
 import useDrawerStore from '@/store/DrawerStore';
 import SideButtonsComponent from '@/components/SideButtonsComponent.vue';
@@ -104,6 +105,7 @@ const { zoomToSelectedPlace, followPanels, flyToBox } = usePlaceBoundaries(
 );
 useCorrectionOutlines(map as Ref<mapboxgl.Map | null>, flyToBox);
 useBoundaryPreview(map as Ref<mapboxgl.Map | null>, flyToBox);
+useBoundaryEdit(map as Ref<mapboxgl.Map | null>, flyToBox);
 
 /** Rendered profile width. The closed Places circle parks beside it. */
 const profileWidth = ref(0);

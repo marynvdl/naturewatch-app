@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import type { BoundaryReviewView } from '@/places/boundaryReview';
 import type { OverlapReviewView } from '@/places/overlapReview';
 import type { MultiPolygon } from 'geojson';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 import {
   loadKeptPlaceIds,
   loadPlaceRelease,
@@ -425,6 +425,15 @@ const usePlacesStore = defineStore('places', () => {
    * outlines. Null while there is none.
    */
   const boundaryPreview = ref<MultiPolygon | null>(null);
+  /**
+   * The boundary to edit on the map, set to start an edit and null to end it.
+   * The map's draw tool writes each change to `boundaryEdited`.
+   */
+  const boundaryEdit = shallowRef<MultiPolygon | null>(null);
+  /** The boundary as edited so far, or null when no edit is open. */
+  const boundaryEdited = shallowRef<MultiPolygon | null>(null);
+  /** Raised to delete the points selected in the edit. */
+  const boundaryEditTrash = ref(0);
   /** The places list's cards while the photo filter is on, in order. */
   const photoListIds = ref<string[]>([]);
   /** Where the place opened from that list was, so Next place still works once it leaves. */
@@ -524,6 +533,9 @@ const usePlacesStore = defineStore('places', () => {
     adminList,
     adminListVersion,
     boundaryPreview,
+    boundaryEdit,
+    boundaryEdited,
+    boundaryEditTrash,
     openFromAdminList,
     openForLinkReview,
     photoListIds,

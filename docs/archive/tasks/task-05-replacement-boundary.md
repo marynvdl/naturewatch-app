@@ -1,6 +1,6 @@
 # Task 05 — Upload a replacement boundary
 
-Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
 
 Repositories: naturewatch-app and naturewatch-analysis. Start from `develop` here and from `main` there. Task 04 merged in #482.
 

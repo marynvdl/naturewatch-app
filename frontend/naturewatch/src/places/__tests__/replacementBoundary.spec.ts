@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOUNDARY_FILE_MAX_BYTES,
+  checkEditedShape,
   parseBoundary,
   readBoundaryFile,
 } from '@/places/replacementBoundary';
@@ -164,5 +165,31 @@ describe('readBoundaryFile', () => {
     } as unknown as File;
     const result = await readBoundaryFile(file);
     expect(result.ok && result.points).toBe(5);
+  });
+});
+
+describe('checkEditedShape', () => {
+  it('takes an edited Polygon or MultiPolygon', () => {
+    const polygon = checkEditedShape({ type: 'Polygon', coordinates: [RING] });
+    const multi = checkEditedShape({
+      type: 'MultiPolygon',
+      coordinates: [[RING]],
+    });
+    expect(polygon.ok && polygon.points).toBe(5);
+    expect(multi.ok && multi.shape).toEqual({
+      type: 'MultiPolygon',
+      coordinates: [[RING]],
+    });
+  });
+
+  it('refuses a ring of fewer than four points, as an upload', () => {
+    const result = checkEditedShape({
+      type: 'Polygon',
+      coordinates: [RING.slice(0, 3)],
+    });
+    expect(result).toEqual({
+      ok: false,
+      message: 'Each ring of the shape needs at least four points.',
+    });
   });
 });

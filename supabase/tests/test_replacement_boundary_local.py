@@ -1,5 +1,6 @@
-"""submit_boundary, approve_boundary, reject_boundary, proposed_boundary, their audit
-rows, and check_boundaries.py measure --unchecked, against the local database.
+"""submit_boundary, approve_boundary, reject_boundary, proposed_boundary,
+current_boundary_shape, their audit rows, and check_boundaries.py measure --unchecked,
+against the local database.
 
 Each test runs in one transaction that is rolled back. Skipped when the local
 database is not running.
@@ -42,10 +43,10 @@ class ReplacementBoundaryLocalTest(unittest.TestCase):
         self.errors = psycopg.errors
         self.conn = connect()
         if self.conn.execute(
-            "select to_regprocedure('public.submit_boundary(uuid, jsonb, text)') as f"
+            "select to_regprocedure('public.submit_boundary(uuid, jsonb, text, uuid)') as f"
         ).fetchone()["f"] is None:
             self.conn.close()
-            self.skipTest("the replacement boundary migration is not applied")
+            self.skipTest("the edit boundary migration is not applied")
         self.release = self.conn.execute(
             "select id from public.source_releases where source_id = 'wdpca'"
         ).fetchone()["id"]
@@ -109,10 +110,11 @@ class ReplacementBoundaryLocalTest(unittest.TestCase):
         self.conn.execute("rollback to savepoint s")
         self.conn.execute("reset role")
 
-    def submit(self, shape=SQUARE, place_id: str | None = None, source_url=None, user_id="admin") -> str:
+    def submit(self, shape=SQUARE, place_id: str | None = None, source_url=None, user_id="admin",
+               derived_from: str | None = None) -> str:
         return self.call(
-            "select public.submit_boundary(%s, %s::jsonb, %s)::text as id",
-            (place_id or self.place_id, json.dumps(shape), source_url),
+            "select public.submit_boundary(%s, %s::jsonb, %s, %s)::text as id",
+            (place_id or self.place_id, json.dumps(shape), source_url, derived_from),
             user_id,
         )[0]["id"]
 
@@ -281,6 +283,75 @@ class ReplacementBoundaryLocalTest(unittest.TestCase):
     def test_imported_inserts_are_not_audited(self):
         _, imported = self.place("Zqx Upload Imported")
         self.assertEqual(self.audit(imported), [])
+
+    # --- editing on the map ---
+
+    def shape_of(self, place_id: str, user_id="admin") -> list[dict]:
+        return self.call(
+            "select boundary_id::text as id, version_number, points, shape "
+            "from public.current_boundary_shape(%s)",
+            (place_id,),
+            user_id,
+        )
+
+    def test_current_boundary_shape_for_an_admin(self):
+        rows = self.shape_of(self.place_id)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0]["id"], rows[0]["version_number"], rows[0]["points"]), (self.old, 1, 5))
+        self.assertEqual(rows[0]["shape"]["type"], "MultiPolygon")
+        no_current, _ = self.place("Zqx Upload Gone", current=False)
+        self.assertEqual(self.shape_of(no_current), [])
+
+    def test_current_boundary_shape_stops_at_5000_points(self):
+        def ring(n: int) -> str:
+            # n points: n - 2 along the bottom edge, one corner, and the closing point.
+            edge = ", ".join(f"{30 + i * 0.2 / (n - 2):.9f} -20" for i in range(n - 2))
+            return f"MULTIPOLYGON((({edge}, 30.1 -19.8, 30 -20)))"
+
+        for n, has_shape in ((5000, True), (5001, False)):
+            place_id = self.conn.execute(
+                "insert into public.places (name, place_type_id, publication_status) "
+                "values (%s, 'conservation_area', 'published') returning id::text as id",
+                (f"Zqx Edit {n}",),
+            ).fetchone()["id"]
+            self.conn.execute(
+                """
+                insert into public.place_boundaries (
+                  place_id, version_number, geom, source_id, source_release_id, review_status, is_current
+                ) values (%s, 1, extensions.ST_GeomFromText(%s, 4326), 'wdpca', %s, 'approved', true)
+                """,
+                (place_id, ring(n), self.release),
+            )
+            row = self.shape_of(place_id)[0]
+            self.assertEqual(row["points"], n)
+            self.assertEqual(row["shape"] is not None, has_shape)
+
+    def test_current_boundary_shape_is_admin_only(self):
+        self.raises(self.errors.InsufficientPrivilege, lambda: self.shape_of(self.place_id, self.other))
+        self.raises(self.errors.InsufficientPrivilege, lambda: self.shape_of(self.place_id, None))
+
+    def test_an_edit_records_its_boundary(self):
+        new = self.submit(derived_from=self.old)
+        derived = self.conn.execute(
+            "select derived_from_boundary_id::text as id from public.place_boundaries where id = %s", (new,)
+        ).fetchone()["id"]
+        self.assertEqual(derived, self.old)
+        rows = self.call(
+            "select derived_from_boundary_id::text as id from public.proposed_boundary(%s)", (self.place_id,)
+        )
+        self.assertEqual(rows[0]["id"], self.old)
+        plain = self.submit(place_id=self.place("Zqx Upload Plain")[0])
+        self.assertIsNone(self.conn.execute(
+            "select derived_from_boundary_id from public.place_boundaries where id = %s", (plain,)
+        ).fetchone()["derived_from_boundary_id"])
+
+    def test_an_edit_must_start_from_the_current_boundary(self):
+        _, other_boundary = self.place("Zqx Upload Other")
+        self.raises(self.errors.InvalidParameterValue, lambda: self.submit(derived_from=other_boundary))
+        self.raises(self.errors.InvalidParameterValue, lambda: self.submit(derived_from=str(uuid.uuid4())))
+        self.approve(self.submit())
+        # The first boundary is superseded now.
+        self.raises(self.errors.InvalidParameterValue, lambda: self.submit(derived_from=self.old))
 
     # --- QC of unchecked boundaries ---
 

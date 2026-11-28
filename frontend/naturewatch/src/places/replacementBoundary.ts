@@ -1,16 +1,19 @@
 import turfArea from '@turf/area';
-import type { Geometry, MultiPolygon, Position } from 'geojson';
+import type { Geometry, MultiPolygon, Polygon, Position } from 'geojson';
 import { placesClient } from '@/places/api';
 
 /**
- * A replacement boundary: a GeoJSON file read in the browser, stored as a
- * proposed version through `submit_boundary`, then approved or discarded.
+ * A replacement boundary: a GeoJSON file read in the browser, or the current
+ * boundary edited on the map, stored as a proposed version through
+ * `submit_boundary`, then approved or discarded.
  */
 
 /** The largest file read. */
 export const BOUNDARY_FILE_MAX_BYTES = 10 * 1024 * 1024;
 /** The most points a shape can have, as `submit_boundary` allows. */
 export const BOUNDARY_POINTS_MAX = 100_000;
+/** The most points a boundary can have to be edited on the map. */
+export const EDIT_POINTS_MAX = 5000;
 
 /** A shape read from a file, ready to submit. */
 export interface BoundaryShape {
@@ -31,8 +34,23 @@ export interface ProposedBoundary {
   sourceUrl: string | null;
   submittedBy: string | null;
   createdAt: string;
+  /** The boundary it was edited from on the map, or null for an upload. */
+  derivedFrom: string | null;
   shape: MultiPolygon;
 }
+
+/** A place's current boundary, with its shape when it can be edited. */
+export interface CurrentBoundary {
+  boundaryId: string;
+  points: number;
+  /** Null when it has more than `EDIT_POINTS_MAX` points. */
+  shape: MultiPolygon | null;
+}
+
+export type CurrentBoundaryResult =
+  | { status: 'ok'; current: CurrentBoundary | null }
+  | { status: 'unconfigured' }
+  | { status: 'error' };
 
 export type ProposedBoundaryResult =
   | { status: 'ok'; proposed: ProposedBoundary | null }
@@ -107,6 +125,17 @@ export function parseBoundary(text: string): BoundaryFileResult {
   if (polygons.length === 0)
     return { ok: false, message: 'The shape is empty.' };
 
+  return checkPolygons(polygons);
+}
+
+/**
+ * Check a shape's polygons and make them one MultiPolygon, without heights.
+ * @param polygons - Each polygon's rings.
+ * @returns The shape with its point count and area, or why it was refused.
+ */
+function checkPolygons(polygons: Position[][][]): BoundaryFileResult {
+  if (polygons.length === 0)
+    return { ok: false, message: 'The shape is empty.' };
   let points = 0;
   const coordinates: Position[][][] = [];
   for (const polygon of polygons) {
@@ -146,6 +175,19 @@ export function parseBoundary(text: string): BoundaryFileResult {
 }
 
 /**
+ * Check a shape edited on the map, as an uploaded one is checked.
+ * @param shape - The edited Polygon or MultiPolygon.
+ * @returns The shape with its point count and area, or why it was refused.
+ */
+export function checkEditedShape(
+  shape: Polygon | MultiPolygon
+): BoundaryFileResult {
+  return checkPolygons(
+    shape.type === 'Polygon' ? [shape.coordinates] : shape.coordinates
+  );
+}
+
+/**
  * Read a boundary from a GeoJSON file.
  * @param file - The chosen file.
  * @returns The shape, or why it was refused.
@@ -169,12 +211,14 @@ export async function readBoundaryFile(
  * @param placeId - `places.id`.
  * @param shape - The shape.
  * @param sourceUrl - Where it comes from, or null.
+ * @param derivedFrom - The current boundary it was edited from, or null for an upload.
  * @returns Null when it was stored, or why it was not.
  */
 export async function submitBoundary(
   placeId: string,
   shape: MultiPolygon,
-  sourceUrl: string | null
+  sourceUrl: string | null,
+  derivedFrom: string | null = null
 ): Promise<string | null> {
   const supabase = placesClient();
   if (!supabase) return 'The database is not configured.';
@@ -182,6 +226,7 @@ export async function submitBoundary(
     p_place_id: placeId,
     p_geojson: shape,
     p_source_url: sourceUrl,
+    p_derived_from_boundary_id: derivedFrom,
   });
   return error ? error.message : null;
 }
@@ -245,7 +290,35 @@ export async function loadProposedBoundary(
       sourceUrl: row.source_url,
       submittedBy: row.submitted_by,
       createdAt: row.created_at,
+      derivedFrom: row.derived_from_boundary_id ?? null,
       shape: row.shape as Geometry as MultiPolygon,
+    },
+  };
+}
+
+/**
+ * Read a place's current boundary, with its shape when it has at most
+ * `EDIT_POINTS_MAX` points. Admins only.
+ * @param placeId - `places.id`.
+ * @returns The current boundary, null when there is none, or why it could not be read.
+ */
+export async function loadCurrentBoundary(
+  placeId: string
+): Promise<CurrentBoundaryResult> {
+  const supabase = placesClient();
+  if (!supabase) return { status: 'unconfigured' };
+  const { data, error } = await supabase.rpc('current_boundary_shape', {
+    p_place_id: placeId,
+  });
+  if (error || !Array.isArray(data)) return { status: 'error' };
+  const row = data[0];
+  if (!row) return { status: 'ok', current: null };
+  return {
+    status: 'ok',
+    current: {
+      boundaryId: row.boundary_id,
+      points: row.points,
+      shape: (row.shape as MultiPolygon | null) ?? null,
     },
   };
 }

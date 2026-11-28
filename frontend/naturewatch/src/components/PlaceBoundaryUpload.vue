@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { formatAreaTag } from '@/places/display';
 import {
   approveBoundary,
+  checkEditedShape,
+  EDIT_POINTS_MAX,
+  loadCurrentBoundary,
   loadProposedBoundary,
   readBoundaryFile,
   rejectBoundary,
@@ -16,7 +19,8 @@ import usePlacesStore from '@/store/PlacesStore';
 
 /**
  * The end of the Boundary section, in Edit mode: Replace boundary takes a
- * GeoJSON file, which the map outlines, and Submit stores it as a proposed
+ * GeoJSON file, which the map outlines, and Edit on map opens the current
+ * boundary in the map's draw tool. Submit stores either as a proposed
  * version. A proposed version shows with Approve and Discard.
  */
 const props = defineProps<{
@@ -41,17 +45,28 @@ const busy = ref(false);
 const error = ref('');
 const approved = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
+/** The current boundary being edited on the map, or null. */
+const editing = ref<{ boundaryId: string } | null>(null);
+/** Why Edit on map did not open. */
+const editNote = ref('');
 let request = 0;
 
-/** The shape the map outlines. */
-const shown = computed(
-  () => picked.value?.shape ?? proposed.value?.shape ?? null
+/** The edited shape, checked, with its size. */
+const edited = computed(() => {
+  const shape = placesStore.boundaryEdited;
+  return editing.value && shape ? checkEditedShape(shape) : null;
+});
+
+/** The shape the map outlines. The draw tool shows the edited one. */
+const shown = computed(() =>
+  editing.value ? null : (picked.value?.shape ?? proposed.value?.shape ?? null)
 );
 watch(shown, shape => {
   placesStore.boundaryPreview = shape;
 });
 onBeforeUnmount(() => {
   placesStore.boundaryPreview = null;
+  placesStore.boundaryEdit = null;
 });
 
 /**
@@ -77,7 +92,7 @@ const uploadedText = computed(() => {
     : current.submittedBy === auth.session?.user.id
       ? ', by you'
       : ', by another admin';
-  return `Uploaded ${day}${who}.`;
+  return `${current.derivedFrom ? 'Edited' : 'Uploaded'} ${day}${who}.`;
 });
 
 /** Read the place's proposed boundary. */
@@ -106,6 +121,8 @@ watch(
     sourceUrl.value = '';
     error.value = '';
     approved.value = false;
+    editNote.value = '';
+    endEdit();
     void load();
   },
   { immediate: true }
@@ -114,6 +131,7 @@ watch(
 /** Open the file picker. */
 function choose() {
   error.value = '';
+  editNote.value = '';
   fileInput.value?.click();
 }
 
@@ -137,28 +155,80 @@ async function onFile(event: Event) {
   approved.value = false;
 }
 
-/** Drop the chosen file. */
+/** Open the current boundary in the map's draw tool. */
+async function startEdit() {
+  error.value = '';
+  editNote.value = '';
+  busy.value = true;
+  const place = props.placeId;
+  const result = await loadCurrentBoundary(place);
+  busy.value = false;
+  if (place !== props.placeId) return;
+  if (result.status !== 'ok') {
+    error.value = 'The boundary could not be read.';
+    return;
+  }
+  const current = result.current;
+  if (!current) {
+    error.value = 'This place has no current boundary.';
+    return;
+  }
+  if (!current.shape) {
+    editNote.value = `This boundary has ${current.points.toLocaleString('en-GB')} points. Edit on map takes at most ${EDIT_POINTS_MAX.toLocaleString('en-GB')}. Use Replace boundary instead.`;
+    return;
+  }
+  approved.value = false;
+  editing.value = { boundaryId: current.boundaryId };
+  placesStore.boundaryEdit = current.shape;
+}
+
+/** Close the draw tool, dropping the changes. */
+function endEdit() {
+  editing.value = null;
+  placesStore.boundaryEdit = null;
+}
+
+/** Delete the points selected in the draw tool. */
+function deletePoints() {
+  placesStore.boundaryEditTrash += 1;
+}
+
+/** Drop the chosen file or the edit. */
 function cancel() {
+  endEdit();
   picked.value = null;
   sourceUrl.value = '';
   error.value = '';
 }
 
-/** Store the chosen shape as the proposed boundary. */
+/** Store the chosen or edited shape as the proposed boundary. */
 async function submit() {
-  if (!picked.value) return;
+  const edit = editing.value;
+  let shape = picked.value?.shape ?? null;
+  if (edit) {
+    const result = edited.value;
+    if (!result) return;
+    if (!result.ok) {
+      error.value = result.message;
+      return;
+    }
+    shape = result.shape;
+  }
+  if (!shape) return;
   busy.value = true;
   error.value = '';
   const message = await submitBoundary(
     props.placeId,
-    picked.value.shape,
-    sourceUrl.value.trim() || null
+    shape,
+    sourceUrl.value.trim() || null,
+    edit?.boundaryId ?? null
   );
   if (message) {
     busy.value = false;
     error.value = message;
     return;
   }
+  endEdit();
   picked.value = null;
   sourceUrl.value = '';
   await load();
@@ -194,8 +264,14 @@ async function decide(decision: 'approve' | 'discard') {
 
 <template>
   <div v-if="state === 'ok' || state === 'error'" class="boundary-upload">
-    <p v-if="proposed || picked" class="upload-heading">
-      {{ proposed ? 'Proposed boundary' : 'New boundary' }}
+    <p v-if="proposed || picked || editing" class="upload-heading">
+      {{
+        proposed
+          ? 'Proposed boundary'
+          : editing
+            ? 'Editing boundary'
+            : 'New boundary'
+      }}
     </p>
     <p v-if="state === 'error'" class="upload-error" role="alert">
       The proposed boundary could not be read.
@@ -235,8 +311,15 @@ async function decide(decision: 'approve' | 'discard') {
         </Button>
       </div>
     </template>
-    <template v-else-if="picked">
-      <p class="upload-help">
+    <template v-else-if="picked || editing">
+      <p v-if="editing" class="upload-help">
+        Drag a point to move it, or a midpoint to add one. Select points and
+        choose Delete point, or press Delete, to remove them.
+      </p>
+      <p v-if="editing && edited?.ok" class="upload-help">
+        {{ sizeText(edited.areaKm2, edited.points) }}.
+      </p>
+      <p v-else-if="picked" class="upload-help">
         {{ sizeText(picked.areaKm2, picked.points) }}, outlined on the map.
       </p>
       <label class="upload-field" :for="`${uid}-source`">
@@ -252,6 +335,16 @@ async function decide(decision: 'approve' | 'discard') {
       </label>
       <p v-if="error" class="upload-error" role="alert">{{ error }}</p>
       <div class="upload-actions">
+        <Button
+          v-if="editing"
+          type="button"
+          size="sm"
+          variant="outline"
+          :disabled="busy"
+          @click="deletePoints"
+        >
+          Delete point
+        </Button>
         <Button type="button" size="sm" :disabled="busy" @click="submit">
           Submit
         </Button>
@@ -273,10 +366,20 @@ async function decide(decision: 'approve' | 'discard') {
       <p v-else class="upload-help">
         A GeoJSON polygon in longitude and latitude, of at most 100,000 points.
       </p>
+      <p v-if="editNote" class="upload-help">{{ editNote }}</p>
       <p v-if="error" class="upload-error" role="alert">{{ error }}</p>
       <div class="upload-actions">
         <Button type="button" size="sm" variant="outline" @click="choose">
           Replace boundary
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          :disabled="busy"
+          @click="startEdit"
+        >
+          Edit on map
         </Button>
       </div>
     </template>

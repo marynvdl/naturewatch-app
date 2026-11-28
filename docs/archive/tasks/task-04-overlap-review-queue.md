@@ -1,6 +1,6 @@
 # Task 04 — Overlap review queue
 
-Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
 
 Repository: naturewatch-app. Start from `develop`. Task 03b merged in #480.
 
