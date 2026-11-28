@@ -1,12 +1,14 @@
 # Task 05 — Upload a replacement boundary
 
-Parcel: [Shaping Boundaries](../parcels/shaping-boundaries.md).
+Parcel: [Shaping Boundaries](../../parcels/shaping-boundaries.md).
 
 Repositories: naturewatch-app and naturewatch-analysis. Start from `develop` here and from `main` there. Task 04 merged in #482.
 
 ## Goal
 
 An admin, in edit mode, uploads a GeoJSON file on a place's Status tab. The shape is drawn on the map from the file. **Submit** stores it through `submit_boundary` as a proposed version. The Status tab then shows the proposed version with **Approve** and **Discard**. `approve_boundary` makes it current, with `submitted_by` and `reviewed_by` recorded. The new boundary starts `unchecked` and `pending`, and gets QC from `check_boundaries.py` on a laptop. naturewatch-analysis gets one step for rebuilding the places archives after admin changes, with its cost. This settles the parcel's open question on how rebuilds start.
+
+Done on 28 November 2026. The migration was applied to the local database with psql and to hosted after the user approved it. The browser check ran against the local stack on an ecoregion, Malpelo Island xeric scrub, whose original boundary was restored afterwards. It found that a refused file's message stayed after a good file was chosen, so choosing a file now clears it. `check_boundaries.py measure --unchecked` and `load --unchecked` checked the approved upload on the local database. The analysis side is naturewatch-analysis #46.
 
 ## Facts already stored
 

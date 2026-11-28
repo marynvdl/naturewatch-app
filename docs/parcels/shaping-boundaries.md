@@ -45,7 +45,7 @@ Do one task at a time, in this order. Start a task only after the one above it h
   - *Goal:* Plain words for the review: one verdict per boundary, Hide from map and Flag for follow-up for the place, a Stats line, and the review list as a filter on the places list. Run the tests and a browser check.
 - [x] [Task 04 — Overlap review queue](../archive/tasks/task-04-overlap-review-queue.md) — naturewatch-app
   - *Goal:* An admin list of overlapping pairs and of the `recognises` links left `proposed`. For each pair, the admin decides the relationship, publication, and Stats eligibility through `review_overlap`. Run the tests and a browser check.
-- [ ] [Task 05 — Upload a replacement boundary](../tasks/task-05-replacement-boundary.md) — naturewatch-app and naturewatch-analysis
+- [x] [Task 05 — Upload a replacement boundary](../archive/tasks/task-05-replacement-boundary.md) — naturewatch-app and naturewatch-analysis
   - *Goal:* `submit_boundary` takes a GeoJSON upload, and `approve_boundary` makes it current, with `submitted_by` and `reviewed_by`. The new boundary gets QC. Add the PMTiles rebuild step and its cost.
 - [ ] Task 06 — Edit a boundary on the map — naturewatch-app
   - *Goal:* In edit mode, an admin edits the vertices of a current boundary with mapbox-gl-draw and saves it as a proposed version through `submit_boundary`. Run the tests and a browser check.
